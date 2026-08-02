@@ -1,0 +1,4199 @@
+{
+ "total": 706,
+ "items": [
+  {
+   "id": "8hrew1eXN682WDa0rJn1",
+   "modifiedDate": "2025-12-17T15:45:29.667132+00:00",
+   "brand": "realme",
+   "brand_key": "ee78cd6c-4411-32ad-9617-9e44dfc77ba9",
+   "displayName": "realme 14 Pro 5G",
+   "name": "realme 14 Pro 5G",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "realme 14 Pro 5G",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/OwXEgAwH31Gle91jO_2Y6J5sinWVx6w_M1DTrz2upkpG_kOtb1QvvKeqqxWg_Os62DdSwA1rhcm73g",
+    "main": "https://lh3.googleusercontent.com/OwXEgAwH31Gle91jO_2Y6J5sinWVx6w_M1DTrz2upkpG_kOtb1QvvKeqqxWg_Os62DdSwA1rhcm73g",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "The realme 14 Pro 5G is the first smartphone in the world to feature color-changing technology that is sensitive to temperature, drawing inspiration from the elegance of mother-of-pearl, and was developed in partnership with the acclaimed design studio Valeur Designers. Along with its eye-catching design, this smartphone is equipped with the advanced Dimensity 7300 Energy 5G chipset, providing incredibly fast processing speeds and effortless multitasking capabilities. Its sophisticated cooling system ensures the device stays cool even during demanding gaming sessions, eliminating any lag or throttling issues.",
+   "models": "RMX5057, RMX5056",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "Europe"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.realme.com/global/legal/AndroidSecurityAdvisories",
+   "telephoneNumber": "",
+   "hardwareFeatures": {
+    "flash": "128GB",
+    "formFactor": "Phone",
+    "ram": "8.0GB",
+    "display": "6.8-inch",
+    "aerOsValidation": [
+     "15.0",
+     "16.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "5860 mAh (rated)/6000 mAh (typical)",
+    "frontCamera": "16MP",
+    "rearCamera": "50MP+2MP",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "4*2.0GHZ + 4 *2.5GZH"
+   },
+   "createDate": "2025-01-19T04:09:07+00:00",
+   "publishDate": "2025-12-17T15:45:29.667123+00:00",
+   "smrDate": "2031-03-30T16:00:00+00:00",
+   "aerDate": "2025-01-31",
+   "rsDate": "2031-03-30T16:00:00+00:00",
+   "esmrDate": "2031-03-30T16:00:00+00:00",
+   "smrUpdateFrequency": "quarterly",
+   "osVersionSupported": "Android15",
+   "certifications": [],
+   "smrUrl": "https://www.realme.com/global/legal/AndroidSecurityAdvisories",
+   "osSupportUrl": "https://www.realme.com/global/legal/AndroidSecurityAdvisories",
+   "isArchived": false,
+   "search_name": "realme 14 pro 5g",
+   "sort_name": "realme 14 pro 5g",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "Europe"
+   ],
+   "manufacturer_facet": "realme",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Quarterly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 15",
+    "Android 16"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 8.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "realme",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "europe"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "quarterly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_15",
+    "android_16"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_8_0gb_"
+  },
+  {
+   "id": "G6yZxmWouvm3gZeVT9OO",
+   "modifiedDate": "2025-11-13T15:56:17.979629+00:00",
+   "brand": "Oppo",
+   "brand_key": "139cc0c1-832b-3506-bc02-f7e97420f908",
+   "displayName": "OPPO Find X9 Pro",
+   "name": "Find X9 Pro",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "OPPO Find X9 Pro",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/Owsd4AmiAKQLntRiZ85uvjPpNSUFz8hM8y5q8GOJxxzL9-M-N8JSYwODghw3dR6ndTD8a2dzt0Sp2A",
+    "main": "https://lh3.googleusercontent.com/Owsd4AmiAKQLntRiZ85uvjPpNSUFz8hM8y5q8GOJxxzL9-M-N8JSYwODghw3dR6ndTD8a2dzt0Sp2A",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "“It,s shines with superb experiences, thin and light design, and excellent entertainment credentials. Its Ultra-Clear Portrait Camera System turns it into a creative powerhouse and the long-lasting, fast-charging battery cements It’s winning balance of style and substance.”",
+   "models": "CPH2791, PLG110",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.oppo.com/en/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "256GB",
+    "formFactor": "Phone",
+    "ram": "12.0GB,16.0GB",
+    "display": "6.8-inch",
+    "aerOsValidation": [
+     "16.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "7290mAh/7500mAh(Rated/Type) Rechargeable Li-ion Polymer Battery",
+    "frontCamera": "50M",
+    "rearCamera": "50M+50M+200M+2M",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "1*Travis @4.21Ghz 3*Alto@3.5Ghz  4*Gelas@2.7Ghz"
+   },
+   "createDate": "2025-11-06T04:10:24.375226+00:00",
+   "publishDate": "2025-11-13T15:56:17.979618+00:00",
+   "smrDate": "2031-10-30T16:00:00+00:00",
+   "aerDate": "2025-09-30",
+   "rsDate": "2031-10-30T16:00:00+00:00",
+   "esmrDate": "2031-10-30T16:00:00+00:00",
+   "smrUpdateFrequency": "dataNotProvided",
+   "osVersionSupported": "dataNotProvided",
+   "certifications": [],
+   "smrUrl": "https://security.oppo.com/en/mend",
+   "osSupportUrl": null,
+   "isArchived": false,
+   "search_name": "oppo find x9 pro",
+   "sort_name": "oppo find x9 pro",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "manufacturer_facet": "Oppo",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Data not provided",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 16"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": "12.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "oppo",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "data_not_provided",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_16"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "__12_0gb_"
+  },
+  {
+   "id": "VT0D3BwtuITmJs6dCfFd",
+   "modifiedDate": "2024-03-25T08:50:09+00:00",
+   "brand": "Oppo",
+   "brand_key": "1005dd8b-e4cd-36f9-9f96-ee898fbde73a",
+   "displayName": "OPPO Find N2 Flip",
+   "name": "Find N2 Flip",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "OPPO Find N2 Flip",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/kdZNGdpaXv3dHstoNZqegiX4T0yplegP6sgWJASfjonw5_diOUDYFCU135On9DuY_dO9eIuhd7xcOQ",
+    "main": "https://lh3.googleusercontent.com/kdZNGdpaXv3dHstoNZqegiX4T0yplegP6sgWJASfjonw5_diOUDYFCU135On9DuY_dO9eIuhd7xcOQ",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Discover the tech-savvy, style statement phone that lets you see more in a snap. The larger cover screen expands your view with innovative features, whilst the foldable design reimagines photography possibilities, all in a gorgeous and flawless design that you can pop in your pocket.",
+   "models": "CPH2437",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.oppo.com/en/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "516GB",
+    "formFactor": "Phone",
+    "ram": "16.0GB",
+    "display": "6.8-inch",
+    "aerOsValidation": [
+     "13.0",
+     "14.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "4190mAh(rated)/4300mAh(typical)",
+    "frontCamera": "32MP",
+    "rearCamera": "50MP+8MP",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "1（3.2GHz）+3+4(Cores)"
+   },
+   "createDate": "2023-03-10T04:00:06+00:00",
+   "publishDate": "2024-03-25T08:50:09+00:00",
+   "smrDate": "2028-02-28T16:00:00+00:00",
+   "aerDate": "2023-01-28",
+   "rsDate": "2028-02-28T16:00:00+00:00",
+   "esmrDate": "2028-02-28T16:00:00+00:00",
+   "smrUpdateFrequency": "quarterly",
+   "osVersionSupported": "Android13",
+   "certifications": [],
+   "smrUrl": "https://security.oppo.com/en/mend",
+   "osSupportUrl": "https://security.oppo.com/en/mend",
+   "isArchived": false,
+   "search_name": "oppo find n2 flip",
+   "sort_name": "oppo find n2 flip",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA"
+   ],
+   "manufacturer_facet": "Oppo",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Quarterly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 13",
+    "Android 14"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": "16.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "oppo",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "quarterly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_13",
+    "android_14"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "__16_0gb_"
+  },
+  {
+   "id": "rGMETnRXLNze32h4iz59",
+   "modifiedDate": "2024-02-04T16:34:34+00:00",
+   "brand": "Samsung",
+   "brand_key": "e5498748-41fc-3e74-918c-5f0f193ca154",
+   "displayName": "Samsung Galaxy S21 FE 5G",
+   "name": "Galaxy S21 FE 5G",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Samsung Galaxy S21 FE 5G",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/vYYasbU9WmAPPtDKssTzEblS11tzG9ZOccNuzXTdlqLfL3Uncam2f0a8kyF2dEA0mHhSdxDl7jo",
+    "main": "https://lh3.googleusercontent.com/vYYasbU9WmAPPtDKssTzEblS11tzG9ZOccNuzXTdlqLfL3Uncam2f0a8kyF2dEA0mHhSdxDl7jo",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Adapt and thrive in this new era of business with Samsung Galaxy devices, built with productivity, security, and management features that empower your teams to work from anywhere. The embedded Knox platform encrypts your data so you can securely create, collaborate on, and share notes, docs, and media, while powerful cameras let you record fine details or host remote video conferences. And long-lasting, fast-charging battery times mean your device works when you want to. Finally, business-ready support with Enterprise Edition devices can help you streamline your IT mobility strategy better. Choose defense-grade security for your business. Choose Samsung.",
+   "models": "SM-G990U1, SM-G990B, SM-G990W, SM-G990U, SM-G990E, SM-G9900, SM-G990B2, SM-G990W2, SM-G990U2, SM-G990U3",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "Europe",
+    "APAC",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.samsung.com/us/smartphones/galaxy-s21-5g/galaxy-s21-fe-5g/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "128GB, 256GB",
+    "formFactor": "Phone",
+    "ram": "6.0GB",
+    "display": "6.4-inch",
+    "aerOsValidation": [
+     "11.0",
+     "12.0",
+     "13.0",
+     "14.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "4,500mAh",
+    "frontCamera": "32MP FF",
+    "rearCamera": "12(2PD/OIS) + 12(UW ) + 8(3x) MP",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "1x 2.9 GHz + 3x 2.80 GHz + 4x 2.2 GHz"
+   },
+   "createDate": "2021-08-26T04:03:16+00:00",
+   "publishDate": "2024-02-04T16:34:34+00:00",
+   "smrDate": "2027-01-30T15:00:00+00:00",
+   "aerDate": "2022-12-28",
+   "rsDate": "2027-01-30T15:00:00+00:00",
+   "esmrDate": "2027-01-30T15:00:00+00:00",
+   "smrUpdateFrequency": "dataNotProvided",
+   "osVersionSupported": "dataNotProvided",
+   "certifications": [],
+   "smrUrl": "https://www.samsungknox.com/en/knox-platform/supported-devices/aer",
+   "osSupportUrl": null,
+   "isArchived": false,
+   "search_name": "samsung galaxy s21 fe 5g",
+   "sort_name": "samsung galaxy s21 fe 5g",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "Europe",
+    "APAC",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "manufacturer_facet": "Samsung",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Data not provided",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 11",
+    "Android 12",
+    "Android 13",
+    "Android 14"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 6.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "samsung",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "europe",
+    "apac",
+    "mea",
+    "latin_america",
+    "north_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "data_not_provided",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_11",
+    "android_12",
+    "android_13",
+    "android_14"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_6_0gb_"
+  },
+  {
+   "id": "C3QLpXWwi7EfdHltTONo",
+   "modifiedDate": "2025-05-22T08:56:41+00:00",
+   "brand": "OnePlus",
+   "brand_key": "6fe6df3c-ee87-33b7-a01a-3234e32fd0a9",
+   "displayName": "OnePlus 12",
+   "name": "OnePlus 12",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "OnePlus 12",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/OLS8S7_TLIpMvrFbz_WQpXmrS-pasq7dpzJu9xmY_MSClCJEfXJzGrdQkh-HzgAww65XTYvomrayjQ",
+    "main": "https://lh3.googleusercontent.com/OLS8S7_TLIpMvrFbz_WQpXmrS-pasq7dpzJu9xmY_MSClCJEfXJzGrdQkh-HzgAww65XTYvomrayjQ",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Representing the pinnacle of the all-round “Pro” smartphone, the OnePlus 12 delivers premium performance with its Qualcomm Snapdragon® 8 Gen 3 mobile platform and OnePlus’ proprietary Trinity Engine. It also features a 3X zoom periscope telephoto camera coupled with the 4th Gen Hasselblad Camera for Mobile make the OnePlus 12 a true ace in photography. OnePlus 12 redefines the meaning of smooth. Seamlessly blending flagship hardware with state-of-the-art software optimizations, OnePlus 12 is Smooth Beyond Belief.",
+   "models": "CPH2581, CPH2573, CPH2583, PJD110",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.oneplus.com/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "256GB",
+    "formFactor": "Phone",
+    "ram": "12.0GB",
+    "display": "6.8-inch",
+    "aerOsValidation": [
+     "14.0",
+     "15.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "5400mAh",
+    "frontCamera": "32M",
+    "rearCamera": "50MP+48MP+64MP",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "1×Kryo Prime @3.3GHz + 3×Kryo Gold @3.15GHz + 2×Kryo Gold @2.95GHz + 2×Kryo Sliver @2.2GH"
+   },
+   "createDate": "2024-01-24T04:09:53+00:00",
+   "publishDate": "2025-05-22T08:56:41+00:00",
+   "smrDate": "2029-02-27T16:00:00+00:00",
+   "aerDate": "2023-12-28",
+   "rsDate": "2029-02-27T16:00:00+00:00",
+   "esmrDate": "2029-02-27T16:00:00+00:00",
+   "smrUpdateFrequency": "dataNotProvided",
+   "osVersionSupported": "dataNotProvided",
+   "certifications": [],
+   "smrUrl": "https://security.oneplus.com/en/mend",
+   "osSupportUrl": "https://security.oneplus.com/en/mend",
+   "isArchived": false,
+   "search_name": "oneplus 12",
+   "sort_name": "oneplus 12",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "manufacturer_facet": "OnePlus",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Data not provided",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 14",
+    "Android 15"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": "12.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "oneplus",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america",
+    "north_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "data_not_provided",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_14",
+    "android_15"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "__12_0gb_"
+  },
+  {
+   "id": "WrOmodRwEB6YOVZPzvCL",
+   "modifiedDate": "2026-07-07T12:48:08.981282+00:00",
+   "brand": "Google",
+   "brand_key": "cf3d4f25-7f72-3a93-948c-fd7570a80ceb",
+   "displayName": "Google Pixel 9",
+   "name": "Pixel 9",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Google Pixel 9",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/VFLWtB5AnehhKtT2ScpI12BnZ1WXSryh11NOBkYD2DAGTJt2mMC1ZenUVP5BsGoiYwbZ9FkBzdXS",
+    "main": "https://lh3.googleusercontent.com/VFLWtB5AnehhKtT2ScpI12BnZ1WXSryh11NOBkYD2DAGTJt2mMC1ZenUVP5BsGoiYwbZ9FkBzdXS",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Pixel 9 brings the best of Google AI to you first. Designed around security and productivity, Pixel 9 works in the background to help safeguard your business’s data while enabling you with tools to help you and your team reach peak productivity. Pixel gives you direct access to Gemini, your built-in AI assistant, to make the most of your workday. With its premium features, built on the certified Titan M2 security chip and the next-generation Google Tensor G4 chip, Pixel 9 is a smartphone that’s built for business.",
+   "models": "Pixel 9",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "North America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://store.google.com/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "128GB",
+    "formFactor": "Phone",
+    "ram": "12.0GB",
+    "display": "6.3-inch",
+    "aerOsValidation": [
+     "14.0",
+     "15.0",
+     "16.0",
+     "17.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "4700 mAh",
+    "frontCamera": "10.5 MP Dual PD selfie camera  ƒ/2.2 aperture",
+    "rearCamera": "50 MP Octa PD wide camera, 48 MP Quad PD ultrawide camera,",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "Google Tensor G4  Titan M2 security coprocessor"
+   },
+   "createDate": "2024-08-23T05:41:40+00:00",
+   "publishDate": "2026-07-07T12:48:08.981273+00:00",
+   "smrDate": "2031-08-31T07:00:00+00:00",
+   "aerDate": "2024-09-28",
+   "rsDate": "2031-08-31T07:00:00+00:00",
+   "esmrDate": "2031-08-31T07:00:00+00:00",
+   "smrUpdateFrequency": "monthly",
+   "osVersionSupported": "Android18",
+   "certifications": [],
+   "smrUrl": "https://support.google.com/pixelphone/answer/4457705?sjid=16078320144820323916-NC#when_updates&zippy=%2Cpixel-pro%2Cpixel-pixel-pro-pixel-pro-xl-pixel-pro-fold",
+   "osSupportUrl": "https://support.google.com/pixelphone/answer/4457705?sjid=16078320144820323916-NC#when_updates&zippy=%2Cpixel-pro%2Cpixel-pixel-pro-pixel-pro-xl-pixel-pro-fold",
+   "isArchived": false,
+   "search_name": "google pixel 9",
+   "sort_name": "google pixel 9",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "North America"
+   ],
+   "manufacturer_facet": "Google",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Monthly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 14",
+    "Android 15",
+    "Android 16",
+    "Android 17"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": "12.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "google",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "north_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "monthly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_14",
+    "android_15",
+    "android_16",
+    "android_17"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "__12_0gb_"
+  },
+  {
+   "id": "eVr2AZfzUc4WhWB5PGkF",
+   "modifiedDate": "2025-01-23T13:55:52+00:00",
+   "brand": "Motorola",
+   "brand_key": "15537436-fbf9-3009-809f-f30c550b8eea",
+   "displayName": "Motorola moto g54 5G",
+   "name": "moto g54 5G",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Motorola moto g54 5G",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/WuICsDZLqIQJRxxueGsiwIFMtzXTGE5N_C9Y9lUv1tqXntUYtmphwfq4MgtsSXWwQ6dKDBIGDeQRWA",
+    "main": "https://lh3.googleusercontent.com/WuICsDZLqIQJRxxueGsiwIFMtzXTGE5N_C9Y9lUv1tqXntUYtmphwfq4MgtsSXWwQ6dKDBIGDeQRWA",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Go beyond speed: Accelerate your performance and elevate your experience with lightning-fast speed, thanks to 12GB RAM and 256GB of built-in storage. Enjoy smoother videos, switch between apps effortlessly, and never worry about running out of storage. Never miss a thing with the MediaTek Dimensity 7020, a powerful octa-core processor offering frequencies up to 2.2GHz. Download your favorite shows in seconds. Stream with virtually no buffering. And video chat without lag, so you feel like you’re in the same room. The outstanding 5000 mAh battery capacity gives you hours and hours of time to binge watch content, video chat with friends, listen to your favourite playlists or scroll to your heart's content. Then fuel up fast with the blazing speed of TurboPower charging. Take beautiful shots in brilliant detail with a 50MP sensor. With Quad Pixel technology, get 4x better low light sensitivity for sharper, more vibrant photos—day or night.",
+   "models": "XT2343-3, moto g54 5G, moto g73 5G",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.motorola.com/we/smartphones-moto-g-54-5g/p?skuId=538",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "128GB, 256GB",
+    "formFactor": "Phone",
+    "ram": "4.0GB,6.0GB,8.0GB",
+    "display": "6.5-inch",
+    "aerOsValidation": [
+     "13.0",
+     "14.0",
+     "15.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 15",
+    "batteryLife": "5000 mAh",
+    "frontCamera": "16 MP",
+    "rearCamera": "50 MP + 2 MP",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": false,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "2.2 GHz"
+   },
+   "createDate": "2023-09-26T06:00:56+00:00",
+   "publishDate": "2025-01-23T13:55:52+00:00",
+   "smrDate": "2027-06-30T03:00:00+00:00",
+   "aerDate": "2027-06-28",
+   "rsDate": "2027-06-30T03:00:00+00:00",
+   "esmrDate": "2027-06-30T03:00:00+00:00",
+   "smrUpdateFrequency": "everyTwoMonths",
+   "osVersionSupported": "Android14",
+   "certifications": [],
+   "smrUrl": "https://en-us.support.motorola.com/app/software-security-update/g_id/7112/productid/11600",
+   "osSupportUrl": "https://en-us.support.motorola.com/app/software-security-update/g_id/7112/productid/11600",
+   "isArchived": false,
+   "search_name": "motorola moto g54 5g",
+   "sort_name": "motorola moto g54 5g",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "manufacturer_facet": "Motorola",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 15+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Every two months",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 13",
+    "Android 14",
+    "Android 15"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 4.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "motorola",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "every_two_months",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_13",
+    "android_14",
+    "android_15"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_4_0gb_"
+  },
+  {
+   "id": "gGXdh2atSHxrQrTDV5SY",
+   "modifiedDate": "2026-01-14T10:52:35.703199+00:00",
+   "brand": "Samsung",
+   "brand_key": "df09d714-582d-3f90-8b8a-8a07953a5bb3",
+   "displayName": "Samsung Galaxy S25 Ultra",
+   "name": "Galaxy S25 Ultra",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Samsung Galaxy S25 Ultra",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/52o0ZMdywHtR0rMafloVywcMLMlRTwRgqUug7QQz_6gKz6yqxHoo23NaIOjGyH4mFuYCiL7HNxpM",
+    "main": "https://lh3.googleusercontent.com/52o0ZMdywHtR0rMafloVywcMLMlRTwRgqUug7QQz_6gKz6yqxHoo23NaIOjGyH4mFuYCiL7HNxpM",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Adapt and thrive in this new era of business with Samsung Galaxy devices, built with productivity, security, and management features that empower your teams to work from anywhere. The embedded Knox platform encrypts your data so you can securely create, collaborate on, and share notes, docs, and media, while powerful cameras let you record fine details or host remote video conferences. And long-lasting, fast-charging battery times mean your device works when you want to. Finally, business-ready support with Enterprise Edition devices can help you streamline your IT mobility strategy better. Choose defense-grade security for your business. Choose Samsung.",
+   "models": "SM-S938N, SM-S938B, SM-S938U, SC-52F, SM-S938U1, SM-S938W, SM-S938Q, SM-S938Z, SCG32, SM-S9380",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.samsung.com/us/business/mobile/phones/galaxy-s25/?msockid=2b441d9aa0ee6fd1091b0822a1ce6eb5",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "256GB, 512GB, 1024GB",
+    "formFactor": "Phone",
+    "ram": "12.0GB",
+    "display": "6.9-inch",
+    "aerOsValidation": [
+     "15.0",
+     "16.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "5,000 mAh",
+    "frontCamera": "12MP",
+    "rearCamera": "200MP+10MP+50MP",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "Octa-core (2x4.47 GHz Oryon V2 Phoenix L + 6x3.53 GHz Oryon V2 Phoenix M)"
+   },
+   "createDate": "2025-01-25T04:02:29+00:00",
+   "publishDate": "2026-01-14T10:52:35.703188+00:00",
+   "smrDate": "2032-01-30T15:00:00+00:00",
+   "aerDate": "2025-04-28",
+   "rsDate": "2032-01-30T15:00:00+00:00",
+   "esmrDate": "2032-01-30T15:00:00+00:00",
+   "smrUpdateFrequency": "dataNotProvided",
+   "osVersionSupported": "dataNotProvided",
+   "certifications": [],
+   "smrUrl": "https://www.samsungknox.com/en/knox-platform/supported-devices/aer",
+   "osSupportUrl": null,
+   "isArchived": false,
+   "search_name": "samsung galaxy s25 ultra",
+   "sort_name": "samsung galaxy s25 ultra",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "manufacturer_facet": "Samsung",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Data not provided",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 15",
+    "Android 16"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": "12.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "samsung",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america",
+    "north_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "data_not_provided",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_15",
+    "android_16"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "__12_0gb_"
+  },
+  {
+   "id": "Ug2gqFRYHDw7zV3Emybh",
+   "modifiedDate": "2026-01-21T14:11:33.626194+00:00",
+   "brand": "Redmi",
+   "brand_key": "db15beaa-ca17-315a-9428-b7cb34e508d4",
+   "displayName": "Redmi Pad 2 Pro",
+   "name": "Redmi Pad 2 Pro",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Redmi Pad 2 Pro",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/DXsTs91RyVAb3S2XR6472xj9kmJAm5a36Pp2XVwjVdwm9u2c11oQ4e-Uko8_EhZUaGg62rdNKN2m",
+    "main": "https://lh3.googleusercontent.com/DXsTs91RyVAb3S2XR6472xj9kmJAm5a36Pp2XVwjVdwm9u2c11oQ4e-Uko8_EhZUaGg62rdNKN2m",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Fun to the max",
+   "models": "25099RP13G, 25099RP13I",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.mi.com/global/product/redmi-pad-2-pro/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "128GB, 256GB",
+    "formFactor": "Tablet",
+    "ram": "6.0GB,8.0GB,12.0GB",
+    "display": "12.1-inch",
+    "aerOsValidation": [
+     "15.0",
+     "16.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "12000mAh (typ)",
+    "frontCamera": "8MP 1/4\", f/2.28, 1.12μm",
+    "rearCamera": "8MP 1/4\", f/2, 1.12μm",
+    "fingerPrintSupport": false,
+    "telephonySupport": false,
+    "zeroTouchSupport": true,
+    "nfcSupport": false,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "CPU：1xA720@ 2.7 GHz+3xA720@ 2.4GHz+4xA520@ 1.8GHz"
+   },
+   "createDate": "2025-09-26T04:02:34.678365+00:00",
+   "publishDate": "2026-01-21T14:11:33.626182+00:00",
+   "smrDate": "2032-10-30T16:00:00+00:00",
+   "aerDate": "2025-09-28",
+   "rsDate": "2032-10-30T16:00:00+00:00",
+   "esmrDate": "2032-10-30T16:00:00+00:00",
+   "smrUpdateFrequency": "quarterly",
+   "osVersionSupported": "Android15",
+   "certifications": [],
+   "smrUrl": "https://trust.mi.com/misrc/updates/phone?tab=aerdata",
+   "osSupportUrl": "https://trust.mi.com/misrc/updates/phone?tab=aerdata",
+   "isArchived": false,
+   "search_name": "redmi pad 2 pro",
+   "sort_name": "redmi pad 2 pro",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Tablet",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "manufacturer_facet": "Redmi",
+   "device_features_facet": [
+    "Zero-touch"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Quarterly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 15",
+    "Android 16"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 6.0GB+",
+   "aer": "true",
+   "device_type": "tablet",
+   "manufacturer": "redmi",
+   "device_features": [
+    "zero_touch"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "quarterly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_15",
+    "android_16"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_6_0gb_"
+  },
+  {
+   "id": "8AMHKA2YARYv3EvGVErt",
+   "modifiedDate": "2026-01-30T11:40:07.083272+00:00",
+   "brand": "Crosscall",
+   "brand_key": "d7a32094-8c97-3bcc-b3d3-bc0eb3cdaff4",
+   "displayName": "Crosscall Core-X5",
+   "name": "Core-X5",
+   "types": [
+    "enterpriseRecommendedSupport",
+    "ruggedizedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Crosscall Core-X5",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/PG1HGC-9nvSTILi0m5Z2YdS2sWw-SwY4AbrABpmoyjNfIlbHnZb5RsxBLM61BlqYReR69adCjBrRNg",
+    "main": "https://lh3.googleusercontent.com/PG1HGC-9nvSTILi0m5Z2YdS2sWw-SwY4AbrABpmoyjNfIlbHnZb5RsxBLM61BlqYReR69adCjBrRNg",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Core-X5\nPowerfully efficient in hostile environments\n\nDesigned for professionals working in hostile environments where a direct means of communication is vital to the success of their work, the CORE-X5 is a bespoke device for technical PMR communication. Along with its comprehensive network coverage and long battery life, it has four programmable buttons and a powerful 100dB loudspeaker.  Fitted with the Octa-core Qualcomm ® Snapdragon™ 665 processor, 4GB of RAM and 64GB of memory, the CORE-X5 can seamlessly handle any business application. Boasting unfailing durability and robustness, it is the perfect work tool for extreme conditions and critical jobs. ",
+   "models": "Core-X5",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "Europe",
+    "MEA"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://crosscall.com/en/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "64GB, 128GB",
+    "formFactor": "Phone",
+    "ram": "4.0GB,6.0GB",
+    "display": "5.5-inch",
+    "aerOsValidation": [
+     "11.0",
+     "12.0",
+     "13.0"
+    ],
+    "dropTest": "2m, on concrete",
+    "ingressProtection": "IP68",
+    "os": "Android 15",
+    "batteryLife": "4940 mAh",
+    "frontCamera": "8 MP",
+    "rearCamera": "48 MP",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": true,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": false,
+    "processorSpeed": "4x1.8GHz + 4x2 GHz"
+   },
+   "createDate": "2022-02-10T04:03:34+00:00",
+   "publishDate": "2026-01-30T11:40:07.083262+00:00",
+   "smrDate": "2030-12-30T23:00:00+00:00",
+   "aerDate": "2023-01-28",
+   "rsDate": "2030-12-30T23:00:00+00:00",
+   "esmrDate": "2030-12-30T23:00:00+00:00",
+   "smrUpdateFrequency": "quarterly",
+   "osVersionSupported": "Android15",
+   "certifications": [],
+   "smrUrl": "https://www.crosscall.com/en_FR/crosscall-securite.html",
+   "osSupportUrl": null,
+   "isArchived": false,
+   "search_name": "crosscall corex5",
+   "sort_name": "crosscall corex5",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "Europe",
+    "MEA"
+   ],
+   "manufacturer_facet": "Crosscall",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Medium - 4.5\" and 5.5\"",
+   "os_version_facet": "Android 15+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Quarterly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 11",
+    "Android 12",
+    "Android 13"
+   ],
+   "device_categories_facet": [
+    "Rugged"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 4.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "crosscall",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "europe",
+    "mea"
+   ],
+   "display_size": "medium_4_5_and_5_5_",
+   "smr_update_frequency": "quarterly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_11",
+    "android_12",
+    "android_13"
+   ],
+   "device_categories": [
+    "rugged"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_4_0gb_"
+  },
+  {
+   "id": "zinMaus8TzFG5sR0oADr",
+   "modifiedDate": "2026-07-03T04:01:56.832555+00:00",
+   "brand": "Oppo",
+   "brand_key": "cb8a66be-cbe7-3600-9e03-c48cc00743d8",
+   "displayName": "OPPO Find X8 Pro",
+   "name": "Find X8 Pro",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "OPPO Find X8 Pro",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/SDxWmpxDkfaBJ_vUOpBbeKvpEJNNP0i-D0SHywM8L6ajARxkJDn9xGlOdHJuea_eNuMwVn2yZaQ",
+    "main": "https://lh3.googleusercontent.com/SDxWmpxDkfaBJ_vUOpBbeKvpEJNNP0i-D0SHywM8L6ajARxkJDn9xGlOdHJuea_eNuMwVn2yZaQ",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "“It,s shines with superb experiences, thin and light design, and excellent entertainment credentials. Its Ultra-Clear Portrait Camera System turns it into a creative powerhouse and the long-lasting, fast-charging battery cements It’s winning balance of style and substance.”",
+   "models": "PKC110, CPH2659",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.oppo.com/en/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "256GB, 512GB",
+    "formFactor": "Phone",
+    "ram": "12.0GB,16.0GB",
+    "display": "6.8-inch",
+    "aerOsValidation": [
+     "15.0",
+     "16.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "5770mAh/5910mAh(Rated/Type) Rechargeable Li-ion Polymer Battery",
+    "frontCamera": "32MP",
+    "rearCamera": "50MP+50MP+50MP+50MP",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "1*X925@3.626Ghz+ 3*X4@3.3Ghz 4*A720@2.4Ghz"
+   },
+   "createDate": "2024-11-01T04:02:27+00:00",
+   "publishDate": "2026-07-03T04:01:56.832541+00:00",
+   "smrDate": "2029-11-29T16:00:00+00:00",
+   "aerDate": "2024-10-31",
+   "rsDate": "2029-11-29T16:00:00+00:00",
+   "esmrDate": "2029-11-29T16:00:00+00:00",
+   "smrUpdateFrequency": "dataNotProvided",
+   "osVersionSupported": "dataNotProvided",
+   "certifications": [],
+   "smrUrl": "https://security.oppo.com/en/mend",
+   "osSupportUrl": "https://security.oppo.com/en/mend",
+   "isArchived": false,
+   "search_name": "oppo find x8 pro",
+   "sort_name": "oppo find x8 pro",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "manufacturer_facet": "Oppo",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Data not provided",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 15",
+    "Android 16"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": "12.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "oppo",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "data_not_provided",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_15",
+    "android_16"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "__12_0gb_"
+  },
+  {
+   "id": "qBtDvRCbUrflkf0peT8x",
+   "modifiedDate": "2025-07-23T13:14:55+00:00",
+   "brand": "Zebra",
+   "brand_key": "f50c8674-95d7-350c-9d2c-7ba018731b5b",
+   "displayName": "Zebra Technologies ET40",
+   "name": "ET40",
+   "types": [
+    "enterpriseRecommendedSupport",
+    "ruggedizedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Zebra Technologies ET40",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/jf2EG0Sz5W6Fr9Mvtf0EBD7Mca0kbiUNhD0EynWFe8Atpi9si8mXu_7af7438gcT25K7l1qkX8k",
+    "main": "https://lh3.googleusercontent.com/jf2EG0Sz5W6Fr9Mvtf0EBD7Mca0kbiUNhD0EynWFe8Atpi9si8mXu_7af7438gcT25K7l1qkX8k",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Introducing the ET40, the right-priced enterprise tablets that are built for business. Start with the best screen size for the job — the easy-to-carry 8-inch or the 10-inch for easy viewing of information rich apps —  and every model provides everything you need, right out of the box. Thin and light consumer styling that is business tough. Integrated enterprise-class scanning. The fastest wireless connections; ET40 – Wi-Fi 6. A multi-year lifecycle. Powerful new communication options. New solutions that add new capabilities, allowing you to turn these tablets into a POS, a workstation, a two-way radio and a PBX handset. Improve every aspect of tablet lifecycles at no cost with complementary Zebra-only Mobility DNA Professional tools. Take worker productivity to the next level with the optional Mobility DNA Enterprise toolkit by making data capture easier than ever. And more. The ET40 Enterprise Tablets — everything you need to do business right, at the right price.",
+   "models": "ET40",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "resources": [
+    {
+     "url": "https://www.zebra.com/us/en/products/spec-sheets/tablets/et40-et45.html",
+     "title": "Specification Sheet"
+    }
+   ],
+   "status": 0,
+   "website": "https://www.zebra.com/us/en/products/tablets/et4x-series.html",
+   "telephoneNumber": "877-208-7756",
+   "hardwareFeatures": {
+    "flash": "64GB",
+    "formFactor": "Tablet",
+    "ram": "4.0GB",
+    "display": "10.0-inch",
+    "aerOsValidation": [
+     "11.0",
+     "13.0"
+    ],
+    "dropTest": "4 ft. / 1.2 m to concrete per MIL-STD-810H, With optional rugged frame: 5.1 ft. / 1.55 m per MIL",
+    "ingressProtection": "IP65",
+    "os": "Android 14",
+    "batteryLife": "8 inch: 6100 mAh/10 inch: 7600 mAh  3.87 V rechargeable Li-Ion Polymer; user replaceable",
+    "frontCamera": "5 MP",
+    "rearCamera": "13 MP auto-focus camera with user controllable LED flash",
+    "fingerPrintSupport": false,
+    "telephonySupport": false,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": true,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": false,
+    "processorSpeed": "Octa-Core (8): 2.2 GHz (2) and 1.8 GHz (6)"
+   },
+   "createDate": "2022-08-03T04:06:40+00:00",
+   "publishDate": "2025-07-23T13:14:55+00:00",
+   "smrDate": "2029-06-30T05:00:00+00:00",
+   "aerDate": "2022-08-28",
+   "rsDate": "2029-06-30T05:00:00+00:00",
+   "esmrDate": "2029-06-30T05:00:00+00:00",
+   "smrUpdateFrequency": "monthly",
+   "osVersionSupported": "Android14",
+   "certifications": [
+    "common_criteria"
+   ],
+   "smrUrl": "https://www.zebra.com/us/en/support-downloads/android-enterprise-recommended.html",
+   "osSupportUrl": "https://www.zebra.com/us/en/support-downloads/lifeguard-security.html",
+   "isArchived": false,
+   "search_name": "zebra technologies et40",
+   "sort_name": "zebra technologies et40",
+   "certifications_obj": {
+    "commonCriteria": true,
+    "commonCriteriaUrl": "https://www.commoncriteriaportal.org/files/epfiles/st_vid11232-ci.pdf"
+   },
+   "aer_facet": true,
+   "device_type_facet": "Tablet",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "manufacturer_facet": "Zebra",
+   "device_features_facet": [
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 14+",
+   "certifications_facet": [
+    "Common Criteria"
+   ],
+   "smr_update_frequency_facet": "Monthly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 11",
+    "Android 13"
+   ],
+   "device_categories_facet": [
+    "Rugged"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 4.0GB+",
+   "aer": "true",
+   "device_type": "tablet",
+   "manufacturer": "zebra",
+   "device_features": [
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america",
+    "north_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "monthly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_11",
+    "android_13"
+   ],
+   "device_categories": [
+    "rugged"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_4_0gb_"
+  },
+  {
+   "id": "OWDHCQr9wM8Ec6SDEtB4",
+   "modifiedDate": "2026-05-15T13:31:43.294604+00:00",
+   "brand": "Isafe",
+   "brand_key": "e5372026-0473-33f3-99ac-a8f0eb3ae2c1",
+   "displayName": "i.safe MOBILE IS530.X",
+   "name": "IS530",
+   "types": [
+    "enterpriseRecommendedSupport",
+    "ruggedizedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "i.safe MOBILE IS530.X",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/Vy86s_BUzvTdoiC13ugll2lynYDdQ30c24HjyJw-bvXsObj_Wf_IjbvCsnOBcR5-r4LbbMhKxMSN_A",
+    "main": "https://lh3.googleusercontent.com/Vy86s_BUzvTdoiC13ugll2lynYDdQ30c24HjyJw-bvXsObj_Wf_IjbvCsnOBcR5-r4LbbMhKxMSN_A",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "The IS530 is a rugged, innovative and multifunctional smartphone for use in ATEX/IECEx zones 1, 2, 21, 22 and Class 1 Div1/Div2 along with a range of additional global explosion protection approvals.\nThe Devices improves ease of use to mobile workers in Oil &amp; Gas, Chemical, Refining, Pharmaceuticals, and other hazardous industries.\nThe Android™ operating system enables the intrinsically safe device to work safely, quickly, and efficiently. \nThe ISM interface of the IS530 can be used within hazardous areas with approved headsets, Remote Speaker Microphones (RSM) and other add-ons, making the smartphone a multifunctional equipment for industrial applications. \nThe IS530 can be equipped with a memory SD card up to 128 GB, dual nano SIMs, has an amplified loudspeaker, a magnetic charging port, two cameras (13 MP rear camera with autofocus and 5 MP front camera) and a 4,5“ HD display.\nTechnologies like 2G/3G/4G (LTE), NFC, GPS, Bluetooth® 5.0 and 2.4GHz/5GHz Wi-Fi complete the performance.",
+   "models": "IS530",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "Europe",
+    "North America",
+    "APAC",
+    "MEA",
+    "Latin America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.isafe-mobile.com/en/products.html",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "64GB",
+    "formFactor": "Phone",
+    "ram": "4.0GB",
+    "display": "4.5-inch",
+    "aerOsValidation": [
+     "9.0"
+    ],
+    "dropTest": "MIL-STD-810H (several drops on concrete Plate from 4 feet high)",
+    "ingressProtection": "IP68",
+    "os": "Android 9",
+    "batteryLife": "3600 mAh",
+    "frontCamera": "5 MP",
+    "rearCamera": "13 MP AF",
+    "fingerPrintSupport": false,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": true,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": false,
+    "processorSpeed": "1.84GHz"
+   },
+   "createDate": "2020-01-09T04:04:13+00:00",
+   "publishDate": "2025-02-17T22:24:24+00:00",
+   "smrDate": "2027-01-30T23:00:00+00:00",
+   "aerDate": "2001-10-28",
+   "rsDate": "2027-01-30T23:00:00+00:00",
+   "esmrDate": "2024-09-29T22:00:00+00:00",
+   "smrUpdateFrequency": "quarterly",
+   "osVersionSupported": "Android13",
+   "certifications": [],
+   "smrUrl": "https://www.isafe-mobile.com/de/support/security-updates",
+   "osSupportUrl": null,
+   "isArchived": false,
+   "search_name": "i.safe mobile is530.x",
+   "sort_name": "i.safe mobile is530.x",
+   "certifications_obj": {
+    "commonCriteria": false,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "Europe",
+    "North America",
+    "APAC",
+    "MEA",
+    "Latin America"
+   ],
+   "manufacturer_facet": "Isafe",
+   "device_features_facet": [
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Small - up to 4.5\"",
+   "os_version_facet": "Android 9+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Quarterly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 9"
+   ],
+   "device_categories_facet": [
+    "Rugged"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 4.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "isafe",
+   "device_features": [
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "europe",
+    "north_america",
+    "apac",
+    "mea",
+    "latin_america"
+   ],
+   "display_size": "small_up_to_4_5_",
+   "smr_update_frequency": "quarterly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_9"
+   ],
+   "device_categories": [
+    "rugged"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_4_0gb_",
+   "os_version": [
+    "android_7_",
+    "android_8_",
+    "android_9_",
+    "android_6_",
+    "android_6_",
+    "android_7_",
+    "android_7_",
+    "android_8_"
+   ]
+  },
+  {
+   "id": "cJM4fm1K8UIOq0AcGPEY",
+   "modifiedDate": "2025-05-29T14:37:28+00:00",
+   "brand": "Samsung",
+   "brand_key": "6826a0c6-3391-3aa9-9ac3-6ae601957cc5",
+   "displayName": "Samsung Galaxy XCover6 Pro",
+   "name": "Galaxy XCover6 Pro",
+   "types": [
+    "enterpriseRecommendedSupport",
+    "ruggedizedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Samsung Galaxy XCover6 Pro",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/IH-xucZT0QdPdy2sAkdIFZwKsqw16N3w5bATXZUd6UmlnXow8XfbjJCc2Qvs7qzeKm9ryr2SzW6PNQ",
+    "main": "https://lh3.googleusercontent.com/IH-xucZT0QdPdy2sAkdIFZwKsqw16N3w5bATXZUd6UmlnXow8XfbjJCc2Qvs7qzeKm9ryr2SzW6PNQ",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Adapt and thrive in this new era of business with Samsung Galaxy devices, built with productivity, security, and management features that empower your teams to work from anywhere. The embedded Knox platform encrypts your data so you can securely create, collaborate on, and share notes, docs, and media, while powerful cameras let you record fine details or host remote video conferences. And long-lasting, fast-charging battery times mean your device works when you want to. Finally, business-ready support with Enterprise Edition devices can help you streamline your IT mobility strategy better. Choose defense-grade security for your business. Choose Samsung.",
+   "models": "SM-G736B, SM-G736W, SM-G736U1, SM-G736U",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://news.samsung.com/global/secure-durable-and-built-for-the-modern-enterprise-meet-the-new-galaxy-xcover6-pro",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "128GB",
+    "formFactor": "Phone",
+    "ram": "6.0GB",
+    "display": "6.6-inch",
+    "aerOsValidation": [
+     "12.0",
+     "13.0",
+     "14.0",
+     "15.0"
+    ],
+    "dropTest": "MIL-STD 810H",
+    "ingressProtection": "IP68",
+    "os": "Android 16",
+    "batteryLife": "4,050mAh (Removable)",
+    "frontCamera": "13MP F2.2",
+    "rearCamera": "50MP F1.8 + 8MP F2.2 (UW)",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": true,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": false,
+    "processorSpeed": "4 x 2.4 GHz &amp; 4 x 1.8 GHz (Octa-core)"
+   },
+   "createDate": "2022-05-25T17:24:26+00:00",
+   "publishDate": "2025-05-29T14:37:28+00:00",
+   "smrDate": "2027-07-30T15:00:00+00:00",
+   "aerDate": "2023-05-28",
+   "rsDate": "2027-07-30T15:00:00+00:00",
+   "esmrDate": "2027-07-30T15:00:00+00:00",
+   "smrUpdateFrequency": "dataNotProvided",
+   "osVersionSupported": "dataNotProvided",
+   "certifications": [],
+   "smrUrl": "https://www.samsungknox.com/en/knox-platform/supported-devices/aer",
+   "osSupportUrl": "https://www.samsungknox.com/en/knox-platform/supported-devices/aer",
+   "isArchived": false,
+   "search_name": "samsung galaxy xcover6 pro",
+   "sort_name": "samsung galaxy xcover6 pro",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "manufacturer_facet": "Samsung",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Data not provided",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 12",
+    "Android 13",
+    "Android 14",
+    "Android 15"
+   ],
+   "device_categories_facet": [
+    "Rugged"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 6.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "samsung",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america",
+    "north_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "data_not_provided",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_12",
+    "android_13",
+    "android_14",
+    "android_15"
+   ],
+   "device_categories": [
+    "rugged"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_6_0gb_"
+  },
+  {
+   "id": "zSEPYrMzmiRvn0rPJHqQ",
+   "modifiedDate": "2025-05-30T12:20:37.834778+00:00",
+   "brand": "Samsung",
+   "brand_key": "50a0f9bf-a7ed-3433-8ef0-c37b58238d64",
+   "displayName": "Samsung Galaxy Tab S8 5G",
+   "name": "Galaxy Tab S8 5G",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Samsung Galaxy Tab S8 5G",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/NtcLquoQ4L6pE4v01Do23roPWOnUGTjTRWxuVlDq39vfF7MKU-yIOq4dhSCNgG-ev2riZEMmHsY",
+    "main": "https://lh3.googleusercontent.com/NtcLquoQ4L6pE4v01Do23roPWOnUGTjTRWxuVlDq39vfF7MKU-yIOq4dhSCNgG-ev2riZEMmHsY",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Adapt and thrive in this new era of business with Samsung Galaxy devices, built with productivity, security, and management features that empower your teams to work from anywhere. The embedded Knox platform encrypts your data so you can securely create, collaborate on, and share notes, docs, and media, while powerful cameras let you record fine details or host remote video conferences. And long-lasting, fast-charging battery times mean your device works when you want to. Finally, business-ready support with Enterprise Edition devices can help you streamline your IT mobility strategy better. Choose defense-grade security for your business. Choose Samsung.",
+   "models": "SM-X706N, SM-X706B, SM-X706C",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.samsung.com/us/tablets/tab-s8/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "128GB, 256GB",
+    "formFactor": "Tablet",
+    "ram": "8.0GB",
+    "display": "11.0-inch",
+    "aerOsValidation": [
+     "12.0",
+     "13.0",
+     "14.0",
+     "15.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 12",
+    "batteryLife": "8,000mAh",
+    "frontCamera": "12MP UW",
+    "rearCamera": "13MP AF + 6MP UW + Flash",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": false,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "1x 3.0GHz + 3x 2.5GHz + 4x 1.8GHz"
+   },
+   "createDate": "2022-02-12T04:04:01+00:00",
+   "publishDate": "2025-05-30T12:20:37.834760+00:00",
+   "smrDate": "2027-02-27T15:00:00+00:00",
+   "aerDate": "2023-01-28",
+   "rsDate": "2027-02-27T15:00:00+00:00",
+   "esmrDate": "2027-02-27T15:00:00+00:00",
+   "smrUpdateFrequency": "dataNotProvided",
+   "osVersionSupported": "dataNotProvided",
+   "certifications": [],
+   "smrUrl": "https://www.samsungknox.com/en/knox-platform/supported-devices/aer",
+   "osSupportUrl": null,
+   "isArchived": false,
+   "search_name": "samsung galaxy tab s8 5g",
+   "sort_name": "samsung galaxy tab s8 5g",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Tablet",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "manufacturer_facet": "Samsung",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 12+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Data not provided",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 12",
+    "Android 13",
+    "Android 14",
+    "Android 15"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 8.0GB+",
+   "aer": "true",
+   "device_type": "tablet",
+   "manufacturer": "samsung",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america",
+    "north_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "data_not_provided",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_12",
+    "android_13",
+    "android_14",
+    "android_15"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_8_0gb_"
+  },
+  {
+   "id": "m4eta4A4bAqTa7GdBMrB",
+   "modifiedDate": "2025-04-14T08:14:36+00:00",
+   "brand": "Sonimtech",
+   "brand_key": "100cf8d7-19c9-37bd-b253-6774589b23b5",
+   "displayName": "Sonim XP Pro",
+   "name": "XP Pro",
+   "types": [
+    "ruggedizedSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Sonim XP Pro",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/aWI9XZABum4sWGXaTrqgU8U_u8_BvCTQsZ2luSnFZEn5xPXnP0L5Z7mnIzJggbj_flnWe9wDcy9t",
+    "main": "https://lh3.googleusercontent.com/aWI9XZABum4sWGXaTrqgU8U_u8_BvCTQsZ2luSnFZEn5xPXnP0L5Z7mnIzJggbj_flnWe9wDcy9t",
+    "shot_1": "https://storage.googleapis.com/ce-android-enterprise-prod-py.appspot.com/static_files/devices/device_m4eta4A4bAqTa7GdBMrB_shot_1_Image_20250413014241576.png",
+    "shot_2": "https://storage.googleapis.com/ce-android-enterprise-prod-py.appspot.com/static_files/devices/device_m4eta4A4bAqTa7GdBMrB_shot_2_Image_20250413014321865.png"
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Designed and engineered for unparalleled toughness, with all the features of an ultra-rugged phone, disguised in a low profile.\nMore than just a phone—this Next Generation Sonim XP is a testament to discreet durability, designed to withstand whatever comes its way.\n\n\t5G NSA and SA support\n\t3-year comprehensive warranty\n\tSlim, light, easy to carry, low-profile\n\tQuick access programmable button for PTT, camera, flashlight, etc.\n\tSOS button\n\tSecureAudio connector Gen 2\n\tWaterproof. Droppable. Unstoppable, Unrecognizable, for wherever your work takes you\n\tBest suited for: First Responders, Enterprise, SMB, Prosumers",
+   "models": "X800",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "North America",
+    "Latin America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://sonimtech.com/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "256GB",
+    "formFactor": "Phone",
+    "ram": "8.0GB",
+    "display": "6.6-inch",
+    "aerOsValidation": [
+     "14.0"
+    ],
+    "dropTest": "MIL-STD-810H, 1.8m to concrete",
+    "ingressProtection": "IP68, IPX9K",
+    "os": "Android 14",
+    "batteryLife": "5000mAh",
+    "frontCamera": "16MP",
+    "rearCamera": "50MP + 13MP + 2MP",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": true,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": false,
+    "processorSpeed": "1@2.63Ghz, 3@2.4Ghz, 4@1.8Ghz"
+   },
+   "createDate": "2025-02-17T04:10:04+00:00",
+   "publishDate": "2025-04-14T08:14:36+00:00",
+   "smrDate": "2030-05-30T16:00:00+00:00",
+   "aerDate": "2024-12-28",
+   "rsDate": "2030-05-30T16:00:00+00:00",
+   "esmrDate": "2030-05-30T16:00:00+00:00",
+   "smrUpdateFrequency": "quarterly",
+   "osVersionSupported": "Android14",
+   "certifications": [],
+   "smrUrl": "https://www.sonimtech.com/products/phones/xp-pro",
+   "osSupportUrl": "https://www.sonimtech.com/products/deviceshttps://www.sonimtech.com/products/phones/xp-pro",
+   "isArchived": false,
+   "search_name": "sonim xp pro",
+   "sort_name": "sonim xp pro",
+   "certifications_obj": {
+    "commonCriteria": false,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "North America",
+    "Latin America"
+   ],
+   "manufacturer_facet": "Sonimtech",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 14+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Quarterly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 14"
+   ],
+   "device_categories_facet": [
+    "Rugged"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 8.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "sonimtech",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "north_america",
+    "latin_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "quarterly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_14"
+   ],
+   "device_categories": [
+    "rugged"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_8_0gb_"
+  },
+  {
+   "id": "lpXtNiTwyvdxr92Md5oH",
+   "modifiedDate": "2026-04-28T06:19:27.846093+00:00",
+   "brand": "Redmi",
+   "brand_key": "5ea85306-4809-3508-930b-73e3cbdfdb13",
+   "displayName": "REDMI A7 Pro",
+   "name": "REDMI A7 Pro",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "REDMI A7 Pro",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/8fJcHO52Omq9prweDO7Hu2aa7MzE2RzIiikzfwBC-nhFjtn2A7Vb4j4cR1NAa8gTTs_ysjyTbXqE",
+    "main": "https://lh3.googleusercontent.com/8fJcHO52Omq9prweDO7Hu2aa7MzE2RzIiikzfwBC-nhFjtn2A7Vb4j4cR1NAa8gTTs_ysjyTbXqE",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Immersive 6.9\" display\nMassive 6000mAh battery",
+   "models": "25128RN17Y, 25128RN17A, 25128RN17L, 25128RN17I",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.mi.com/global/product/redmi-a7-pro/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "64GB, 128GB, 256GB",
+    "formFactor": "Phone",
+    "ram": "4.0GB,6.0GB,8.0GB",
+    "display": "6.9-inch",
+    "aerOsValidation": [
+     "16.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "6000mAh (typ)",
+    "frontCamera": "8MP front camera f/2.0",
+    "rearCamera": "13MP main camera 1/3.06\" sensor size f/2.2",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "2*A75@1.8GHz+6*A55@1.6GHz  Max CPU frequency: 1.8GHz"
+   },
+   "createDate": "2026-03-28T04:02:26.223493+00:00",
+   "publishDate": "2026-04-28T06:19:27.846085+00:00",
+   "smrDate": "2032-04-29T16:00:00+00:00",
+   "aerDate": "2026-02-28",
+   "rsDate": "2032-04-29T16:00:00+00:00",
+   "esmrDate": "2032-04-29T16:00:00+00:00",
+   "smrUpdateFrequency": "quarterly",
+   "osVersionSupported": "Android16",
+   "certifications": [],
+   "smrUrl": "https://trust.mi.com/misrc/updates/phone?tab=aerdata",
+   "osSupportUrl": "https://trust.mi.com/misrc/updates/phone?tab=aerdata",
+   "isArchived": false,
+   "search_name": "redmi a7 pro",
+   "sort_name": "redmi a7 pro",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "manufacturer_facet": "Redmi",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Quarterly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 16"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 4.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "redmi",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "quarterly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_16"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_4_0gb_"
+  },
+  {
+   "id": "M1XddIPQw2haPJmISB4h",
+   "modifiedDate": "2026-04-09T01:41:42.258827+00:00",
+   "brand": "Samsung",
+   "brand_key": "0b675380-0bbc-3a92-91bd-7ff0ddf65d2e",
+   "displayName": "Samsung Galaxy Tab S11 5G",
+   "name": "Galaxy Tab S11 5G",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Samsung Galaxy Tab S11 5G",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/uDY8y-5m6js7M5-ArHEBMWkbAG6tH_PenLF_nvV7UZWNP7DhKPUMCM1cerZaCWRvERLsBKy-zSIe",
+    "main": "https://lh3.googleusercontent.com/uDY8y-5m6js7M5-ArHEBMWkbAG6tH_PenLF_nvV7UZWNP7DhKPUMCM1cerZaCWRvERLsBKy-zSIe",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Adapt and thrive in this new era of business with Samsung Galaxy devices, built with productivity, security, and management features that empower your teams to work from anywhere. The embedded Knox platform encrypts your data so you can securely create, collaborate on, and share notes, docs, and media, while powerful cameras let you record fine details or host remote video conferences. And long-lasting, fast-charging battery times mean your device works when you want to. Finally, business-ready support with Enterprise Edition devices can help you streamline your IT mobility strategy better. Choose defense-grade security for your business. Choose Samsung.",
+   "models": "SM-X736N, SM-X736C, SM-X736B",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.samsung.com/uk/business/tablets/galaxy-tab-s/galaxy-tab-s11-grey-128gb-5g-sm-x736bzareub/buy/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "128GB, 256GB, 512GB",
+    "formFactor": "Tablet",
+    "ram": "12.0GB",
+    "display": "11.0-inch",
+    "aerOsValidation": [
+     "16.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "8400 mAh",
+    "frontCamera": "12MP",
+    "rearCamera": "13MP",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": false,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "1x3.63 GHz Cortex-X925 &amp; 3x3.3 GHz Cortex-X4 &amp; 4x2.4 GHz Cortex-A720"
+   },
+   "createDate": "2025-09-16T18:52:08+00:00",
+   "publishDate": "2026-04-09T01:41:42.258816+00:00",
+   "smrDate": "2032-09-29T15:00:00+00:00",
+   "aerDate": "2025-12-28",
+   "rsDate": "2032-09-29T15:00:00+00:00",
+   "esmrDate": "2032-09-29T15:00:00+00:00",
+   "smrUpdateFrequency": "dataNotProvided",
+   "osVersionSupported": "dataNotProvided",
+   "certifications": [],
+   "smrUrl": "https://www.samsungknox.com/en/knox-platform/supported-devices/aer",
+   "osSupportUrl": "https://www.samsungknox.com/en/knox-platform/supported-devices/aer",
+   "isArchived": false,
+   "search_name": "samsung galaxy tab s11 5g",
+   "sort_name": "samsung galaxy tab s11 5g",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Tablet",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "manufacturer_facet": "Samsung",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Data not provided",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 16"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": "12.0GB+",
+   "aer": "true",
+   "device_type": "tablet",
+   "manufacturer": "samsung",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america",
+    "north_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "data_not_provided",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_16"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "__12_0gb_"
+  },
+  {
+   "id": "VDiy70cvG8GPOVMlFYIT",
+   "modifiedDate": "2026-02-15T08:55:16.360706+00:00",
+   "brand": "iMin",
+   "brand_key": "4bfb8975-5ca5-37ad-82d6-3b41fbff5112",
+   "displayName": "iMin Roc 1 Max",
+   "name": "Roc 1 Max",
+   "types": [
+    "enterpriseRecommendedSupport",
+    "ruggedizedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "iMin Roc 1 Max",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/sAy_3OmH2DzKgpdeLu91ZnONSExAFEIKQO7yj74cEk_PtJtkbrU0fQ3cqjRjHrPHyTA3wdi375EjrQ",
+    "main": "https://lh3.googleusercontent.com/sAy_3OmH2DzKgpdeLu91ZnONSExAFEIKQO7yj74cEk_PtJtkbrU0fQ3cqjRjHrPHyTA3wdi375EjrQ",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "iMin Roc 1 Max – Rugged AER-Certified Mobile Computer\n\nThe iMin Roc 1 Max is a high-performance, enterprise-ready rugged mobile computer with IP55 dust/water resistance, MIL-STD-810H certification, and 1.22m drop protection. Running Android 14 with full Android Enterprise Recommended (AER) certification, it supports Zero-touch enrollment, Work Profile, and OEMConfig.\n\nFeaturing a 8.68\" HD glove-touch display, advanced 1D/2D scanning (Honeywell/Zebra optional), 8MP + 5MP cameras, 6700mAh hot-swappable battery, and 5G/Wi-Fi 6 connectivity, Roc 1 Max excels in logistics, warehousing, and field operations.\n\nDurable, secure, and AER-validated for enterprise use.",
+   "models": "I25M02",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.imin.com/product/roc-1-max/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "64GB",
+    "formFactor": "Phone",
+    "ram": "4.0GB",
+    "display": "8.7-inch",
+    "aerOsValidation": [
+     "14.0"
+    ],
+    "dropTest": "Per MIL-STD 810H: 1.22m to steel plate",
+    "ingressProtection": "IP55",
+    "os": "Android 14",
+    "batteryLife": "Capacity: 3.89V / 8000mAh Swappable Smart Battery, Backup Battery: 3.8V / 205 mAh",
+    "frontCamera": "5.0 MP",
+    "rearCamera": "8.0 MP",
+    "fingerPrintSupport": true,
+    "telephonySupport": false,
+    "zeroTouchSupport": true,
+    "nfcSupport": false,
+    "ruggedizedSupport": true,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": false,
+    "processorSpeed": "Octa core (Dual-core A78 2.4GHz Quad-core A55 1.8GHz) NPU 6 TOPS"
+   },
+   "createDate": "2026-01-29T04:01:32.915533+00:00",
+   "publishDate": "2026-02-15T08:55:16.360697+00:00",
+   "smrDate": "2030-12-30T16:00:00+00:00",
+   "aerDate": "2026-02-28",
+   "rsDate": "2030-12-30T16:00:00+00:00",
+   "esmrDate": "2030-12-30T16:00:00+00:00",
+   "smrUpdateFrequency": "quarterly",
+   "osVersionSupported": "dataNotProvided",
+   "certifications": [],
+   "smrUrl": "https://www.imin.com/support-security-updates-android-enterprise-recommended/",
+   "osSupportUrl": null,
+   "isArchived": false,
+   "search_name": "imin roc 1 max",
+   "sort_name": "imin roc 1 max",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "manufacturer_facet": "iMin",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Zero-touch"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 14+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Quarterly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 14"
+   ],
+   "device_categories_facet": [
+    "Rugged"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 4.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "imin",
+   "device_features": [
+    "fingerprint_sensor",
+    "zero_touch"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america",
+    "north_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "quarterly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_14"
+   ],
+   "device_categories": [
+    "rugged"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_4_0gb_"
+  },
+  {
+   "id": "mnKg8FGxlGN2vKhJHcBO",
+   "modifiedDate": "2026-06-02T07:03:03.626248+00:00",
+   "brand": "Motorola",
+   "brand_key": "e839614e-2d99-3133-9aef-fdfda0b2cb77",
+   "displayName": "Motorola moto g87",
+   "name": "moto g87",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Motorola moto g87",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/gdf7NI3MeJKKSWyX0gbDYhhIODFtYksNirX5S6FygKGTph2QHZ1u7tFNnuxcf7RWjXNsHH_n5Opw",
+    "main": "https://lh3.googleusercontent.com/gdf7NI3MeJKKSWyX0gbDYhhIODFtYksNirX5S6FygKGTph2QHZ1u7tFNnuxcf7RWjXNsHH_n5Opw",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Ultra-clear photos\nTake your best shots yet with a 200MP ultra-res camera and Optical Image Stabilization (OIS). With enhanced light sensitivity and lossless 2x zoom, every photo comes out sharp, bright, and full of detail, even at night.\nPerformance built for speed\nSpeed through tasks with the MediaTek Dimensity 6400, an octa-core processor with speeds up to 2.5GHz and advanced 6nm efficiency.\nReliable all day power\nScroll to your heart’s content with a massive 5200mAh battery.\nSuper fast charging\nGet hours of battery life in just minutes with TurboPower charging.\n\nFor devices launched with Android 16 or later, only those with 6 GB of RAM or more are considered Android Enterprise Recommended.",
+   "models": "moto g67, moto g87, moto g max",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "Europe",
+    "MEA"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.motorola.com/gb/en/p/phones/moto-g/87/pmipmjh44mo?pn=PBBS0000GB",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "128GB, 256GB, 512GB",
+    "formFactor": "Phone",
+    "ram": "4.0GB,8.0GB,12.0GB",
+    "display": "6.8-inch",
+    "aerOsValidation": [
+     "16.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "5200mAh",
+    "frontCamera": "32MP",
+    "rearCamera": "200MP + 8MP",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "2.5GHz"
+   },
+   "createDate": "2026-05-12T15:16:41.992115+00:00",
+   "publishDate": "2026-06-02T07:03:03.626242+00:00",
+   "smrDate": "2030-06-30T03:00:00+00:00",
+   "aerDate": "2026-03-28",
+   "rsDate": "2030-06-30T03:00:00+00:00",
+   "esmrDate": "2030-06-30T03:00:00+00:00",
+   "smrUpdateFrequency": "everyTwoMonths",
+   "osVersionSupported": "Android19",
+   "certifications": [],
+   "smrUrl": "https://en-us.support.motorola.com/app/software-security-update/g_id/7112/productid/12536",
+   "osSupportUrl": "https://en-us.support.motorola.com/app/software-security-update/g_id/7112/productid/12536",
+   "isArchived": false,
+   "search_name": "motorola moto g87",
+   "sort_name": "motorola moto g87",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "Europe",
+    "MEA"
+   ],
+   "manufacturer_facet": "Motorola",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Every two months",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 16"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 4.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "motorola",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "europe",
+    "mea"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "every_two_months",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_16"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_4_0gb_"
+  },
+  {
+   "id": "fuKptUWUyjYxi74Bo84z",
+   "modifiedDate": "2025-02-05T14:05:24+00:00",
+   "brand": "Honor",
+   "brand_key": "c648bed5-5d8f-3e68-a699-e0ee5471f77b",
+   "displayName": "HONOR X7c",
+   "name": "HONOR X7c",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "HONOR X7c",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/h5WFMhQowz1eSeFn_9RABatP3O8oigCCBAw33FsOi76tfly3r1VKi2vrCWLqq_UuByDIcSTWN7g",
+    "main": "https://lh3.googleusercontent.com/h5WFMhQowz1eSeFn_9RABatP3O8oigCCBAw33FsOi76tfly3r1VKi2vrCWLqq_UuByDIcSTWN7g",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "5-star Drop Resistance\nWaterproof resistance Level\nExtra-long Battery Life\nSuper-large  Storage\n*NFC support depends on the regions",
+   "models": "ALT-LX2, ALT-LX1, ALT-LX3",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "MEA",
+    "Latin America",
+    "APAC"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.honor.com/global/phones/honor-x7c/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "128GB, 256GB",
+    "formFactor": "Phone",
+    "ram": "6.0GB,8.0GB",
+    "display": "6.8-inch",
+    "aerOsValidation": [
+     "14.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 14",
+    "batteryLife": "5200mAh(typical value),6000mAh(typical value)",
+    "frontCamera": "8MP",
+    "rearCamera": "108MP+2MP",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "4xA73@2.8GHz + 4xA53@1.9GHz"
+   },
+   "createDate": "2024-11-07T05:55:23+00:00",
+   "publishDate": "2025-02-05T14:05:24+00:00",
+   "smrDate": "2026-10-30T16:00:00+00:00",
+   "aerDate": "2024-10-28",
+   "rsDate": "2026-10-30T16:00:00+00:00",
+   "esmrDate": "2026-10-30T16:00:00+00:00",
+   "smrUpdateFrequency": "dataNotProvided",
+   "osVersionSupported": "Android16",
+   "certifications": [],
+   "smrUrl": "https://www.honor.com/global/tech/security-update/",
+   "osSupportUrl": "https://www.honor.com/global/tech/security-update/",
+   "isArchived": false,
+   "search_name": "honor x7c",
+   "sort_name": "honor x7c",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "MEA",
+    "Latin America",
+    "APAC"
+   ],
+   "manufacturer_facet": "Honor",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 14+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Data not provided",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 14"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 6.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "honor",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "mea",
+    "latin_america",
+    "apac"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "data_not_provided",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_14"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_6_0gb_"
+  },
+  {
+   "id": "Izsvmsz1kz384NfrCmH4",
+   "modifiedDate": "2026-05-05T14:41:13.510734+00:00",
+   "brand": "Zebra",
+   "brand_key": "430369c1-8854-3abb-92b8-27d52d9df16a",
+   "displayName": "Zebra Technologies KC50 Android™ Kiosk computers",
+   "name": "KC50 Android™ Kiosk computers",
+   "types": [
+    "ruggedizedSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Zebra Technologies KC50 Android™ Ki...",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/vjxR-4Tbmh4-_mGUFsCpxMegVAnUs4d1g7nN053n2KyKDoqsCg_FKWMe8RtL5_txb9gvC2LQ_S69",
+    "main": "https://lh3.googleusercontent.com/vjxR-4Tbmh4-_mGUFsCpxMegVAnUs4d1g7nN053n2KyKDoqsCg_FKWMe8RtL5_txb9gvC2LQ_S69",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Introducing the Zebra Kiosk System, a cross-industry modular Android-based kiosk solution providing the great flexibility, unmatched manageability, and exceptional consumer design required to deliver a superior customer experience in retail, hospitality, healthcare, postal services, travel, and more.",
+   "models": "KC50",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "resources": [
+    {
+     "url": "https://www.zebra.com/us/en/products/spec-sheets/interactive-kiosks/kc50.html",
+     "title": "Specification Sheet"
+    }
+   ],
+   "status": 0,
+   "website": "https://www.zebra.com/us/en.html",
+   "telephoneNumber": "877-208-7756",
+   "hardwareFeatures": {
+    "flash": "128GB",
+    "formFactor": "Tablet",
+    "ram": "8.0GB",
+    "display": "15.6-inch",
+    "aerOsValidation": [
+     "14.0",
+     "15.0"
+    ],
+    "dropTest": "N/A",
+    "ingressProtection": "IP65 per IEC 60529",
+    "os": "Android 15",
+    "batteryLife": "24 VDC Zebra PSU",
+    "frontCamera": "5 MP",
+    "rearCamera": "N/A",
+    "fingerPrintSupport": false,
+    "telephonySupport": false,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": true,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": false,
+    "processorSpeed": "Qualcomm® 5430 Octa Core chipset 2.1 GHz"
+   },
+   "createDate": "2024-12-13T04:03:52+00:00",
+   "publishDate": "2026-05-05T14:41:13.510722+00:00",
+   "smrDate": "2033-02-28T06:00:00+00:00",
+   "aerDate": "2025-04-28",
+   "rsDate": "2033-02-28T06:00:00+00:00",
+   "esmrDate": "2033-02-28T06:00:00+00:00",
+   "smrUpdateFrequency": "monthly",
+   "osVersionSupported": "Android16",
+   "certifications": [],
+   "smrUrl": "https://www.zebra.com/us/en/support-downloads/android-enterprise-recommended.html",
+   "osSupportUrl": "https://www.zebra.com/us/en/support-downloads/android-enterprise-recommended.html",
+   "isArchived": false,
+   "search_name": "zebra technologies kc50 android kiosk computers",
+   "sort_name": "zebra technologies kc50 android kiosk computers",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Tablet",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "manufacturer_facet": "Zebra",
+   "device_features_facet": [
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 15+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Monthly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 14",
+    "Android 15"
+   ],
+   "device_categories_facet": [
+    "Rugged"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 8.0GB+",
+   "aer": "true",
+   "device_type": "tablet",
+   "manufacturer": "zebra",
+   "device_features": [
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america",
+    "north_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "monthly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_14",
+    "android_15"
+   ],
+   "device_categories": [
+    "rugged"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_8_0gb_"
+  },
+  {
+   "id": "hsnLzvnxITZ4Gu4qq2bc",
+   "modifiedDate": "2025-10-18T13:01:10.601667+00:00",
+   "brand": "Xiaomi",
+   "brand_key": "a2ba3b65-e285-345b-a279-8f07c13cf824",
+   "displayName": "Xiaomi 15 Ultra",
+   "name": "Xiaomi 15 Ultra",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Xiaomi 15 Ultra",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/beJZVC6QY0jA-dKwz8UwOael41Oj-S3njCc3t36tXpNcoV-x1BGd9K1g-Hwnzuqf0UjcKtvdBW0",
+    "main": "https://lh3.googleusercontent.com/beJZVC6QY0jA-dKwz8UwOael41Oj-S3njCc3t36tXpNcoV-x1BGd9K1g-Hwnzuqf0UjcKtvdBW0",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Pinnacle Photography",
+   "models": "25010PN30I, 25010PN30G, 25010PN30C, 25019PNF3C",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.mi.com/en/index.html",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "256GB, 512GB, 1024GB",
+    "formFactor": "Phone",
+    "ram": "12.0GB,16.0GB",
+    "display": "6.7-inch",
+    "aerOsValidation": [
+     "15.0",
+     "16.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "5410mAh (typ) Xiaomi Surge Battery",
+    "frontCamera": "32MP in-display selfie camera",
+    "rearCamera": "50MP mode (wide/ultra wide/telephoto) 200MP mode (periscope)",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "CPU:2 x Prime Core, up to 4.32GHz6 x Performance Core, up to 3.53GHz"
+   },
+   "createDate": "2025-03-02T04:02:33+00:00",
+   "publishDate": "2025-10-18T13:01:10.601654+00:00",
+   "smrDate": "2031-02-27T16:00:00+00:00",
+   "aerDate": "2025-01-28",
+   "rsDate": "2031-02-27T16:00:00+00:00",
+   "esmrDate": "2031-02-27T16:00:00+00:00",
+   "smrUpdateFrequency": "quarterly",
+   "osVersionSupported": "Android15",
+   "certifications": [],
+   "smrUrl": "https://trust.mi.com/misrc/updates/phone?tab=aerdata",
+   "osSupportUrl": "https://trust.mi.com/misrc/updates/phone?tab=aerdata",
+   "isArchived": false,
+   "search_name": "xiaomi 15 ultra",
+   "sort_name": "xiaomi 15 ultra",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "manufacturer_facet": "Xiaomi",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Quarterly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 15",
+    "Android 16"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": "12.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "xiaomi",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "quarterly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_15",
+    "android_16"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "__12_0gb_"
+  },
+  {
+   "id": "ECcJSovQwDgbi4pCmW5a",
+   "modifiedDate": "2026-04-27T14:59:32.685339+00:00",
+   "brand": "Xiaomi",
+   "brand_key": "be90c66b-69a2-3972-a4c9-2bcedde98e0d",
+   "displayName": "Xiaomi Pad 8",
+   "name": "Xiaomi Pad 8",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Xiaomi Pad 8",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/Yxz4U56aaCqIKmL3gEn1gAzHUsfEAJwR_OZqjGRY_ejiWmB7g7dDGagsug5OfQksF9KOKOohEAVd",
+    "main": "https://lh3.googleusercontent.com/Yxz4U56aaCqIKmL3gEn1gAzHUsfEAJwR_OZqjGRY_ejiWmB7g7dDGagsug5OfQksF9KOKOohEAVd",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Powerfully productive",
+   "models": "25097RP43C",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.mi.com/global/product/xiaomi-pad-8/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "128GB, 256GB",
+    "formFactor": "Tablet",
+    "ram": "8.0GB,12.0GB",
+    "display": "11.2-inch",
+    "aerOsValidation": [
+     "16.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "9200mAh (typ)",
+    "frontCamera": "8M 1/4\" 1.12μm pixel size f/2.28",
+    "rearCamera": "13M 1/3.06\" 1.12μm pixel size f/2.2 PDAF",
+    "fingerPrintSupport": false,
+    "telephonySupport": false,
+    "zeroTouchSupport": true,
+    "nfcSupport": false,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "1x X4@3.2GHz+3x A720@3.0GHz +2x A720@2.8GHz+2x A720 @2.0GHz"
+   },
+   "createDate": "2025-09-28T04:02:12.887989+00:00",
+   "publishDate": "2026-04-27T14:59:32.685326+00:00",
+   "smrDate": "2032-03-30T16:00:00+00:00",
+   "aerDate": "2025-10-28",
+   "rsDate": "2032-03-30T16:00:00+00:00",
+   "esmrDate": "2032-03-30T16:00:00+00:00",
+   "smrUpdateFrequency": "quarterly",
+   "osVersionSupported": "Android16",
+   "certifications": [],
+   "smrUrl": "https://trust.mi.com/misrc/updates/phone?tab=aerdata",
+   "osSupportUrl": "https://trust.mi.com/misrc/updates/phone?tab=aerdata",
+   "isArchived": false,
+   "search_name": "xiaomi pad 8",
+   "sort_name": "xiaomi pad 8",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Tablet",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "manufacturer_facet": "Xiaomi",
+   "device_features_facet": [
+    "Zero-touch"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Quarterly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 16"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 8.0GB+",
+   "aer": "true",
+   "device_type": "tablet",
+   "manufacturer": "xiaomi",
+   "device_features": [
+    "zero_touch"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "quarterly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_16"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_8_0gb_"
+  },
+  {
+   "id": "9eh9grPSFlHHoF8G5cvB",
+   "modifiedDate": "2026-06-09T05:59:16.127566+00:00",
+   "brand": "TCL",
+   "brand_key": "a4f32762-1520-3358-aaa4-c27e4c98af90",
+   "displayName": "TCL K70 Power 4G",
+   "name": "TCL K70 Power 4G",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "TCL K70 Power 4G",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/czkoDOWqvalllBCqw4_8r6zvmwr-SfNd1hl8Q6SrvCIJ7ELYprp9tH3QI45Tzm09Gf_WxyoQhPqL",
+    "main": "https://lh3.googleusercontent.com/czkoDOWqvalllBCqw4_8r6zvmwr-SfNd1hl8Q6SrvCIJ7ELYprp9tH3QI45Tzm09Gf_WxyoQhPqL",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "1:6500mAh Mega Battery — Power for 3 Days\n2:MediaTek Helio G100 — Smooth Performance for 5 Years\n3:6.8″ Big Screen &amp; DTS Sound — Entertainment That Surrounds You\n4: 50MP Rear Camera— Crystal-Clear Shots, Every Time\nFor Devices released with Android 16 and above, only variants with 6GB and above are Android Enterprise Recommended",
+   "models": "T522E",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "Latin America",
+    "MEA"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.tcl.com/global/en/mobile/tcl-k70-power-4g",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "256GB",
+    "formFactor": "Phone",
+    "ram": "4.0GB,8.0GB",
+    "display": "6.8-inch",
+    "aerOsValidation": [
+     "16.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "6500mAh",
+    "frontCamera": "8MP",
+    "rearCamera": "50MP",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "2.2GHz"
+   },
+   "createDate": "2026-02-04T07:07:08.630329+00:00",
+   "publishDate": "2026-06-09T05:59:16.127557+00:00",
+   "smrDate": "2032-03-30T16:00:00+00:00",
+   "aerDate": "2026-01-28",
+   "rsDate": "2032-03-30T16:00:00+00:00",
+   "esmrDate": "2032-03-30T16:00:00+00:00",
+   "smrUpdateFrequency": "quarterly",
+   "osVersionSupported": "Android16",
+   "certifications": [],
+   "smrUrl": "https://www.tcl.com/global/en/mobile/tcl-k70-power-4g",
+   "osSupportUrl": "https://www.tcl.com/global/en/mobile/tcl-k70-power-4g",
+   "isArchived": false,
+   "search_name": "tcl k70 power 4g",
+   "sort_name": "tcl k70 power 4g",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "Latin America",
+    "MEA"
+   ],
+   "manufacturer_facet": "TCL",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Quarterly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 16"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 4.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "tcl",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "latin_america",
+    "mea"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "quarterly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_16"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_4_0gb_"
+  },
+  {
+   "id": "bswkIlxY3XxPDrQ7TbYb",
+   "modifiedDate": "2025-12-11T17:06:08.435541+00:00",
+   "brand": "M3 Mobile",
+   "brand_key": "607bcb4b-4d76-38c3-9a20-47489668e71f",
+   "displayName": "M3 Mobile SM30",
+   "name": "M3SM30",
+   "types": [
+    "ruggedizedSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "M3 Mobile SM30",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/vOc0rC2bpQDkc-M1uJHnydm0WlPzguh9X5PwlJxbmRD-7kVf-8VkfXySISpiXCPBujx7dwijcj-Ybw",
+    "main": "https://lh3.googleusercontent.com/vOc0rC2bpQDkc-M1uJHnydm0WlPzguh9X5PwlJxbmRD-7kVf-8VkfXySISpiXCPBujx7dwijcj-Ybw",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "A revolutionary premium performance mobile computer that surpasses all existing performances.\n\nEquipped with Qualcomm's top-of-the-line chipset QCM6490, it enables high-speed data processing at up to 2.7GHz, and dramatically improves productivity and efficiency in the workplace through AI-based image analysis and high-speed barcode scanning functions.\n\nIt also supports Wi-Fi 6E, 5G, and Android 14 to 18 OS, ensuring long-term software compatibility and regular security updates.\n\n8GB of RAM, 128GB of storage, and up to a 7,000mAh (optional) battery provide powerful work continuity that sets it apart from existing mobile devices.\nFinally, with IP68-rated water and dust resistance and MIL-STD-810H military standard certification, this premium industrial mobile computer surpasses existing limitations in every aspect, from functionality to durability.",
+   "models": "M3SM30",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA"
+   ],
+   "resources": [
+    {
+     "url": "https://www.m3mobile.co.kr/upload/business/1763535056_HjALAv_20.pdf",
+     "title": "SM30 Specsheet"
+    },
+    {
+     "url": "https://www.m3mobile.co.kr/upload/business/1763535863_BT67ty_21.pdf",
+     "title": "SM30 User Manual"
+    }
+   ],
+   "status": 0,
+   "website": "https://www.m3mobile.co.kr/eng/business/detail.html?id=28&bid=22&bid_2=23",
+   "telephoneNumber": "+82 2 2022 1364",
+   "hardwareFeatures": {
+    "flash": "128GB",
+    "formFactor": "Phone",
+    "ram": "8.0GB",
+    "display": "5.7-inch",
+    "aerOsValidation": [
+     "14.0"
+    ],
+    "dropTest": "1.5m drops to steel across",
+    "ingressProtection": "IP68",
+    "os": "Android 14",
+    "batteryLife": "Li-Ion 3.8V, 5,000mAh",
+    "frontCamera": "8M",
+    "rearCamera": "16M",
+    "fingerPrintSupport": false,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": true,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": false,
+    "processorSpeed": "2.7 GHz Octa-core processor"
+   },
+   "createDate": "2025-04-21T04:08:47.244794+00:00",
+   "publishDate": "2025-12-11T17:06:08.435531+00:00",
+   "smrDate": "2027-03-30T15:00:00+00:00",
+   "aerDate": "2025-12-28",
+   "rsDate": "2027-03-30T15:00:00+00:00",
+   "esmrDate": "2027-03-30T15:00:00+00:00",
+   "smrUpdateFrequency": "quarterly",
+   "osVersionSupported": "Android14",
+   "certifications": [],
+   "smrUrl": "https://www.m3mobile.co.kr/eng/solution/update.html",
+   "osSupportUrl": "https://www.m3mobile.co.kr/eng/solution/update.html",
+   "isArchived": false,
+   "search_name": "m3 mobile sm30",
+   "sort_name": "m3 mobile sm30",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA"
+   ],
+   "manufacturer_facet": "M3 Mobile",
+   "device_features_facet": [
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 14+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Quarterly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 14"
+   ],
+   "device_categories_facet": [
+    "Rugged"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 8.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "m3_mobile",
+   "device_features": [
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "quarterly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_14"
+   ],
+   "device_categories": [
+    "rugged"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_8_0gb_"
+  },
+  {
+   "id": "qgEybqLtNQLCxo06DieW",
+   "modifiedDate": "2026-06-24T20:09:17.540879+00:00",
+   "brand": "Seuic",
+   "brand_key": "b44f1d10-151b-376c-8ac9-afc889aba8b3",
+   "displayName": "SEUIC AUTOID10",
+   "name": "AUTOID10",
+   "types": [
+    "enterpriseRecommendedSupport",
+    "ruggedizedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "SEUIC AUTOID10",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/SOfT1-afyBKvQO38YoFd31GJXfCiUUDgrIOonCSqCvsxErt9FqfzWL86_-M0V07fK_IAHNXhEkNS2A",
+    "main": "https://lh3.googleusercontent.com/SOfT1-afyBKvQO38YoFd31GJXfCiUUDgrIOonCSqCvsxErt9FqfzWL86_-M0V07fK_IAHNXhEkNS2A",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "A mobile terminal with one-handed operation designed for industrial and inventory use, new platform combining powerful \"Core\" capabilities with fast and accurate AI scanning. Design the battery back cover so that it is easy to replace battery. Furthermore, the new Wi-Fi6 Ready Technology brings a smooth communication experience. A long standby battery is a real challenge, escorting the continuous operation strength for two shifts for the frontline work. With the highest level of protection, it's easy to handle when it comes to water, dust, and falls. It's designed to enhance human-computer interactions in several ways, including more precise reminders and a more intuitive terminal operation. Furthermore, it also supports scanning options for standard and extended ranges to meet the needs of a wide range of customers.",
+   "models": "AUTOID10",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "North America",
+    "Latin America",
+    "MEA",
+    "Europe",
+    "APAC"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://en.seuic.com/product/d9lkELVa.html",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "64GB",
+    "formFactor": "Phone",
+    "ram": "4.0GB",
+    "display": "4.0-inch",
+    "aerOsValidation": [
+     "14.0"
+    ],
+    "dropTest": "The certification name is GB/T 2423.7-2018. The height is 1.8m. The surface material is PC+10% G",
+    "ingressProtection": "IP67",
+    "os": "Android 14",
+    "batteryLife": "5200mA",
+    "frontCamera": "5Mp",
+    "rearCamera": "13Mp",
+    "fingerPrintSupport": false,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": true,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": false,
+    "processorSpeed": "Qualcomm Snapdragon SM6115, Quad high-performance Kryocores 2.0 GHz"
+   },
+   "createDate": "2022-03-30T04:03:30+00:00",
+   "publishDate": "2026-06-24T20:09:17.540863+00:00",
+   "smrDate": "2027-12-30T16:00:00+00:00",
+   "aerDate": "2023-01-28",
+   "rsDate": "2027-12-30T16:00:00+00:00",
+   "esmrDate": "2027-12-30T16:00:00+00:00",
+   "smrUpdateFrequency": "quarterly",
+   "osVersionSupported": "Android14",
+   "certifications": [],
+   "smrUrl": "https://iot.seuic.com/previewFile/Seuic-AER.html",
+   "osSupportUrl": "https://iot.seuic.com/previewFile/Seuic-AER.html",
+   "isArchived": false,
+   "search_name": "seuic autoid10",
+   "sort_name": "seuic autoid10",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "North America",
+    "Latin America",
+    "MEA",
+    "Europe",
+    "APAC"
+   ],
+   "manufacturer_facet": "Seuic",
+   "device_features_facet": [
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Small - up to 4.5\"",
+   "os_version_facet": "Android 14+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Quarterly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 14"
+   ],
+   "device_categories_facet": [
+    "Rugged"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 4.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "seuic",
+   "device_features": [
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "north_america",
+    "latin_america",
+    "mea",
+    "europe",
+    "apac"
+   ],
+   "display_size": "small_up_to_4_5_",
+   "smr_update_frequency": "quarterly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_14"
+   ],
+   "device_categories": [
+    "rugged"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_4_0gb_"
+  },
+  {
+   "id": "kN08tLr0dDYpH7wdFUyD",
+   "modifiedDate": "2024-04-26T08:34:28+00:00",
+   "brand": "Motorola",
+   "brand_key": "19e9da88-1ec5-3093-b6c9-f15310d7c52c",
+   "displayName": "Motorola moto g53j 5G",
+   "name": "moto g53j 5G",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Motorola moto g53j 5G",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/Ux6VCF5TkivQhCg33xBavldq0rEjukjKmeG-wXaz9XF2J81wzR-Cxq3K3lOmjk8Q-fuimTXx9TEH",
+    "main": "https://lh3.googleusercontent.com/Ux6VCF5TkivQhCg33xBavldq0rEjukjKmeG-wXaz9XF2J81wzR-Cxq3K3lOmjk8Q-fuimTXx9TEH",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Bringing the speed and functionality of 5G closer to you. \n\nHigh definition 50 million pixels. Clearly captures a special moment in any light. The macro camera lens allows you to capture details from close range.\n\n5G speed. Experience a new level of performance with the smooth performance of the Snapdragon® 480+ 5G processor.\n\nLong drive. A long-lasting battery supports your current moment. Compatible with TurboPower chargers. It can be charged in a short time.",
+   "models": "moto g53j 5G",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.motorola.co.jp/smartphone-moto-g53j/p",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "64GB, 128GB",
+    "formFactor": "Phone",
+    "ram": "4.0GB,6.0GB",
+    "display": "6.5-inch",
+    "aerOsValidation": [
+     "13.0",
+     "14.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 14",
+    "batteryLife": "5000 mAh",
+    "frontCamera": "8MP",
+    "rearCamera": "50MP + 2MP Macro",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "2.2 Ghz"
+   },
+   "createDate": "2023-04-12T04:07:49+00:00",
+   "publishDate": "2024-04-26T08:34:28+00:00",
+   "smrDate": "2026-12-31T03:00:00+00:00",
+   "aerDate": "2023-03-28",
+   "rsDate": "2026-12-31T03:00:00+00:00",
+   "esmrDate": "2026-12-31T03:00:00+00:00",
+   "smrUpdateFrequency": "everyTwoMonths",
+   "osVersionSupported": "Android14",
+   "certifications": [],
+   "smrUrl": "https://motorola-global-portal.custhelp.com/app/software-security-update/g_id/7112/productid/11585",
+   "osSupportUrl": "",
+   "isArchived": false,
+   "search_name": "motorola moto g53j 5g",
+   "sort_name": "motorola moto g53j 5g",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC"
+   ],
+   "manufacturer_facet": "Motorola",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 14+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Every two months",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 13",
+    "Android 14"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 4.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "motorola",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "every_two_months",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_13",
+    "android_14"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_4_0gb_"
+  },
+  {
+   "id": "Ik1YnRMA173KdRUgBanY",
+   "modifiedDate": "2025-06-09T09:15:30+00:00",
+   "brand": "Oppo",
+   "brand_key": "3ff346c9-c890-3d5c-8872-e2b268a66621",
+   "displayName": "OPPO Reno12 F/Reno12 FS/Reno11 FS",
+   "name": "Reno12 F",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "OPPO Reno12 F/Reno12 FS/Reno11 FS",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/GST0SIp7Ap7ragRpbk5f8Da5Z3lkES3AnNPc_MIYqhhXfyIQU1loBAr8yEqvezXEah5GE0XoF9ni",
+    "main": "https://lh3.googleusercontent.com/GST0SIp7Ap7ragRpbk5f8Da5Z3lkES3AnNPc_MIYqhhXfyIQU1loBAr8yEqvezXEah5GE0XoF9ni",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "“It,s shines with superb experiences, thin and light design, and excellent entertainment credentials. Its Ultra-Clear Portrait Camera System turns it into a creative powerhouse and the long-lasting, fast-charging battery cements It’s winning balance of style and substance.”",
+   "models": "CPH2687",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "MEA"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.oppo.com/en/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "256GB",
+    "formFactor": "Phone",
+    "ram": "8.0GB",
+    "display": "6.7-inch",
+    "aerOsValidation": [
+     "14.0",
+     "15.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 16",
+    "batteryLife": "4870mAh/5000mAh(Rated/Typ) Rechargeable Li-ion Battery",
+    "frontCamera": "32M",
+    "rearCamera": "50M+8M+2M",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "4 x A73 @2.8GHz 4 x A53 @1.9GHz"
+   },
+   "createDate": "2024-07-22T04:10:09+00:00",
+   "publishDate": "2025-06-09T09:15:30+00:00",
+   "smrDate": "2027-07-30T16:00:00+00:00",
+   "aerDate": "2024-07-28",
+   "rsDate": "2027-07-30T16:00:00+00:00",
+   "esmrDate": "2027-07-30T16:00:00+00:00",
+   "smrUpdateFrequency": "dataNotProvided",
+   "osVersionSupported": "dataNotProvided",
+   "certifications": [],
+   "smrUrl": "https://security.oppo.com/en/mend",
+   "osSupportUrl": "https://security.oppo.com/en/mend",
+   "isArchived": false,
+   "search_name": "oppo reno12 freno12 fsreno11 fs",
+   "sort_name": "oppo reno12 freno12 fsreno11 fs",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "MEA"
+   ],
+   "manufacturer_facet": "Oppo",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 16+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Data not provided",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 14",
+    "Android 15"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 8.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "oppo",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "mea"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "data_not_provided",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_14",
+    "android_15"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_8_0gb_"
+  },
+  {
+   "id": "WhcUIXPyzjMO3WOFlRIJ",
+   "modifiedDate": "2026-04-10T13:00:45.883919+00:00",
+   "brand": "Datalogic",
+   "brand_key": "42a82896-466c-33d0-843c-3d87ea827fe7",
+   "displayName": "Datalogic Joya Smart/Smart+",
+   "name": "Joya Smart/Smart+",
+   "types": [
+    "enterpriseRecommendedSupport",
+    "ruggedizedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Datalogic Joya Smart/Smart+",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/ldYzLvFX29OE71_1WOBxLwStg8KL8vZedx_wxQjLZd0R1cq70zI9B1Fs41QHFhXBMPAWZXIVSUCH",
+    "main": "https://lh3.googleusercontent.com/ldYzLvFX29OE71_1WOBxLwStg8KL8vZedx_wxQjLZd0R1cq70zI9B1Fs41QHFhXBMPAWZXIVSUCH",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Joya Smart family delivers powerful benefits for both retailers and shoppers. Its large, brilliant 5” display gives shoppers full control and visibility throughout their journey, making the experience intuitive and engaging. Integrated NFC contactless payment enables instant checkout with a simple tap, saving time while allowing retailers to reduce kiosks, lower costs, and optimize store space.\nWith Joya Smart and Smart+, Smart Cart Mode introduces, an embedded AI algorithm powered by a rear camera to ensure a seamless and secure shopping experience. Best-in-class barcode reading captures even damaged labels, while Datalogic’s Green Spot and smiley LED provide instant feedback. Enhanced performance, expanded memory, and Wi-Fi 6E support demanding applications, while wireless charging and long-term Android ensure lasting investment protection. Combined with sustainability, extended lifecycle services, and Datalogic Mobility Suite, Joya Smart is the ultimate solution for smarter retail.",
+   "models": "Joya Smart",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "resources": [
+    {
+     "url": "https://datalogic.github.io/",
+     "title": "datalogic.github.io"
+    },
+    {
+     "url": "https://www.datalogic.com/eng/retail/mobile-computers/joya-smart-smart+-pd-1148.html",
+     "title": "Joya Smart/Smart+"
+    }
+   ],
+   "status": 0,
+   "website": "https://www.datalogic.com/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "64GB",
+    "formFactor": "Phone",
+    "ram": "6.0GB",
+    "display": "5.0-inch",
+    "aerOsValidation": [
+     "15.0"
+    ],
+    "dropTest": "MIL-STD-810H",
+    "ingressProtection": "IP65/IP68",
+    "os": "Android 15",
+    "batteryLife": "3,500 mAh",
+    "frontCamera": "-",
+    "rearCamera": "13MP",
+    "fingerPrintSupport": false,
+    "telephonySupport": false,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": true,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": false,
+    "processorSpeed": "2.4 GHz"
+   },
+   "createDate": "2026-03-22T04:02:07.151929+00:00",
+   "publishDate": "2026-04-10T13:00:45.883909+00:00",
+   "smrDate": "2033-11-29T23:00:00+00:00",
+   "aerDate": "2025-10-28",
+   "rsDate": "2033-11-29T23:00:00+00:00",
+   "esmrDate": "2033-11-29T23:00:00+00:00",
+   "smrUpdateFrequency": "monthly",
+   "osVersionSupported": "Android15",
+   "certifications": [],
+   "smrUrl": "https://www.datalogic.com/eng/mobile-computers/datalogic-shield-pd-846.html",
+   "osSupportUrl": "https://www.datalogic.com/eng/mobile-computers/datalogic-shield-pd-846.html",
+   "isArchived": false,
+   "search_name": "datalogic joya smartsmart",
+   "sort_name": "datalogic joya smartsmart",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America",
+    "North America"
+   ],
+   "manufacturer_facet": "Datalogic",
+   "device_features_facet": [
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Medium - 4.5\" and 5.5\"",
+   "os_version_facet": "Android 15+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Monthly",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 15"
+   ],
+   "device_categories_facet": [
+    "Rugged"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 6.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "datalogic",
+   "device_features": [
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america",
+    "north_america"
+   ],
+   "display_size": "medium_4_5_and_5_5_",
+   "smr_update_frequency": "monthly",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_15"
+   ],
+   "device_categories": [
+    "rugged"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_6_0gb_"
+  },
+  {
+   "id": "tFUi6fUJinHbQZoYD7mP",
+   "modifiedDate": "2024-12-21T14:30:58+00:00",
+   "brand": "Redmi",
+   "brand_key": "2109a07c-a7e9-35b4-a9ff-2f099655166c",
+   "displayName": "Redmi 12",
+   "name": "Redmi 12",
+   "types": [
+    "knowledgeWorkerSupport",
+    "enterpriseRecommendedSupport"
+   ],
+   "enabled": null,
+   "footnotes": null,
+   "gridTitle": "Redmi 12",
+   "imageUrls": {
+    "original": "https://lh3.googleusercontent.com/FsL_sD06CeFaKX4ztPGVHVEdS2cL3fcC5mrz7oB7-WW8v4mbsMikquQMoeOjHrxSH8lkfxA0mQ",
+    "main": "https://lh3.googleusercontent.com/FsL_sD06CeFaKX4ztPGVHVEdS2cL3fcC5mrz7oB7-WW8v4mbsMikquQMoeOjHrxSH8lkfxA0mQ",
+    "shot_1": "",
+    "shot_2": ""
+   },
+   "markedForDeletion": null,
+   "marketingDescription": "Large 90Hz FHD+ display\nPremium glass back design",
+   "models": "23053RN02Y, 23053RN02I, 23053RN02A, 23053RN02L",
+   "videos": null,
+   "published": true,
+   "regions": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "resources": null,
+   "status": 0,
+   "website": "https://www.mi.com/global/product/redmi-12/",
+   "telephoneNumber": null,
+   "hardwareFeatures": {
+    "flash": "64GB, 128GB",
+    "formFactor": "Phone",
+    "ram": "4.0GB",
+    "display": "6.8-inch",
+    "aerOsValidation": [
+     "13.0",
+     "14.0",
+     "15.0"
+    ],
+    "dropTest": null,
+    "ingressProtection": null,
+    "os": "Android 15",
+    "batteryLife": "5000mAh battery (typ)",
+    "frontCamera": "8MP camera",
+    "rearCamera": "50MP+8MP+2MP triple camera",
+    "fingerPrintSupport": true,
+    "telephonySupport": true,
+    "zeroTouchSupport": true,
+    "nfcSupport": true,
+    "ruggedizedSupport": false,
+    "enterpriseRecommendedSupport": true,
+    "knowledgeWorkerSupport": true,
+    "processorSpeed": "2 x Arm Cortex-A75 @ 2GHz6 x Arm Cortex-A55 @ 1.8GHz"
+   },
+   "createDate": "2023-06-27T04:03:54+00:00",
+   "publishDate": "2024-12-21T14:30:58+00:00",
+   "smrDate": "2027-06-29T16:00:00+00:00",
+   "aerDate": "2023-06-28",
+   "rsDate": "2027-06-29T16:00:00+00:00",
+   "esmrDate": "2027-06-29T16:00:00+00:00",
+   "smrUpdateFrequency": "dataNotProvided",
+   "osVersionSupported": "dataNotProvided",
+   "certifications": [],
+   "smrUrl": "https://trust.mi.com/psirt/updates/phone?tab=aerdata",
+   "osSupportUrl": "https://trust.mi.com/misrc/updates/phone?tab=aerdata",
+   "isArchived": false,
+   "search_name": "redmi 12",
+   "sort_name": "redmi 12",
+   "certifications_obj": {
+    "commonCriteria": null,
+    "commonCriteriaUrl": null
+   },
+   "aer_facet": true,
+   "device_type_facet": "Phone",
+   "region_names_facet": [
+    "APAC",
+    "Europe",
+    "MEA",
+    "Latin America"
+   ],
+   "manufacturer_facet": "Redmi",
+   "device_features_facet": [
+    "Fingerprint Sensor",
+    "Telephony",
+    "Zero-touch",
+    "NFC"
+   ],
+   "display_size_facet": "Large - 5.5\" and up",
+   "os_version_facet": "Android 15+",
+   "certifications_facet": [],
+   "smr_update_frequency_facet": "Data not provided",
+   "os_version_supported_facet": null,
+   "aer_os_version_validation_facet": [
+    "Android 13",
+    "Android 14",
+    "Android 15"
+   ],
+   "device_categories_facet": [
+    "Knowledge Worker"
+   ],
+   "rsDate_facet": "Yes",
+   "is_archived_facet": false,
+   "ram_size_facet": " 4.0GB+",
+   "aer": "true",
+   "device_type": "phone",
+   "manufacturer": "redmi",
+   "device_features": [
+    "fingerprint_sensor",
+    "telephony",
+    "zero_touch",
+    "nfc"
+   ],
+   "region_names": [
+    "apac",
+    "europe",
+    "mea",
+    "latin_america"
+   ],
+   "display_size": "large_5_5_and_up",
+   "smr_update_frequency": "data_not_provided",
+   "os_version_supported": null,
+   "aer_os_version_validation": [
+    "android_13",
+    "android_14",
+    "android_15"
+   ],
+   "device_categories": [
+    "knowledge_worker"
+   ],
+   "rs_date": "yes",
+   "is_archived": "false",
+   "ram_size": "_4_0gb_"
+  }
+ ]
+}
