@@ -346,11 +346,26 @@ def search_model(model_query: str) -> dict:
 
     # Per la cronologia si privilegia un dato da fonte ufficiale, se c'è:
     # una build verificata vale più del titolo di una notizia.
+    #
+    # MA SOLO SE PORTA DAVVERO UN FIRMWARE. Alcune fonti ufficiali
+    # confermano che un modello esiste senza pubblicarne la versione (il
+    # catalogo Android Enterprise Recommended, l'elenco Oppo): sceglierle
+    # comunque faceva finire in cronologia un «—» mentre una notizia
+    # riportava una patch datata. È la stessa regola già adottata per la
+    # scelta del risultato — si preferisce ciò CHE HA la versione — qui
+    # applicata anche a quello che si annota.
+    def _ha_firmware(voce: dict) -> bool:
+        return bool(voce.get("os_version") or voce.get("build") or voce.get("patch_level"))
+
     structured_relevant = [i for i in structured_items if i.get("is_relevant")]
     rilevanti = [i for i in items if i.get("is_relevant")]
-    best = (
-        structured_relevant[0] if structured_relevant
-        else (rilevanti[0] if rilevanti else (items[0] if items else None))
+    best = next(
+        (i for i in structured_relevant if _ha_firmware(i)),
+        next(
+            (i for i in rilevanti if _ha_firmware(i)),
+            (structured_relevant[0] if structured_relevant
+             else (rilevanti[0] if rilevanti else (items[0] if items else None))),
+        ),
     )
     if best:
         storage.log_search(model_query, best)

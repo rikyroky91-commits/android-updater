@@ -177,7 +177,13 @@ class TestGuastoDellaFonte(unittest.TestCase):
         temporaneo non deve far sparire i dispositivi dall'app."""
         aer.reset_cache()
         aer._dispositivi, aer._per_nome, aer._per_codice = aer._indicizza(VOCI)
-        aer._scaricato_a = 0.0        # scaduto: forza un nuovo scaricamento
+        # `None` = mai scaricato, quindi il prossimo `carica()` riprova.
+        # Prima qui c'era `0.0`, che sembrava «scaduto da sempre» e invece
+        # è un istante di `time.monotonic()` quasi coincidente con l'avvio
+        # del processo: la cache risultava FRESCA, `_scarica` non veniva
+        # mai chiamato e il test falliva su una macchina appena avviata
+        # mentre passava su una accesa da più di dodici ore.
+        aer._scaricato_a = None
 
         originale = aer._scarica
         aer._scarica = lambda: (_ for _ in ()).throw(OSError("rete assente"))
@@ -199,6 +205,117 @@ class TestGuastoDellaFonte(unittest.TestCase):
         finally:
             aer._scarica = originale
             aer.reset_cache()
+
+
+class TestIntegrazioneNelleFonti(unittest.TestCase):
+    """Il catalogo AER si AGGIUNGE alle fonti esistenti, non le sostituisce.
+
+    La misura del 2026-08-02 dice perché: sulla pagina ufficiale Honor ha 26
+    modelli tutti con versione contro i 21 del JSON, e vivo 20 contro 15.
+    Sostituirle avrebbe tolto dati. Quello che questa fonte aggiunge e che
+    nessun'altra dà sono i codici modello verificati, la finestra di
+    supporto, e OnePlus — che non ha nessun'altra fonte strutturata.
+    """
+
+    def setUp(self):
+        from core import sources
+        self.sources = sources
+        aer.reset_cache()
+        aer._dispositivi, aer._per_nome, aer._per_codice = aer._indicizza(VOCI)
+        aer._scaricato_a = time.monotonic()
+
+    def tearDown(self):
+        aer.reset_cache()
+
+    def test_le_fonti_per_marca_restano_tutte(self):
+        """Il punto della scelta: nessuna fonte ufficiale è stata rimossa."""
+        chiavi = {s.key for s in self.sources.all_sources()}
+        for attesa in ("honor_aer", "realme_aer", "oppo_aer", "vivo_aer", "aer_catalog"):
+            self.assertIn(attesa, chiavi, f"la fonte «{attesa}» è sparita dal registro")
+
+    def test_nome_samsung_allineato_alle_altre_fonti(self):
+        """L'AER scrive «Samsung Galaxy S25 Ultra», la fonte FOTA produce
+        «Galaxy S25 Ultra». Senza allineamento sarebbero due dispositivi
+        distinti in archivio, ciascuno con metà della storia."""
+        self.assertEqual(
+            self.sources.nome_aer_normalizzato("Samsung Galaxy S25 Ultra", "Samsung"),
+            "Galaxy S25 Ultra")
+        self.assertEqual(
+            self.sources.nome_aer_normalizzato("Google Pixel 10 Pro Fold", "Google"),
+            "Pixel 10 Pro Fold")
+
+    def test_motorola_ricondotto_alla_forma_del_progetto(self):
+        """L'AER scrive «Motorola moto g14», il resto del progetto «Moto
+        G14»: senza questo erano due dispositivi diversi. È il doppione che
+        ha fatto fallire un test della cronologia ricerche."""
+        self.assertEqual(
+            self.sources.nome_aer_normalizzato("Motorola moto g14", "Motorola"),
+            "Moto G14")
+
+    def test_le_altre_marche_tengono_il_prefisso(self):
+        """Lì il prefisso È la convenzione del progetto: toglierlo
+        creerebbe il problema opposto."""
+        for nome in ("OPPO Find X9 Pro", "vivo V70", "realme 14 Pro 5G",
+                     "HONOR 600e", "OnePlus 12", "Redmi 12"):
+            self.assertEqual(self.sources.nome_aer_normalizzato(nome), nome)
+
+    def test_la_versione_di_lancio_non_diventa_versione_del_dispositivo(self):
+        """Il punto più delicato dell'integrazione.
+
+        Questa fonte conosce solo la versione DI LANCIO. Dichiararla come
+        `android_version` la rendeva un dato strutturato che scavalcava le
+        altre fonti: in prova, un «Moto G14 — patch di luglio 2026»,
+        datato e attuale, veniva sostituito in cronologia da un «Android
+        14» di fabbrica. Per un tracker degli aggiornamenti è il contrario
+        di quello che serve.
+        """
+        con_versione = [d for d in aer.all_devices() if d["launch_android"]]
+        self.assertTrue(con_versione, "la fixture non ha device con versione di lancio")
+        item = self.sources._item_da_aer(con_versione[0])
+        self.assertIsNone(item.android_version)
+        # Non va persa, però: resta leggibile e marcata come di fabbrica.
+        self.assertIn("FABBRICA", item.size_info.upper())
+
+    def test_il_titolo_non_contiene_versioni_ne_date(self):
+        """`RawItem.text` (titolo + versione + build + sommario) è il testo
+        che gli estrattori rileggono: una versione scritta nel titolo
+        ricrea il campo appena tolto, e «patch fino a 2031-10-30» diventa
+        un livello di patch datato 2031 — un dato falso, nel futuro.
+        `size_info` invece non entra in `text`, ed è lì che i dettagli
+        vanno scritti."""
+        from core import extract
+        for device in aer.all_devices():
+            item = self.sources._item_da_aer(device)
+            estratto = extract.extract_all(item.text)
+            self.assertIsNone(estratto.android_version,
+                              f"versione estraibile dal titolo: «{item.title}»")
+            self.assertIsNone(estratto.patch_level,
+                              f"data estraibile dal titolo: «{item.title}»")
+
+    def test_ricerca_per_codice_tecnico(self):
+        """È il motivo più frequente di ricerca a vuoto: un codice che
+        nessun dataset conosce. Qui ce ne sono 1404 verificati."""
+        trovati = self.sources._lookup_aer_catalog("CPH2791")
+        self.assertTrue(trovati)
+        self.assertEqual(trovati[0].device, "OPPO Find X9 Pro")
+
+    def test_finestra_di_supporto_riportata(self):
+        trovati = self.sources._lookup_aer_catalog("CPH2791")
+        self.assertIn("patch fino a", trovati[0].size_info)
+
+    def test_modello_sconosciuto_non_inventa_nulla(self):
+        self.assertEqual(self.sources._lookup_aer_catalog("Nokia 3310"), [])
+
+    def test_fonte_irraggiungibile_riportata_non_sollevata(self):
+        aer.reset_cache()
+        originale = aer.carica
+        aer.carica = lambda forza=False: []
+        try:
+            items, errore = self.sources.fetch_aer_catalog()
+        finally:
+            aer.carica = originale
+        self.assertEqual(items, [])
+        self.assertTrue(errore, "una fonte vuota deve dichiarare il motivo")
 
 
 if __name__ == "__main__":

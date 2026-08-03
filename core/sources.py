@@ -18,6 +18,7 @@ d'ambiente `EXTRA_FEEDS` (vedi in fondo al file).
 """
 from __future__ import annotations
 
+import html
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -29,6 +30,7 @@ try:
 except ImportError:  # pragma: no cover
     yaml = None
 
+from . import aer_catalog
 from . import config as C
 from . import extract
 from . import modelcodes
@@ -391,15 +393,35 @@ def fetch_pixel_ota() -> tuple[list[RawItem], str | None]:
             seen.add(device)
             items.append(
                 RawItem(
-                    title=f"{device} — Android {android_version} · build {build}",
+                    # QUESTE PAGINE SERVONO IMMAGINI BETA, TUTTE. Verificato
+                    # il 2026-08-03: `/versions/17/`, `/16/qpr3/` e `/16/`
+                    # contengono solo file `*_beta-ota-*`, e la regex dei
+                    # nomi file lo pretende pure. La pagina delle immagini
+                    # stabili (developers.google.com/android/ota) è resa in
+                    # JavaScript e a una richiesta semplice risponde con
+                    # zero righe.
+                    #
+                    # Finché non si trova una fonte stabile, questa va detta
+                    # per quello che è. Prima dichiarava «Pixel 9 Pro —
+                    # Android 17», cioè un'anteprima spacciata per la
+                    # versione del telefono: la parola «beta» nel titolo fa
+                    # sì che il classificatore la marchi BETA, e quindi che
+                    # resti fuori dalle notifiche automatiche.
+                    title=f"{device} — immagine OTA beta · build {build}",
                     link=url,
                     published=published,
                     brand=C.PIXEL,
                     device=device,
-                    version=f"Android {android_version}" if android_version else None,
+                    # Niente `version`/`android_version`: sono la versione
+                    # dell'ANTEPRIMA, non quella installata. Scriverla qui
+                    # la farebbe diventare la versione del dispositivo nella
+                    # vista per modello. Resta leggibile in `size_info`, che
+                    # non passa dagli estrattori.
                     build=build,
-                    android_version=android_version,
-                    size_info="Immagine OTA ufficiale (canale Beta)",
+                    size_info=(
+                        "Immagine OTA canale Beta"
+                        + (f" · anteprima Android {android_version}" if android_version else "")
+                    ),
                 )
             )
         if items:
@@ -823,34 +845,109 @@ def _apple_version_key(version: str) -> tuple:
 # ======================================================================
 # vivo / iQOO — pagina ufficiale Android Enterprise Recommended
 # ======================================================================
-# NOTA DI ONESTÀ SUL METODO. Non sono riuscito a leggere questa pagina con
-# gli strumenti a disposizione (il sito rifiuta l'accesso automatico),
-# quindi il riconoscimento NON è stato verificato sul contenuto reale.
-# In questa stessa applicazione è già successo due volte di costruire un
-# riconoscimento su un formato ipotizzato e ritrovarsi con una fonte
-# perennemente in errore.
+# VERIFICATO SUL CONTENUTO REALE il 2026-08-02. La versione precedente di
+# questo parser era dichiaratamente un'ipotesi — riusava lo schema AER
+# generico di Honor e realme senza aver mai letto la pagina vivo — e stava
+# in errore da giorni. La pagina è invece perfettamente raggiungibile: a non
+# combaciare era il riconoscimento, per tre motivi che si vedono solo
+# guardando l'HTML vero:
 #
-# Per questo il parser qui sotto non inventa un formato nuovo: riusa lo
-# schema del programma Android Enterprise Recommended, che Google impone
-# uguale a tutti i produttori aderenti ("Shipped version" / "Future
-# version"), ed è lo stesso già verificato sulle pagine Honor e realme.
-# È un'ipotesi fondata, non una supposizione — ma resta un'ipotesi.
+#   1. lo schema generico pretende che il nome cominci con «vivo» o «iQOO»,
+#      mentre la tabella scrive soltanto «X300 Ultra», senza marca;
+#   2. ogni cella è preceduta da `&nbsp;&nbsp;`, che resta nel testo perché
+#      togliere i tag NON decodifica le entità;
+#   3. qui si legge «Shipped version: Android 16», con la parola «Android»
+#      davanti al numero, non «Shipped version: 15» come su Honor.
 #
-# Se il formato non combacia, la fonte lo dichiara con un errore esplicito
-# in Diagnostica invece di restituire in silenzio una lista vuota: si vede
-# subito, e si corregge con i dati reali sotto gli occhi.
+# È la stessa famiglia di errore già costata giorni con realme: una regex
+# costruita su un formato immaginato invece che osservato. Il parser qui
+# sotto legge la tabella per quello che è — righe e celle — e i suoi test
+# girano sull'HTML vero registrato in tests/fixtures/vivo_aer.html.
 VIVO_AER_URL = "https://www.vivo.com/en/security"
 
-# Schema AER generico: nome del modello, poi le due versioni. Volutamente
-# tollerante su spaziatura e separatori, che variano da produttore a
-# produttore pur restando lo schema lo stesso.
-_AER_GENERICO_RE = re.compile(
-    r"((?:vivo|iQOO)\s+[A-Za-z0-9 +\-]{1,28}?)\s*[\n|]+\s*"
-    r"(?:[^\n|]{0,60}?[\n|]+\s*)??"
-    r"Shipped version:\s*(?:Android\s*)?(\d{1,2})\s*[\n|]*\s*"
-    r"Future version:\s*(?:Android\s*)?(\d{1,2})",
-    re.IGNORECASE,
-)
+# Righe e celle della tabella AER. Si legge la STRUTTURA (una riga per
+# modello, tre celle) invece di inseguire il testo con una regex sola: la
+# tabella è marcata bene, e questo la rende insensibile a come sono scritti
+# i contenuti — «Android 16» o «16», con o senza `&nbsp;`.
+_VIVO_RIGA_RE = re.compile(r"<tr[^>]*class=\"table-content\"[^>]*>(.*?)</tr>", re.S | re.I)
+_VIVO_CELLA_RE = re.compile(r"<td[^>]*>(.*?)</td>", re.S | re.I)
+# «Shipped version: Android 16» oppure «Shipped version: 16».
+_VIVO_SHIPPED_RE = re.compile(r"Shipped\s+version:\s*(?:Android\s*)?(\d{1,2})", re.I)
+_VIVO_FINE_RE = re.compile(r"End\s+date:\s*([0-9]{1,2}/[0-9]{4})", re.I)
+_VIVO_FREQUENZA_RE = re.compile(r"Frequency:\s*([^()\n]{1,40})", re.I)
+# «V40 Lite(V2341)»: il codice va tolto dal nome — attaccato lo renderebbe
+# un dispositivo diverso da «vivo V40 Lite» delle altre fonti — ma non
+# buttato via, perché è il codice ufficiale del modello.
+_VIVO_CODICE_RE = re.compile(r"\(\s*(V\d{4}[A-Z0-9]*)\s*\)", re.I)
+
+
+def _testo_cella(html_cella: str) -> str:
+    """Cella HTML → testo piano.
+
+    `html.unescape` NON è opzionale: ogni cella comincia con `&nbsp;&nbsp;`,
+    e senza decodificarle il nome del modello risulta «&nbsp;&nbsp;X300
+    Ultra». È metà del motivo per cui il parser precedente non trovava mai
+    niente.
+    """
+    testo = re.sub(r"<[^>]+>", " ", html_cella or "")
+    return " ".join(html.unescape(testo).split())
+
+
+def parse_vivo_aer(pagina: str) -> list[RawItem]:
+    """Tabella AER di vivo → elenco di modelli.
+
+    Separata dalla rete perché i test possano girare sull'HTML vero.
+    """
+    visti, items = set(), []
+    for riga in _VIVO_RIGA_RE.findall(pagina or ""):
+        celle = [_testo_cella(c) for c in _VIVO_CELLA_RE.findall(riga)]
+        if len(celle) < 3:
+            continue
+        nome_grezzo, supporto, versioni = celle[0], celle[1], celle[2]
+
+        shipped = _VIVO_SHIPPED_RE.search(versioni)
+        if not shipped or not nome_grezzo:
+            continue
+        # Versione EFFETTIVA di fabbrica, mai la promessa futura: è l'errore
+        # già commesso con Honor, dove un X8c su Android 15 veniva
+        # dichiarato su Android 16. Qui la promessa non viene nemmeno letta.
+        android = int(shipped.group(1))
+        if not 5 <= android <= C.MAX_PLAUSIBLE_ANDROID:
+            continue
+
+        codice = _VIVO_CODICE_RE.search(nome_grezzo)
+        nome = " ".join(_VIVO_CODICE_RE.sub(" ", nome_grezzo).split())
+        # La tabella scrive «X300 Ultra» senza marca: senza il prefisso il
+        # `device_key` non coinciderebbe con quello delle altre fonti, e lo
+        # stesso telefono diventerebbe due dispositivi distinti.
+        if not re.match(r"^\s*(?:vivo|iqoo)\b", nome, re.I):
+            nome = f"vivo {nome}"
+
+        chiave = modelcodes._normalize_name(nome)
+        if not chiave or chiave in visti:
+            continue
+        visti.add(chiave)
+
+        fine = _VIVO_FINE_RE.search(supporto)
+        frequenza = _VIVO_FREQUENZA_RE.search(supporto)
+        dettagli = ["Piano ufficiale vivo Android Enterprise Recommended"]
+        if fine:
+            dettagli.append(f"patch fino a {fine.group(1)}")
+        if frequenza:
+            dettagli.append(frequenza.group(1).strip().rstrip("."))
+        if codice:
+            dettagli.append(codice.group(1).upper())
+
+        items.append(RawItem(
+            title=f"{nome} — Android {android} di fabbrica"
+                  + (f"; patch garantite fino a {fine.group(1)}" if fine else ""),
+            link=VIVO_AER_URL,
+            brand=C.VIVO,
+            device=nome,
+            android_version=android,
+            size_info=" · ".join(dettagli),
+        ))
+    return items
 
 
 def fetch_vivo_aer() -> tuple[list[RawItem], str | None]:
@@ -861,38 +958,162 @@ def fetch_vivo_aer() -> tuple[list[RawItem], str | None]:
     if risposta.status_code != 200:
         return [], f"HTTP {risposta.status_code}"
 
-    testo = re.sub(r"<[^>]+>", "\n", risposta.text)
-    testo = re.sub(r"[ \t]+", " ", testo)
-
-    visti, items = set(), []
-    for match in _AER_GENERICO_RE.finditer(testo):
-        nome_grezzo, shipped, future = match.groups()
-        nome = " ".join(nome_grezzo.split())
-        chiave = modelcodes._normalize_name(nome)
-        if not chiave or chiave in visti:
-            continue
-        visti.add(chiave)
-        # Versione EFFETTIVA di fabbrica, mai la promessa futura: è
-        # l'errore già commesso con Honor, dove un X8c su Android 15
-        # veniva dichiarato su Android 16.
-        items.append(RawItem(
-            title=(
-                f"{nome} — Android {shipped} di fabbrica; aggiornamenti "
-                f"garantiti almeno fino ad Android {future}"
-            ),
-            link=VIVO_AER_URL,
-            brand=C.VIVO,
-            device=nome,
-            android_version=int(shipped),
-            size_info="Piano ufficiale vivo Android Enterprise Recommended",
-        ))
+    items = parse_vivo_aer(risposta.text)
     if not items:
         return [], (
-            "pagina raggiungibile ma nessun dispositivo riconosciuto: il formato "
-            "non è quello atteso dallo schema Android Enterprise Recommended "
-            "(questo riconoscimento non è mai stato verificato sul contenuto reale)"
+            "pagina raggiungibile ma nessuna riga della tabella «Android Enterprise "
+            "Recommended Device List» è stata riconosciuta: probabile cambio di "
+            "struttura della pagina"
         )
     return items, None
+
+
+# ======================================================================
+# Android Enterprise Recommended — catalogo ufficiale in JSON
+# ======================================================================
+# PERCHÉ COMPLEMENTARE E NON SOSTITUTIVA. L'idea iniziale era rimpiazzare
+# con questa i quattro parser HTML (Honor, realme, vivo, Oppo). La misura
+# dice di no, ed è il motivo per cui vale la pena misurare:
+#
+#   Honor   pagina 26 device, 26 con versione  →  JSON 24, solo 21
+#   vivo    pagina 20 device, 20 con versione  →  JSON 19, solo 15
+#   realme  pagina  6 device                   →  JSON 16, 15 con versione
+#   Oppo    pagina 113 device, ZERO versioni   →  JSON 50, con codici
+#
+# Sostituire avrebbe tolto dati a Honor e vivo. Quello che questa fonte
+# aggiunge davvero, e che nessun'altra dà:
+#
+#   * 1404 CODICI MODELLO verificati (CPH2791 → OPPO Find X9 Pro), che
+#     permettono di confermare la corrispondenza invece di dedurla;
+#   * la FINESTRA DI SUPPORTO di sicurezza per 706 dispositivi — per un QA
+#     è il dato che dice se un device di test è ancora vivo;
+#   * OnePlus, che oggi non ha nessuna fonte strutturata.
+#
+# NON dà la versione attuale, e il campo che sembra darla non è
+# affidabile: vedi il docstring di core/aer_catalog.py.
+_MARCHE_DA_TOGLIERE = re.compile(r"^\s*(?:samsung|google|motorola)\s+", re.IGNORECASE)
+# Le tre marche per cui l'AER usa una forma DIVERSA da quella del resto del
+# progetto: «Samsung Galaxy S25 Ultra» contro «Galaxy S25 Ultra» della fonte
+# FOTA, «Google Pixel 10» contro «Pixel 10», «Motorola moto g14» contro
+# «Moto G14». Solo per queste il nome va ricondotto, o lo stesso telefono
+# finisce in archivio due volte con metà storia ciascuno.
+_MARCHE_DA_RICONDURRE = {"samsung", "google", "motorola"}
+
+
+def nome_aer_normalizzato(display_name: str, brand_aer: str = "") -> str:
+    """Adegua il nome AER alle convenzioni già usate nel progetto.
+
+    PERCHÉ NON SI APPLICA A TUTTI. La tentazione è passare ogni nome dal
+    riconoscitore di `extract`, che allineerebbe tutto per costruzione.
+    Provato, e peggiora: «HONOR 600e» diventa «Honor 600» — un altro
+    telefono — e «realme 14 Pro 5G» perde il 5G. Il riconoscitore è tarato
+    sui titoli delle notizie, non su un catalogo, e semplifica.
+
+    Quindi si ricorre a lui solo per le tre marche dove serve davvero, e
+    per tutte le altre il nome AER si tiene com'è: lì il prefisso È già la
+    convenzione del progetto («OPPO A6x», «vivo X300 Ultra», «realme C61»).
+    """
+    nome = " ".join(str(display_name or "").split())
+    if not nome:
+        return ""
+    if str(brand_aer or "").strip().lower() not in _MARCHE_DA_RICONDURRE:
+        return nome
+    _brand, modello = extract.extract_device(nome)
+    if modello:
+        return modello
+    # Il riconoscitore non l'ha visto (un tablet, un modello troppo nuovo):
+    # si toglie almeno la marca ripetuta, che è la differenza principale.
+    return " ".join(_MARCHE_DA_TOGLIERE.sub(" ", nome).split())
+
+
+def _item_da_aer(device: dict) -> RawItem | None:
+    nome = nome_aer_normalizzato(device.get("device_model"), device.get("brand_aer"))
+    if not nome:
+        return None
+    android = device.get("launch_android")
+    dettagli = ["Android Enterprise Recommended"]
+    if android:
+        dettagli.append(f"Android {android} DI FABBRICA")
+    if device.get("security_until"):
+        dettagli.append(f"patch fino a {device['security_until']}")
+    if device.get("security_frequency"):
+        dettagli.append(device["security_frequency"])
+    if device.get("model_codes"):
+        dettagli.append("/".join(device["model_codes"][:3]))
+
+    # IL TITOLO NON DEVE CONTENERE NÉ VERSIONI NÉ DATE, e la ragione non è
+    # estetica: `RawItem.text` (titolo + versione + build + sommario) è il
+    # testo che gli estrattori rileggono. Scriverci «Android 14 di
+    # fabbrica» ricreava la `android_version` appena tolta dal campo, e
+    # «patch fino a 2031-10-30» sarebbe diventato un livello di patch di
+    # sicurezza datato 2031 — un dato falso, per giunta nel futuro.
+    #
+    # `size_info` invece NON entra in `text`: è il posto giusto per i
+    # dettagli leggibili da una persona.
+    return RawItem(
+        title=f"{nome} — dispositivo certificato Android Enterprise Recommended",
+        link=aer_catalog.ENDPOINT.split("?")[0],
+        brand=device.get("brand"),
+        device=nome,
+        # NIENTE `android_version`, ed è una decisione, non una svista.
+        #
+        # Questa fonte conosce solo la versione DI LANCIO. Dichiararla come
+        # versione del dispositivo la rendeva un dato strutturato che
+        # scavalcava le altre fonti: durante l'integrazione un «Moto G14 —
+        # patch di luglio 2026», datato e attuale, è stato sostituito in
+        # cronologia da un «Android 14» di fabbrica. Per un tracker degli
+        # aggiornamenti è esattamente il contrario di quello che serve.
+        #
+        # La versione di lancio resta leggibile nel titolo e in `size_info`,
+        # marcata come tale. Il valore di questa fonte è altrove: codici
+        # modello, finestra di supporto, copertura di OnePlus.
+        size_info=" · ".join(dettagli),
+    )
+
+
+def fetch_aer_catalog() -> tuple[list[RawItem], str | None]:
+    dispositivi = aer_catalog.carica()
+    if not dispositivi:
+        return [], aer_catalog.status()
+    items = [i for i in (_item_da_aer(d) for d in dispositivi) if i]
+    return items, None
+
+
+def _lookup_aer_catalog(model_name: str) -> list[RawItem]:
+    """Ricerca per nome commerciale O per codice tecnico, indifferentemente."""
+    device = aer_catalog.lookup(model_name)
+    if not device:
+        return []
+    item = _item_da_aer(device)
+    return [item] if item else []
+
+
+def _lookup_pixel(model_name: str) -> list[RawItem]:
+    """Ultima immagine OTA ufficiale per un Pixel.
+
+    Mancava, e la mancanza era invisibile: la fonte Pixel esisteva ma solo
+    nella scansione periodica, quindi cercare «Pixel 9 Pro» a comando dava
+    la sola conferma che il dispositivo esiste — su una delle marche con la
+    fonte ufficiale migliore del progetto.
+    """
+    tutti, errore = fetch_pixel_ota()
+    if errore or not tutti:
+        return []
+    bersaglio = modelcodes._normalize_name(model_name)
+    if not bersaglio:
+        return []
+    esatti = [i for i in tutti if modelcodes._normalize_name(i.device or "") == bersaglio]
+    if esatti:
+        return esatti[:1]
+    # Confronto contenitivo, ma solo verso nomi PIÙ LUNGHI del cercato:
+    # «Pixel 9» non deve restituire «Pixel 9 Pro XL», che è un altro
+    # telefono, mentre chi scrive «pixel 9 pro» deve trovarlo comunque.
+    parziali = [
+        i for i in tutti
+        if bersaglio in modelcodes._normalize_name(i.device or "")
+    ]
+    parziali.sort(key=lambda i: len(modelcodes._normalize_name(i.device or "")))
+    return parziali[:1]
 
 
 def _lookup_vivo(model_name: str) -> list[RawItem]:
@@ -1449,6 +1670,47 @@ def _samsung_fus_latest(model: str) -> tuple[str | None, str | None, str | None]
     return None, None, None
 
 
+# Tetto ai modelli aggiunti dal parco di test: una richiesta per modello, e
+# la scansione gira ogni ora. Chi ne segue 200 sta usando lo strumento in un
+# altro modo, e può interrogarli a comando dalla scheda Parco di test.
+SAMSUNG_WATCHLIST_MAX = 40
+
+
+def _samsung_da_controllare() -> list[tuple[str, str]]:
+    """Modelli Samsung da interrogare nella scansione periodica.
+
+    La tabella scritta a mano copre i modelli più diffusi, ma **i telefoni
+    che contano davvero sono quelli nel parco di test**: se un device
+    seguito non è in tabella, l'utente non riceve mai una notifica per esso
+    — proprio lo scopo per cui l'ha aggiunto. Il controllo versione Samsung
+    funziona per qualunque codice `SM-`, quindi qui si uniscono le due
+    cose: la tabella di base più i modelli seguiti, risolti in codice
+    tramite i dataset pubblici.
+    """
+    coppie: list[tuple[str, str]] = list(SAMSUNG_FUS_DEVICES)
+    visti = {codice for codice, _nome in coppie}
+    try:
+        seguiti = storage.get_watchlist()
+    except Exception:      # pragma: no cover - il DB può non essere pronto
+        return coppie
+
+    aggiunti = 0
+    for voce in seguiti:
+        if aggiunti >= SAMSUNG_WATCHLIST_MAX:
+            break
+        if voce.get("brand") != C.SAMSUNG:
+            continue
+        nome = voce.get("model") or ""
+        for codice in modelcodes.codes_for_name(nome):
+            if not _SAMSUNG_CODE_RE.match(codice) or codice in visti:
+                continue
+            visti.add(codice)
+            coppie.append((codice, nome))
+            aggiunti += 1
+            break          # una variante regionale basta
+    return coppie
+
+
 def fetch_samsung_fus() -> tuple[list[RawItem], str | None]:
     """Ultima versione firmware nota per i modelli Samsung più diffusi,
     letta dall'endpoint di controllo versione ufficiale (non richiede
@@ -1469,7 +1731,8 @@ def fetch_samsung_fus() -> tuple[list[RawItem], str | None]:
 
     items = []
     with ThreadPoolExecutor(max_workers=10) as pool:
-        for model, display_name, pda, android_version, csc in pool.map(_check, SAMSUNG_FUS_DEVICES):
+        for model, display_name, pda, android_version, csc in pool.map(
+                _check, _samsung_da_controllare()):
             if not pda:
                 continue
             items.append(
@@ -1755,9 +2018,13 @@ SOURCES: list[Source] = [
     Source("apple_devices", "Apple — firmware per dispositivo (iOS/iPadOS)", C.TRUST_STRUCTURED,
            fetch_apple, C.APPLE, "https://ipsw.me",
            "Versione, build e data di rilascio letti dalla lista firmware del singolo dispositivo."),
-    Source("pixel_ota", "Google Pixel — immagini OTA ufficiali", C.TRUST_STRUCTURED,
+    Source("pixel_ota", "Google Pixel — immagini OTA (canale Beta)", C.TRUST_STRUCTURED,
            fetch_pixel_ota, C.PIXEL, "https://developers.google.com/android/ota",
-           "Device, versione Android e build number da fonte ufficiale."),
+           "Build ufficiali, ma del canale BETA: le pagine per-release servono "
+           "solo file `*_beta-ota-*`. La pagina delle immagini stabili è resa in "
+           "JavaScript e non è leggibile con una richiesta semplice — finché non "
+           "si trova una fonte stabile, questi item restano marcati BETA e fuori "
+           "dalle notifiche automatiche."),
     Source("xiaomi_tracker", "Xiaomi — MIUI/HyperOS Updates Tracker", C.TRUST_STRUCTURED,
            fetch_xiaomi, C.XIAOMI, "https://xiaomifirmwareupdater.com",
            "Dataset community aggiornato di continuo, per singolo codename."),
@@ -1793,6 +2060,12 @@ SOURCES: list[Source] = [
     Source("honor_aer", "Honor — piano ufficiale Android Enterprise Recommended", C.TRUST_STRUCTURED,
            fetch_honor_aer, C.HUAWEI, HONOR_AER_URL,
            "Versione Android di partenza e impegno di aggiornamento futuro per modello."),
+    Source("aer_catalog", "Multi-brand — Android Enterprise Recommended (catalogo)",
+           C.TRUST_STRUCTURED, fetch_aer_catalog, None,
+           "https://androidenterprisepartners.withgoogle.com/devices/",
+           "706 dispositivi di 40+ marche in JSON: codici modello verificati, "
+           "finestra di supporto e cadenza delle patch. Non pubblica la versione "
+           "attuale. Unica fonte strutturata per OnePlus."),
     Source("piunikaweb", "Multi-brand — PiunikaWeb Software Updates", C.TRUST_CURATED,
            fetch_piunikaweb, None, "https://piunikaweb.com"),
     Source("gsmarena", "Multi-brand — GSMArena", C.TRUST_CURATED,
@@ -1801,7 +2074,8 @@ SOURCES: list[Source] = [
            fetch_9to5google, C.PIXEL, "https://9to5google.com"),
     Source("vivo_aer", "vivo/iQOO — piano ufficiale Android Enterprise Recommended",
            C.TRUST_STRUCTURED, fetch_vivo_aer, C.VIVO, VIVO_AER_URL,
-           "Riconoscimento basato sullo schema AER standard, non verificato sul sito reale."),
+           "Tabella AER ufficiale: 20 modelli con versione di fabbrica, "
+           "fine del supporto e cadenza delle patch. Verificata sul sito reale."),
     Source("news_vivo_iqoo", "vivo/iQOO — ricerca news", C.TRUST_NOISY,
            fetch_vivo_iqoo, C.VIVO, "https://news.google.com", is_web_search=True),
     Source("motorola_lolinet", "Motorola — firmware (mirror lolinet.com)", C.TRUST_STRUCTURED,
@@ -2127,6 +2401,8 @@ _STRUCTURED_LOOKUPS_LIST = [
     StructuredLookup(C.SAMSUNG, _lookup_samsung, "alto", "controllo versione Samsung"),
     StructuredLookup(C.APPLE, _lookup_apple, "alto", "firmware Apple per dispositivo"),
     StructuredLookup(C.VIVO, _lookup_motorola, "alto", "mirror firmware Motorola"),
+    StructuredLookup(C.PIXEL, _lookup_pixel, "basso", "immagini OTA ufficiali Pixel",
+                     fetch_pixel_ota),
     StructuredLookup(C.VIVO, _lookup_vivo, "basso", "piano ufficiale vivo", fetch_vivo_aer),
     StructuredLookup(C.XIAOMI, _lookup_xiaomi, "basso", "catalogo Xiaomi", fetch_xiaomi),
     StructuredLookup(C.HUAWEI, _lookup_honor, "basso", "piano ufficiale Honor", fetch_honor_aer),
@@ -2143,6 +2419,13 @@ _STRUCTURED_LOOKUPS_LIST = [
                      "archivio firmware ufficiale Oppo"),
     StructuredLookup(C.OPPO, _lookup_realme, "basso", "piano ufficiale realme", fetch_realme_aer),
     StructuredLookup(C.OPPO, _lookup_oppo, "basso", "elenco ufficiale Oppo", fetch_oppo_aer),
+    # In fondo alle economiche, appena prima di GSMArena: le pagine
+    # ufficiali di marca hanno la versione di fabbrica e vanno provate
+    # prima. Questa risponde per QUALSIASI marca — comprese quelle senza
+    # fonte dedicata, OnePlus in testa — e riconosce anche i codici
+    # tecnici, che è il motivo più frequente di ricerca a vuoto.
+    StructuredLookup(None, _lookup_aer_catalog, "basso",
+                     "catalogo Android Enterprise Recommended", fetch_aer_catalog),
 ]
 
 # Ripiego universale: vale per QUALSIASI marca, comprese quelle senza

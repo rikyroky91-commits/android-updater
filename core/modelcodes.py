@@ -50,6 +50,33 @@ _memory_cache: dict[str, list[str]] | None = None
 # Indice inverso nome commerciale -> codici tecnici, costruito su richiesta
 # a partire da `_memory_cache` (vedi codes_for_name).
 _reverse_cache: dict[str, list[str]] | None = None
+_reverse_senza_suffisso: dict[str, list[str]] | None = None
+
+# Sigle di CONNETTIVITÀ, non di gamma. La distinzione è tutta qui: «5G» in
+# «Galaxy A55 5G» non individua un telefono diverso da «Galaxy A55», mentre
+# «Ultra», «Pro», «Plus» e «FE» sì. Togliere anche quelle unirebbe modelli
+# distinti e restituirebbe il codice sbagliato — molto peggio di nessun
+# codice, perché un dato falso non si nota.
+_SUFFISSI_CONNETTIVITA = ("5g", "4g", "lte", "wifi", "wi fi", "ds", "dual sim")
+
+
+def _senza_suffissi(chiave_normalizzata: str) -> str:
+    """«galaxy a55 5g» → «galaxy a55». Lavora sulla chiave già normalizzata.
+
+    Lo spazio va ripulito a ogni giro: senza, il risultato è «galaxy a55 »
+    con lo spazio in coda, che non combacia con niente — il ripiego
+    sembrava attivo e non trovava nulla lo stesso.
+    """
+    testo = (chiave_normalizzata or "").strip()
+    cambiato = True
+    while cambiato:
+        cambiato = False
+        for suffisso in _SUFFISSI_CONNETTIVITA:
+            for forma in (suffisso, suffisso.replace(" ", "")):
+                if len(testo) > len(forma) + 2 and testo.endswith(forma):
+                    testo = testo[: -len(forma)].strip()
+                    cambiato = True
+    return " ".join(testo.split())
 
 # Stato leggibile dell'ultimo caricamento di ciascuna fonte, per distinguere
 # "database non raggiungibile" da "codice non presente" invece di un
@@ -235,11 +262,12 @@ def codes_for_name(name: str) -> list[str]:
     qualunque modello presente nei dataset invece che solo per quelli di
     una tabella scritta a mano.
     """
-    global _reverse_cache, _memory_cache
+    global _reverse_cache, _reverse_senza_suffisso, _memory_cache
     if _memory_cache is None:
         _memory_cache = _build_index()
     if _reverse_cache is None:
         reverse: dict[str, list[str]] = {}
+        senza: dict[str, list[str]] = {}
         for code, names in _memory_cache.items():
             for candidate in names:
                 key = _normalize_name(candidate)
@@ -248,13 +276,39 @@ def codes_for_name(name: str) -> list[str]:
                 bucket = reverse.setdefault(key, [])
                 if code not in bucket:
                     bucket.append(code)
+                ridotta = _senza_suffissi(key)
+                if ridotta and ridotta != key:
+                    bucket2 = senza.setdefault(ridotta, [])
+                    if code not in bucket2:
+                        bucket2.append(code)
         _reverse_cache = reverse
-    return _reverse_cache.get(_normalize_name(name), [])
+        _reverse_senza_suffisso = senza
+
+    chiave = _normalize_name(name)
+    trovati = _reverse_cache.get(chiave)
+    if trovati:
+        return trovati
+    # RIPIEGO SUI SUFFISSI COMMERCIALI. Il catalogo scrive «Galaxy A55 5G»,
+    # le persone cercano «Galaxy A55»: con il solo confronto esatto quel
+    # modello non aveva NESSUN codice, e senza codice il controllo versione
+    # Samsung — che è generico e funzionerebbe — non poteva partire. Su
+    # sedici nomi comuni ne mancavano tre, tutti per questo motivo.
+    #
+    # Si tolgono solo le sigle di connettività, mai le sigle di gamma:
+    # «Ultra», «Pro», «Plus», «FE» distinguono telefoni diversi e unirli
+    # produrrebbe il codice sbagliato, che è molto peggio di nessun codice.
+    ridotta = _senza_suffissi(chiave)
+    if ridotta and ridotta != chiave:
+        trovati = _reverse_cache.get(ridotta)
+        if trovati:
+            return trovati
+    return (_reverse_senza_suffisso or {}).get(ridotta or chiave, [])
 
 
 def reset_cache() -> None:
     """Usato dai test per forzare una nuova build dell'indice."""
-    global _memory_cache, _reverse_cache, _status
+    global _memory_cache, _reverse_cache, _reverse_senza_suffisso, _status
     _memory_cache = None
     _reverse_cache = None
+    _reverse_senza_suffisso = None
     _status = {"mobilemodels": "non ancora caricato", "google_play": "non ancora caricato"}

@@ -133,6 +133,23 @@ CREATE TABLE IF NOT EXISTS search_log (
     searched_at TEXT NOT NULL
 );
 
+-- Fotografia dello stato software al momento in cui si è dichiarato «testato».
+-- È il riferimento contro cui si dice «cosa è cambiato da allora»: senza,
+-- l'app sa dire solo qual è la versione attuale, che non è la domanda del QA.
+-- Non viene MAI toccata da `rebuild_if_logic_changed`: è un dato inserito da
+-- una persona, non il risultato dell'interpretazione di una fonte.
+CREATE TABLE IF NOT EXISTS test_baseline (
+    device_key      TEXT PRIMARY KEY,
+    brand           TEXT,
+    model           TEXT,
+    os_version      TEXT,
+    android_version INTEGER,
+    build           TEXT,
+    patch_level     TEXT,
+    tested_at       TEXT NOT NULL,
+    note            TEXT NOT NULL DEFAULT ''
+);
+
 -- Cache immagini modello (query di ricerca -> URL Wikipedia), per non
 -- interrogare Wikipedia a ogni rerun di Streamlit per lo stesso modello.
 CREATE TABLE IF NOT EXISTS device_images (
@@ -472,6 +489,67 @@ def watched_keys() -> set[str]:
 
 
 # ----------------------------------------------------------------------
+# Baseline di test («l'ultima volta che ho provato l'app su questo device»)
+# ----------------------------------------------------------------------
+def set_test_baseline(device: dict, note: str = "", tested_at: str | None = None) -> dict:
+    """Fotografa lo stato software attuale di un dispositivo.
+
+    `device` è una riga di `get_devices()`. Ogni nuova fotografia sostituisce
+    la precedente: la domanda è sempre «cosa è cambiato dall'ULTIMA volta»,
+    non dalla prima.
+    """
+    from .retest import snapshot
+
+    stato = snapshot(device)
+    riga = {
+        "device_key": device["device_key"],
+        "brand": device.get("brand"),
+        "model": device.get("model") or device.get("device_model"),
+        "tested_at": tested_at or now_iso(),
+        "note": note or "",
+        **stato,
+    }
+    with transaction() as conn:
+        conn.execute(
+            """INSERT INTO test_baseline
+                   (device_key, brand, model, os_version, android_version,
+                    build, patch_level, tested_at, note)
+               VALUES (:device_key, :brand, :model, :os_version, :android_version,
+                       :build, :patch_level, :tested_at, :note)
+               ON CONFLICT(device_key) DO UPDATE SET
+                   brand = excluded.brand, model = excluded.model,
+                   os_version = excluded.os_version,
+                   android_version = excluded.android_version,
+                   build = excluded.build, patch_level = excluded.patch_level,
+                   tested_at = excluded.tested_at, note = excluded.note""",
+            riga,
+        )
+    return riga
+
+
+def get_test_baseline(device_key: str) -> dict | None:
+    conn = connect()
+    row = conn.execute(
+        "SELECT * FROM test_baseline WHERE device_key = ?", (device_key,)
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def get_test_baselines() -> dict[str, dict]:
+    """Tutte le baseline, indicizzate per device_key (una sola query)."""
+    conn = connect()
+    return {
+        r["device_key"]: dict(r)
+        for r in conn.execute("SELECT * FROM test_baseline").fetchall()
+    }
+
+
+def clear_test_baseline(device_key: str) -> None:
+    with transaction() as conn:
+        conn.execute("DELETE FROM test_baseline WHERE device_key = ?", (device_key,))
+
+
+# ----------------------------------------------------------------------
 # Notifiche, scansioni, stato fonti
 # ----------------------------------------------------------------------
 def log_notification(item: dict, kind: str = "auto", ok: bool = True) -> None:
@@ -742,8 +820,15 @@ def rebuild_if_logic_changed() -> int:
     continuava a mostrare il vecchio valore rimasto in archivio.
 
     Non si perde nulla di irrecuperabile: gli aggiornamenti vengono
-    ricostruiti alla prima scansione. Watchlist, storico notifiche e
-    cronologia ricerche NON vengono toccati.
+    ricostruiti alla prima scansione. Watchlist, storico notifiche,
+    cronologia ricerche e **baseline di test** NON vengono toccati: sono
+    dati inseriti da una persona, non il risultato dell'interpretazione di
+    una fonte, e ricostruirli è impossibile.
+
+    Conseguenza da tenere presente: fra l'azzeramento e la prima scansione
+    il confronto con la baseline vede i campi vuoti. Non produce un falso
+    «da ritestare» perché `core/retest.py` tratta un campo sparito come un
+    buco di copertura, non come un cambiamento.
     """
     memorizzata = get_meta(_LOGIC_VERSION_KEY)
     if memorizzata == C.DATA_LOGIC_VERSION:

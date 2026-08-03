@@ -226,7 +226,36 @@ MAX_PLAUSIBLE_IOS = env_int("MAX_PLAUSIBLE_IOS", 30)
 #       Nello stesso giro: corretto il catalogo dei suggerimenti, che una
 #       variabile di ciclo omonima riduceva a un solo modello (l'errore era
 #       invisibile perché un `except Exception: pass` lo inghiottiva).
-DATA_LOGIC_VERSION = env_int("DATA_LOGIC_VERSION", 18)
+#  19 → vivo: parser riscritto sulla TABELLA REALE della pagina AER, dopo
+#       averla finalmente letta. Il precedente era un'ipotesi (schema di
+#       Honor/realme) e la fonte era in errore da giorni: la tabella non
+#       scrive la marca nel nome, usa `&nbsp;` e dice «Shipped version:
+#       Android 16» invece di «Shipped version: 15». Ora 20 modelli, con
+#       fine del supporto e cadenza delle patch.
+#  20 → catalogo Android Enterprise Recommended in JSON come fonte
+#       AGGIUNTIVA (non sostitutiva: la misura dice che le pagine ufficiali
+#       Honor e vivo hanno più versioni del JSON). Porta 706 dispositivi di
+#       40+ marche, 1404 codici modello verificati, la finestra di supporto
+#       di sicurezza, e la prima fonte strutturata per OnePlus.
+#  21 → COPERTURA. Il nome commerciale ora combacia anche quando differisce
+#       per una sigla di connettività: il catalogo scrive «Galaxy A55 5G»,
+#       le persone cercano «Galaxy A55», e con il confronto esatto quel
+#       modello non aveva nessun codice — quindi il controllo versione
+#       Samsung, che è generico, non poteva partire. Dati presenti,
+#       meccanismo funzionante, risultato zero. Samsung passa da 23 modelli
+#       a tutti quelli del dataset (2332 codici). Inoltre la scansione
+#       periodica interroga anche i Samsung del parco di test, che prima
+#       non ricevevano notifiche se fuori dalla tabella scritta a mano.
+#       Aggiunta la ricerca a comando per Pixel, che non c'era: la fonte
+#       esisteva solo nella scansione periodica.
+#  22 → Pixel: la fonte serve immagini del canale BETA, non stabili
+#       (verificato: tutte le pagine per-release contengono solo file
+#       `*_beta-ota-*`). Dichiarava «Pixel 9 Pro — Android 17», cioè
+#       un'anteprima spacciata per la versione installata, su OGNI Pixel.
+#       Ora gli item sono marcati beta e non impongono più una versione al
+#       dispositivo. Serve una fonte stabile: la pagina delle immagini
+#       ufficiali è resa in JavaScript e non è leggibile via HTTP.
+DATA_LOGIC_VERSION = env_int("DATA_LOGIC_VERSION", 22)
 
 
 # --- Tempo massimo di una ricerca interattiva ---------------------------

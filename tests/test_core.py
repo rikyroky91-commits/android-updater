@@ -16,7 +16,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core import classify, config as C, extract, sources, storage  # noqa: E402
 from core import appledevices, images, imeicheck, modelcodes, scan, suggest  # noqa: E402
-from core import oppo_official  # noqa: E402
+from core import aer_catalog, oppo_official  # noqa: E402
+
+_FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+
+with open(os.path.join(_FIXTURES, "aer_devices.json"), encoding="utf-8") as _f:
+    AER_VOCI = json.load(_f)["items"]
 
 
 class TestBrandDetection(unittest.TestCase):
@@ -777,6 +782,37 @@ class TestCronologiaRicerche(unittest.TestCase):
         self.assertEqual(storia[0]["query"], "moto g14")
         self.assertIn("2026-07", storia[0]["firmware"])
 
+    def test_fonte_ufficiale_senza_firmware_non_oscura_una_patch_datata(self):
+        """Alcune fonti ufficiali confermano che un modello ESISTE senza
+        pubblicarne la versione (il catalogo Android Enterprise
+        Recommended, l'elenco Oppo). Preferirle comunque, solo perché
+        strutturate, faceva finire in cronologia un «—» mentre una notizia
+        riportava una patch datata: la fonte più autorevole vince, ma solo
+        se ha davvero qualcosa da dire."""
+        sources.rss_items = self._rss_con_titolo(
+            "Moto G14 gets July 2026 security patch update", "2026-07-10")
+
+        def solo_esistenza(model_name):
+            return [sources.RawItem(
+                title=f"{model_name} — dispositivo certificato",
+                brand=C.VIVO, device="Moto G14",
+                size_info="Android Enterprise Recommended",
+            )]
+
+        originale = sources._lookup_order
+        sources._lookup_order = lambda brand: [
+            sources.StructuredLookup(None, solo_esistenza, "basso", "catalogo di prova")
+        ]
+        try:
+            scan.search_model("moto g14")
+        finally:
+            sources._lookup_order = originale
+
+        storia = storage.get_search_history()
+        self.assertEqual(len(storia), 1)
+        self.assertIn("2026-07", storia[0]["firmware"],
+                      "la cronologia ha preferito una voce senza firmware")
+
     def test_piu_ricerche_restano_in_ordine_cronologico_inverso(self):
         sources.rss_items = self._rss_con_titolo("Foo Phone update", "2026-01-01")
         scan.search_model("foo phone")
@@ -1349,10 +1385,30 @@ class TestRicercaOnDemandFontiUfficiali(unittest.TestCase):
         # Nessuna notizia disponibile: il caso peggiore.
         sources.rss_items = lambda urls, brand, size_info, limit=None, timeout=None: ([], "nessun risultato")
 
+        # Il catalogo AER NON passa da `sources.http_get`: ha un client HTTP
+        # suo. Senza questa riga i test qui sotto uscivano davvero in rete —
+        # l'errore n. 10 del documento di passaggio consegne — e il loro
+        # esito dipendeva da cosa rispondeva Google in quel momento:
+        # `test_brand_senza_fonte_dedicata_degrada_pulitamente` passava con
+        # la rete e falliva senza. Ora parte da una risposta registrata.
+        aer_catalog.carica_da(AER_VOCI, "fixture di test")
+        # Stessa storia per l'archivio Oppo, che usa `urllib` per conto suo:
+        # ogni ricerca qui apriva davvero una connessione verso
+        # `sgp-sow-cms.oppo.com`. L'ha trovato `tests/test_niente_rete.py`,
+        # che blocca il socket invece di fidarsi dell'elenco degli agganci.
+        self._orig_oppo_post = oppo_official._post
+        self._orig_oppo_catalog = oppo_official._catalog
+        oppo_official._post = lambda url, payload, timeout=None: (
+            (_ for _ in ()).throw(ConnectionError("URL non previsto in questo test")))
+        oppo_official._catalog = {}
+
     def tearDown(self):
         modelcodes._download = self._orig_download
         sources.http_get = self._orig_http_get
         sources.rss_items = self._orig_rss_items
+        oppo_official._post = self._orig_oppo_post
+        oppo_official._catalog = self._orig_oppo_catalog
+        aer_catalog.reset_cache()
         modelcodes.reset_cache()
         storage.reset_state()
         if os.path.exists(self._db):
@@ -1415,13 +1471,31 @@ class TestRicercaOnDemandFontiUfficiali(unittest.TestCase):
         self.assertEqual(len(devices), 1)
         self.assertEqual(devices[0]["android_version"], 15)
 
-    def test_brand_senza_fonte_ufficiale_non_solleva_errori(self):
-        """Oppo/OnePlus/realme e i brand di nicchia non hanno una fonte
-        ufficiale interrogabile a comando: la ricerca deve degradare
-        pulitamente sulle notizie, con una nota esplicativa, non fallire."""
+    def test_brand_senza_fonte_dedicata_degrada_pulitamente(self):
+        """La ricerca su una marca senza fonte DEDICATA non deve mai
+        fallire: o trova qualcosa di strutturato, o spiega perché no.
+
+        Questo test asseriva `structured_count == 0` per OnePlus. Non vale
+        più, ed è una buona notizia: dal catalogo Android Enterprise
+        Recommended OnePlus ha finalmente una fonte strutturata. Asserire
+        ancora lo zero significherebbe difendere una lacuna appena chiusa —
+        è l'errore già commesso quando tre test difendevano la «Future
+        version» di Honor.
+        """
         res = scan.search_model("OnePlus 12")
-        self.assertEqual(res["structured_count"], 0)
-        self.assertIsNotNone(res["structured_note"])
+        self.assertIsNone(res.get("error"))
+        self.assertTrue(
+            res["structured_count"] > 0 or res.get("structured_note"),
+            "senza risultati strutturati va detto il motivo, non taciuto",
+        )
+        # Ora che il catalogo arriva da una risposta registrata invece che
+        # dalla rete, si può asserire QUALE fonte ha risposto — prima
+        # l'esito dipendeva da cosa restituiva il server in quel momento.
+        self.assertEqual(res["structured_count"], 1)
+        self.assertEqual(res["items"][0]["device_model"], "OnePlus 12")
+        self.assertIn("Android Enterprise Recommended", res["items"][0]["source_label"])
+        # E che NON millanti una versione: il catalogo non ce l'ha.
+        self.assertFalse(res["items"][0].get("android_version"))
 
 
 class TestSupportoApple(unittest.TestCase):
@@ -2518,6 +2592,9 @@ class TestMatriceRicerca(unittest.TestCase):
         # Oppo coperto dall'archivio firmware ufficiale: qui la risposta è
         # la versione DAVVERO rilasciata, non quella di fabbrica.
         (["OPPO Find X2", "find x2", "Find X2"], "OPPO Find X2"),
+        # vivo: la tabella ufficiale scrive «X300 Ultra» senza marca, quindi
+        # entrambe le forme devono arrivare allo stesso dispositivo.
+        (["vivo X300 Ultra", "X300 Ultra", "x300 ultra"], "vivo X300 Ultra"),
     ]
 
     HONOR_HTML = (
@@ -2532,6 +2609,17 @@ class TestMatriceRicerca(unittest.TestCase):
     )
     SAMSUNG_XML = '<latest o="15">S928BXXU5CYA1/S928BOXM5CYA1/S928BXXU5CYA1</latest>'
     OPPO_HTML = "<div><p>OPPO A6x</p><a href='/a6x/'>Learn more</a></div>"
+    # Struttura reale della tabella vivo, `&nbsp;` compresi: è la forma su
+    # cui il parser deve funzionare, non una ripulita.
+    VIVO_HTML = (
+        '<table><tr class="table-content">'
+        '<td>&nbsp;&nbsp;X300 Ultra</td>'
+        '<td>&nbsp;&nbsp;End date: 07/2031 at least(Global)</br>'
+        '&nbsp;&nbsp;Frequency: Every 30 days</td>'
+        '<td>&nbsp;&nbsp;Shipped version: Android 16</br>'
+        '&nbsp;&nbsp;Future version: Andorid 17&18&19 at least(Globa)</td>'
+        '</tr></table>'
+    )
     APPLE_FW = {
         "name": "iPhone 15 Pro",
         "firmwares": [{"version": "26.2", "buildid": "23C100",
@@ -2594,6 +2682,8 @@ class TestMatriceRicerca(unittest.TestCase):
                 return Resp(200, TestMatriceRicerca.REALME_HTML)
             if "oppo.com" in url:
                 return Resp(200, TestMatriceRicerca.OPPO_HTML)
+            if "vivo.com" in url:
+                return Resp(200, TestMatriceRicerca.VIVO_HTML)
             if "ospserver.net" in url:
                 return Resp(200, TestMatriceRicerca.SAMSUNG_XML)
             if "/device/iPhone16,1" in url:

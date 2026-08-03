@@ -60,7 +60,7 @@ Quello che si può fare davvero, ed è quello a cui punto qui, è:
 | `security.oppo.com` | 200, ma è il portale bug-bounty (OSRC): avvisi CVE, **nessun patch level per modello** |
 | `security.oneplus.com` | 200 ma 2,8 KB: pagina vuota, contenuto caricato altrove |
 | `security.realme.com` | **il dominio non esiste** (DNS) |
-| `vivo.com/en/support/security-update` | **404** |
+| `vivo.com/en/support/security-update` | **404** — ma `vivo.com/en/security` funziona: vedi sotto |
 | `hihonor.com/global/security` | 200 ma sono bollettini CVE, non versioni per modello |
 | API OTA Oppo/OnePlus/realme (Allawn/ColorOS) | richiedono l'impronta del dispositivo e la finzione dell'app ufficiale → **fuori dalle regole del progetto**, come già deciso per OxygenUpdater |
 
@@ -113,9 +113,9 @@ Una richiesta, **706 dispositivi di 40+ marche**, con:
 * versione Android **di lancio**;
 * la **foto ufficiale** del modello (oggi si indovina da Wikipedia).
 
-Sostituisce i quattro parser HTML separati di Honor, realme, vivo e Oppo —
-compreso quello vivo **mai verificato sul sito vero**. Da quattro punti di
-rottura silenziosa a uno rumoroso.
+Sostituirebbe i parser HTML separati di Honor, realme e Oppo: da tre punti
+di rottura silenziosa a uno rumoroso. (vivo non serve più: la sua pagina
+ufficiale è stata letta e il parser riscritto sui dati veri — vedi sotto.)
 
 > **La trappola, e vale la pena scriverla due volte.** Il campo
 > `hardwareFeatures.os` sembra la versione attuale. Non lo è: il **Galaxy
@@ -243,3 +243,40 @@ le notizie ma **non** le fonti strutturate: interrogava davvero il catalogo
 Xiaomi, che per «Redmi 12 India» risponde, e la premessa «ricerca live
 vuota» cadeva. Passava o falliva a seconda della rete. Reso ermetico
 azzerando anche `_lookup_order`.
+
+
+---
+
+## vivo — risolto sui dati veri (2026-08-02)
+
+Era l'unica fonte in errore, e il documento di passaggio consegne la dava
+per illeggibile («il sito rifiuta l'accesso automatico»). **Non è vero**:
+`https://www.vivo.com/en/security` risponde 200 con 37 KB di HTML e una
+tabella regolare di 20 modelli. A non funzionare era il riconoscimento, per
+tre motivi che si vedono solo guardando l'HTML vero:
+
+1. lo schema AER generico pretende che il nome cominci con «vivo» o
+   «iQOO» — la tabella scrive soltanto `X300 Ultra`, senza marca, e
+   l'ancora non ha mai combaciato;
+2. ogni cella comincia con `&nbsp;&nbsp;`, che **resta nel testo** perché
+   togliere i tag non decodifica le entità;
+3. la pagina scrive `Shipped version: Android 16`, con la parola davanti al
+   numero, mentre Honor scrive `Shipped version: 15`.
+
+Il parser ora legge la tabella per quello che è — righe e celle — invece di
+inseguire il testo con una regex sola. **20 modelli**, con versione di
+fabbrica, **fine del supporto** e **cadenza delle patch** (`patch fino a
+07/2031 · Every 30 days`), che prima si buttavano via pur essendo nella
+stessa riga.
+
+Due dettagli tenuti dalle lezioni passate: la marca viene aggiunta al nome
+(`vivo X300 Ultra`), altrimenti lo stesso telefono avrebbe un `device_key`
+diverso dalle altre fonti e diventerebbe due dispositivi; e il codice in
+`V40 Lite(V2341)` viene tolto dal nome ma conservato a parte.
+
+La promessa futura non viene nemmeno letta — nella pagina vivo è per giunta
+scritta `Andorid`, con un refuso del produttore.
+
+`tests/test_vivo_aer.py`: **16 test sull'HTML vero** registrato in
+`tests/fixtures/vivo_aer.html`, più una riga nella matrice di ricerca.
+Scansione completa dopo la correzione: **nessuna fonte in errore**.

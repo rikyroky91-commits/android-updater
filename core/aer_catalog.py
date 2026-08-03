@@ -84,7 +84,14 @@ _lock = threading.Lock()
 _dispositivi: list[dict] | None = None
 _per_nome: dict[str, dict] = {}
 _per_codice: dict[str, dict] = {}
-_scaricato_a: float = 0.0
+# `None` = mai scaricato. NON `0.0`: il valore è un istante di
+# `time.monotonic()`, il cui zero è arbitrario (il boot della macchina, non
+# un'epoca). Su un container appena avviato `monotonic()` vale una manciata
+# di secondi, quindi `0.0` non significa «scaduto da sempre» ma «scaricato
+# 94 secondi fa» — e la cache risultava fresca quando era vuota. L'errore
+# era mascherato dal fatto che `_dispositivi is not None` faceva da guardia
+# di fatto; si è visto solo quando un test ha provato a forzare la scadenza.
+_scaricato_a: float | None = None
 _status = "non ancora caricato"
 
 
@@ -98,7 +105,7 @@ def reset_cache() -> None:
         _dispositivi = None
         _per_nome = {}
         _per_codice = {}
-        _scaricato_a = 0.0
+        _scaricato_a = None
         _status = "non ancora caricato"
 
 
@@ -287,7 +294,11 @@ def _indicizza(voci: list[dict]) -> tuple[list[dict], dict, dict]:
 def carica(forza: bool = False) -> list[dict]:
     global _dispositivi, _per_nome, _per_codice, _scaricato_a, _status
     with _lock:
-        fresco = _dispositivi is not None and (time.monotonic() - _scaricato_a) < TTL_SECONDS
+        fresco = (
+            _dispositivi is not None
+            and _scaricato_a is not None
+            and (time.monotonic() - _scaricato_a) < TTL_SECONDS
+        )
         if fresco and not forza:
             return _dispositivi
         try:
@@ -300,6 +311,26 @@ def carica(forza: bool = False) -> list[dict]:
         _dispositivi, _per_nome, _per_codice = _indicizza(voci)
         _scaricato_a = time.monotonic()
         _status = f"{len(_dispositivi)} dispositivi, {len(_per_codice)} codici modello"
+        return _dispositivi
+
+
+def carica_da(voci: list[dict], etichetta: str = "elenco fornito") -> list[dict]:
+    """Indicizza un elenco già in mano, **senza toccare la rete**.
+
+    Esiste per due usi legittimi che prima non avevano un modo pulito di
+    farsi: i test (che devono partire da una risposta registrata, non da
+    quello che il server dice oggi) e un'eventuale copia locale del
+    catalogo. Prima l'unica via era riassegnare `_scarica` e le variabili
+    di modulo dall'esterno — cioè scrivere nei dettagli interni di un altro
+    modulo, che è esattamente il genere di aggancio che si rompe in
+    silenzio alla prima riorganizzazione.
+    """
+    global _dispositivi, _per_nome, _per_codice, _scaricato_a, _status
+    with _lock:
+        _dispositivi, _per_nome, _per_codice = _indicizza(list(voci))
+        _scaricato_a = time.monotonic()
+        _status = (f"{len(_dispositivi)} dispositivi, {len(_per_codice)} codici "
+                   f"modello ({etichetta})")
         return _dispositivi
 
 
