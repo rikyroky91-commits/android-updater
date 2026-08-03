@@ -1,0 +1,37 @@
+# Scansione oraria senza server: esegue il worker e conserva il database
+# nel repository, così lo storico per dispositivo sopravvive.
+name: scan
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Solo le dipendenze del worker headless (niente streamlit/pandas,
+      # non servono e appesantirebbero ogni run orario). pyyaml serve al
+      # tracker Xiaomi, openpyxl al database TAC per l'identificazione IMEI.
+      - run: pip install requests feedparser pyyaml openpyxl
+      - name: Esegui una scansione
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TRACKER_DB: tracker.db
+        run: python worker.py --once
+      - name: Salva il database aggiornato
+        run: |
+          git config user.name "update-tracker"
+          git config user.email "bot@users.noreply.github.com"
+          git add -f tracker.db
+          git diff --cached --quiet || git commit -m "scan: $(date -u +%FT%TZ)"
+          git push
