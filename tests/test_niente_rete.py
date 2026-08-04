@@ -89,6 +89,8 @@ class TestLaRicercaNonEsceInRete(unittest.TestCase):
         self._orig_oppo_catalog = oppo_official._catalog
 
         modelcodes.reset_cache()
+        sources.reset_telegram_cache()
+        sources.reset_arb_cache()
         modelcodes._download = lambda url, source_key: (
             self.MOBILEMODELS.encode("utf-8-sig")
             if url == modelcodes.MOBILEMODELS_URL else None
@@ -117,6 +119,8 @@ class TestLaRicercaNonEsceInRete(unittest.TestCase):
         oppo_official._post = self._orig_oppo_post
         oppo_official._catalog = self._orig_oppo_catalog
         modelcodes.reset_cache()
+        sources.reset_telegram_cache()
+        sources.reset_arb_cache()
         aer_catalog.reset_cache()
         storage.reset_state()
         if os.path.exists(self._db):
@@ -156,12 +160,16 @@ class TestScansioneSenzaRete(unittest.TestCase):
         aer_catalog.reset_cache()
         oppo_official.reset_cache()
         modelcodes.reset_cache()
+        sources.reset_telegram_cache()
+        sources.reset_arb_cache()
 
     def tearDown(self):
         storage.reset_state()
         aer_catalog.reset_cache()
         oppo_official.reset_cache()
         modelcodes.reset_cache()
+        sources.reset_telegram_cache()
+        sources.reset_arb_cache()
         for suffisso in ("", "-wal", "-shm"):
             percorso = self._db + suffisso
             if os.path.exists(percorso):

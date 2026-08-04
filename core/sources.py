@@ -34,8 +34,10 @@ from . import aer_catalog
 from . import config as C
 from . import extract
 from . import modelcodes
+from . import oplus_arb
 from . import oppo_official
 from . import storage
+from . import telegram_tracker
 from .util import clean_text, iso
 
 try:  # dipendenze opzionali: il core resta importabile senza rete
@@ -65,6 +67,16 @@ class RawItem:
     size_gb: float = 0.0
     size_info: str = ""
     summary: str = ""
+    # Livello di fiducia dichiarato dalla fonte che ha prodotto l'item.
+    # Serve SOLO alle ricerche a comando: `scan._lookup_structured_for`
+    # etichettava d'ufficio come STRUCTURED tutto ciò che usciva da
+    # `lookup_model_structured`, perché fino a ieri lì dentro c'erano solo
+    # fonti ufficiali. Con una fonte CURATED nell'elenco quella
+    # scorciatoia diventerebbe una bugia — e per giunta la peggiore, dato
+    # che il trust è ciò che decide quale dato vince quando due fonti si
+    # contraddicono. `None` significa «quello predefinito del chiamante»,
+    # così nessuna fonte esistente cambia comportamento.
+    trust: str | None = None
 
     @property
     def text(self) -> str:
@@ -1289,6 +1301,379 @@ def _lookup_oppo_support(model_name: str) -> list[RawItem]:
     )]
 
 
+# ======================================================================
+# Oppo / OnePlus / realme moderni — canale Telegram di rollout
+# ======================================================================
+# Il buco che questa fonte chiude, e perché è accettabile tenerla:
+# `_lookup_oppo_support` copre solo i ~94 modelli d'archivio fino al
+# 2021-22; l'AER e il piano realme danno la versione DI FABBRICA; le news
+# danno un titolo da interpretare. Per un Reno 15 o un OnePlus 13 uscito
+# ieri non c'era nessun numero di build da nessuna parte — ed è
+# esattamente la domanda che il QA fa.
+#
+# Il prezzo: è il canale di una persona, quindi TRUST_CURATED e mai
+# STRUCTURED. Non deve poter sovrascrivere un dato ufficiale, e
+# nell'interfaccia deve dire da dove viene.
+TELEGRAM_OPLUS_URL = telegram_tracker.URL_CANALE
+
+_telegram_cache: list[telegram_tracker.Rilascio] | None = None
+_telegram_errore: str | None = None
+# Sentinel «mai scaricato» = None, NON 0.0: lo zero di `time.monotonic()`
+# è l'accensione della macchina, non un'epoca, e su un container appena
+# avviato «0.0» significherebbe «scaricato pochi secondi fa». È l'errore
+# n. 11 del passaggio di consegne, già pagato una volta in aer_catalog.
+_telegram_scaricato_a: float | None = None
+_TELEGRAM_TTL_SECONDI = 30 * 60
+
+
+def _telegram_get(url: str, timeout: int | None = None):
+    """Unico punto di rete di questa fonte, isolato apposta.
+
+    Sta qui e non in `telegram_tracker` perché quel modulo deve restare
+    puro: così i test lo esercitano sui messaggi registrati senza dover
+    intercettare niente, e chi cerca gli agganci di rete ne trova uno
+    solo, sostituibile, invece di un client nascosto in un altro file.
+    """
+    return http_get(url, timeout=timeout)
+
+
+def _telegram_rilasci(forza: bool = False):
+    """Rilasci confermati dal canale, con cache a tempo.
+
+    Ritorna `(rilasci, errore)`. Una pagina che non contiene rilasci NON
+    è un errore (il canale parla spesso d'altro); una pagina da cui non
+    si estrae nessun messaggio sì, ed è il segnale che l'HTML di Telegram
+    è cambiato.
+    """
+    global _telegram_cache, _telegram_errore, _telegram_scaricato_a
+
+    fresca = (
+        _telegram_cache is not None
+        and _telegram_scaricato_a is not None
+        and (time.monotonic() - _telegram_scaricato_a) < _TELEGRAM_TTL_SECONDI
+    )
+    if fresca and not forza:
+        return _telegram_cache, _telegram_errore
+
+    try:
+        risposta = _telegram_get(TELEGRAM_OPLUS_URL)
+    except Exception as exc:
+        _telegram_cache, _telegram_errore = [], f"canale non raggiungibile: {exc}"
+        _telegram_scaricato_a = time.monotonic()
+        return _telegram_cache, _telegram_errore
+
+    codice = getattr(risposta, "status_code", 0)
+    if codice != 200:
+        _telegram_cache, _telegram_errore = [], f"HTTP {codice} da {TELEGRAM_OPLUS_URL}"
+        _telegram_scaricato_a = time.monotonic()
+        return _telegram_cache, _telegram_errore
+
+    rilasci, errore = telegram_tracker.rilasci_da_pagina(getattr(risposta, "text", "") or "")
+    _telegram_cache, _telegram_errore = rilasci, errore
+    _telegram_scaricato_a = time.monotonic()
+    return _telegram_cache, _telegram_errore
+
+
+def reset_telegram_cache() -> None:
+    """Azzera la cache del canale (usata dai test e dal pulsante di
+    ricarica in Diagnostica)."""
+    global _telegram_cache, _telegram_errore, _telegram_scaricato_a
+    _telegram_cache = None
+    _telegram_errore = None
+    _telegram_scaricato_a = None
+
+
+def _nome_per_codice(codice: str | None) -> str | None:
+    """Codice modello → nome commerciale, con le due tabelle già in casa.
+
+    È il pezzo che rende utile questa fonte invece che curiosa: più della
+    metà dei post confermati porta la build **senza il nome del telefono**
+    (`Version : CPH2613_16.0.3.500` e basta). Il canale porta il firmware,
+    il progetto ci mette l'identità — AER prima perché usa la grafia
+    ufficiale, poi i dataset di `modelcodes`.
+    """
+    if not codice:
+        return None
+    try:
+        nome = aer_catalog.name_for_code(codice)
+        if nome:
+            return nome
+    except Exception:
+        pass
+    try:
+        nomi = modelcodes.resolve(codice)
+    except Exception:
+        nomi = []
+    return nomi[0] if nomi else None
+
+
+def _item_da_rilascio(rilascio, nome_forzato: str | None = None) -> RawItem | None:
+    """Da `Rilascio` a `RawItem`, o None se il telefono resta ignoto.
+
+    **Un rilascio senza nome viene scartato nel giro periodico**, e non è
+    uno spreco: un dispositivo chiamato «CPH2613» in archivio non si
+    incontra con «OPPO A6x» delle altre fonti, quindi produrrebbe una
+    scheda gemella con metà della storia — lo stesso danno descritto in
+    INTEGRAZIONE-OPPO.md. Nella ricerca a comando il nome arriva invece
+    da chi cerca, e allora l'item si costruisce lo stesso.
+    """
+    nome = nome_forzato or rilascio.device_name or _nome_per_codice(rilascio.model_code)
+    if not nome:
+        return None
+
+    descrizione = ["Canale rollout OxygenOS/ColorOS (non ufficiale)"]
+    if rilascio.model_code:
+        descrizione.append(rilascio.model_code)
+    if rilascio.region:
+        descrizione.append(f"regione {rilascio.region}")
+    if rilascio.canale_build:
+        descrizione.append(rilascio.canale_build)
+
+    skin = " ".join(p for p in (rilascio.skin, rilascio.skin_version) if p)
+    titolo = f"{nome} — {rilascio.build}" + (f" ({skin})" if skin else "")
+
+    return RawItem(
+        title=titolo,
+        link=rilascio.link,
+        # La data del rilascio non c'è: il canale pubblica il livello di
+        # patch, non il giorno di distribuzione. Lasciare `published`
+        # vuoto è corretto — l'archivio userà la data di prima
+        # rilevazione e la marcherà come stimata, invece di spacciare il
+        # livello di patch per una data di uscita.
+        published=None,
+        brand=C.OPPO,
+        device=nome,
+        version=skin or None,
+        build=rilascio.build,
+        android_version=rilascio.android_version,
+        # Il livello di patch viaggia nel testo perché è da lì che gli
+        # estrattori lo leggono, come per l'archivio ufficiale Oppo.
+        summary=(f"Security patch level: {rilascio.patch_level}. "
+                 if rilascio.patch_level else "") + rilascio.changelog,
+        size_info=" · ".join(descrizione),
+        trust=C.TRUST_CURATED,
+    )
+
+
+# ======================================================================
+# OnePlus / OPPO — tracker ARB (build correnti per regione)
+# ======================================================================
+# Perché sta PRIMA del canale Telegram nell'ordine dei lookup: entrambe
+# sono fonti community, ma questa è generata da uno script che scarica i
+# firmware veri e ne estrae i dati, mentre l'altra è la prosa di una
+# persona. A parità di trust, vince il dato prodotto da una macchina.
+#
+# Copre OnePlus quasi per intero e una parte degli OPPO (Reno, Find N,
+# Find X di qualche anno fa). NON copre la serie A di OPPO, né realme,
+# né vivo: per quelli la risposta onesta resta «nessuna fonte».
+ARB_README_URL = oplus_arb.URL_README
+
+_arb_cache: list | None = None
+_arb_errore: str | None = None
+_arb_scaricato_a: float | None = None
+_ARB_TTL_SECONDI = 6 * 60 * 60
+
+
+def _arb_rilasci(forza: bool = False):
+    """Build correnti dal tracker ARB, con cache a tempo."""
+    global _arb_cache, _arb_errore, _arb_scaricato_a
+
+    fresca = (
+        _arb_cache is not None
+        and _arb_scaricato_a is not None
+        and (time.monotonic() - _arb_scaricato_a) < _ARB_TTL_SECONDI
+    )
+    if fresca and not forza:
+        return _arb_cache, _arb_errore
+
+    try:
+        risposta = http_get(ARB_README_URL)
+    except Exception as exc:
+        _arb_cache, _arb_errore = [], f"tracker ARB non raggiungibile: {exc}"
+        _arb_scaricato_a = time.monotonic()
+        return _arb_cache, _arb_errore
+
+    codice = getattr(risposta, "status_code", 0)
+    if codice != 200:
+        _arb_cache, _arb_errore = [], f"HTTP {codice} da {ARB_README_URL}"
+        _arb_scaricato_a = time.monotonic()
+        return _arb_cache, _arb_errore
+
+    rilasci, errore = oplus_arb.rilasci_da_readme(getattr(risposta, "text", "") or "")
+    _arb_cache, _arb_errore = rilasci, errore
+    _arb_scaricato_a = time.monotonic()
+    return _arb_cache, _arb_errore
+
+
+def reset_arb_cache() -> None:
+    global _arb_cache, _arb_errore, _arb_scaricato_a
+    _arb_cache = None
+    _arb_errore = None
+    _arb_scaricato_a = None
+
+
+def _chiave_versione(rilascio) -> tuple:
+    """Ordina le build per anzianità. Le build di vecchio stile
+    (`CPH2611_11_A.65`), che non espongono una versione numerica
+    confrontabile, finiscono in fondo invece di essere scartate."""
+    if not rilascio.skin_version:
+        return (0,)
+    try:
+        return (1,) + tuple(int(p) for p in rilascio.skin_version.split("."))
+    except ValueError:
+        return (0,)
+
+
+def _arb_item(rilascio, con_regione: bool = True) -> RawItem:
+    descrizione = ["Tracker ARB OnePlus/OPPO (non ufficiale)", rilascio.model_code]
+    if con_regione and rilascio.region:
+        descrizione.append(f"regione {rilascio.region}")
+    if rilascio.canale_build:
+        descrizione.append(rilascio.canale_build)
+    if rilascio.arb_nota:
+        descrizione.append(rilascio.arb_nota)
+
+    titolo = f"{rilascio.device_name} — {rilascio.build}"
+    if rilascio.region:
+        titolo += f" [{rilascio.region}]"
+
+    riepilogo = ""
+    if rilascio.last_checked:
+        # È la data in cui il TRACKER ha visto quella build, non quella in
+        # cui OnePlus l'ha distribuita. Detta com'è, invece di essere
+        # spacciata per data di rilascio.
+        riepilogo = f"Build vista dal tracker il {rilascio.last_checked}."
+
+    return RawItem(
+        title=titolo,
+        link=rilascio.link,
+        published=None,
+        brand=C.OPPO,
+        device=rilascio.device_name,
+        version=rilascio.skin_version,
+        build=rilascio.build,
+        # La versione di Android NON viene dedotta dal numero di build.
+        # Si potrebbe: OxygenOS 16 gira su Android 16, quasi sempre. Ma
+        # «quasi sempre» su un dato che decide un retest completo è
+        # esattamente il tipo di scorciatoia che questo progetto paga poi
+        # a caro prezzo. Meglio un campo vuoto di un campo plausibile.
+        android_version=None,
+        summary=riepilogo,
+        size_info=" · ".join(p for p in descrizione if p),
+        trust=C.TRUST_CURATED,
+    )
+
+
+def fetch_oplus_arb() -> tuple[list[RawItem], str | None]:
+    """Una voce per dispositivo, con la build più avanzata fra le regioni.
+
+    Nel giro periodico si tiene un solo rilascio per telefono: l'archivio
+    è indicizzato per dispositivo, quindi cinque regioni dello stesso
+    OnePlus 13 si sovrascriverebbero a vicenda lasciando in memoria
+    l'ultima arrivata invece della più significativa. Le altre regioni
+    restano visibili nella ricerca a comando, dove servono davvero.
+    """
+    rilasci, errore = _arb_rilasci()
+    if errore:
+        return [], errore
+
+    migliori: dict[str, object] = {}
+    for rilascio in rilasci:
+        attuale = migliori.get(rilascio.device_name)
+        if attuale is None or _chiave_versione(rilascio) > _chiave_versione(attuale):
+            migliori[rilascio.device_name] = rilascio
+    return [_arb_item(r) for r in migliori.values()], None
+
+
+def _lookup_oplus_arb(model_name: str) -> list[RawItem]:
+    """Ricerca a comando: per codice modello o per nome commerciale.
+
+    Restituisce PIÙ regioni quando esistono, perché è l'informazione che
+    il tracker ha in più di chiunque altro: lo stesso OnePlus 13 è
+    CPH2653 in Europa e CPH2649 in India, con build che non procedono di
+    pari passo. Per un parco di test misto, sapere quale delle due si ha
+    in mano è metà del lavoro.
+    """
+    testo = (model_name or "").strip()
+    if not testo:
+        return []
+
+    rilasci, errore = _arb_rilasci()
+    if errore or not rilasci:
+        return []
+
+    codici = {c.upper() for c in _code_candidates(testo)}
+    codici.update(c.upper() for c in modelcodes.codes_for_name(testo))
+    atteso = extract.canonical_device(testo).lower()
+
+    trovati = []
+    for rilascio in rilasci:
+        codice = rilascio.model_code.upper()
+        # Confronto anche col codice base: chi cerca «CPH2525» deve
+        # trovare la riga europea che si chiama «CPH2525EEA».
+        base = re.match(r"^[A-Z]{2,4}\d{3,4}", codice)
+        per_codice = codice in codici or (base and base.group(0) in codici)
+        per_nome = (rilascio.device_name.lower() == atteso
+                    or extract.canonical_device(rilascio.device_name).lower() == atteso)
+        if per_codice or per_nome:
+            trovati.append(rilascio)
+
+    trovati.sort(key=_chiave_versione, reverse=True)
+    return [_arb_item(r) for r in trovati[:5]]
+
+
+def fetch_oplus_telegram() -> tuple[list[RawItem], str | None]:
+    """Build confermate di OnePlus/Oppo/realme dal canale di rollout."""
+    rilasci, errore = _telegram_rilasci()
+    if errore:
+        return [], errore
+    items = []
+    for rilascio in rilasci:
+        item = _item_da_rilascio(rilascio)
+        if item is not None:
+            items.append(item)
+    return items, None
+
+
+def _lookup_oplus_telegram(model_name: str) -> list[RawItem]:
+    """Ricerca a comando nel canale, per nome commerciale o per codice.
+
+    Cercare per codice funziona anche quando il post non nominava il
+    telefono: chi digita «CPH2613» ottiene la sua build, ed è il caso in
+    cui le altre fonti Oppo restituiscono solo «esiste, versione ignota».
+    """
+    testo = (model_name or "").strip()
+    if not testo:
+        return []
+
+    rilasci, errore = _telegram_rilasci()
+    if errore or not rilasci:
+        return []
+
+    codici_cercati = {c.upper() for c in _code_candidates(testo)}
+    codici_cercati.update(c.upper() for c in modelcodes.codes_for_name(testo))
+    atteso = extract.canonical_device(testo).lower()
+
+    trovati = []
+    for rilascio in rilasci:
+        per_codice = bool(rilascio.model_code
+                          and rilascio.model_code.upper() in codici_cercati)
+        nome = rilascio.device_name or _nome_per_codice(rilascio.model_code)
+        per_nome = bool(nome and (
+            nome.lower() == atteso
+            or extract.canonical_device(nome).lower() == atteso
+        ))
+        if per_codice or per_nome:
+            item = _item_da_rilascio(rilascio, nome_forzato=nome or None)
+            if item is not None:
+                trovati.append(item)
+
+    # Più rilasci per lo stesso telefono (regioni o mesi diversi): vince
+    # il livello di patch più alto, non il primo incontrato.
+    trovati.sort(key=lambda i: i.summary or "", reverse=True)
+    return trovati[:3]
+
+
 def fetch_coloros_news():
     """Notizie dedicate agli aggiornamenti ColorOS (Oppo e OnePlus).
 
@@ -2041,6 +2426,18 @@ SOURCES: list[Source] = [
     Source("oppo_aer", "Oppo — elenco ufficiale Android Enterprise Recommended", C.TRUST_STRUCTURED,
            fetch_oppo_aer, C.OPPO, OPPO_AER_URL,
            "Modelli certificati e politica di supporto; non pubblica la versione per dispositivo."),
+    Source("oplus_arb", "OnePlus/OPPO — tracker ARB (build per regione)",
+           C.TRUST_CURATED, fetch_oplus_arb, C.OPPO, ARB_README_URL,
+           "Build correnti per regione, estratte dai firmware veri da uno "
+           "script automatico. NON ufficiale: progetto community nato per "
+           "segnalare il rischio di anti-rollback. Copre OnePlus quasi per "
+           "intero e parte degli OPPO; non copre la serie A, realme e vivo."),
+    Source("oplus_telegram", "Oppo/OnePlus/realme — canale rollout OxygenOS/ColorOS",
+           C.TRUST_CURATED, fetch_oplus_telegram, C.OPPO, TELEGRAM_OPLUS_URL,
+           "Numeri di build reali per i modelli recenti, che nessuna fonte "
+           "ufficiale di questi marchi pubblica. NON ufficiale: canale gestito "
+           "da una persona. I post di versioni previste ('Upcoming', 'subject "
+           "to change') vengono scartati."),
     Source("coloros_news", "Oppo/OnePlus — aggiornamenti ColorOS", C.TRUST_CURATED,
            fetch_coloros_news, C.OPPO, "https://news.google.com",
            "Annunci di rilascio ColorOS ripresi dalle testate."),
@@ -2395,6 +2792,15 @@ class StructuredLookup:
     # irraggiungibile»: la ricerca per modello restituisce solo gli item e
     # l'errore andrebbe altrimenti perduto.
     fetch: Callable[[], tuple] | None = None
+    # Livello di fiducia. In coda ai campi di proposito: `fetch` è già
+    # passato come quinto argomento POSIZIONALE in mezza dozzina di punti,
+    # e infilare un campo prima di lui li avrebbe silenziosamente
+    # riassegnati tutti — il tipo di rottura che i test non vedono perché
+    # i tipi combaciano.
+    #
+    # Predefinito STRUCTURED perché fino a ieri qui c'erano solo fonti
+    # ufficiali; da quando ce n'è una CURATED, il valore va dichiarato.
+    trust: str = C.TRUST_STRUCTURED
 
 
 _STRUCTURED_LOOKUPS_LIST = [
@@ -2417,6 +2823,20 @@ _STRUCTURED_LOOKUPS_LIST = [
     # «find x2» scritto senza «oppo» non trovava niente.
     StructuredLookup(C.OPPO, _lookup_oppo_support, "basso",
                      "archivio firmware ufficiale Oppo"),
+    # SUBITO DOPO l'archivio ufficiale, e PRIMA delle due fonti che danno
+    # la versione di fabbrica. L'ordine è la tesi di tutta l'aggiunta:
+    #   1. se Oppo pubblica il firmware di quel modello, vince Oppo;
+    #   2. altrimenti una build reale da un canale dichiaratamente non
+    #      ufficiale vale più della versione con cui il telefono è uscito
+    #      di fabbrica tre anni fa;
+    #   3. e comunque il trust CURATED impedisce che sovrascriva un dato
+    #      ufficiale già in archivio.
+    StructuredLookup(C.OPPO, _lookup_oplus_arb, "basso",
+                     "tracker ARB OnePlus/OPPO (non ufficiale)",
+                     fetch_oplus_arb, trust=C.TRUST_CURATED),
+    StructuredLookup(C.OPPO, _lookup_oplus_telegram, "basso",
+                     "canale rollout OxygenOS/ColorOS (non ufficiale)",
+                     fetch_oplus_telegram, trust=C.TRUST_CURATED),
     StructuredLookup(C.OPPO, _lookup_realme, "basso", "piano ufficiale realme", fetch_realme_aer),
     StructuredLookup(C.OPPO, _lookup_oppo, "basso", "elenco ufficiale Oppo", fetch_oppo_aer),
     # In fondo alle economiche, appena prima di GSMArena: le pagine
@@ -2459,6 +2879,41 @@ _CODE_BRAND_PATTERNS = [
     # 2 lettere e da una a quattro cifre/lettere secondo la variante.
     (re.compile(r"^[A-Z]{3}-[A-Z]{2}\w{1,4}$", re.I), C.HUAWEI),
 ]
+
+
+# ======================================================================
+# Onestà sulla copertura
+# ======================================================================
+# A cosa serve. Una ricerca che restituisce il modello senza il firmware
+# è vissuta come un guasto dell'app, non come un limite del produttore —
+# ed è comprensibile, perché finora l'app non diceva la differenza. Il
+# dato mancante resta mancante, ma sapere PERCHÉ manca è la differenza
+# fra uno strumento che si può usare e uno di cui non ci si fida.
+_NOTE_COPERTURA = {
+    C.OPPO: (
+        "OPPO, OnePlus e realme non pubblicano da nessuna parte la versione "
+        "OTA corrente per modello: i portali ufficiali rispondono 403/404 e "
+        "l'API OTA pretende l'impronta del dispositivo. Coperti con build "
+        "reale: i ~94 modelli dell'archivio firmware Oppo (fino al 2021-22) "
+        "e i modelli recenti che passano dal canale di rollout, in gran "
+        "parte OnePlus e Oppo di fascia alta, regione India. Fuori da questi, "
+        "resta la versione di fabbrica dichiarata come tale."
+    ),
+    C.VIVO: (
+        "vivo e iQOO pubblicano il piano di supporto ufficiale ma non la "
+        "build per modello. Per Motorola la build reale c'è (mirror lolinet)."
+    ),
+    C.OTHER: (
+        "Marca senza fonte dedicata: si può solo riportare quanto scrivono "
+        "le testate, con l'incertezza che questo comporta."
+    ),
+}
+
+
+def nota_copertura(brand: str | None) -> str | None:
+    """Perché per questa marca può mancare il firmware. None se la marca
+    ha una fonte che pubblica la versione attuale."""
+    return _NOTE_COPERTURA.get(brand or "")
 
 
 def brand_from_code(query: str) -> str | None:

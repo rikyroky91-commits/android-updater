@@ -607,6 +607,14 @@ def render_search_outcome(display_name: str, live_result: dict) -> None:
                 f"versione firmware**: conferma solo che il modello esiste e la "
                 f"finestra di supporto.  \n*Fonte: {fonte}*"
             )
+            # PERCHE' manca, non solo CHE manca. Un modello mostrato senza
+            # firmware sembra un guasto dell'app; detto cosi' e' il limite
+            # del produttore, ed e' un'informazione utile a chi fa QA
+            # (dice su quali marche non si puo' contare per il retest).
+            nota_brand = sources.nota_copertura(best.get("brand"))
+            if nota_brand:
+                with st.expander("Perche' questo modello non ha una versione"):
+                    st.write(nota_brand)
         if best.get("size_info") and "FABBRICA" in (best["size_info"] or "").upper():
             st.caption("⚠️ Questa è la versione **di fabbrica**, non necessariamente "
                        "quella installata oggi dopo gli aggiornamenti.")

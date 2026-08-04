@@ -407,10 +407,23 @@ def _lookup_structured_for(model_query: str) -> tuple[list[dict], str | None]:
         raw_items, lookup_note = sources.lookup_model_structured(name)
         note = note or lookup_note
         if raw_items:
+            # IL TRUST LO DICHIARA LA FONTE, NON QUESTA FUNZIONE.
+            # Finché in `_STRUCTURED_LOOKUPS_LIST` c'erano solo fonti
+            # ufficiali, scrivere STRUCTURED qui era una scorciatoia
+            # innocua. Da quando c'è anche un canale non ufficiale
+            # sarebbe una bugia, e per giunta quella che conta di più: il
+            # trust è ciò che decide chi vince quando due fonti dicono
+            # cose diverse sullo stesso telefono. Una fonte curated
+            # promossa a strutturata potrebbe sovrascrivere un dato
+            # ufficiale — il difetto già corretto una volta in
+            # `storage.get_devices()`.
+            trust = raw_items[0].trust or C.TRUST_STRUCTURED
+            etichetta = raw_items[0].size_info or (
+                "Fonte ufficiale" if trust == C.TRUST_STRUCTURED else "Fonte dedicata")
             source = sources.Source(
-                key="official_lookup",
-                label=f"{raw_items[0].size_info or 'Fonte ufficiale'} (ricerca diretta)",
-                trust=C.TRUST_STRUCTURED,
+                key="official_lookup" if trust == C.TRUST_STRUCTURED else "curated_lookup",
+                label=f"{etichetta} (ricerca diretta)",
+                trust=trust,
                 fetch=None,
                 brand=raw_items[0].brand,
                 homepage="",

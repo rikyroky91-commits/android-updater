@@ -65,10 +65,74 @@ Quello che si può fare davvero, ed è quello a cui punto qui, è:
 | API OTA Oppo/OnePlus/realme (Allawn/ColorOS) | richiedono l'impronta del dispositivo e la finzione dell'app ufficiale → **fuori dalle regole del progetto**, come già deciso per OxygenUpdater |
 
 **Conclusione onesta su Oppo/OnePlus/realme moderni:** non esiste una fonte
-pubblica e machine-readable della versione OTA corrente. Non è un limite
-del progetto, è una scelta di quei produttori. Per quei modelli la strada
-resta: versione di fabbrica dichiarata come tale + notizie, con l'etichetta
-corretta.
+**ufficiale** pubblica e machine-readable della versione OTA corrente. Non è
+un limite del progetto, è una scelta di quei produttori.
+
+Da qui è nata l'unica eccezione dichiaratamente non ufficiale del progetto,
+descritta sotto.
+
+---
+
+## Il canale di rollout OxygenOS/ColorOS — misurato prima di essere adottato
+
+`https://t.me/s/oxygenos14update` — vista web pubblica, nessun account,
+nessun token, nessuna API di Telegram. **Trust `CURATED`, mai `STRUCTURED`:**
+è il canale di una persona e non deve poter sovrascrivere un dato ufficiale.
+
+### La misura, fatta prima di scrivere il parser
+
+Due pagine consecutive (messaggi 1636-1677), lette il 2026-08-03:
+
+| | |
+|---|---|
+| post totali | ~40 |
+| **rilasci confermati** | **11**, su 11 codici modello distinti |
+| di cui **senza il nome del telefono** | **5** — c'è solo `CPH2613`, `NE2211`… |
+| post di versioni **previste** | 6 (scartati) |
+| rumore (rilanci da X, sondaggi, dirette) | il resto |
+
+Due conclusioni operative da questi numeri.
+
+**La copertura è reale ma stretta.** Prevalgono OnePlus e Oppo di fascia
+alta, regione India; realme quasi non compare nonostante il nome del canale.
+Una pagina intera (1656-1677) non conteneva **nessun** rilascio confermato:
+è normale, non un guasto, e il codice distingue i due casi.
+
+**Metà dei rilasci arriva senza nome commerciale.** È il motivo per cui
+questa fonte funziona *qui* e non funzionerebbe altrove: `modelcodes` e il
+catalogo AER traducono già `CPH2613` in un nome. Il canale porta il
+firmware, il progetto ci mette l'identità. Un rilascio il cui codice non si
+risolve viene **scartato** nel giro periodico: un dispositivo chiamato
+«CPH2613» non incontrerebbe mai «OPPO A6x» delle altre fonti, e
+produrrebbe due schede con mezza storia ciascuna.
+
+### La trappola: è di nuovo quella di Honor
+
+Una fetta consistente dei post è una **previsione**, con build ben formata e
+livello di patch — sembra un dato buono in tutto, e lo smentisce solo la
+prosa: «Upcoming…», «these values are subject to change as the verification
+process is still ongoing». Prenderla per versione attuale sarebbe
+**identico** all'errore già pagato con la pagina AER di Honor, dove la
+versione *promessa* era stata letta come *spedita*.
+
+Il rifiuto è esplicito, elencato in `MARCATORI_PRELIMINARI`, e coperto da un
+test che verifica anche il contrario — che quel post conteneva davvero una
+build valida — così se qualcuno «semplificasse» il filtro si vedrebbe subito
+perché il test è rosso.
+
+### L'unico pezzo non verificato sul vivo
+
+I **testi dei messaggi** sono registrati dal canale vero
+(`tests/fixtures/telegram_oplus_messaggi.json`). L'**involucro HTML** della
+vista `/s/` no: è ricostruito sulla struttura nota della pagina, perché lo
+strumento con cui l'ho letta restituisce testo estratto, non HTML grezzo.
+
+Il rischio è contenuto per costruzione: `rilasci_da_pagina()` restituisce un
+**errore** quando non estrae nessun messaggio. Se l'involucro fosse
+sbagliato, o se Telegram cambiasse le classi CSS, la fonte apparirebbe
+**rossa in Diagnostica** invece che verde e vuota — che è la differenza fra
+un guasto e una bugia silenziosa. **Da confermare comunque al primo giro in
+produzione**, guardando Diagnostica.
 
 ---
 
@@ -280,3 +344,103 @@ scritta `Andorid`, con un refuso del produttore.
 `tests/test_vivo_aer.py`: **16 test sull'HTML vero** registrato in
 `tests/fixtures/vivo_aer.html`, più una riga nella matrice di ricerca.
 Scansione completa dopo la correzione: **nessuna fonte in errore**.
+
+---
+
+## Tracker ARB OnePlus/OPPO — la fonte migliore per questi marchi
+
+`https://raw.githubusercontent.com/Bartixxx32/OnePlus-antirollchecker/main/README.md`
+Trust **CURATED**. Progetto community (154 star) nato per un altro scopo:
+avvisare chi fa flashing del rischio di brick da anti-rollback. Il numero di
+build, per lui, e' un sottoprodotto — ma e' esattamente il dato che serve qui.
+
+**Perche' viene prima del canale Telegram.** Entrambe sono fonti community, ma
+questa e' generata da uno script che scarica i firmware veri e ne estrae i dati,
+l'altra e' la prosa di una persona. A parita' di trust, vince la macchina.
+
+**Cosa da' in piu' di tutte le altre fonti:** la build **per regione**, con i
+codici modello distinti. Lo stesso OnePlus 13 e' `CPH2653_16.0.5.703` in Europa
+e `CPH2649_16.0.7.201` in India — build diverse che non procedono di pari passo.
+Per un parco di test misto, sapere quale delle due si ha in mano e' meta' del
+lavoro.
+
+**Copertura misurata:** OnePlus quasi per intero (dal 7 al 15, Nord, Ace, Pad) e
+una parte di OPPO (Reno10 Pro, Find N3/N5, Find X3/X5, Find X8 Ultra).
+**NON copre**: la serie A di OPPO (quindi *non* l'A6x), realme, vivo/iQOO.
+
+**Due trappole gestite nel codice:**
+1. Il README contiene due tipi di tabella. Quelle di **storico** elencano build
+   superate: prenderle per correnti direbbe che un telefono e' fermo a una
+   versione che ha lasciato mesi fa. Il discriminante e' la colonna `Region`,
+   presente solo nello stato corrente.
+2. La data in tabella e' quando il **tracker ha visto** la build, non quando il
+   produttore l'ha distribuita. Va detta com'e', non spacciata per data di uscita.
+
+**Non si deduce la versione di Android dal numero di build.** OxygenOS 16 gira su
+Android 16 quasi sempre; "quasi" non basta per un campo che decide un retest
+completo.
+
+**Da sorvegliare:** il README letto riportava `Last updated: 2026-05-17`. Se
+quella data smette di avanzare, il progetto e' fermo e la fonte va spenta.
+`oplus_arb.copertura()` restituisce `ultima_verifica` apposta.
+
+---
+
+## Piste valutate e CHIUSE — non riaprirle senza un motivo nuovo
+
+Elencate qui con la ragione tecnica, perche' sono tutte idee che sembrano buone
+e tornano a galla ogni pochi mesi.
+
+### User-Agent (`Build/XXXXXX`) — CHIUSA
+Lo User-Agent Android conteneva il build ID reale del telefono di un utente vero.
+Non piu': Chrome congela modello e versione a partire dalla **110** (febbraio
+2023), con rollout completato entro la **113** (maggio 2023). Il modello diventa
+la lettera `K` e la piattaforma `Android 10` fissi. I Client Hints
+(`Sec-CH-UA-Model`) danno al massimo il nome del modello, **mai** build o patch.
+I database di UA (WhatIsMyBrowser e simili) restano utili solo come archeologia
+di build vecchie. Da Android 17 la riduzione vale anche per la WebView.
+
+### Database di benchmark (Geekbench, AnTuTu, GFXBench) — CHIUSA
+Verificato aprendo pagine di risultati reali per CPH2649 e CPH2865: il campo
+sistema operativo riporta **solo** `Android 15` / `Android 16`. Nessun
+`ro.build.version.incremental`, nessun fingerprint, nessun livello di patch.
+Resta un segnale debole utile a una cosa sola: accorgersi che un modello ha
+cambiato versione **maggiore** di Android.
+
+### Cataloghi Google (Play Console, Firebase Test Lab) — CHIUSA
+L'intuizione e' giusta: Google riceve i fingerprint in fase di certificazione e
+via attestazione. Ma non li pubblica. Firebase Test Lab espone `MODEL_ID`, brand
+e **versioni Android supportate in laboratorio**, non la build corrente sul
+telefono di nessuno. Il Device Catalog da' RAM, SoC e API level. L'Android
+Management API ha il campo giusto (`androidBuildNumber`, `securityPatchLevel`)
+ma solo per dispositivi arruolati in una policy EMM che si controlla.
+
+### AndroidDumps / dumps.tadiphone.dev — VALUTATA, NON INTEGRATA
+Sulla carta la migliore: i `build.prop` contengono `ro.build.fingerprint` **e**
+`ro.build.version.security_patch`, cioe' l'unico posto dove il livello di patch
+sarebbe leggibile. Misurata prima di scrivere codice, e scartata per tre motivi
+che vanno insieme:
+1. **Copertura sbagliata**: pochi flagship Snapdragon. OPPO A6x assente (4G e
+   5G), Find X9 assente, vivo X200 assente, iQOO 13 assente. Cio' che c'e' —
+   OnePlus 13, realme GT 7 — e' gia' coperto meglio dal tracker ARB.
+2. **Per la coda lunga c'e' un solo dump, fatto al lancio**: cioe' la versione
+   di fabbrica, che e' il dato inutile gia' disponibile dall'AER.
+3. **Il sito blocca i lettori automatici**, quindi l'indice andrebbe ricavato
+   scrapando il canale Telegram di annuncio: due punti di fragilita' in fila per
+   un guadagno che si sovrappone a una fonte che abbiamo gia'.
+
+**Cosa la riaprirebbe:** se servisse davvero il livello di patch di sicurezza per
+i modelli coperti (oggi nessuna delle due fonti OnePlus/OPPO lo da'), oppure se
+la copertura si allargasse alla serie A di OPPO e a vivo.
+
+### EPREL (database UE) — DA VALUTARE, con una cautela grossa
+Dal 20 giugno 2025 il Regolamento (UE) 2023/1670 obbliga a registrare ogni
+smartphone venduto nell'UE in `eprel.ec.europa.eu`, con API pubblica e chiave
+gratuita. E' **ufficiale e obbligatoria per legge**, quindi tentante.
+
+Ma il campo che espone e' la *durata minima garantita degli aggiornamenti*
+(almeno 5 anni dalla fine dell'immissione sul mercato): **una promessa in anni,
+non la versione installata oggi**. E' la trappola di Honor riscritta in un
+regolamento europeo. Se venisse integrata, va etichettata come "finestra di
+supporto" e non deve mai finire nel campo versione. Copre solo i modelli
+immessi sul mercato dopo il 20/06/2025.
