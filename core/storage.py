@@ -852,7 +852,12 @@ def purge_retired_sources(valid_keys) -> int:
     mostrava un errore TLS di 35 minuti prima mentre tutte le altre fonti
     riportavano «pochi istanti fa»).
     """
-    chiavi = list(dict.fromkeys(list(valid_keys) + ["live_search", "official_lookup"]))
+    # `curated_lookup` e' nato con le fonti community (tracker ARB, canale
+    # rollout): senza di lui nell'elenco, la pulizia delle fonti ritirate
+    # cancellerebbe a ogni giro proprio i dispositivi che quelle fonti
+    # sono le uniche a coprire.
+    chiavi = list(dict.fromkeys(
+        list(valid_keys) + ["live_search", "official_lookup", "curated_lookup"]))
     if not chiavi:
         return 0
     segnaposto = ",".join("?" * len(chiavi))

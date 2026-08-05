@@ -9,7 +9,7 @@ i test.
 streamlit run app.py                    # dashboard
 python worker.py --once                 # una scansione sola (cron / GitHub Actions)
 python worker.py                        # ciclo continuo, senza UI
-python -m unittest discover -s tests    # 413 test
+python -m unittest discover -s tests    # 448 test
 ```
 
 ## Cosa fa
@@ -99,10 +99,11 @@ core/
   suggest.py       completamento e correzione degli errori di battitura
   retest.py        confronto fra la baseline testata e lo stato attuale
   oplus_arb.py     tracker ARB OnePlus/OPPO: build correnti per regione
+  soc.py           quale chip monta un modello (per codice, non per nome)
   telegram_tracker.py  lettura del canale rollout OxygenOS/ColorOS
                    (parser puro, zero rete: scarica sources.py)
   backup.py        persistenza del database fra i riavvii (Gist/URL)
-tests/             413 test, nessuno tocca la rete — verificato, non promesso:
+tests/             448 test, nessuno tocca la rete — verificato, non promesso:
                    test_niente_rete.py blocca il socket e fallisce se un
                    percorso di ricerca prova a uscire
 ```

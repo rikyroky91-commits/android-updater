@@ -444,3 +444,82 @@ non la versione installata oggi**. E' la trappola di Honor riscritta in un
 regolamento europeo. Se venisse integrata, va etichettata come "finestra di
 supporto" e non deve mai finire nel campo versione. Copre solo i modelli
 immessi sul mercato dopo il 20/06/2025.
+
+---
+
+## Il SoC: quale chip monta un modello
+
+Per il QA e' meta' della domanda. Un difetto legato al chip si riproduce solo
+su una delle varianti, e il caso da manuale e' il Galaxy S24: `SM-S921B`
+(Europa) monta Exynos 2400, `SM-S921U` (USA) monta Snapdragon 8 Gen 3. Stesso
+nome, stesso firmware, chip diverso.
+
+**Quindi il SoC va risolto per CODICE MODELLO, non per nome.** Una fonte che
+dice "Galaxy S24 -> Snapdragon" da' un'informazione sbagliata a meta' del mondo.
+E' il criterio con cui sono state scartate quasi tutte le fonti disponibili.
+
+### Ordine delle fonti, in `core/soc.py`
+
+1. **Catalogo dispositivi di Google Play** — `data/play_device_catalog.csv`.
+   L'unica fonte gratuita e strutturata con il SoC per codice esatto: le
+   varianti regionali sono righe distinte, quindi il problema e' risolto per
+   costruzione. **Non e' inclusa nel repo** perche' non e' scaricabile in modo
+   anonimo (vedi sotto).
+2. **Regole deterministiche** per Apple (identificatore -> chip) e Pixel
+   (generazione -> Tensor). Qui una regola e' lecita perche' non esistono
+   varianti di mercato: un iPhone17,3 monta lo stesso A18 ovunque.
+3. **Tabella curata a mano** — `data/soc_modelli.csv`. Corta di proposito.
+
+### Come ottenere il catalogo Play (opzionale, ma raddoppia la copertura)
+
+Play Console -> *Monitor and improve* -> *Reach and devices* -> *Device catalog*
+-> **Export device list**. Il CSV ha una colonna `System on Chip` per codice
+modello. Va salvato come `data/play_device_catalog.csv` e caricato nel repo:
+l'app lo legge da disco, senza rete e senza credenziali a runtime. Il SoC di un
+modello non cambia mai, quindi un export ogni pochi mesi basta.
+
+Serve un account Play Console (25 USD una tantum) con un'app pubblicata. Senza,
+l'app funziona lo stesso con le fonti 2 e 3.
+
+**Da verificare al primo export vero:** l'importatore e' scritto sulle
+intestazioni **documentate** da Google, non su un file catturato, perche' il
+download richiede il login. E' l'unico pezzo del modulo non provato su dati
+reali. Le colonne sono riconosciute per nome e non per posizione, e il campo
+SoC arriva nella forma "Qualcomm SDM855" (produttore davanti alla sigla).
+
+### Perche' la tabella curata e' cosi' corta
+
+Perche' un dato che guida una decisione non si inventa. Riempire un CSV di
+qualche centinaio di righe plausibili sarebbe stato facile, ma chi legge non
+distingue una riga verificata da una ricordata male, e un Exynos scritto al
+posto di uno Snapdragon manda a cercare un bug su un telefono che non ce l'ha.
+
+In particolare **non esiste una regola sul suffisso** Samsung B/U che si possa
+applicare alla cieca: la ripartizione cambia a ogni generazione. S22 e S24
+splittano Exynos/Snapdragon, S23 e S25 no, e nella stessa generazione l'Ultra
+puo' seguire una regola diversa dagli altri modelli. Solo tabella.
+
+### Quando la risposta non puo' essere una sola
+
+Chi cerca "galaxy s24" senza codice non puo' ricevere una risposta secca,
+perche' sarebbe sbagliata per meta' dei telefoni con quel nome. Ma tacere e'
+peggio: l'app elenca **entrambe** le varianti e dice di cercare la sigla
+esatta. Sapere che esistono due varianti e' gia' un'informazione operativa.
+
+### Piste scartate per il SoC
+
+- **Catalogo Android Enterprise Recommended** (gia' integrato per altro):
+  verificato che **non contiene il SoC**. L'unico campo vicino e'
+  `processorSpeed`, una stringa di clock tipo "2.2 GHz". Era la speranza di una
+  soluzione a costo zero, ed e' smentita.
+- **Firebase Test Lab**: da' `MODEL_ID`, brand e versioni Android. Nessun chip.
+- **PhoneDB**: la piu' accurata per sigla esatta, ma il database e' sotto
+  licenza a pagamento e lo scraping non e' consentito. Usabile solo come
+  verifica manuale a campione.
+- **GSMArena, DeviceSpecifications, Kimovil**: nessuna API, scraping non
+  autorizzato.
+- **Wikidata (proprieta' P880)**: gratuita e interrogabile via SPARQL, ma modella
+  il nome commerciale e non la sigla: appiattisce proprio la distinzione che
+  serve. Eventuale fallback NOISY, mai per le varianti.
+- **Dataset generici di specifiche su Kaggle/GitHub**: tutti a livello di nome
+  commerciale. Comodi e fuorvianti.

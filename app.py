@@ -42,6 +42,7 @@ from core import appledevices  # noqa: E402
 from core import backup  # noqa: E402
 from core import suggest  # noqa: E402
 from core import retest  # noqa: E402
+from core import soc  # noqa: E402
 from core.classify import qa_impact  # noqa: E402
 from core.util import days_since, fmt_date, fmt_dt, fmt_relative, truncate  # noqa: E402
 
@@ -572,13 +573,21 @@ if unified_query and not unified_submitted and len(unified_query.strip()) >= 2:
         bottoniera(completamenti, "sugg")
 
 
-def render_search_outcome(display_name: str, live_result: dict) -> None:
+def render_search_outcome(display_name: str, live_result: dict,
+                          query_grezza: str = "") -> None:
     """Mostra prima il dato più preciso disponibile, poi l'esito della
     verifica su notizie — l'ordine conta: un dato da fonte ufficiale è
     sempre più affidabile di una notizia, anche quando la ricerca online non
     trova nulla di nuovo in questo momento."""
+    # `official_lookup` e `curated_lookup` sono ENTRAMBI risultati di una
+    # ricerca diretta su una fonte, non notizie. La distinzione fra i due
+    # e' il livello di fiducia, che viene mostrato accanto al dato; se qui
+    # si guardasse solo il primo, i risultati del tracker ARB e del canale
+    # di rollout finirebbero fra gli articoli di giornale — cioe' proprio
+    # le uniche fonti che coprono OnePlus e OPPO recenti.
+    CHIAVI_LOOKUP = ("official_lookup", "curated_lookup")
     structured = [i for i in live_result.get("items", [])
-                  if i.get("source") == "official_lookup"]
+                  if i.get("source") in CHIAVI_LOOKUP]
     if structured:
         best = structured[0]
         pezzi = []
@@ -598,15 +607,31 @@ def render_search_outcome(display_name: str, live_result: dict) -> None:
         # di avere una risposta che non c'è.
         nome_mostrato = best.get("device_model") or display_name
         fonte = best.get("source_label", "")
+
+        # IL CHIP, accanto al firmware. Per il QA e' meta' della
+        # domanda: un difetto legato al SoC si riproduce solo su una
+        # delle varianti, e su Samsung due telefoni con lo STESSO nome
+        # e lo STESSO firmware possono montare Exynos o Snapdragon a
+        # seconda del mercato.
+        chip = soc.per_modello(query_grezza or best.get("model_code"),
+                               f"{nome_mostrato} {best.get('size_info') or ''}")
+        if chip:
+            pezzi.append(f"SoC **{chip.etichetta}**")
+
         if pezzi:
             st.success(f"✅ **{nome_mostrato}** — " + " · ".join(pezzi)
                        + f"  \n*Fonte: {fonte}*")
+            if chip and chip.nota:
+                st.caption(f"🔧 {chip.nota}")
         else:
             st.warning(
                 f"**{nome_mostrato}** riconosciuto, ma **questa fonte non pubblica la "
                 f"versione firmware**: conferma solo che il modello esiste e la "
                 f"finestra di supporto.  \n*Fonte: {fonte}*"
             )
+            if chip:
+                nota_chip = f" — {chip.nota}" if chip.nota else ""
+                st.caption(f"🔧 SoC: **{chip.etichetta}**{nota_chip}")
             # PERCHE' manca, non solo CHE manca. Un modello mostrato senza
             # firmware sembra un guasto dell'app; detto cosi' e' il limite
             # del produttore, ed e' un'informazione utile a chi fa QA
@@ -633,7 +658,7 @@ def render_search_outcome(display_name: str, live_result: dict) -> None:
                    f"aggiornato **{fmt_relative(device['last_update_at'])}** ({fonte}).")
 
     news_items = [i for i in live_result.get("items", [])
-                  if i.get("source") != "official_lookup"]
+                  if i.get("source") not in CHIAVI_LOOKUP]
     if news_items:
         rilevanti = sum(1 for i in news_items if i["is_relevant"])
         st.caption(f"Verifica online: {len(news_items)} notizie trovate, "
@@ -678,7 +703,7 @@ if unified_submitted and unified_query.strip():
     else:
         with st.spinner(f"Verifico «{query}»…"):
             live_result = scan.search_model(query)
-        render_search_outcome(query, live_result)
+        render_search_outcome(query, live_result, query_grezza=query)
         active_search = query
 
 search_history = storage.get_search_history(30)

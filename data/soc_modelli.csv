@@ -1,0 +1,31 @@
+model_code,nome_commerciale,soc_nome,produttore,soc_codice,nota
+# Tabella CURATA A MANO. Corta di proposito: contiene solo modelli per cui
+# l'abbinamento codice-chip e' verificato, non "plausibile". Chi legge un
+# risultato non puo' distinguere una riga giusta da una ricordata male, e un
+# Exynos scritto al posto di uno Snapdragon fa cercare un bug su un telefono
+# che non ce l'ha. Per tutto il resto vale il catalogo Play (vedi FONTI.md).
+#
+# Il caso per cui questa tabella esiste e' la serie Galaxy S: stesso nome
+# commerciale, stesso firmware, chip diverso per mercato. E la ripartizione
+# cambia a ogni generazione, quindi NON esiste una regola sul suffisso B/U
+# che si possa applicare alla cieca.
+SM-S931B,Galaxy S25,Snapdragon 8 Elite for Galaxy,Qualcomm,SM8750-AC,Variante Europa/Global
+SM-S931U,Galaxy S25,Snapdragon 8 Elite for Galaxy,Qualcomm,SM8750-AC,Variante USA
+SM-S936B,Galaxy S25+,Snapdragon 8 Elite for Galaxy,Qualcomm,SM8750-AC,Variante Europa/Global
+SM-S938B,Galaxy S25 Ultra,Snapdragon 8 Elite for Galaxy,Qualcomm,SM8750-AC,Variante Europa/Global
+SM-S938U,Galaxy S25 Ultra,Snapdragon 8 Elite for Galaxy,Qualcomm,SM8750-AC,Variante USA
+SM-S921B,Galaxy S24,Exynos 2400,Samsung,S5E9945,Variante Europa/Global — la USA monta Snapdragon
+SM-S921U,Galaxy S24,Snapdragon 8 Gen 3 for Galaxy,Qualcomm,SM8650-AC,Variante USA — la europea monta Exynos
+SM-S926B,Galaxy S24+,Exynos 2400,Samsung,S5E9945,Variante Europa/Global — la USA monta Snapdragon
+SM-S926U,Galaxy S24+,Snapdragon 8 Gen 3 for Galaxy,Qualcomm,SM8650-AC,Variante USA — la europea monta Exynos
+SM-S928B,Galaxy S24 Ultra,Snapdragon 8 Gen 3 for Galaxy,Qualcomm,SM8650-AC,Ultra: Snapdragon in tutti i mercati
+SM-S928U,Galaxy S24 Ultra,Snapdragon 8 Gen 3 for Galaxy,Qualcomm,SM8650-AC,Ultra: Snapdragon in tutti i mercati
+SM-S911B,Galaxy S23,Snapdragon 8 Gen 2 for Galaxy,Qualcomm,SM8550-AC,Snapdragon in tutti i mercati
+SM-S916B,Galaxy S23+,Snapdragon 8 Gen 2 for Galaxy,Qualcomm,SM8550-AC,Snapdragon in tutti i mercati
+SM-S918B,Galaxy S23 Ultra,Snapdragon 8 Gen 2 for Galaxy,Qualcomm,SM8550-AC,Snapdragon in tutti i mercati
+SM-S901B,Galaxy S22,Exynos 2200,Samsung,S5E9925,Variante Europa/Global — la USA monta Snapdragon
+SM-S901U,Galaxy S22,Snapdragon 8 Gen 1,Qualcomm,SM8450,Variante USA — la europea monta Exynos
+SM-S906B,Galaxy S22+,Exynos 2200,Samsung,S5E9925,Variante Europa/Global — la USA monta Snapdragon
+SM-S906U,Galaxy S22+,Snapdragon 8 Gen 1,Qualcomm,SM8450,Variante USA — la europea monta Exynos
+SM-S908B,Galaxy S22 Ultra,Exynos 2200,Samsung,S5E9925,Variante Europa/Global — la USA monta Snapdragon
+SM-S908U,Galaxy S22 Ultra,Snapdragon 8 Gen 1,Qualcomm,SM8450,Variante USA — la europea monta Exynos
