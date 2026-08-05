@@ -9,7 +9,7 @@ i test.
 streamlit run app.py                    # dashboard
 python worker.py --once                 # una scansione sola (cron / GitHub Actions)
 python worker.py                        # ciclo continuo, senza UI
-python -m unittest discover -s tests    # 463 test
+python -m unittest discover -s tests    # 467 test
 ```
 
 ## Cosa fa
@@ -103,7 +103,7 @@ core/
   telegram_tracker.py  lettura del canale rollout OxygenOS/ColorOS
                    (parser puro, zero rete: scarica sources.py)
   backup.py        persistenza del database fra i riavvii (Gist/URL)
-tests/             463 test, nessuno tocca la rete — verificato, non promesso:
+tests/             467 test, nessuno tocca la rete — verificato, non promesso:
                    test_niente_rete.py blocca il socket e fallisce se un
                    percorso di ricerca prova a uscire
 ```

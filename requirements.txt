@@ -1,4 +1,27 @@
 streamlit>=1.40   # st.columns(vertical_alignment=...) esiste da questa versione
+
+# VINCOLO CHE TIENE IN PIEDI IL DEPLOY — non toglierlo senza aver verificato.
+#
+# Starlette 1.4.0 ha reso `thread_minimum_size` un argomento obbligatorio di
+# `GZipResponder`. Il middleware di Streamlit
+# (streamlit/web/server/starlette/starlette_gzip_middleware.py) lo istanzia
+# ancora con la vecchia firma, quindi con Starlette >= 1.4.0 OGNI richiesta
+# HTTP muore con:
+#
+#   TypeError: GZipResponder.__init__() missing 1 required
+#              keyword-only argument: 'thread_minimum_size'
+#
+# L'app non arriva nemmeno a essere eseguita: falliscono i controlli di
+# salute e il container si riavvia in ciclo. Sintomo osservato il
+# 2026-08-05 su Streamlit Community Cloud con streamlit 1.61.0 +
+# starlette 1.4.0 + Python 3.14.6.
+#
+# Streamlit non dichiara un tetto su starlette, quindi senza questa riga
+# l'installatore prende sempre l'ultima versione e il deploy si rompe da
+# solo, senza che nel repo cambi niente. Da rimuovere solo quando una
+# versione di Streamlit dichiarera' il supporto a Starlette 1.4+.
+starlette<1.4.0
+
 requests>=2.31
 feedparser>=6.0
 pandas>=2.0
