@@ -2026,7 +2026,28 @@ SAMSUNG_FUS_DEVICES: list[tuple[str, str]] = [
 
 # CSC (region code) da provare in ordine: ITV = Italia, poi Europa generica.
 # Non tutti i modelli pubblicano un firmware per ogni CSC, da qui il fallback.
-SAMSUNG_CSC_CANDIDATES = ["ITV", "DBT", "EUX", "XEO"]
+# Region (CSC) provate in sequenza sull'endpoint FOTA.
+#
+# ERANO QUATTRO, TUTTE EUROPEE — ed era il motivo per cui un modello come
+# `SM-A075F`, venduto soprattutto in India e in Asia, non restituiva NULLA:
+# non perché il firmware non esista, ma perché nessuna delle quattro region
+# interrogate lo distribuisce. La ricerca sembrava rotta e invece stava
+# guardando nel posto sbagliato.
+#
+# L'ordine è deliberato: prima le region multi-paese, che coprono di più con
+# una richiesta sola, poi i mercati singoli grandi. La ricerca si ferma alla
+# prima che risponde, quindi una lista più lunga non costa tempo quando il
+# modello è europeo — costa solo quando altrimenti non si troverebbe niente.
+SAMSUNG_CSC_CANDIDATES = [
+    # Multi-paese europee
+    "EUX", "EUY", "DBT", "ITV", "XEO", "BTU", "XEF", "PHE", "NEE",
+    # India, il mercato che mancava del tutto
+    "INS", "INU", "IND",
+    # Nord America
+    "XAA", "TMB", "ATT", "VZW", "XAC",
+    # Asia-Pacifico, Medio Oriente, Africa, America Latina
+    "XSG", "XSA", "THL", "XME", "XTC", "ZTO", "CHC", "SEK", "KOO",
+]
 
 _SAMSUNG_VERSION_XML_RE = re.compile(
     r'<latest(?:\s+o=["\'](\d+)["\'])?[^>]*>([^<]+)</latest>', re.IGNORECASE
@@ -2542,6 +2563,36 @@ def all_sources() -> list[Source]:
 # modello — e trattarla come codice la fa corrispondere per caso a
 # dispositivi di marche del tutto diverse (Chainway C61, Oukitel C61), su
 # cui la ricerca viene poi sprecata.
+# Suffissi di variante che compaiono sulla scatola, nell'etichetta sotto la
+# batteria e in «Info software», ma che NON fanno parte del codice usato
+# dalle fonti firmware: `SM-A075F/DS` è il dual-SIM di `SM-A075F`, e
+# l'endpoint FOTA conosce solo il secondo.
+#
+# Finché non venivano tolti, un utente che copiava il codice come lo vedeva
+# scritto sul proprio telefono non trovava NIENTE: né il firmware, né il
+# modello. Ed è la forma più naturale in cui copiarlo.
+_RE_SUFFISSO_VARIANTE = re.compile(
+    r"[/\s]+(?:DS|DSN|DUOS|D|N|ZA|ZT)\s*$", re.I)
+
+
+def normalizza_codice_modello(testo: str) -> str:
+    """Toglie spazi e suffissi di variante da un codice modello.
+
+    `SM-A075F/DS` → `SM-A075F` · `SM-A075F DS` → `SM-A075F`
+
+    L'ordine conta: il suffisso va tolto PRIMA di comprimere gli spazi.
+    Al contrario, «SM-A075F DS» diventerebbe «SM-A075FDS», che ha ancora
+    la forma di un codice valido — e quindi non verrebbe segnalato come
+    errore, verrebbe solo cercato invano.
+    """
+    grezzo = (testo or "").strip().upper()
+    precedente = None
+    while grezzo != precedente:
+        precedente = grezzo
+        grezzo = _RE_SUFFISSO_VARIANTE.sub("", grezzo).strip()
+    return re.sub(r"\s+", "", grezzo)
+
+
 _MODEL_CODE_SHAPES = [
     re.compile(r"^SM-[A-Z]\d{3}[A-Z]{0,3}$", re.I),          # Samsung
     re.compile(r"^[A-Z]{3}-[A-Z]{2}\w{1,4}$", re.I),          # Huawei/Honor
@@ -2556,7 +2607,7 @@ _MODEL_CODE_SHAPES = [
 
 def looks_like_model_code(text: str) -> bool:
     """True solo se il testo ha la forma di un codice modello vero."""
-    compatto = re.sub(r"\s+", "", (text or "")).strip()
+    compatto = normalizza_codice_modello(text)
     return any(pattern.match(compatto) for pattern in _MODEL_CODE_SHAPES)
 
 
@@ -2571,8 +2622,11 @@ def _code_candidates(query: str) -> list[str]:
     """
     stripped = query.strip().upper()
     no_spaces = re.sub(r"\s+", "", stripped)
+    # La forma senza suffisso di variante viene per PRIMA: è quella che
+    # le fonti firmware conoscono. `SM-A075F/DS` è come l'utente lo
+    # legge sul telefono, `SM-A075F` è come lo chiama l'endpoint FOTA.
     variants = []
-    for v in (stripped, no_spaces):
+    for v in (normalizza_codice_modello(query), stripped, no_spaces):
         if v and v not in variants and looks_like_model_code(v):
             variants.append(v)
     return variants
@@ -2631,8 +2685,9 @@ def _lookup_samsung(model_name: str) -> list[RawItem]:
     # Il testo digitato può essere già un codice ("SM-S928B") o un nome
     # scritto in minuscolo: in entrambi i casi il nome da mostrare è quello
     # ufficiale del dataset, non la forma battuta a tastiera.
-    if _SAMSUNG_CODE_RE.match(re.sub(r"\s+", "", model_name)):
-        codes = [re.sub(r"\s+", "", model_name).upper()]
+    normalizzato = normalizza_codice_modello(model_name)
+    if _SAMSUNG_CODE_RE.match(normalizzato):
+        codes = [normalizzato]
     else:
         codes = [c for c in modelcodes.codes_for_name(model_name) if _SAMSUNG_CODE_RE.match(c)]
     items: list[RawItem] = []
@@ -2652,10 +2707,10 @@ def _lookup_samsung(model_name: str) -> list[RawItem]:
             continue
         items.append(
             RawItem(
-                title=f"{_nome_ufficiale(code, model_name)} ({code}) — build {pda} ({csc})",
+                title=f"{_nome_ufficiale(code, code)} ({code}) — build {pda} ({csc})",
                 link=f"https://fota-cloud-dn.ospserver.net/firmware/{csc}/{code}/version.xml",
                 brand=C.SAMSUNG,
-                device=_nome_ufficiale(code, model_name),
+                device=_nome_ufficiale(code, code),
                 build=pda,
                 android_version=int(android_version) if android_version else None,
                 size_info="Controllo versione ufficiale (endpoint FOTA)",

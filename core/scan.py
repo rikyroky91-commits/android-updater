@@ -11,7 +11,7 @@ import threading
 import time
 import traceback
 
-from . import backup, classify, config as C, extract, modelcodes, notify, sources, storage
+from . import backup, classify, config as C, extract, modelcodes, notify, soc, sources, storage
 from .util import now_iso, short_hash, slug, utcnow
 
 _scan_lock = threading.Lock()
@@ -429,7 +429,64 @@ def _lookup_structured_for(model_query: str) -> tuple[list[dict], str | None]:
                 homepage="",
             )
             return [normalize(raw, source) for raw in raw_items], None
+
+    # ULTIMA SPIAGGIA: nessuna fonte firmware conosce questo modello, ma il
+    # codice potrebbe essere comunque riconoscibile.
+    #
+    # Il progetto ha già in casa ~70.000 codici modello (MobileModels e la
+    # lista Google Play) e un modulo che sa quale chip monta un dispositivo.
+    # Prima, se le fonti firmware tacevano, tutto questo restava inutilizzato
+    # e la ricerca rispondeva «niente» — dando l'impressione che l'app fosse
+    # rotta, quando in realtà sapeva benissimo di che telefono si trattava e
+    # semplicemente non ne conosceva l'aggiornamento.
+    #
+    # Sono due domande diverse e vanno risposte separatamente:
+    #   «che telefono è?»          → quasi sempre rispondibile
+    #   «a che firmware sta?»      → dipende dal produttore
+    identificato = _identifica_senza_firmware(model_query)
+    if identificato:
+        return identificato, note
     return [], note
+
+
+def _identifica_senza_firmware(model_query: str) -> list[dict]:
+    """Riconosce il dispositivo senza saperne il firmware.
+
+    Restituisce un item SENZA versione, build o patch: l'interfaccia lo
+    distingue già da un risultato completo e mostra il ramo «riconosciuto,
+    ma questa fonte non pubblica la versione firmware». Riempirlo di campi
+    inventati per farlo sembrare un risultato pieno sarebbe il contrario
+    di quello che serve.
+    """
+    for codice in sources._code_candidates(model_query):
+        nomi = modelcodes.resolve(codice)
+        if not nomi:
+            continue
+        nome = nomi[0]
+        pulito = sources.normalizza_codice_modello(codice)
+        descrizione = [f"Codice modello riconosciuto ({pulito})"]
+        chip = soc.per_modello(pulito, nome)
+        if chip:
+            descrizione.append(f"SoC {chip.etichetta}")
+
+        raw = sources.RawItem(
+            title=f"{nome} ({pulito})",
+            link="",
+            brand=sources.brand_from_code(pulito) or sources.brand_from_known_device(nome),
+            device=nome,
+            size_info=" · ".join(descrizione),
+            trust=C.TRUST_STRUCTURED,
+        )
+        source = sources.Source(
+            key="official_lookup",
+            label="Riconoscimento del codice modello (ricerca diretta)",
+            trust=C.TRUST_STRUCTURED,
+            fetch=None,
+            brand=raw.brand,
+            homepage="",
+        )
+        return [normalize(raw, source)]
+    return []
 
 
 def seconds_until_next_scan() -> int:
