@@ -2605,9 +2605,37 @@ _MODEL_CODE_SHAPES = [
 ]
 
 
+# Codice Samsung scritto SENZA il prefisso: `A325F`, `S928B`, `G991B`.
+#
+# È la forma in cui il codice compare nel numero di build (`A325FXXU2CVK1`),
+# nei log, nelle discussioni tecniche e nei nomi dei firmware — quindi è
+# quella che chi fa QA copia più spesso, molto più di `SM-A325F`.
+#
+# Finché non veniva riconosciuta, cercare «a325f» non attivava il controllo
+# firmware Samsung: rispondeva un'altra fonte, con la versione **di
+# fabbrica**. Su un Galaxy A32 significava vedere Android 11 (il lancio,
+# 2021) su un telefono che intanto è arrivato ad Android 13. Non era un
+# dato mancante — era un dato SBAGLIATO, che è molto peggio.
+#
+# Il vincolo sulle cifre è stretto (esattamente tre) apposta: allargarlo
+# farebbe passare per codice Samsung qualunque parola con dei numeri.
+_RE_SAMSUNG_SENZA_PREFISSO = re.compile(r"^([A-Z]\d{3}[A-Z]{0,3})$")
+
+
+def espandi_codice_samsung(testo: str) -> str | None:
+    """`A325F` → `SM-A325F`. None se non ha quella forma."""
+    compatto = normalizza_codice_modello(testo)
+    if compatto.startswith("SM-"):
+        return None
+    match = _RE_SAMSUNG_SENZA_PREFISSO.match(compatto)
+    return f"SM-{match.group(1)}" if match else None
+
+
 def looks_like_model_code(text: str) -> bool:
     """True solo se il testo ha la forma di un codice modello vero."""
     compatto = normalizza_codice_modello(text)
+    if espandi_codice_samsung(compatto):
+        return True
     return any(pattern.match(compatto) for pattern in _MODEL_CODE_SHAPES)
 
 
@@ -2626,7 +2654,12 @@ def _code_candidates(query: str) -> list[str]:
     # le fonti firmware conoscono. `SM-A075F/DS` è come l'utente lo
     # legge sul telefono, `SM-A075F` è come lo chiama l'endpoint FOTA.
     variants = []
-    for v in (normalizza_codice_modello(query), stripped, no_spaces):
+    # La forma ESPANSA per prima: `a325f` va cercato come `SM-A325F`,
+    # che e' l'unico nome che l'endpoint firmware Samsung conosce.
+    espanso = espandi_codice_samsung(query)
+    for v in (espanso, normalizza_codice_modello(query), stripped, no_spaces):
+        if not v:
+            continue
         if v and v not in variants and looks_like_model_code(v):
             variants.append(v)
     return variants
@@ -2685,7 +2718,7 @@ def _lookup_samsung(model_name: str) -> list[RawItem]:
     # Il testo digitato può essere già un codice ("SM-S928B") o un nome
     # scritto in minuscolo: in entrambi i casi il nome da mostrare è quello
     # ufficiale del dataset, non la forma battuta a tastiera.
-    normalizzato = normalizza_codice_modello(model_name)
+    normalizzato = espandi_codice_samsung(model_name) or normalizza_codice_modello(model_name)
     if _SAMSUNG_CODE_RE.match(normalizzato):
         codes = [normalizzato]
     else:
@@ -2973,6 +3006,8 @@ def nota_copertura(brand: str | None) -> str | None:
 
 def brand_from_code(query: str) -> str | None:
     """Brand dedotto dal formato di un codice modello, o None."""
+    if espandi_codice_samsung(query):
+        return C.SAMSUNG
     testo = re.sub(r"\s+", "", (query or "")).upper()
     for pattern, brand in _CODE_BRAND_PATTERNS:
         if pattern.match(testo):

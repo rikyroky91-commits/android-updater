@@ -398,11 +398,22 @@ def get_devices(brands: list[str] | None = None, search: str | None = None) -> l
                       WHERE u.device_key = r.device_key AND u.is_relevant = 1
                         AND (u.android_version IS NOT NULL OR u.skin_name IS NOT NULL)
                       ORDER BY CASE u.source_trust WHEN 'structured' THEN 0 WHEN 'curated' THEN 1 WHEN 'noisy' THEN 2 ELSE 3 END ASC,
+                               COALESCE(u.android_version, -1) DESC,
                                COALESCE(u.published, u.first_seen) DESC LIMIT 1),
                     r.os_version) AS os_version,
            (SELECT u.android_version FROM updates u
              WHERE u.device_key = r.device_key AND u.is_relevant = 1 AND u.android_version IS NOT NULL
-             ORDER BY CASE u.source_trust WHEN 'structured' THEN 0 WHEN 'curated' THEN 1 WHEN 'noisy' THEN 2 ELSE 3 END ASC, COALESCE(u.published, u.first_seen) DESC LIMIT 1) AS android_version,
+             -- A PARITA' DI AFFIDABILITA' VINCE LA VERSIONE PIU' ALTA,
+             -- non la piu' recentemente vista. Un telefono Android non
+             -- torna indietro di major: se due fonti ugualmente
+             -- affidabili dicono 11 e 13, quella giusta e' 13, anche se
+             -- l'articolo che diceva 11 e' stato incontrato ieri.
+             -- E' il difetto osservato su Galaxy A32 (SM-A325F), dato
+             -- per Android 11 del 2021 quando era gia' su Android 13.
+             -- L'ordine per affidabilita' resta PRIMA: una fonte
+             -- ufficiale che dice 13 batte comunque una notizia che
+             -- dice 14.
+             ORDER BY CASE u.source_trust WHEN 'structured' THEN 0 WHEN 'curated' THEN 1 WHEN 'noisy' THEN 2 ELSE 3 END ASC, u.android_version DESC, COALESCE(u.published, u.first_seen) DESC LIMIT 1) AS android_version,
            (SELECT u.build FROM updates u
              WHERE u.device_key = r.device_key AND u.is_relevant = 1 AND u.build IS NOT NULL
              ORDER BY CASE u.source_trust WHEN 'structured' THEN 0 WHEN 'curated' THEN 1 WHEN 'noisy' THEN 2 ELSE 3 END ASC, COALESCE(u.published, u.first_seen) DESC LIMIT 1) AS build,
