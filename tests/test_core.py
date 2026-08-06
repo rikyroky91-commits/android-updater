@@ -866,11 +866,17 @@ class TestRicercaLiveModelloQualunque(unittest.TestCase):
         risultato = scan.search_model("wiko view5")
 
         self.assertIsNone(risultato["error"])
-        self.assertEqual(len(risultato["items"]), 1)
-        item = risultato["items"][0]
+        # Si asserisce che la notizia DIVENTI un dispositivo, non che sia
+        # l'unica voce: da quando il nome commerciale arriva ai codici come
+        # ci arriva il codice stesso, un modello noto al dataset riceve
+        # anche la voce «riconosciuto». È informazione vera e coerente —
+        # stesso `device_key`, quindi un dispositivo solo in archivio — e
+        # legare il test al numero di voci lo farebbe fallire ogni volta
+        # che il riconoscimento migliora.
+        self.assertTrue(risultato["items"])
+        item = next(i for i in risultato["items"] if i.get("is_relevant"))
         self.assertEqual(item["device_model"], "Wiko View5")
         self.assertTrue(item["device_key"])
-        self.assertTrue(item["is_relevant"])
 
         trovati = storage.get_devices(search="wiko")
         self.assertEqual(len(trovati), 1)

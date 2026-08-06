@@ -3157,11 +3157,24 @@ _RE_MARCA_DAVANTI = re.compile(
     r"motorola|moto|oneplus|nothing)\s+", re.IGNORECASE)
 # Sigla nuda: una lettera, due o tre cifre, eventuale suffisso corto.
 _RE_SIGLA_CORTA = re.compile(r"^([A-Za-z])\s*(\d{2,3})\s*([A-Za-z]{0,2})$")
-# Gamme sotto cui una sigla nuda può stare, per marca dedotta dal contesto.
+# Gamma sotto cui una sigla nuda va letta, PER MARCA. Cablare «Galaxy» per
+# tutti era un errore attivo: «oppo a96» diventava «Galaxy A96», un
+# telefono che non esiste, e la ricerca non poteva che fallire.
 _GAMME_PER_SIGLA = {
-    "samsung": "Galaxy",
-    "galaxy": "Galaxy",
+    "samsung": "Galaxy", "galaxy": "Galaxy",
+    "oppo": "OPPO",
+    "realme": "realme",
+    "vivo": "vivo", "iqoo": "iQOO",
+    "honor": "HONOR",
+    "huawei": "Huawei",
+    "xiaomi": "Xiaomi", "redmi": "Redmi", "poco": "POCO",
+    "oneplus": "OnePlus",
 }
+# Senza marca scritta, la sigla da sola non dice di chi sia: si provano le
+# gamme che numerano davvero in questo modo. Un nome inesistente non trova
+# nulla e non fa danno, mentre indovinarne una sola sbagliata fa fallire
+# ricerche che avrebbero successo.
+_GAMME_SENZA_MARCA = ["Galaxy", "OPPO", "realme", "vivo", "HONOR", "Redmi"]
 
 
 def _nomi_da_sigla_corta(query: str) -> list[str]:
@@ -3191,11 +3204,18 @@ def _nomi_da_sigla_corta(query: str) -> list[str]:
     lettera, cifre, coda = match.groups()
     sigla = f"{lettera.upper()}{cifre}{coda.upper()}"
 
-    # Senza marca davanti, la gamma più probabile per questa forma è
-    # Galaxy: è l'unica famiglia che numera così in modo sistematico. Con
-    # una marca esplicita si usa la sua.
-    gamma = _GAMME_PER_SIGLA.get(marca, "Galaxy")
-    return [f"{gamma} {sigla}"]
+    # TRE CIFRE SONO GIÀ UN CODICE, non un nome commerciale: «a235» è la
+    # radice di `SM-A235F`, non un «Galaxy A235» — che non esiste. Prima
+    # veniva inventato quel nome, e per giunta al posto dell'espansione del
+    # codice, che avrebbe funzionato: «samsung a235» non trovava nulla
+    # mentre «a235» da solo sì.
+    if len(cifre) == 3 and not coda:
+        return []
+
+    if marca:
+        gamma = _GAMME_PER_SIGLA.get(marca)
+        return [f"{gamma} {sigla}"] if gamma else []
+    return [f"{g} {sigla}" for g in _GAMME_SENZA_MARCA]
 
 
 def expand_query(query: str) -> list[str]:
@@ -3219,8 +3239,19 @@ def expand_query(query: str) -> list[str]:
 
     candidati = [query]
 
+    # Il codice va cercato ANCHE senza la marca davanti: «samsung a235»
+    # contiene il codice `a235`, ma con la parola «samsung» attaccata non ha
+    # più la forma di un codice e non veniva riconosciuto. Risultato: la
+    # stessa ricerca funzionava scritta «a235» e falliva scritta
+    # «samsung a235», che è il modo più naturale di scriverla.
+    testi_da_esaminare = [query]
+    senza_marca = _RE_MARCA_DAVANTI.sub("", query).strip()
+    if senza_marca and senza_marca != query:
+        testi_da_esaminare.append(senza_marca)
+
     # Codice tecnico → nomi commerciali (RMX3939 → realme C63/…)
-    for codice in _code_candidates(query):
+    for codice in dict.fromkeys(
+            c for testo in testi_da_esaminare for c in _code_candidates(testo)):
         nomi = modelcodes.resolve(codice)
         candidati.extend(nomi)
         if nomi:
@@ -3317,14 +3348,43 @@ def lookup_model_structured(model_name: str, brand: str | None = None):
     if not ordinati:
         return [], "nessuna fonte ufficiale disponibile"
 
+    # Con una sigla senza marca, dedurne UNA sola esclude le fonti costose
+    # delle altre: per «a15» la marca dedotta era Oppo, e il controllo
+    # versione Samsung — che avrebbe dato il Galaxy A15 su Android 16 — non
+    # entrava nemmeno nell'elenco. Si uniscono quindi gli ordini di tutte le
+    # marche implicate dalle forme espanse.
+    if not looks_like_model_code(model_name) and not extract.detect_brand(model_name):
+        viste = {id(v.funzione) for v in ordinati}
+        for forma in expand_query(model_name):
+            altra = extract.detect_brand(forma) or brand_from_known_device(forma)
+            if not altra or altra == brand:
+                continue
+            for voce in _lookup_order(altra):
+                if id(voce.funzione) not in viste:
+                    viste.add(id(voce.funzione))
+                    ordinati.append(voce)
+
     # Ogni fonte riceve TUTTE le forme equivalenti della ricerca, non solo
     # il testo digitato: è ciò che rende uniforme il comportamento fra
     # marche diverse (vedi expand_query).
     forme = expand_query(model_name) or [model_name]
 
+    # QUANDO LA MARCA NON È SCRITTA, LA DOMANDA È AMBIGUA.
+    # «a15» è insieme un OPPO A15 e un Galaxy A15, ed esistono entrambi. La
+    # ricerca si ferma alla prima fonte che ha una versione, e l'ordine
+    # delle fonti è per costo, non per pertinenza: rispondeva «OPPO A15,
+    # patch 2022-04» senza mai interrogare Samsung, e senza dire che stava
+    # scegliendo. Una risposta sola a una domanda con due risposte è
+    # sbagliata anche quando è verificata.
+    #
+    # Con la marca scritta, o con un codice, l'ambiguità non c'è e ci si
+    # ferma al primo risultato buono come prima.
+    ambigua = not looks_like_model_code(model_name) and not extract.detect_brand(model_name)
+
     scadenza = time.monotonic() + C.SEARCH_BUDGET_SECONDS
     tentate, fallite = [], []
     ripiego = None      # risultato che conferma il modello ma senza versione
+    raccolti: list = []  # usato solo quando la ricerca è ambigua
     for voce in ordinati:
         if time.monotonic() >= scadenza:
             break
@@ -3347,10 +3407,28 @@ def lookup_model_structured(model_name: str, brand: str | None = None):
             # versione: è esattamente ciò che rendeva la ricerca inutile
             # per Oppo, pur essendo andata a buon fine.
             if _ha_versione(items[0]):
-                return items, None
+                if not ambigua:
+                    return items, None
+                raccolti.extend(items)
+                break
             if ripiego is None:
                 ripiego = items
             break
+
+    if raccolti:
+        # Un dispositivo per nome: due fonti che descrivono lo stesso
+        # telefono non devono comparire due volte, ma due telefoni diversi
+        # sì — è tutto il punto.
+        # La chiave NON passa da `_normalize_name`: quella toglie la marca,
+        # e «OPPO A15» e «Galaxy A15» finivano sulla stessa chiave — cioè
+        # esattamente i due telefoni che qui vanno tenuti distinti.
+        visti, distinti = set(), []
+        for voce in raccolti:
+            chiave = " ".join((voce.device or "").lower().split())
+            if chiave and chiave not in visti:
+                visti.add(chiave)
+                distinti.append(voce)
+        return distinti, None
 
     # Nessuna fonte aveva la versione: si restituisce comunque quello che
     # si è trovato, ma il chiamante potrà dire che manca il firmware.

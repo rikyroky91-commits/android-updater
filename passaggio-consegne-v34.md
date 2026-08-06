@@ -1,8 +1,8 @@
-# Mobile Update Tracker — passaggio consegne (v33)
+# Mobile Update Tracker — passaggio consegne (v34)
 
 Aggiorna `passaggio-consegne-v32.md`.
 
-- **527 test**, tutti verdi (erano 511 con **2 rossi già prima** di questa sessione).
+- **533 test**, tutti verdi (erano 511 con **2 rossi già prima** di questa sessione).
 - `DATA_LOGIC_VERSION` **25**: la versione riportata per i Samsung cambia,
   quindi l'archivio va ricostruito.
 
@@ -120,3 +120,101 @@ I venticinque precedenti restano validi.
 ## Il repo
 
 **GitHub Desktop.** Ci sono `.github/`, `.streamlit/` e `data/`.
+
+
+---
+
+## Secondo giro: le forme viste negli screenshot
+
+Segnalazione: «samsung a235» e «oppo a96» non davano risultati pur essendo
+nomi e codici veri.
+
+### «samsung a235» — la marca nascondeva il codice
+
+`a235` funzionava, `samsung a235` no: con la parola davanti il testo non ha
+più la forma di un codice e non veniva riconosciuto. Il codice ora si cerca
+anche sul testo **senza marca**.
+
+E si smette di inventare nomi: tre cifre sono già la radice di un codice
+(`a235` → `SM-A235F`), non un nome commerciale. Veniva prodotto un
+«Galaxy A235» inesistente che per giunta **prendeva il posto**
+dell'espansione del codice, che invece funziona.
+
+### «oppo a96» — la gamma era cablata a Galaxy
+
+L'errore peggiore di questa sessione, e mio: `_nomi_da_sigla_corta`
+attribuiva la gamma «Galaxy» a **qualunque** marca. «oppo a96» diventava
+«Galaxy A96», un telefono che non esiste, e la ricerca non poteva che
+fallire. Ora la gamma segue la marca scritta (`OPPO`, `realme`, `vivo`,
+`HONOR`, `Redmi`, `POCO`, `OnePlus`, `iQOO`); senza marca si provano più
+gamme, perché una sigla da sola non dice di chi sia e indovinarne una sola
+fa fallire ricerche che avrebbero successo.
+
+### Il nome commerciale valeva meno del codice
+
+`CPH2333` rispondeva «OPPO A96 riconosciuto», `oppo a96` non rispondeva
+niente: stessa domanda, stesso telefono, e la forma muta era quella più
+naturale. Il riconoscimento ora parte anche dai **nomi**, risolti a codici
+con il dataset che già faceva il percorso inverso.
+
+### Riconosciuto e invisibile insieme
+
+Un item con modello ma senza marca deducibile veniva mostrato sotto «Altri
+brand» e **restava senza `device_key`**: compariva nella ricerca e non
+entrava mai nella lista dispositivi. Ora la chiave si costruisce sulla marca
+effettivamente mostrata — ma **solo per le fonti strutturate**, che il
+modello lo hanno verificato: farlo anche per le notizie moltiplicherebbe i
+dispositivi fantasma, che restano un problema aperto.
+
+## Errori da non ripetere (seguito)
+
+29. **Cablare una gamma per tutte le marche.** «Galaxy» per Oppo produce un
+    modello inesistente: non una ricerca a vuoto, un dato inventato.
+30. **Trattare una radice di codice come un nome.** Tre cifre dopo la
+    lettera sono un codice; inventarci sopra un nome commerciale toglie
+    anche il posto all'espansione che avrebbe funzionato.
+31. **Far valere il codice più del nome.** Se il dataset sa andare da nome a
+    codice, le due forme devono avere la stessa risposta.
+
+---
+
+## Terzo giro: strutturale, non per-modello
+
+Domanda: «hai risolto solo i modelli degli screenshot o a livello
+strutturale?». Verificato su modelli **mai toccati**, quattro forme
+ciascuno: **22 forme su 22** risolte (Samsung A15/M34/S23, OPPO A58,
+realme C53, vivo Y27, HONOR X7b).
+
+La misura ha però fatto emergere un difetto che nessuno aveva segnalato.
+
+### Una sigla senza marca è ambigua, e veniva risolta in silenzio
+
+`a15` è insieme un **OPPO A15** e un **Galaxy A15**: esistono entrambi.
+L'app rispondeva «OPPO A15, patch 2022-04» — il più vecchio dei due — senza
+mai interrogare Samsung e senza dire che stava scegliendo.
+
+Due cause sovrapposte:
+
+1. la ricerca si ferma alla prima fonte che ha una versione, e l'ordine
+   delle fonti è per **costo**, non per pertinenza;
+2. la marca dedotta era una sola (Oppo), e questo **escludeva** il controllo
+   versione Samsung, che è costoso e parte solo a marca corrispondente.
+
+Ora, quando la marca non è scritta e il testo non è un codice, si uniscono
+gli ordini di tutte le marche implicate dalle forme espanse e si
+restituiscono **tutti i dispositivi distinti** trovati. Con la marca scritta
+o con un codice il comportamento è invariato: una domanda precisa merita una
+risposta sola.
+
+```
+a15         -> Galaxy A15 (Android 16) ; OPPO A15 (Patch 2022-04)
+samsung a15 -> Galaxy A15 (Android 16)
+oppo a15    -> OPPO A15 (Patch 2022-04)
+```
+
+32. **Una risposta sola a una domanda con due risposte è sbagliata anche
+    quando è verificata.** Vale ovunque l'input sia ambiguo: la scelta
+    silenziosa è peggio dell'ambiguità dichiarata.
+33. **Deduplicare con la chiave sbagliata cancella informazione.**
+    `_normalize_name` toglie la marca per far combaciare le forme dello
+    stesso telefono: usarla per distinguere telefoni diversi li fonde.

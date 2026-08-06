@@ -104,6 +104,90 @@ class TestStessoTelefonoScrittoInModiDiversi(unittest.TestCase):
         self.assertFalse(quattro & cinque)
 
 
+class TestMarcaDavantiAllaSigla(unittest.TestCase):
+    """Le forme viste negli screenshot: «samsung a235» e «oppo a96».
+
+    Entrambe fallivano, per due ragioni opposte e istruttive.
+    """
+
+    def test_la_marca_non_nasconde_il_codice(self):
+        """«a235» funzionava, «samsung a235» no: con la parola davanti il
+        testo non ha più la forma di un codice e non veniva riconosciuto.
+        Ora il codice si cerca anche sul testo senza marca."""
+        nudo = {modelcodes._normalize_name(e) for e in sources.expand_query("a235")}
+        con_marca = {modelcodes._normalize_name(e)
+                     for e in sources.expand_query("samsung a235")}
+        self.assertTrue(nudo & con_marca,
+                        "«samsung a235» non arriva dove arriva «a235»")
+
+    def test_niente_modelli_inventati_da_una_radice(self):
+        """Tre cifre sono già una radice di codice (`a235` → `SM-A235F`),
+        non un nome: «Galaxy A235» non esiste, e inventarlo prendeva anche
+        il posto dell'espansione del codice, che invece funziona."""
+        self.assertEqual(sources._nomi_da_sigla_corta("a235"), [])
+        self.assertNotIn("Galaxy A235", sources.expand_query("samsung a235"))
+
+    def test_la_gamma_segue_la_marca_scritta(self):
+        """L'errore più grave: la gamma era cablata a «Galaxy» per tutti, e
+        «oppo a96» diventava «Galaxy A96» — un telefono che non esiste."""
+        self.assertEqual(sources._nomi_da_sigla_corta("oppo a96"), ["OPPO A96"])
+        self.assertEqual(sources._nomi_da_sigla_corta("realme c61"), ["realme C61"])
+        self.assertEqual(sources._nomi_da_sigla_corta("samsung a23"), ["Galaxy A23"])
+
+    def test_senza_marca_si_provano_piu_gamme(self):
+        """Una sigla da sola non dice di chi sia: indovinarne una sola fa
+        fallire ricerche che avrebbero successo. Un nome inesistente non
+        trova nulla e non fa danno."""
+        proposte = sources._nomi_da_sigla_corta("a96")
+        self.assertIn("OPPO A96", proposte)
+        self.assertIn("Galaxy A96", proposte)
+
+
+class TestNomeCommercialeValeQuantoIlCodice(unittest.TestCase):
+    """`CPH2333` diceva «OPPO A96 riconosciuto», `oppo a96` non diceva
+    niente: stessa domanda, stesso telefono, due risposte diverse — e
+    quella muta toccava alla forma più naturale."""
+
+    def test_il_nome_arriva_agli_stessi_codici_del_codice(self):
+        codici = scan._codici_riconoscibili("OPPO A96")
+        self.assertTrue(codici, "nessun codice raggiunto dal nome commerciale")
+
+    def test_un_nome_ignoto_non_produce_codici(self):
+        self.assertEqual(scan._codici_riconoscibili("Telefono Inesistente 999"), [])
+
+
+class TestSiglaSenzaMarcaEAmbigua(unittest.TestCase):
+    """«a15» è insieme un OPPO A15 e un Galaxy A15: esistono entrambi.
+
+    La ricerca si fermava alla prima fonte con una versione, e l'ordine
+    delle fonti è per COSTO, non per pertinenza: rispondeva «OPPO A15,
+    patch 2022-04» senza mai interrogare Samsung e senza dire che stava
+    scegliendo. Una risposta sola a una domanda con due risposte è
+    sbagliata anche quando è verificata.
+    """
+
+    def test_una_sigla_nuda_e_riconosciuta_come_ambigua(self):
+        self.assertFalse(sources.looks_like_model_code("a15"))
+        self.assertIsNone(__import__("core.extract", fromlist=["x"]).detect_brand("a15"))
+
+    def test_con_la_marca_scritta_non_ce_ambiguita(self):
+        from core import extract
+        self.assertIsNotNone(extract.detect_brand("samsung a15"))
+        self.assertIsNotNone(extract.detect_brand("oppo a15"))
+
+    def test_il_deduplicatore_non_fonde_marche_diverse(self):
+        """La deduplica dei risultati ambigui usa il nome COSÌ COM'È.
+
+        `_normalize_name` è fatta per far combaciare le forme dello stesso
+        telefono e toglie la marca quando la riconosce: «OPPO A15» diventa
+        «a15». Usarla qui rischierebbe di fondere due telefoni diversi —
+        cioè esattamente quelli che questa funzione deve tenere distinti.
+        """
+        self.assertEqual(modelcodes._normalize_name("OPPO A15"), "a15")
+        chiavi = {" ".join(n.lower().split()) for n in ("OPPO A15", "Galaxy A15")}
+        self.assertEqual(len(chiavi), 2)
+
+
 class TestChipSempreAllegato(unittest.TestCase):
     """3 — il chip non dipende da chi ha risposto sul firmware."""
 

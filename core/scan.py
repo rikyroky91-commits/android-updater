@@ -186,7 +186,18 @@ def normalize(raw: sources.RawItem, source: sources.Source) -> dict:
         "id": _item_id(brand or source.key, model, fingerprint, source.key, raw.title),
         "brand": brand or C.OTHER,
         "device_model": model,
-        "device_key": extract.device_key(brand, model) if (brand and model) else None,
+        # La chiave si costruisce sulla marca EFFETTIVAMENTE mostrata. Se il
+        # produttore non si deduce, l'item veniva presentato sotto «Altri
+        # brand» ma restava senza chiave: compariva nella ricerca e non
+        # entrava mai nella lista dispositivi — riconosciuto e invisibile
+        # insieme. Vale solo per le fonti strutturate, che il modello lo
+        # hanno verificato: per una notizia un modello dedotto male
+        # diventerebbe un dispositivo fantasma, ed è un problema aperto.
+        "device_key": (
+            extract.device_key(brand, model) if (brand and model)
+            else (extract.device_key(C.OTHER, model)
+                  if (model and source.trust == C.TRUST_STRUCTURED) else None)
+        ),
         "title": raw.title,
         "os_version": os_version,
         "android_version": data.android_version,
@@ -536,6 +547,27 @@ def _lookup_structured_for(model_query: str) -> tuple[list[dict], str | None]:
     return [], note
 
 
+def _codici_riconoscibili(model_query: str) -> list[str]:
+    """Codici modello a cui questa ricerca può arrivare.
+
+    NON SOLO QUELLI SCRITTI. Prima si guardava solo se il testo digitato
+    *era* un codice: chi scriveva `CPH2333` otteneva «OPPO A96
+    riconosciuto», chi scriveva `oppo a96` — cioè il nome commerciale, il
+    modo normale di chiamarlo — non otteneva niente. Stessa domanda, stesso
+    telefono, due risposte diverse, e quella sbagliata era per la forma più
+    naturale.
+
+    Il dataset sa già fare il percorso inverso: dal nome ai codici. Qui lo
+    si usa, così una ricerca per nome vale quanto una per codice.
+    """
+    codici = list(sources._code_candidates(model_query))
+    for forma in sources.expand_query(model_query):
+        for codice in modelcodes.codes_for_name(forma):
+            if codice not in codici:
+                codici.append(codice)
+    return codici
+
+
 def _identifica_senza_firmware(model_query: str) -> list[dict]:
     """Riconosce il dispositivo senza saperne il firmware.
 
@@ -545,7 +577,7 @@ def _identifica_senza_firmware(model_query: str) -> list[dict]:
     inventati per farlo sembrare un risultato pieno sarebbe il contrario
     di quello che serve.
     """
-    for codice in sources._code_candidates(model_query):
+    for codice in _codici_riconoscibili(model_query):
         nomi = modelcodes.resolve(codice)
         if not nomi:
             continue
