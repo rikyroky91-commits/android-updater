@@ -255,7 +255,17 @@ MAX_PLAUSIBLE_IOS = env_int("MAX_PLAUSIBLE_IOS", 30)
 #       Ora gli item sono marcati beta e non impongono più una versione al
 #       dispositivo. Serve una fonte stabile: la pagina delle immagini
 #       ufficiali è resa in JavaScript e non è leggibile via HTTP.
-DATA_LOGIC_VERSION = env_int("DATA_LOGIC_VERSION", 24)
+#  25 → Samsung: si sceglie la regione con il firmware PIÙ RECENTE invece
+#       della prima che risponde. Per `SM-A325F` la prima della lista
+#       (`EUX`) è ferma ad Android 11 mentre tredici altre danno Android
+#       13: l'app dichiarava Android 11 per un telefono aggiornato ad
+#       Android 13. Cambia il dato in archivio, quindi va ricostruito.
+#       Nello stesso giro: codice incompleto («a325») e sigla senza gamma
+#       («a32», «samsung a32») ora risolvono allo stesso modello; il chip
+#       viene allegato a ogni risultato strutturato e non solo al ripiego;
+#       la ricerca da IMEI usa il codice esatto del database TAC invece
+#       del nome commerciale.
+DATA_LOGIC_VERSION = env_int("DATA_LOGIC_VERSION", 25)
 
 
 # --- Tempo massimo di una ricerca interattiva ---------------------------

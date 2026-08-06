@@ -2107,22 +2107,80 @@ _SAMSUNG_VERSION_XML_RE = re.compile(
 )
 
 
+# Anno e mese sono codificati nelle ULTIME TRE lettere del PDA Samsung:
+# `A325FXXSCDYB2` → `YB2` = anno Y (2025), mese B (febbraio), revisione 2.
+# Serve a confrontare due build fra loro, che è l'unico modo di sapere
+# quale regione ha il firmware più recente.
+_ANNI_PDA = "RSTUVWXYZ"          # R=2018 … Z=2026
+_MESI_PDA = "ABCDEFGHIJKL"       # A=gennaio … L=dicembre
+
+
+def _eta_build_samsung(pda: str) -> tuple[int, int, str]:
+    """(anno, mese, revisione) da un PDA. (0, 0, '') se non decodificabile."""
+    coda = (pda or "").strip().upper()[-3:]
+    if len(coda) < 3:
+        return (0, 0, "")
+    anno, mese, revisione = coda[0], coda[1], coda[2]
+    if anno not in _ANNI_PDA or mese not in _MESI_PDA:
+        return (0, 0, "")
+    return (_ANNI_PDA.index(anno), _MESI_PDA.index(mese), revisione)
+
+
+# Regioni interrogate SEMPRE, e confrontate fra loro. Non è la lista intera:
+# sono otto regioni scelte per coprire i mercati principali, perché ognuna
+# costa una richiesta e la scansione periodica le paga per ogni modello.
+SAMSUNG_CSC_PRIMARIE = ["EUX", "DBT", "ITV", "XEF", "BTU", "INS", "XAA", "XSG"]
+
+
 def _samsung_fus_latest(model: str) -> tuple[str | None, str | None, str | None]:
-    """Ritorna (build_pda, android_version, csc_usato) per un modello, provando
-    le region candidate in ordine finché una risponde con un dato valido."""
-    for csc in SAMSUNG_CSC_CANDIDATES:
+    """Ritorna (build_pda, android_version, csc_usato): il firmware PIÙ
+    RECENTE fra le regioni interrogate.
+
+    NON la prima regione che risponde, ed è una correzione di sostanza.
+    Alcune regioni restano ferme a un firmware vecchio mentre il modello ha
+    ricevuto altro altrove: per `SM-A325F` la regione `EUX` — che era la
+    prima della lista — dichiara **Android 11**, mentre tredici altre
+    regioni danno **Android 13**. L'app riportava quindi Android 11 per un
+    telefono aggiornato ad Android 13, e lo faceva con l'aria del dato
+    ufficiale.
+
+    Le regioni si interrogano in parallelo e si confronta il risultato:
+    prima la versione di Android, poi la data codificata nel PDA. Se non si
+    trova niente fra le primarie si allarga alle altre, perché un modello
+    venduto in un solo mercato non deve sparire.
+    """
+    def _una(csc: str):
         url = f"https://fota-cloud-dn.ospserver.net/firmware/{csc}/{model}/version.xml"
         testo = _fota_get(url)
         if not testo:
-            continue
+            return None
         match = _SAMSUNG_VERSION_XML_RE.search(testo)
         if not match:
-            continue
+            return None
         android_version, versions = match.groups()
         pda = versions.split("/")[0].strip()
         if not pda:
-            continue
+            return None
         return pda, android_version, csc
+
+    def _migliore(regioni):
+        esiti = []
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            for esito in pool.map(_una, regioni):
+                if esito:
+                    esiti.append(esito)
+        if not esiti:
+            return None
+        return max(esiti, key=lambda e: (int(e[1] or 0), _eta_build_samsung(e[0])))
+
+    trovato = _migliore(SAMSUNG_CSC_PRIMARIE)
+    if trovato:
+        return trovato
+
+    restanti = [c for c in SAMSUNG_CSC_CANDIDATES if c not in SAMSUNG_CSC_PRIMARIE]
+    trovato = _migliore(restanti)
+    if trovato:
+        return trovato
     return None, None, None
 
 
@@ -3092,6 +3150,54 @@ def brand_from_known_device(query: str) -> str | None:
     return None
 
 
+# Marche che si scrivono davanti a una sigla nuda («samsung a32») e che
+# vanno tolte prima di riconoscerla.
+_RE_MARCA_DAVANTI = re.compile(
+    r"^\s*(?:samsung|galaxy|oppo|realme|vivo|iqoo|honor|huawei|xiaomi|redmi|poco|"
+    r"motorola|moto|oneplus|nothing)\s+", re.IGNORECASE)
+# Sigla nuda: una lettera, due o tre cifre, eventuale suffisso corto.
+_RE_SIGLA_CORTA = re.compile(r"^([A-Za-z])\s*(\d{2,3})\s*([A-Za-z]{0,2})$")
+# Gamme sotto cui una sigla nuda può stare, per marca dedotta dal contesto.
+_GAMME_PER_SIGLA = {
+    "samsung": "Galaxy",
+    "galaxy": "Galaxy",
+}
+
+
+def _nomi_da_sigla_corta(query: str) -> list[str]:
+    """«a32» → «Galaxy A32». «samsung a32» → «Galaxy A32».
+
+    Vale solo per la forma «lettera + 2-3 cifre», che è quella delle serie
+    A/M/F Samsung. Non si inventa una gamma quando il testo non la implica:
+    una sigla di quattro cifre è già un codice e passa da un'altra strada.
+    """
+    testo = " ".join(str(query or "").split())
+    if not testo:
+        return []
+    # Se è già un codice valido non serve inventargli una gamma: «a325f»
+    # produrrebbe un inesistente «Galaxy A325F», rumore che allunga la
+    # ricerca senza aggiungere niente.
+    if looks_like_model_code(testo):
+        return []
+    marca = ""
+    match_marca = _RE_MARCA_DAVANTI.match(testo)
+    if match_marca:
+        marca = match_marca.group(0).strip().lower()
+        testo = testo[match_marca.end():]
+
+    match = _RE_SIGLA_CORTA.match(testo.strip())
+    if not match:
+        return []
+    lettera, cifre, coda = match.groups()
+    sigla = f"{lettera.upper()}{cifre}{coda.upper()}"
+
+    # Senza marca davanti, la gamma più probabile per questa forma è
+    # Galaxy: è l'unica famiglia che numera così in modo sistematico. Con
+    # una marca esplicita si usa la sua.
+    gamma = _GAMME_PER_SIGLA.get(marca, "Galaxy")
+    return [f"{gamma} {sigla}"]
+
+
 def expand_query(query: str) -> list[str]:
     """Tutte le forme equivalenti con cui questo modello può essere indicato.
 
@@ -3115,7 +3221,27 @@ def expand_query(query: str) -> list[str]:
 
     # Codice tecnico → nomi commerciali (RMX3939 → realme C63/…)
     for codice in _code_candidates(query):
-        candidati.extend(modelcodes.resolve(codice))
+        nomi = modelcodes.resolve(codice)
+        candidati.extend(nomi)
+        if nomi:
+            continue
+        # CODICE INCOMPLETO. Chi scrive «a325» intende il Galaxy A32, ma nel
+        # dataset esistono solo `SM-A325F`, `SM-A325M`, `SM-A325N`: l'ultima
+        # lettera è il mercato. Senza questo passaggio la ricerca falliva
+        # avendo il dato a un carattere di distanza — ed è una delle forme
+        # più comuni, perché il codice si legge sulla scatola senza la
+        # lettera finale o si ricorda a metà.
+        for completo in modelcodes.codici_per_prefisso(codice):
+            candidati.append(completo)
+            candidati.extend(modelcodes.resolve(completo))
+
+    # NOME CORTO SENZA GAMMA. «a32» e «samsung a32» sono il modo più
+    # naturale di chiamare un Galaxy A32, e non venivano riconosciuti né
+    # come codice (due cifre sono troppo poche) né come nome (il catalogo
+    # lo chiama «Galaxy A32»). Si prova quindi la forma con la gamma
+    # davanti, che è l'unica cosa che manca.
+    for esteso in _nomi_da_sigla_corta(query):
+        candidati.append(esteso)
 
     # Nome regionale → nomi gemelli dello stesso dispositivo
     try:
@@ -3173,6 +3299,19 @@ def lookup_model_structured(model_name: str, brand: str | None = None):
         or brand_from_code(model_name)
         or brand_from_known_device(model_name)
     )
+    if not brand:
+        # LA MARCA SI DEDUCE ANCHE DALLE FORME ESPANSE, non solo dal testo
+        # digitato. «a32» non contiene nulla che riveli il produttore, ma si
+        # espande in «Galaxy A32», che sì. Senza questo passaggio la fonte
+        # Samsung — che è costosa e quindi entra solo a marca nota — non
+        # veniva mai interrogata, e la ricerca finiva a vuoto pur avendo
+        # riconosciuto il modello un attimo prima.
+        for forma in expand_query(model_name):
+            brand = (extract.detect_brand(forma)
+                     or brand_from_code(forma)
+                     or brand_from_known_device(forma))
+            if brand:
+                break
 
     ordinati = _lookup_order(brand)
     if not ordinati:

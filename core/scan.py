@@ -386,6 +386,28 @@ def search_model(model_query: str) -> dict:
 
     items = []
 
+    # Il SoC NON dipende dalla fonte che ha risposto sul firmware: si sa
+    # comunque, e va allegato a qualunque risultato strutturato. Prima
+    # veniva aggiunto solo nel ripiego «codice riconosciuto ma nessun
+    # firmware»: bastava che una fonte rispondesse — cioè il caso
+    # migliore — perché il chip sparisse dalla scheda.
+    def _aggiungi_chip(item: dict, testo_cercato: str) -> None:
+        if "soc" in (item.get("size_info") or "").lower():
+            return
+        chip = soc.per_modello(
+            model_code=testo_cercato,
+            device_name=item.get("device_model") or "",
+        )
+        if not chip:
+            # Il codice può essere annegato nella build (`A325FXXSCDYB2`),
+            # che spesso è l'unico posto dove compare.
+            chip = soc.per_modello(model_code=item.get("build") or "")
+        if not chip:
+            return
+        pezzi = [p for p in [(item.get("size_info") or "").strip(),
+                             f"SoC {chip.etichetta}"] if p]
+        item["size_info"] = " · ".join(pezzi)
+
     # 1) Fonte UFFICIALE del brand, interrogata a comando per questo modello.
     #    È il passaggio che rende la ricerca capace di dare un firmware reale
     #    anche per un modello mai visto prima dal giro periodico (situazione
@@ -393,6 +415,7 @@ def search_model(model_query: str) -> dict:
     #    riavvio del container).
     structured_items, structured_note = _lookup_structured_for(model_query)
     for item in structured_items:
+        _aggiungi_chip(item, model_query)
         storage.upsert_update(item)
     items.extend(structured_items)
 

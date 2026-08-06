@@ -1482,20 +1482,36 @@ class TestRicercaOnDemandFontiUfficiali(unittest.TestCase):
         è l'errore già commesso quando tre test difendevano la «Future
         version» di Honor.
         """
+        aer_catalog.carica_da(AER_VOCI, "fixture di test")
+
         res = scan.search_model("OnePlus 12")
         self.assertIsNone(res.get("error"))
         self.assertTrue(
             res["structured_count"] > 0 or res.get("structured_note"),
             "senza risultati strutturati va detto il motivo, non taciuto",
         )
-        # Ora che il catalogo arriva da una risposta registrata invece che
-        # dalla rete, si può asserire QUALE fonte ha risposto — prima
-        # l'esito dipendeva da cosa restituiva il server in quel momento.
-        self.assertEqual(res["structured_count"], 1)
-        self.assertEqual(res["items"][0]["device_model"], "OnePlus 12")
-        self.assertIn("Android Enterprise Recommended", res["items"][0]["source_label"])
-        # E che NON millanti una versione: il catalogo non ce l'ha.
-        self.assertFalse(res["items"][0].get("android_version"))
+        # SI ASSERISCE IL COMPORTAMENTO, NON QUALE FONTE VINCE.
+        #
+        # Questo test pretendeva prima `structured_count == 1`, poi che a
+        # rispondere fosse il catalogo Android Enterprise Recommended. Sono
+        # cadute entrambe, e per una buona ragione: OnePlus ha ora un
+        # tracker ARB dedicato, che risponde per primo e meglio. Legare un
+        # test alla fonte che vince significa doverlo riscrivere ogni volta
+        # che la copertura MIGLIORA — e nel frattempo il rosso non segnala
+        # un guasto, il che è il modo più rapido di smettere di leggerlo.
+        #
+        # Quello che deve restare vero è: il modello viene riconosciuto, e
+        # nessuno si inventa una versione che la fonte non ha pubblicato.
+        self.assertGreater(res["structured_count"], 0)
+        nomi = {i.get("device_model") for i in res["items"]}
+        self.assertIn("OnePlus 12", nomi)
+        for voce in res["items"]:
+            if voce.get("android_version"):
+                self.assertTrue(
+                    voce.get("build") or voce.get("os_version"),
+                    f"«{voce.get('source_label')}» dichiara una versione senza "
+                    "nessun firmware a sostegno",
+                )
 
 
 class TestSupportoApple(unittest.TestCase):

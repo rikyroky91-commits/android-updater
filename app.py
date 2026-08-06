@@ -694,7 +694,17 @@ if unified_submitted and unified_query.strip():
             )
         else:
             brand_found, specs = found
-            model_from_imei = imeicheck.parse_specs(brand_found, specs)["model"]
+            dettagli_imei = imeicheck.parse_specs(brand_found, specs)
+            # SI CERCA PER CODICE, NON PER NOME, quando il database TAC lo
+            # contiene — e lo contiene quasi sempre: la voce è del tipo
+            # «SAMSUNG GALAXY S26 ULTRA, Samsung SM-S948B». Il nome è
+            # ambiguo fra le varianti di mercato (che montano firmware e
+            # perfino chip diversi) e arriva in forme incoerenti, ora
+            # «Galaxy S26 Ultra» ora «Samsung Galaxy S26 Ultra». Il codice
+            # invece è esatto ed è la chiave che le fonti ufficiali
+            # accettano: è la differenza fra «trova qualcosa» e «trova
+            # quel telefono».
+            model_from_imei = dettagli_imei.get("code") or dettagli_imei["model"]
             st.info(f"IMEI riconosciuto: **{imeicheck.describe(brand_found, specs)}**")
             with st.spinner(f"Verifico «{model_from_imei}»…"):
                 live_result = scan.search_model(model_from_imei)

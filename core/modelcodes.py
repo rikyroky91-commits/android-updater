@@ -227,6 +227,35 @@ def resolve(code: str) -> list[str]:
     return _memory_cache.get((code or "").strip().upper(), [])
 
 
+def codici_per_prefisso(prefisso: str, limite: int = 12) -> list[str]:
+    """Codici completi che cominciano per `prefisso`.
+
+    Serve per il CODICE INCOMPLETO, che è come le persone lo scrivono
+    davvero: chi cerca «a325» intende il Galaxy A32, ma nel dataset non
+    esiste `SM-A325` — esistono `SM-A325F`, `SM-A325M`, `SM-A325N`, perché
+    l'ultima lettera indica il mercato. Senza questa espansione la ricerca
+    non trovava nulla pur avendo il dato a un carattere di distanza.
+
+    Il prefisso deve essere già abbastanza specifico (almeno una lettera e
+    tre cifre): su un dataset da 68.000 voci un prefisso corto
+    restituirebbe decine di modelli diversi, e la ricerca peggiorerebbe
+    invece di migliorare.
+    """
+    global _memory_cache
+    if _memory_cache is None:
+        _memory_cache = _build_index()
+    chiave = (prefisso or "").strip().upper()
+    if not _RE_PREFISSO_UTILE.match(chiave):
+        return []
+    trovati = sorted(k for k in _memory_cache if k.startswith(chiave) and k != chiave)
+    return trovati[:limite]
+
+
+# Un prefisso utile ha una radice riconoscibile: `SM-A325`, `CPH264`,
+# `RMX393`. Sotto questa soglia si pescherebbe nel mucchio.
+_RE_PREFISSO_UTILE = re.compile(r"^(?:SM-[A-Z]\d{3}|[A-Z]{2,3}\d{3,4}|[A-Z]\d{3})[A-Z0-9]*$")
+
+
 def _normalize_name(name: str) -> str:
     """Chiave di confronto tollerante per un nome commerciale: minuscolo,
     senza punteggiatura, spazi normalizzati, senza prefisso di marca
