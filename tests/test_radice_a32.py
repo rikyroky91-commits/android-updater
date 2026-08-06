@@ -198,3 +198,55 @@ class TestChipSerieA(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class TestNotiziaSenzaBuild(unittest.TestCase):
+    """Un articolo non può dettare la versione di un telefono.
+
+    È il difetto che ha prodotto «Samsung A32 · Android 14»: nella scheda
+    la build era `—`, cioè il dato non veniva da nessun rilascio
+    osservato ma da una notizia. Un titolo che nomina un modello e una
+    versione può parlare di un aggiornamento atteso, di un elenco di
+    dispositivi ESCLUSI, o semplicemente sbagliare.
+
+    Il numero di build è ciò che distingue le due cose: esiste solo se un
+    pacchetto è stato davvero distribuito.
+    """
+
+    def setUp(self):
+        from core import config as C, scan
+        self.scan, self.C = scan, C
+
+    def _voce(self, titolo, trust, build=None):
+        from core import sources
+        raw = sources.RawItem(title=titolo, link="https://x.test",
+                              brand=self.C.SAMSUNG, device="Galaxy A32",
+                              build=build)
+        fonte = sources.Source(key="k", label="L", trust=trust, fetch=None,
+                               brand=self.C.SAMSUNG, homepage="")
+        return self.scan.normalize(raw, fonte)
+
+    def test_una_notizia_senza_build_non_porta_la_versione(self):
+        voce = self._voce("Samsung Galaxy A32 gets Android 14 update",
+                          self.C.TRUST_NOISY)
+        self.assertIsNone(voce.get("android_version"))
+        self.assertFalse(voce.get("os_version"))
+
+    def test_ma_con_la_build_la_porta(self):
+        """Con un pacchetto osservato la notizia torna credibile."""
+        voce = self._voce("Galaxy A32 Android 13 build A325FXXSCDYB2",
+                          self.C.TRUST_NOISY, build="A325FXXSCDYB2")
+        self.assertEqual(voce.get("android_version"), 13)
+
+    def test_le_fonti_affidabili_non_sono_toccate(self):
+        """Alcune fonti ufficiali danno la versione senza build: la regola
+        vale solo per le fonti inaffidabili."""
+        voce = self._voce("Galaxy A32 Android 13", self.C.TRUST_STRUCTURED)
+        self.assertEqual(voce.get("android_version"), 13)
+
+    def test_il_livello_di_patch_resta(self):
+        """È una rivendicazione più debole e più verificabile: «ha
+        ricevuto la patch di luglio» descrive un fatto datato."""
+        voce = self._voce("Galaxy A32 gets July 2026 security patch",
+                          self.C.TRUST_NOISY)
+        self.assertTrue(voce.get("patch_level"))

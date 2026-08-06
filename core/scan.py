@@ -134,7 +134,36 @@ def normalize(raw: sources.RawItem, source: sources.Source) -> dict:
             data.android_version = implicata
             dedotto_da_skin = True
 
+    # UNA NOTIZIA SENZA BUILD NON PUÒ DETTARE LA VERSIONE DI UN TELEFONO.
+    #
+    # È il difetto che ha prodotto «Samsung A32 · Android 14»: un articolo
+    # che nomina un modello e una versione non è l'osservazione di un
+    # rilascio, è un'opinione su un telefono. Poteva parlare di un
+    # aggiornamento atteso, di un elenco di dispositivi ESCLUSI, o
+    # semplicemente sbagliare.
+    #
+    # Il numero di build è ciò che distingue le due cose: esiste solo se
+    # un pacchetto è stato davvero distribuito. Senza, l'item resta
+    # visibile fra le notizie ma non porta più una versione, quindi non
+    # può diventare la risposta alla domanda «a che versione sta questo
+    # telefono».
+    #
+    # Vale SOLO per le fonti inaffidabili: le fonti ufficiali che danno la
+    # versione senza build (rare ma esistono) non sono toccate.
+    if source.trust == C.TRUST_NOISY and not data.build:
+        # `os_version` è una proprietà calcolata da skin e Android:
+        # si azzerano le fonti, non il risultato.
+        data.android_version = None
+        data.skin_name = None
+        data.skin_version = None
+        # Il livello di patch RESTA. È una rivendicazione più debole e
+        # più verificabile: «ha ricevuto la patch di luglio» descrive un
+        # fatto datato, mentre «Android 14» in un titolo parla quasi
+        # sempre di attese, di idoneità o di elenchi di esclusi.
+
     os_version = data.os_version or (raw.version or "")
+    if source.trust == C.TRUST_NOISY and not data.build:
+        os_version = ""
     if dedotto_da_skin and not os_version:
         os_version = f"Android {data.android_version}"
     fingerprint = data.build or os_version or data.patch_level
