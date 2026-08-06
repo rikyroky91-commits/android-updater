@@ -906,8 +906,27 @@ def render_dispositivi() -> None:
                 identificativi.append(f"build <span class='build'>{device['build']}</span>")
             if device["patch_level"]:
                 identificativi.append(f"patch <span class='build'>{device['patch_level']}</span>")
+
+            # IL CHIP NELLA SCHEDA, non solo nel riquadro di ricerca.
+            # Chi guarda un dispositivo del parco di test vuole sapere
+            # quale processore monta senza doverlo ricercare: un difetto
+            # legato al SoC si riproduce solo su una delle varianti.
+            #
+            # Quando non lo sappiamo lo diciamo, invece di lasciare la
+            # riga vuota: un campo assente sembra un guasto dell'app,
+            # una frase esplicita dice che il dato manca e si puo'
+            # aggiungere (data/soc_modelli.csv).
+            chip_device = soc.per_modello(
+                device.get("model_code") or device.get("build"), device["model"])
+            if chip_device:
+                identificativi.append(
+                    f"SoC <span class='build'>{chip_device.etichetta}</span>")
+            else:
+                identificativi.append("SoC non disponibile")
             if identificativi:
                 info_col.markdown(" · ".join(identificativi), unsafe_allow_html=True)
+            if chip_device and chip_device.nota:
+                info_col.caption(f"🔧 {chip_device.nota}")
             info_col.markdown(f"**Stato:** {freshness(device['last_update_at'])} — "
                               f"{qa_impact(device['severity'], bool(device['watched']))}")
 

@@ -250,3 +250,53 @@ class TestNotiziaSenzaBuild(unittest.TestCase):
         voce = self._voce("Galaxy A32 gets July 2026 security patch",
                           self.C.TRUST_NOISY)
         self.assertTrue(voce.get("patch_level"))
+
+
+class TestCoperturaChip(unittest.TestCase):
+    """La CPU deve rispondere sui modelli veri, non solo sui top di gamma.
+
+    Il segnale che qualcosa non andava: `a135f` e `a145f` — due telefoni
+    della stessa famiglia — si comportavano in modo diverso. Non era un
+    caso particolare: era che la tabella copriva pochi modelli e la
+    copertura sembrava casuale a chi la usava.
+    """
+
+    def setUp(self):
+        from core import soc
+        self.soc = soc
+        soc.reset_cache()
+
+    def test_i_due_modelli_del_caso_segnalato(self):
+        for codice in ("a135f", "a145f"):
+            with self.subTest(codice=codice):
+                self.assertIsNotNone(self.soc.per_modello(codice))
+
+    def test_le_varianti_4g_e_5g_hanno_chip_diversi(self):
+        coppie = [("SM-A135F", "SM-A136B"), ("SM-A165F", "SM-A166B"),
+                  ("SM-A325F", "SM-A326B")]
+        for quattro, cinque in coppie:
+            with self.subTest(coppia=(quattro, cinque)):
+                a = self.soc.per_modello(quattro)
+                b = self.soc.per_modello(cinque)
+                self.assertNotEqual(a.nome, b.nome)
+
+    def test_la_variante_di_mercato_conta(self):
+        """Lo stesso Galaxy A14 monta Helio G80 nelle versioni /F e /P e
+        Exynos 850 nella /R: senza il codice esatto non è decidibile."""
+        self.assertIn("Helio G80", self.soc.per_modello("SM-A145F").etichetta)
+        self.assertIn("Exynos 850", self.soc.per_modello("SM-A145R").etichetta)
+
+    def test_il_chip_si_risolve_dal_numero_di_build(self):
+        """La build Samsung comincia col codice modello: spesso è l'unico
+        posto dove il codice compare in una scheda dispositivo."""
+        chip = self.soc.per_modello("A325FXXSCDYB2")
+        self.assertIn("Helio G80", chip.etichetta)
+
+    def test_il_codice_dentro_una_build_con_trattino_basso(self):
+        """Per le espressioni regolari il trattino basso è un carattere di
+        parola: con `\\b` il codice dentro `CPH2649_16.0.7.201` restava
+        invisibile."""
+        self.assertEqual(self.soc.codici_da_testo("CPH2649_16.0.7.201"), ["CPH2649"])
+
+    def test_un_modello_ignoto_resta_ignoto(self):
+        self.assertIsNone(self.soc.per_modello("SM-A999Z"))

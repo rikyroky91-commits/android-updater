@@ -438,12 +438,17 @@ def status() -> str:
 # ricerca, o è annegato nel nome mostrato. E senza il codice si perde
 # esattamente la distinzione per cui questo modulo esiste — «Galaxy S24»
 # da solo non dice se è l'Exynos europeo o lo Snapdragon americano.
+# I confini sono espressi come «non alfanumerico» invece che con `\b`
+# perché il trattino basso, per le espressioni regolari, è un carattere di
+# parola: con `\b` il codice dentro una build come `CPH2649_16.0.7.201`
+# non veniva riconosciuto, e per quei dispositivi il chip non si risolveva
+# mai partendo dal numero di build.
 _RE_CODICI = re.compile(
-    r"\b(?:SM-[A-Z]\d{3,4}[A-Z0-9/]*"      # Samsung: SM-S921B, SM-S928U
-    r"|CPH\d{4}[A-Z]{0,4}"                  # OPPO/OnePlus: CPH2649, CPH2525EEA
-    r"|RMX\d{4}"                            # realme
-    r"|XT\d{4}-\d{1,2}"                     # Motorola
-    r"|[A-Z]{2}\d{4})\b",                   # NE2211, MT2111, OPD2420
+    r"(?<![A-Za-z0-9])(?:SM-[A-Z]\d{3,4}[A-Z0-9/]*"   # Samsung
+    r"|CPH\d{4}[A-Z]{0,4}"                           # OPPO/OnePlus
+    r"|RMX\d{4}"                                     # realme
+    r"|XT\d{4}-\d{1,2}"                              # Motorola
+    r"|[A-Z]{2}\d{4})(?![A-Za-z0-9])",                # NE2211, MT2111, OPD2420
     re.I,
 )
 
@@ -465,6 +470,14 @@ def codici_da_testo(testo: str) -> list[str]:
     # I confini di parola sono obbligatori: senza, dentro «CPH2649» si
     # legge «H264» e si finisce per cercare un inesistente «SM-H264».
     parole = re.findall(r"\b[A-Za-z]\d{3}[A-Za-z]{0,3}\b", testo or "")
+
+    # Il numero di build Samsung COMINCIA col codice modello:
+    # `A325FXXSCDYB2` = A325F + regione + revisione + data. È spesso
+    # l'unico posto dove il codice compare in una scheda dispositivo, dove
+    # il nome commerciale da solo non basterebbe a distinguere le varianti.
+    for build in re.findall(r"\b([A-Za-z]\d{3}[A-Za-z])[A-Z]{2,3}\w{4,}\b", testo or ""):
+        parole.append(build)
+
     candidati = [(testo or "").strip().upper()] + [p.upper() for p in parole]
 
     espansi = []
