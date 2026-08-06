@@ -1373,7 +1373,7 @@ class TestRicercaOnDemandFontiUfficiali(unittest.TestCase):
                 self.status_code = 200
                 self.text = text
 
-        def fake_http_get(url, timeout=None):
+        def fake_http_get(url, timeout=None, headers=None):
             if "honor.com" in url:
                 return Resp(TestRicercaOnDemandFontiUfficiali.HONOR_PAGE)
             if "ospserver.net" in url:
@@ -1570,7 +1570,7 @@ class TestSupportoApple(unittest.TestCase):
             def text(self):
                 return json.dumps(self._payload)
 
-        def fake_http_get(url, timeout=None):
+        def fake_http_get(url, timeout=None, headers=None):
             for identifier, payload in TestSupportoApple.FIRMWARE_PER_DEVICE.items():
                 if url.endswith(f"/device/{identifier}"):
                     return Resp(payload)
@@ -2523,7 +2523,7 @@ class TestDiagnosticaFonteDistinta(unittest.TestCase):
             def json(self):
                 raise ValueError("non JSON")
 
-        def finto(url, timeout=None):
+        def finto(url, timeout=None, headers=None):
             # La ricerca ora prova anche le altre fonti economiche: quelle
             # non pertinenti devono rispondere in modo pulito, non rompersi.
             if "realme.com" in url:
@@ -2547,7 +2547,7 @@ class TestDiagnosticaFonteDistinta(unittest.TestCase):
             def json(self):
                 raise ValueError("non JSON")
 
-        def finto(url, timeout=None):
+        def finto(url, timeout=None, headers=None):
             if "realme.com" in url:
                 return Resp(200, (
                     "<table><tr><td>realme 14 5G</td>"
@@ -2675,7 +2675,7 @@ class TestMatriceRicerca(unittest.TestCase):
                     raise ValueError("non JSON")
                 return self._payload
 
-        def finto_http(url, timeout=None):
+        def finto_http(url, timeout=None, headers=None):
             if "honor.com" in url:
                 return Resp(200, TestMatriceRicerca.HONOR_HTML)
             if "realme.com" in url:
@@ -2731,7 +2731,7 @@ class TestMatriceRicerca(unittest.TestCase):
         Ora, se quella tace, le altre vengono comunque provate."""
         originale = sources.http_get
 
-        def honor_rotto(url, timeout=None):
+        def honor_rotto(url, timeout=None, headers=None):
             if "honor.com" in url:
                 raise ConnectionError("fonte Honor irraggiungibile")
             return originale(url, timeout)
@@ -2884,7 +2884,7 @@ class TestDiagnosiRicerca(unittest.TestCase):
         self.assertIn("nessuna fonte", passi["esito"])
 
     def test_riporta_gli_errori_delle_fonti(self):
-        def esplode(url, timeout=None):
+        def esplode(url, timeout=None, headers=None):
             raise ConnectionError("rete non disponibile")
 
         sources.http_get = esplode
@@ -3102,7 +3102,7 @@ class TestSceltaRisultatoMigliore(unittest.TestCase):
             def json(self):
                 raise ValueError("non JSON")
 
-        def finto(url, timeout=None):
+        def finto(url, timeout=None, headers=None):
             if "oppo.com" in url:
                 return Resp(TestSceltaRisultatoMigliore.OPPO_AER)
             if con_gsmarena and "oppo_a6x-14322" in url:

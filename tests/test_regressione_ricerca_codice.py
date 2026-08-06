@@ -121,7 +121,7 @@ class TestRicercaSamsungFunziona(unittest.TestCase):
     def _rete_fota(self):
         richieste = []
 
-        def get(url, timeout=None):
+        def get(url, timeout=None, headers=None):
             richieste.append(url)
             if "fota-cloud-dn" in url:
                 return _Risposta(XML_FOTA)
@@ -155,7 +155,7 @@ class TestIdentificazioneSenzaFirmware(unittest.TestCase):
         storage.reset_state()
         storage.init_db()
 
-        def giu(url, timeout=None):
+        def giu(url, timeout=None, headers=None):
             raise ConnectionError("nessuna fonte firmware raggiungibile")
 
         sources.http_get = giu

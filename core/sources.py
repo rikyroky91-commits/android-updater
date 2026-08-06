@@ -18,6 +18,8 @@ d'ambiente `EXTRA_FEEDS` (vedi in fondo al file).
 """
 from __future__ import annotations
 
+import gzip
+
 import html
 import re
 import time
@@ -109,10 +111,61 @@ def _headers() -> dict:
     return {"User-Agent": C.USER_AGENT, "Accept": "*/*"}
 
 
-def http_get(url: str, timeout: int | None = None):
+def http_get(url: str, timeout: int | None = None, headers: dict | None = None):
+    """GET con gli header del progetto, sovrascrivibili per singola fonte.
+
+    Il parametro `headers` esiste per l'endpoint FOTA di Samsung, che
+    rifiuta gli User-Agent da browser: vedi `_fota_get`.
+    """
     if requests is None:  # pragma: no cover
         raise RuntimeError("la libreria 'requests' non è installata")
-    return requests.get(url, timeout=timeout or C.HTTP_TIMEOUT, headers=_headers())
+    intestazioni = _headers()
+    if headers:
+        intestazioni.update(headers)
+    return requests.get(url, timeout=timeout or C.HTTP_TIMEOUT, headers=intestazioni)
+
+
+# Header che l'endpoint FOTA si aspetta. NON è un capriccio: è il client
+# ufficiale Samsung (Kies) che quel server serve, e con uno User-Agent da
+# browser risponde 403 o restituisce corpi che non si riescono a leggere.
+#
+# È LA RADICE DEL GUASTO SAMSUNG. Il controllo versione veniva chiamato
+# con lo User-Agent generico del progetto: ogni region falliva in
+# silenzio (`except: continue`) e la ricerca finiva per rispondere con
+# una fonte di ripiego — la versione di fabbrica o una notizia vecchia.
+# Da fuori sembrava che il modello non fosse coperto; in realtà non gli
+# veniva mai chiesto niente.
+FOTA_USER_AGENT = "Kies2.0_FUS"
+
+
+def _fota_get(url: str, timeout: int | None = None) -> str | None:
+    """Testo XML da `fota-cloud-dn`, o None se la region non risponde.
+
+    Oltre allo User-Agent, gestisce la compressione: il server può
+    restituire gzip senza dichiararlo negli header, e in quel caso
+    `response.text` è un blocco binario in cui la ricerca del numero di
+    build non trova nulla — un altro modo silenzioso di non funzionare.
+    """
+    try:
+        response = http_get(url, timeout=timeout,
+                            headers={"User-Agent": FOTA_USER_AGENT})
+    except Exception:
+        return None
+    if getattr(response, "status_code", 0) != 200:
+        return None
+
+    testo = getattr(response, "text", "") or ""
+    if "<" in testo:
+        return testo
+
+    # Nessun tag: probabile gzip non dichiarato.
+    dati = getattr(response, "content", None)
+    if not dati:
+        return testo or None
+    try:
+        return gzip.decompress(dati).decode("utf-8", "replace")
+    except Exception:
+        return testo or None
 
 
 def fetch_json(urls: list[str]) -> tuple[object | None, str | None]:
@@ -2059,13 +2112,10 @@ def _samsung_fus_latest(model: str) -> tuple[str | None, str | None, str | None]
     le region candidate in ordine finché una risponde con un dato valido."""
     for csc in SAMSUNG_CSC_CANDIDATES:
         url = f"https://fota-cloud-dn.ospserver.net/firmware/{csc}/{model}/version.xml"
-        try:
-            response = http_get(url)
-        except Exception:
+        testo = _fota_get(url)
+        if not testo:
             continue
-        if response.status_code != 200:
-            continue
-        match = _SAMSUNG_VERSION_XML_RE.search(response.text)
+        match = _SAMSUNG_VERSION_XML_RE.search(testo)
         if not match:
             continue
         android_version, versions = match.groups()

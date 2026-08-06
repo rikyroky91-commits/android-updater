@@ -11,7 +11,7 @@ import threading
 import time
 import traceback
 
-from . import backup, classify, config as C, extract, modelcodes, notify, soc, sources, storage
+from . import backup, classify, config as C, extract, modelcodes, notify, skinmap, soc, sources, storage
 from .util import now_iso, short_hash, slug, utcnow
 
 _scan_lock = threading.Lock()
@@ -52,6 +52,21 @@ def _implausibilita(brand: str | None, data, os_version: str) -> list[str]:
             f"implausibile: Android {data.android_version} oltre il massimo "
             f"atteso ({C.MAX_PLAUSIBLE_ANDROID})"
         )
+
+    # Skin del produttore in contraddizione con la versione Android.
+    #
+    # È il difetto osservato sul Galaxy A32: una fonte diceva Android 12,
+    # un'altra One UI 5.0 — e One UI 5 gira su Android 13. L'app aveva il
+    # dato giusto sotto forma di versione dell'interfaccia e mostrava
+    # quello sbagliato come versione Android.
+    #
+    # Il controllo tace dove la corrispondenza è nota come non univoca
+    # (One UI 3.1.1, EMUI 11, MIUI, ColorOS antecedenti alla 11): lì una
+    # discrepanza non è una prova di errore.
+    conflitto = skinmap.contraddizione(
+        data.skin_name, data.skin_version, data.android_version)
+    if conflitto:
+        motivi.append(conflitto)
 
     # iOS: dal 2025 Apple usa la numerazione per anno (26 = ciclo 2025-26),
     # quindi il tetto è diverso da quello di Android.
@@ -101,7 +116,27 @@ def normalize(raw: sources.RawItem, source: sources.Source) -> dict:
         )
     severity, color, severity_reason = classify.classify_severity(text, data, raw.size_gb)
 
+    # La versione Android DEDOTTA dalla skin, quando la fonte non la dice.
+    #
+    # «One UI 5.1» da solo non risponde alla domanda che conta per un QA —
+    # se il telefono ha cambiato major Android — ma la contiene: One UI 5
+    # gira su Android 13. Dove la corrispondenza è univoca conviene
+    # esplicitarla, invece di lasciare un campo vuoto accanto a un dato che
+    # lo implica.
+    #
+    # Si deduce SOLO se la fonte non ha detto niente: un dato dichiarato
+    # non viene mai sovrascritto da uno dedotto. E si deduce solo dove la
+    # tabella è certa — MIUI, EMUI 11 e ColorOS vecchie restano vuote.
+    dedotto_da_skin = False
+    if data.android_version is None:
+        implicata = skinmap.android_da_skin(data.skin_name, data.skin_version)
+        if implicata is not None:
+            data.android_version = implicata
+            dedotto_da_skin = True
+
     os_version = data.os_version or (raw.version or "")
+    if dedotto_da_skin and not os_version:
+        os_version = f"Android {data.android_version}"
     fingerprint = data.build or os_version or data.patch_level
 
     # ---- Controllo di plausibilità (rete di sicurezza) ------------------

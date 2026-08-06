@@ -449,8 +449,40 @@ _RE_CODICI = re.compile(
 
 
 def codici_da_testo(testo: str) -> list[str]:
-    """Codici modello plausibili dentro una stringa qualsiasi."""
-    return [m.group(0).upper() for m in _RE_CODICI.finditer(testo or "")]
+    """Codici modello plausibili dentro una stringa qualsiasi.
+
+    Include l'espansione dei codici Samsung scritti senza prefisso:
+    `a325f` è la forma che compare nei numeri di build e nei log, ed è
+    quella che chi fa QA copia più spesso. Senza questa riga il chip non
+    veniva risolto proprio per le ricerche più frequenti.
+    """
+    trovati = [m.group(0).upper() for m in _RE_CODICI.finditer(testo or "")]
+
+    # Il codice nudo non ha una forma che `_RE_CODICI` intercetti (una
+    # lettera e tre cifre sono troppo poco per distinguerlo da una parola
+    # qualsiasi), quindi va cercato a parte: sia come intera stringa
+    # digitata, sia come singola parola dentro una frase.
+    # I confini di parola sono obbligatori: senza, dentro «CPH2649» si
+    # legge «H264» e si finisce per cercare un inesistente «SM-H264».
+    parole = re.findall(r"\b[A-Za-z]\d{3}[A-Za-z]{0,3}\b", testo or "")
+    candidati = [(testo or "").strip().upper()] + [p.upper() for p in parole]
+
+    espansi = []
+    for codice in candidati + trovati:
+        if codice.startswith("SM-") or not _RE_SAMSUNG_NUDO.match(codice):
+            continue
+        completo = f"SM-{codice}"
+        if completo not in espansi:
+            espansi.append(completo)
+    ordinati = espansi + trovati
+    return list(dict.fromkeys(ordinati))
+
+
+# Stessa forma riconosciuta da `sources.espandi_codice_samsung`. È ripetuta
+# qui invece di importata perché questo modulo non dipende da nessun altro:
+# è una tabella di consultazione, e tenerla isolata la rende collaudabile
+# senza tirarsi dietro mezza applicazione.
+_RE_SAMSUNG_NUDO = re.compile(r"^[A-Z]\d{3}[A-Z]{0,3}$")
 
 
 def per_modello(model_code: str | None = None,
@@ -486,7 +518,7 @@ def per_modello(model_code: str | None = None,
         if apple:
             return apple
 
-    pixel = _soc_pixel(device_name or "")
+    pixel = _soc_pixel(f"{device_name or ''} {model_code or ''}")
     if pixel:
         return pixel
 

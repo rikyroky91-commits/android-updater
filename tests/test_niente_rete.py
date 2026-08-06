@@ -96,7 +96,7 @@ class TestLaRicercaNonEsceInRete(unittest.TestCase):
             if url == modelcodes.MOBILEMODELS_URL else None
         )
 
-        def niente_http(url, timeout=None):
+        def niente_http(url, timeout=None, headers=None):
             raise ConnectionError("fonte non prevista in questo test")
 
         sources.http_get = niente_http

@@ -82,7 +82,7 @@ class TestRicercaA325F(unittest.TestCase):
         storage.reset_state()
         storage.init_db()
 
-        def get(url, timeout=None):
+        def get(url, timeout=None, headers=None):
             if "fota-cloud-dn" in url:
                 return _Risposta(XML_A32)
             raise ConnectionError("altre fonti non disponibili")
@@ -113,7 +113,7 @@ class TestRicercaA325F(unittest.TestCase):
     def test_l_endpoint_riceve_il_codice_completo(self):
         richieste = []
 
-        def get(url, timeout=None):
+        def get(url, timeout=None, headers=None):
             richieste.append(url)
             if "fota-cloud-dn" in url:
                 return _Risposta(XML_A32)

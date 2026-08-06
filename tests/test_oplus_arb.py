@@ -244,7 +244,7 @@ class TestFonteInSources(unittest.TestCase):
         self.assertEqual(self.sources._lookup_oplus_arb(""), [])
 
     def test_rete_assente_non_solleva(self):
-        def esplode(url, timeout=None):
+        def esplode(url, timeout=None, headers=None):
             raise ConnectionError("niente rete")
 
         self.sources.http_get = esplode
@@ -262,7 +262,7 @@ class TestFonteInSources(unittest.TestCase):
     def test_la_cache_evita_di_riscaricare(self):
         chiamate = []
 
-        def conta(url, timeout=None):
+        def conta(url, timeout=None, headers=None):
             chiamate.append(url)
             return _Risposta(_readme())
 

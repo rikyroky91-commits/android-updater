@@ -169,7 +169,7 @@ class TestNonInventare(unittest.TestCase):
         """Un SM-xxxxB non presente in tabella NON diventa Exynos per
         analogia con gli altri: la ripartizione cambia a ogni
         generazione, quindi dedurla sarebbe un errore sistematico."""
-        self.assertIsNone(soc.per_modello("SM-A546B"))
+        self.assertIsNone(soc.per_modello("SM-A999Z"))
 
     def test_la_provenienza_viaggia_sempre_col_dato(self):
         for chip in (soc.per_modello("SM-S921B"),

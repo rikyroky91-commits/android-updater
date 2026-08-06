@@ -255,7 +255,7 @@ MAX_PLAUSIBLE_IOS = env_int("MAX_PLAUSIBLE_IOS", 30)
 #       Ora gli item sono marcati beta e non impongono più una versione al
 #       dispositivo. Serve una fonte stabile: la pagina delle immagini
 #       ufficiali è resa in JavaScript e non è leggibile via HTTP.
-DATA_LOGIC_VERSION = env_int("DATA_LOGIC_VERSION", 22)
+DATA_LOGIC_VERSION = env_int("DATA_LOGIC_VERSION", 23)
 
 
 # --- Tempo massimo di una ricerca interattiva ---------------------------

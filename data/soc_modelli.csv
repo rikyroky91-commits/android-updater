@@ -29,3 +29,22 @@ SM-S906B,Galaxy S22+,Exynos 2200,Samsung,S5E9925,Variante Europa/Global — la U
 SM-S906U,Galaxy S22+,Snapdragon 8 Gen 1,Qualcomm,SM8450,Variante USA — la europea monta Exynos
 SM-S908B,Galaxy S22 Ultra,Exynos 2200,Samsung,S5E9925,Variante Europa/Global — la USA monta Snapdragon
 SM-S908U,Galaxy S22 Ultra,Snapdragon 8 Gen 1,Qualcomm,SM8450,Variante USA — la europea monta Exynos
+SM-A325F,Galaxy A32 4G,Helio G80,MediaTek,MT6769V,Variante 4G — la 5G monta Dimensity 720
+SM-A326B,Galaxy A32 5G,Dimensity 720,MediaTek,MT6853,Variante 5G — la 4G monta Helio G80
+SM-A528B,Galaxy A52s 5G,Snapdragon 778G,Qualcomm,SM7325,
+SM-A525F,Galaxy A52 4G,Snapdragon 720G,Qualcomm,SM7125,
+SM-A526B,Galaxy A52 5G,Snapdragon 750G,Qualcomm,SM7225,
+SM-A536B,Galaxy A53 5G,Exynos 1280,Samsung,S5E8825,
+SM-A546B,Galaxy A54 5G,Exynos 1380,Samsung,S5E8835,
+SM-A556B,Galaxy A55 5G,Exynos 1480,Samsung,S5E8845,
+SM-A566B,Galaxy A56 5G,Exynos 1580,Samsung,S5E8855,
+SM-A346B,Galaxy A34 5G,Dimensity 1080,MediaTek,MT6877V,
+SM-A356B,Galaxy A35 5G,Exynos 1380,Samsung,S5E8835,
+SM-A366B,Galaxy A36 5G,Snapdragon 6 Gen 3,Qualcomm,SM6475,
+SM-A256B,Galaxy A25 5G,Exynos 1280,Samsung,S5E8825,
+SM-A156B,Galaxy A15 5G,Dimensity 6100+,MediaTek,MT6835,
+SM-A155F,Galaxy A15 4G,Helio G99,MediaTek,MT6789,
+SM-G991B,Galaxy S21,Exynos 2100,Samsung,S5E9840,Variante Europa/Global — la USA monta Snapdragon 888
+SM-G991U,Galaxy S21,Snapdragon 888,Qualcomm,SM8350,Variante USA — la europea monta Exynos
+SM-G998B,Galaxy S21 Ultra,Exynos 2100,Samsung,S5E9840,Variante Europa/Global — la USA monta Snapdragon 888
+SM-G998U,Galaxy S21 Ultra,Snapdragon 888,Qualcomm,SM8350,Variante USA — la europea monta Exynos
