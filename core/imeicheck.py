@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 import csv
 import io
+import json
 import os
 from datetime import datetime, timezone
 
@@ -165,6 +166,100 @@ def carica_tac_curati(testo: str) -> dict[str, tuple[str, str]]:
     return indice
 
 
+# ======================================================================
+# TAC inseriti dall'utente dentro l'app
+# ======================================================================
+# Perché non basta il CSV. Il file nel repository è la forma definitiva —
+# sopravvive ai riavvii e si porta dietro la cronologia — ma richiede di
+# uscire dall'app, aprire un editor e ricaricare il progetto. Chi sta
+# controllando un telefono in quel momento non lo fa, e il dato si perde.
+#
+# Quindi: si salva subito nell'archivio, dove vale immediatamente, e
+# l'app mostra comunque la riga da incollare nel CSV per renderlo
+# permanente. Le due strade non si escludono, si completano.
+_META_TAC_UTENTE = "imei_tac_inseriti"
+
+# I siti dove verificare un TAC a mano. Nessuno di questi viene
+# interrogato dall'app: bloccano l'accesso automatico o lo vietano nei
+# termini d'uso. Consultarli di persona è invece del tutto lecito, ed è
+# esattamente ciò che questi collegamenti permettono.
+#
+# Sono più d'uno di proposito: hanno cataloghi diversi, e un TAC assente
+# da uno si trova spesso nell'altro. Il primo non richiede nemmeno
+# registrazione.
+SITI_VERIFICA_TAC = [
+    ("HiCellTek", "https://hicelltek.com/en/tac-lookup/",
+     "gratuito, nessuna registrazione"),
+    ("imei.info", "https://www.imei.info/it/?imei={imei}",
+     "catalogo ampio"),
+    ("nobbi.com", "http://www.nobbi.com/tacquery.php",
+     "storico, utile per i modelli vecchi"),
+    ("IMEI DB", "https://imeidb.xyz/",
+     "aggiornato di frequente"),
+]
+
+
+def link_verifica(imei: str) -> list[tuple[str, str, str]]:
+    """`(nome, url, nota)` dei siti dove controllare un TAC a mano."""
+    pulito = "".join(c for c in (imei or "") if c.isdigit())
+    return [(nome, url.format(imei=pulito), nota)
+            for nome, url, nota in SITI_VERIFICA_TAC]
+
+
+def tac_inseriti() -> dict[str, tuple[str, str]]:
+    """I TAC salvati dall'utente dentro l'app."""
+    grezzo = storage.get_meta(_META_TAC_UTENTE)
+    if not grezzo:
+        return {}
+    try:
+        dati = json.loads(grezzo) if isinstance(grezzo, str) else grezzo
+    except Exception:
+        return {}
+    if not isinstance(dati, dict):
+        return {}
+    voci = {}
+    for tac, valore in dati.items():
+        if isinstance(valore, (list, tuple)) and len(valore) == 2:
+            voci[str(tac)] = (str(valore[0]), str(valore[1]))
+    return voci
+
+
+def aggiungi_tac(tac: str, marca: str, modello: str) -> bool:
+    """Salva un TAC verificato a mano. False se i dati non bastano.
+
+    Non c'è nessuna validazione del *contenuto*: se qualcuno scrive un
+    modello sbagliato, l'app lo mostrerà. È accettabile perché è un dato
+    inserito deliberatamente da chi lo sta verificando in quel momento —
+    ed è comunque meglio di un dato inventato da un'euristica.
+    """
+    tac = "".join(c for c in (tac or "") if c.isdigit())[:8]
+    marca = (marca or "").strip()
+    modello = (modello or "").strip()
+    if len(tac) != 8 or not (marca or modello):
+        return False
+
+    voci = tac_inseriti()
+    voci[tac] = (marca or "Sconosciuto", modello)
+    storage.set_meta(_META_TAC_UTENTE, json.dumps(voci, ensure_ascii=False))
+    reset_cache()
+    return True
+
+
+def rimuovi_tac(tac: str) -> bool:
+    voci = tac_inseriti()
+    if tac not in voci:
+        return False
+    del voci[tac]
+    storage.set_meta(_META_TAC_UTENTE, json.dumps(voci, ensure_ascii=False))
+    reset_cache()
+    return True
+
+
+def riga_csv(tac: str, marca: str = "Marca", modello: str = "Nome del modello") -> str:
+    """La riga da incollare in `data/tac_modelli.csv` per renderlo permanente."""
+    return f"{tac},{marca},{modello},verificato a mano"
+
+
 def _indice_curato() -> dict[str, tuple[str, str]]:
     try:
         with open(FILE_TAC_CURATO, encoding="utf-8-sig") as f:
@@ -173,22 +268,8 @@ def _indice_curato() -> dict[str, tuple[str, str]]:
         return {}
 
 
-def _build_index() -> dict[str, tuple[str, str]]:
-    global _status
-    if openpyxl is None:  # pragma: no cover
-        _status = "libreria 'openpyxl' non disponibile"
-        return {}
-    raw = _cached_bytes()
-    if not raw:
-        return {}
-
-    index: dict[str, tuple[str, str]] = {}
-    try:
-        workbook = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
-    except Exception as exc:
-        _status = f"file scaricato ma non interpretabile: {exc}"
-        return {}
-
+def _leggi_workbook(workbook, index: dict) -> None:
+    """Righe valide del file scaricato dentro l'indice."""
     for sheet in workbook.worksheets:
         rows = sheet.iter_rows(values_only=True)
         try:
@@ -210,7 +291,39 @@ def _build_index() -> dict[str, tuple[str, str]]:
             specs = str(row[i_specs] or "").strip()
             if len(tac) == 8 and tac.isdigit() and brand:
                 index[tac] = (brand, specs)
-    workbook.close()
+
+
+def _build_index() -> dict[str, tuple[str, str]]:
+    """Indice completo dei TAC, da tutte le fonti.
+
+    ATTENZIONE ALL'ORDINE DELLE USCITE ANTICIPATE. Prima, se il database
+    scaricato non era disponibile, questa funzione usciva subito — e con
+    lei sparivano anche la tabella verificata a mano e i TAC inseriti
+    dentro l'app, che non c'entrano niente col download. Bastava un'ora
+    senza rete perché l'app dimenticasse dati che aveva in casa.
+
+    Ora le fonti locali si aggiungono SEMPRE, qualunque cosa faccia il
+    download.
+    """
+    global _status
+    index: dict[str, tuple[str, str]] = {}
+
+    raw = _cached_bytes() if openpyxl is not None else None
+    if openpyxl is None:  # pragma: no cover
+        _status = "libreria 'openpyxl' non disponibile"
+
+    workbook = None
+    if raw:
+        try:
+            workbook = openpyxl.load_workbook(io.BytesIO(raw), read_only=True,
+                                              data_only=True)
+        except Exception as exc:
+            _status = f"file scaricato ma non interpretabile: {exc}"
+            workbook = None
+
+    if workbook is not None:
+        _leggi_workbook(workbook, index)
+        workbook.close()
 
     prima = len(index)
     for tac, voce in _indice_fallback().items():
@@ -223,12 +336,21 @@ def _build_index() -> dict[str, tuple[str, str]]:
     curati = _indice_curato()
     index.update(curati)
 
+    # I TAC inseriti dentro l'app vengono per ULTIMI, quindi vincono su
+    # tutto: sono l'azione più recente e più deliberata di chi usa
+    # l'applicazione, e se contraddicono un database scaricato è quasi
+    # sempre perché il database ha torto.
+    inseriti = tac_inseriti()
+    index.update(inseriti)
+
     if not index:
         _status = "file interpretato ma nessuna riga valida trovata (formato cambiato?)"
     else:
         _status += f" — {prima} codici TAC indicizzati"
         if curati:
             _status += f" · {len(curati)} verificati a mano"
+        if inseriti:
+            _status += f" · {len(inseriti)} inseriti da te"
         if aggiunti:
             _status += f" (+{aggiunti} dalla base dati storica)"
     return index

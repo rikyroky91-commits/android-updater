@@ -693,28 +693,59 @@ if unified_submitted and unified_query.strip():
                 f"IMEI valido, ma il TAC **{tac_cercato}** non è in nessuno dei "
                 f"database consultati ({imeicheck.status()})."
             )
-            # NON È UN GUASTO, È UN BUCO DI COPERTURA — e vale la pena
-            # dirlo, perché sono due cose che l'utente vive allo stesso
-            # modo ma che si risolvono in modi opposti.
+            # NON È UN GUASTO, È UN BUCO DI COPERTURA. Sono due cose che
+            # si vivono allo stesso modo ma si risolvono in modi opposti,
+            # e dirlo evita di cercare un difetto che non c'è.
             #
-            # I servizi commerciali hanno cataloghi più completi, ma
-            # bloccano l'accesso automatico e nei termini d'uso lo
-            # vietano: consultarli a mano è lecito, farlo dall'app no.
-            # Quindi si offre il collegamento invece di copiare il dato.
+            # I siti sotto NON vengono interrogati dall'app: bloccano
+            # l'accesso automatico o lo vietano nei termini d'uso.
+            # Consultarli di persona è invece del tutto lecito.
             st.caption(
-                "I database pubblici gratuiti hanno buchi diversi fra loro e "
-                "nessuno è completo. Per questo TAC puoi verificare a mano: "
-                f"[imei.info](https://www.imei.info/it/?imei={query.strip()}) · "
-                "poi aggiungi una riga a `data/tac_modelli.csv` e quel "
-                "telefono è coperto per sempre."
+                "I database gratuiti hanno buchi diversi fra loro e nessuno è "
+                "completo. Controlla su uno di questi e poi salva il modello qui "
+                "sotto: resterà valido anche per le prossime ricerche."
             )
-            st.code(f"{tac_cercato},Marca,Nome del modello,verificato a mano",
-                    language="text")
+            colonne_link = st.columns(len(imeicheck.SITI_VERIFICA_TAC))
+            for colonna, (nome_sito, url_sito, nota_sito) in zip(
+                    colonne_link, imeicheck.link_verifica(query)):
+                colonna.link_button(nome_sito, url_sito, use_container_width=True,
+                                    help=nota_sito)
+
+            with st.expander("✍️ Salva tu il modello per questo TAC"):
+                st.caption(
+                    f"Vale subito per il TAC **{tac_cercato}**, cioè per tutti gli "
+                    "IMEI di quel modello. Ha la precedenza sui database "
+                    "scaricati: se lo hai verificato tu, hai ragione tu."
+                )
+                mc1, mc2 = st.columns(2)
+                marca_manuale = mc1.text_input("Marca", key="tac_marca",
+                                               placeholder="es. Samsung")
+                modello_manuale = mc2.text_input("Modello", key="tac_modello",
+                                                 placeholder="es. Galaxy A54 5G")
+                if st.button("Salva questo modello", key="tac_salva"):
+                    if imeicheck.aggiungi_tac(tac_cercato, marca_manuale,
+                                              modello_manuale):
+                        st.success("Salvato. Ricerca di nuovo l'IMEI.")
+                        st.rerun()
+                    else:
+                        st.error("Serve almeno la marca o il modello.")
+
+                # Il salvataggio vive nell'archivio, quindi sopravvive ai
+                # riavvii ma non a un archivio ricostruito da zero. La riga
+                # nel file del progetto è la forma definitiva: le due strade
+                # non si escludono, si completano.
+                st.caption("Per renderlo permanente, aggiungi questa riga a "
+                           "`data/tac_modelli.csv`:")
+                st.code(imeicheck.riga_csv(tac_cercato,
+                                           marca_manuale or "Marca",
+                                           modello_manuale or "Nome del modello"),
+                        language="text")
+
             if not imeicheck._chiave_api():
                 st.caption(
-                    "💡 Con una chiave gratuita in `TAC_API_KEY` (100 ricerche "
-                    "al mese) l'app può interrogare un catalogo più ampio "
-                    "inviando **solo le prime 8 cifre**, mai l'IMEI intero."
+                    "💡 Con una chiave gratuita in `TAC_API_KEY` l'app può "
+                    "interrogare un catalogo più ampio inviando **solo le prime "
+                    "8 cifre**, mai l'IMEI intero."
                 )
         else:
             brand_found, specs = found
