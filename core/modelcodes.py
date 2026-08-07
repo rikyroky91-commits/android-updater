@@ -202,6 +202,19 @@ def _build_google_play_index() -> dict[str, list[str]]:
     return index
 
 
+def carica_indice(indice: dict[str, list[str]]) -> None:
+    """Sostituisce l'indice in memoria con uno dato.
+
+    Serve ai test: senza questo seme, ogni prova sulla risoluzione dei
+    codici scaricherebbe i dataset veri, e la suite fallirebbe su una
+    macchina senza rete — cosa che è puntualmente successa. Il progetto ha
+    la regola che nessun test tocchi la rete, e senza un punto di innesto
+    quella regola non è applicabile a questo modulo.
+    """
+    global _memory_cache
+    _memory_cache = dict(indice)
+
+
 def _build_index() -> dict[str, list[str]]:
     merged: dict[str, list[str]] = {}
     for code, names in _build_mobilemodels_index().items():

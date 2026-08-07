@@ -19,6 +19,7 @@ un controllo diretto sul dispositivo specifico.
 from __future__ import annotations
 
 import re
+import csv
 import io
 from datetime import datetime, timezone
 
@@ -36,6 +37,21 @@ from . import config as C
 from . import storage
 
 TAC_DB_URL = "https://raw.githubusercontent.com/MoazEb/tac-database/main/tac_full.xlsx"
+
+# SECONDA base dati, consultata solo per i TAC che la prima non ha.
+#
+# Nessun database TAC pubblico è completo: sono tutti alimentati dalla
+# community e ognuno ha buchi diversi. Un IMEI valido che «non esiste»
+# mentre altri siti lo riconoscono è quasi sempre un buco di copertura,
+# non un IMEI sbagliato — quindi vale la pena chiedere a due fonti prima
+# di dire di no.
+#
+# Osmocom è vecchia (i dati a monte si fermano intorno al 2014) e non
+# aiuta sui modelli recenti, ma copre bene i TAC storici, che è
+# esattamente dove la prima base dati è più debole.
+TAC_DB_FALLBACK_URL = "http://tacdb.osmocom.org/export/tacdb.csv"
+_META_FALLBACK_BYTES = "imei_tacdb2_bytes"
+_META_FALLBACK_FETCHED = "imei_tacdb2_fetched_at"
 _META_BYTES_KEY = "imei_tacdb_bytes"
 _META_FETCHED_KEY = "imei_tacdb_fetched_at"
 _REFRESH_HOURS = 24 * 14  # database molto stabile, un refresh ogni due settimane basta
@@ -89,6 +105,48 @@ def _cached_bytes() -> bytes | None:
     return None
 
 
+def _scarica_url(url: str, minimo: int = 10_000) -> bytes | None:
+    """Scarica una base dati TAC senza toccare lo stato globale.
+
+    A differenza di `_download`, non scrive in `_status`: questo serve alla
+    fonte supplementare, il cui esito non deve mascherare la diagnosi della
+    fonte principale — se la storica non risponde non è un guasto dell'app.
+    """
+    if requests is None:  # pragma: no cover
+        return None
+    try:
+        response = requests.get(url, timeout=C.HTTP_TIMEOUT + 30,
+                                headers={"User-Agent": C.USER_AGENT})
+    except Exception:
+        return None
+    if response.status_code != 200 or len(response.content) < minimo:
+        return None
+    return response.content
+
+
+def _cached_bytes_url(url: str, chiave_byte: str, chiave_data: str) -> bytes | None:
+    """Come `_cached_bytes` ma per un URL qualsiasi."""
+    fetched_at = storage.get_meta(chiave_data)
+    cached_hex = storage.get_meta(chiave_byte)
+    if cached_hex and fetched_at:
+        try:
+            eta = (datetime.now(timezone.utc)
+                   - datetime.fromisoformat(fetched_at)).total_seconds() / 3600
+        except ValueError:
+            eta = _REFRESH_HOURS + 1
+        if eta < _REFRESH_HOURS:
+            return bytes.fromhex(cached_hex)
+
+    fresco = _scarica_url(url)
+    if fresco:
+        storage.set_meta(chiave_byte, fresco.hex())
+        storage.set_meta(chiave_data, datetime.now(timezone.utc).isoformat())
+        return fresco
+    if cached_hex:
+        return bytes.fromhex(cached_hex)
+    return None
+
+
 def _build_index() -> dict[str, tuple[str, str]]:
     global _status
     if openpyxl is None:  # pragma: no cover
@@ -128,11 +186,65 @@ def _build_index() -> dict[str, tuple[str, str]]:
                 index[tac] = (brand, specs)
     workbook.close()
 
+    prima = len(index)
+    for tac, voce in _indice_fallback().items():
+        index.setdefault(tac, voce)
+    aggiunti = len(index) - prima
+
     if not index:
         _status = "file interpretato ma nessuna riga valida trovata (formato cambiato?)"
     else:
-        _status += f" — {len(index)} codici TAC indicizzati"
+        _status += f" — {prima} codici TAC indicizzati"
+        if aggiunti:
+            _status += f" (+{aggiunti} dalla base dati storica)"
     return index
+
+
+def _indice_fallback() -> dict[str, tuple[str, str]]:
+    """TAC dalla base dati storica, in formato CSV.
+
+    Fallisce in silenzio di proposito: è un supplemento, e se non è
+    raggiungibile l'app deve continuare a funzionare con la prima base
+    dati invece di non identificare più niente.
+    """
+    raw = _cached_bytes_url(TAC_DB_FALLBACK_URL, _META_FALLBACK_BYTES,
+                            _META_FALLBACK_FETCHED)
+    if not raw:
+        return {}
+    try:
+        testo = raw.decode("utf-8", "replace")
+    except Exception:
+        return {}
+
+    indice: dict[str, tuple[str, str]] = {}
+    lettore = csv.reader(io.StringIO(testo))
+    try:
+        intestazione = [c.strip().lower() for c in next(lettore)]
+    except StopIteration:
+        return {}
+
+    def colonna(*nomi):
+        for nome in nomi:
+            if nome in intestazione:
+                return intestazione.index(nome)
+        return None
+
+    i_tac = colonna("tac")
+    i_marca = colonna("manufacturer", "brand", "vendor")
+    i_modello = colonna("model", "name", "device")
+    if i_tac is None or i_marca is None:
+        return {}
+
+    for riga in lettore:
+        if len(riga) <= max(i_tac, i_marca):
+            continue
+        tac = str(riga[i_tac] or "").strip()
+        marca = str(riga[i_marca] or "").strip()
+        modello = (str(riga[i_modello] or "").strip()
+                   if i_modello is not None and i_modello < len(riga) else "")
+        if len(tac) == 8 and tac.isdigit() and marca:
+            indice[tac] = (marca, modello)
+    return indice
 
 
 def is_valid_imei(imei: str) -> bool:

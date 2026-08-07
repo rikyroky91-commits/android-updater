@@ -285,6 +285,57 @@ def _leggi(percorso: str) -> str | None:
         return None
 
 
+# Parole di gamma che i produttori mettono nel nome ma che la gente omette,
+# e nomi di marca che invece la gente aggiunge. Nella pratica lo stesso
+# telefono si scrive «Galaxy S24 Ultra», «Samsung S24 Ultra» o «S24 Ultra»,
+# e tutte e tre devono portare allo stesso chip.
+_GAMME = ("GALAXY", "REDMI", "POCO", "IQOO", "NARZO", "MOTO")
+_MARCHE = ("SAMSUNG", "XIAOMI", "OPPO", "REALME", "ONEPLUS", "VIVO",
+           "MOTOROLA", "HONOR", "HUAWEI", "GOOGLE", "APPLE", "NOTHING")
+
+
+def varianti_nome(nome: str) -> list[str]:
+    """Tutti i modi in cui la gente scrive lo stesso nome commerciale.
+
+    «Galaxy S24 Ultra» genera anche «S24 Ultra» e «Samsung S24 Ultra»,
+    perché è così che viene digitato e così che le fonti di notizie lo
+    scrivono. Senza queste varianti il chip si trovava solo indovinando la
+    grafia esatta del CSV — che è il motivo per cui cercando «samsung s24
+    ultra» non compariva nessun processore.
+    """
+    pulito = re.sub(r"\s+", " ", (nome or "")).strip().upper()
+    if not pulito:
+        return []
+
+    forme = {pulito}
+    parole = pulito.split(" ")
+
+    # Senza la parola di gamma: «Galaxy S24 Ultra» → «S24 Ultra»
+    senza_gamma = [p for p in parole if p not in _GAMME]
+    if senza_gamma and senza_gamma != parole:
+        forme.add(" ".join(senza_gamma))
+
+    # Senza la marca: «Samsung Galaxy A32» → «Galaxy A32»
+    senza_marca = [p for p in parole if p not in _MARCHE]
+    if senza_marca and senza_marca != parole:
+        forme.add(" ".join(senza_marca))
+
+    # Con la marca davanti, per ognuna delle forme trovate finora.
+    marca = _MARCA_DI_GAMMA.get(parole[0])
+    if marca:
+        for forma in list(forme):
+            forme.add(f"{marca} {forma}")
+            senza = [p for p in forma.split(" ") if p not in _GAMME]
+            if senza:
+                forme.add(f"{marca} {' '.join(senza)}")
+
+    return [f for f in forme if f]
+
+
+_MARCA_DI_GAMMA = {"GALAXY": "SAMSUNG", "REDMI": "XIAOMI", "POCO": "XIAOMI",
+                   "NARZO": "REALME", "MOTO": "MOTOROLA", "IQOO": "VIVO"}
+
+
 def carica_curato(testo: str) -> dict[str, Soc]:
     """Legge `soc_modelli.csv`: codice modello → chip, curato a mano.
 
@@ -310,8 +361,8 @@ def carica_curato(testo: str) -> dict[str, Soc]:
         )
         indice[codice] = voce
         commerciale = (riga.get("nome_commerciale") or "").strip().upper()
-        if commerciale:
-            per_nome.setdefault(commerciale, []).append(voce)
+        for scritto in varianti_nome(commerciale):
+            per_nome.setdefault(scritto, []).append(voce)
 
     # Voci per nome commerciale, con l'AMBIGUITÀ resa esplicita. Chi cerca
     # «Galaxy S24» senza codice non può ricevere una risposta sola, perché

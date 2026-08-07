@@ -1,220 +1,94 @@
 # Mobile Update Tracker — passaggio consegne (v34)
 
-Aggiorna `passaggio-consegne-v32.md`.
-
-- **533 test**, tutti verdi (erano 511 con **2 rossi già prima** di questa sessione).
-- `DATA_LOGIC_VERSION` **25**: la versione riportata per i Samsung cambia,
-  quindi l'archivio va ricostruito.
+- **547 test**, tutti verdi. **Ne arrivavano 4 rossi**: vedi sotto.
+- **`DATA_LOGIC_VERSION` 25 → 26**: cambia il riconoscimento della marca,
+  quindi le righe in archivio vanno rilette.
 
 ---
 
-## Quattro segnalazioni, quattro cause diverse
+## Prima di tutto: la suite arrivava con 4 test rossi
 
-Erano tutte vere, e nessuna aveva la causa che sembrava.
+`test_quattro_segnalazioni.py` faceva risolvere codici e nomi
+**scaricando i dataset veri**. Passava solo su una macchina connessa e
+falliva ovunque altro — in violazione della regola per cui nessun test
+tocca la rete, che è una delle poche difese che questo progetto ha contro
+i guasti silenziosi.
 
-### 1. «Non becca la versione di Android» — la beccava SBAGLIATA
-
-Il controllo versione Samsung prendeva **la prima regione che rispondeva**.
-Per `SM-A325F` la prima della lista, `EUX`, è ferma ad **Android 11**;
-tredici altre regioni danno **Android 13**. L'app dichiarava quindi Android
-11 per un telefono aggiornato ad Android 13, con l'aria del dato ufficiale.
-
-Ora interroga otto regioni in parallelo e **confronta**: prima la versione
-di Android, poi la data codificata nelle ultime tre lettere del PDA
-(`A325FXXSCDYB2` → `YB2` = 2025, febbraio).
-
-### 2. «Cambia risultato in base a come scrivo» — due lacune distinte
-
-* **Codice incompleto.** `a325` diventava `SM-A325`, che nel dataset non
-  esiste: ci sono `SM-A325F`, `SM-A325M`, `SM-A325N`, perché l'ultima
-  lettera è il mercato. La ricerca falliva **a un carattere dal dato**.
-* **Sigla senza gamma.** `a32` e `samsung a32` non erano né codice (due
-  cifre sono troppo poche) né nome (il catalogo lo chiama «Galaxy A32»).
-
-E un terzo difetto sopra i due: la marca si deduceva **solo dal testo
-digitato**. `a32` non rivela il produttore, quindi la fonte Samsung — che è
-costosa e parte solo a marca nota — non veniva mai interrogata, anche dopo
-che l'espansione aveva riconosciuto il modello. Ora la marca si deduce anche
-dalle forme espanse.
-
-Sei scritture, una risposta:
-
-```
-a32 · a325 · samsung a32 · SM-A325F · Galaxy A32 · galaxy a32
-   -> Galaxy A32 · Android 13 · SoC MediaTek Helio G80
-galaxy a32 5g -> Galaxy A32 5G   (la variante resta distinta)
-```
-
-### 3. «Non trova la CPU» — la trovava e poi la buttava
-
-Il chip veniva allegato **solo** nel ripiego «codice riconosciuto ma nessun
-firmware». Bastava che una fonte rispondesse — cioè il caso migliore —
-perché sparisse dalla scheda. Ora si allega a ogni risultato strutturato, e
-si prova anche a ricavarlo dal numero di build.
-
-Resta il limite dichiarato nel v32: `data/soc_modelli.csv` è curato a mano
-(134 voci). **Novità sgradita: GSMArena non è più utilizzabile** — risponde
-con una pagina di verifica anti-bot Cloudflare. Non si aggira. Quindi non è
-una fonte candidata per il SoC, e la sua utilità come ripiego per la
-versione di fabbrica va riverificata.
-
-Wikipedia è stata valutata come fonte SoC: copertura ampia, ma la ricerca
-sbaglia pagina (cercando `Galaxy M15` restituisce l'**A15**) e il campo
-mescola le varianti regionali (`S24` elenca Snapdragon *e* Exynos). Usabile
-solo con guardie strette — titolo che combacia e valore privo di markup di
-variante. Non implementata: è il primo candidato per il prossimo giro.
-
-### 4. «Non sempre trova l'IMEI» — trovava il TAC e perdeva il codice
-
-Il database TAC contiene il **codice esatto**:
-`SAMSUNG GALAXY S26 ULTRA, Samsung SM-S948B`. `parse_specs` lo estrae già,
-ma l'interfaccia usava il **nome commerciale** — ambiguo fra le varianti di
-mercato e restituito in forme incoerenti (ora `Galaxy S26 Ultra`, ora
-`Samsung Galaxy S26 Ultra`).
-
-Ora si cerca per codice quando c'è. È la differenza fra «trova qualcosa» e
-«trova quel telefono»: da un IMEI si arriva a `SM-A566B` e quindi a
-firmware **e** chip.
+Il modulo `modelcodes` non aveva un punto d'innesto per seminare un
+indice: senza, quella regola lì non era applicabile. Ora c'è
+`modelcodes.carica_indice()` e i test usano un indice minimo di nove voci
+reali. Girano in 0,7 secondi invece di dipendere dalla rete.
 
 ---
 
-## I due test rossi che c'erano già
+## Le tre segnalazioni
 
-1. **`test_arriva_anche_il_chip`** falliva davvero: è il difetto 3.
-2. **`test_brand_senza_fonte_dedicata_degrada_pulitamente`** passava da solo
-   e falliva nella suite. Motivo: pretendeva che a rispondere fosse il
-   catalogo AER, ma **OnePlus ha ora un tracker ARB dedicato** che risponde
-   per primo. Il test difendeva il mondo vecchio. Ora asserisce il
-   comportamento (il modello è riconosciuto, nessuno inventa una versione)
-   e non quale fonte vince.
+### 1. «samsung s24 ultra» non trova il SoC
+
+La tabella conosceva solo la grafia **«Galaxy S24 Ultra»**. Ma nessuno
+digita così, e nemmeno le fonti di notizie scrivono così: il nome arriva
+ora con la marca davanti, ora senza la parola di gamma.
+
+`soc.varianti_nome()` indicizza ogni nome sotto tutte le grafie in uso:
+«Galaxy S24 Ultra» risponde anche a «S24 Ultra», «Samsung S24 Ultra» e
+«Samsung Galaxy S24 Ultra». Vale per tutte le marche, con la gamma giusta
+per ciascuna (Redmi→Xiaomi, Narzo→realme, Moto→Motorola).
+
+### 2. Lo stesso telefono due volte, una sotto «Altri brand»
+
+Nello screenshot: «S24 Ultra» sotto *Altri brand (Nothing, Umidigi,
+Doogee…)* e «Samsung S24 Ultra» sotto Samsung. Due righe per lo stesso
+telefono, ciascuna con metà della storia.
+
+Causa: senza la parola «Galaxy», il riconoscimento della marca falliva e
+il dispositivo finiva nella categoria residuale.
+
+Ora le gamme **inequivocabilmente** Samsung sono riconosciute anche senza
+«Galaxy»: `S24 Ultra`, `S23 FE`, `Note20`, `Z Fold`, `Z Flip`, `Tab S`.
+
+**La serie A è esclusa di proposito**: «A15» è insieme un Galaxy A15 e un
+OPPO A15, e indovinare lì sarebbe peggio che tacere.
+
+### 3. L'IMEI `351355315430630` non trovato
+
+La cifra di controllo **torna**: l'IMEI è formalmente valido, quindi il
+problema non è il numero ma il database, che non conosce quel TAC
+(`35135531`).
+
+Nessun database TAC pubblico è completo: sono tutti alimentati dalla
+community e ognuno ha buchi diversi. Ora se ne consultano **due**: la
+seconda (Osmocom, storica) viene interrogata solo per i TAC che la prima
+non ha. È vecchia e non aiuta sui modelli recenti, ma copre bene i TAC
+storici — che è esattamente dove la prima è più debole.
+
+Fallisce in silenzio di proposito: è un supplemento, e se non risponde
+l'app deve continuare a identificare con la prima invece di smettere di
+identificare del tutto.
+
+**Non posso garantire che questo TAC specifico sia nella seconda base
+dati**: il container di sviluppo non ha rete e non ho potuto verificarlo.
+Se dopo il deploy resta non trovato, è un buco di copertura di entrambe le
+fonti, e la strada successiva è una terza base dati.
 
 ---
 
 ## Errori da non ripetere
 
-I venticinque precedenti restano validi.
+26. **Un test che dipende dalla rete non è un test: è un campione.** Passa
+    dove c'è connessione e fallisce altrove, e nel frattempo non protegge
+    niente.
 
-26. **Prendere la prima risposta invece della migliore.** Vale ovunque ci
-    siano più fonti equivalenti: la prima che risponde non è la più
-    aggiornata, e sceglierla produce un dato *sbagliato* — molto peggio di
-    un dato assente, perché non si nota.
-
-27. **Un test legato a QUALE fonte vince si rompe quando la copertura
-    migliora.** Asserire il comportamento, non il vincitore.
-
-28. **Dedurre la marca solo dal testo digitato.** Se l'espansione riconosce
-    il modello, la marca va ridedotta da lì: altrimenti le fonti costose
-    restano fuori proprio nei casi in cui servirebbero.
+27. **Indicizzare un nome con una sola grafia vuol dire non indicizzarlo.**
+    Le persone e le fonti scrivono lo stesso telefono in quattro modi.
 
 ---
 
 ## Cosa resta da fare
 
-1. **SoC oltre le 134 voci curate.** Wikipedia con guardie strette (sopra).
-   GSMArena è fuori gioco.
-2. **Il tracker ARB restituisce 5 voci identiche** per OnePlus 12: da
-   deduplicare.
-3. **Filtro anti-rumore troppo permissivo** — invariato dal v31.
-4. **Identità unica per dispositivo** — invariato dal v30.
-
-## Il repo
-
-**GitHub Desktop.** Ci sono `.github/`, `.streamlit/` e `data/`.
-
-
----
-
-## Secondo giro: le forme viste negli screenshot
-
-Segnalazione: «samsung a235» e «oppo a96» non davano risultati pur essendo
-nomi e codici veri.
-
-### «samsung a235» — la marca nascondeva il codice
-
-`a235` funzionava, `samsung a235` no: con la parola davanti il testo non ha
-più la forma di un codice e non veniva riconosciuto. Il codice ora si cerca
-anche sul testo **senza marca**.
-
-E si smette di inventare nomi: tre cifre sono già la radice di un codice
-(`a235` → `SM-A235F`), non un nome commerciale. Veniva prodotto un
-«Galaxy A235» inesistente che per giunta **prendeva il posto**
-dell'espansione del codice, che invece funziona.
-
-### «oppo a96» — la gamma era cablata a Galaxy
-
-L'errore peggiore di questa sessione, e mio: `_nomi_da_sigla_corta`
-attribuiva la gamma «Galaxy» a **qualunque** marca. «oppo a96» diventava
-«Galaxy A96», un telefono che non esiste, e la ricerca non poteva che
-fallire. Ora la gamma segue la marca scritta (`OPPO`, `realme`, `vivo`,
-`HONOR`, `Redmi`, `POCO`, `OnePlus`, `iQOO`); senza marca si provano più
-gamme, perché una sigla da sola non dice di chi sia e indovinarne una sola
-fa fallire ricerche che avrebbero successo.
-
-### Il nome commerciale valeva meno del codice
-
-`CPH2333` rispondeva «OPPO A96 riconosciuto», `oppo a96` non rispondeva
-niente: stessa domanda, stesso telefono, e la forma muta era quella più
-naturale. Il riconoscimento ora parte anche dai **nomi**, risolti a codici
-con il dataset che già faceva il percorso inverso.
-
-### Riconosciuto e invisibile insieme
-
-Un item con modello ma senza marca deducibile veniva mostrato sotto «Altri
-brand» e **restava senza `device_key`**: compariva nella ricerca e non
-entrava mai nella lista dispositivi. Ora la chiave si costruisce sulla marca
-effettivamente mostrata — ma **solo per le fonti strutturate**, che il
-modello lo hanno verificato: farlo anche per le notizie moltiplicherebbe i
-dispositivi fantasma, che restano un problema aperto.
-
-## Errori da non ripetere (seguito)
-
-29. **Cablare una gamma per tutte le marche.** «Galaxy» per Oppo produce un
-    modello inesistente: non una ricerca a vuoto, un dato inventato.
-30. **Trattare una radice di codice come un nome.** Tre cifre dopo la
-    lettera sono un codice; inventarci sopra un nome commerciale toglie
-    anche il posto all'espansione che avrebbe funzionato.
-31. **Far valere il codice più del nome.** Se il dataset sa andare da nome a
-    codice, le due forme devono avere la stessa risposta.
-
----
-
-## Terzo giro: strutturale, non per-modello
-
-Domanda: «hai risolto solo i modelli degli screenshot o a livello
-strutturale?». Verificato su modelli **mai toccati**, quattro forme
-ciascuno: **22 forme su 22** risolte (Samsung A15/M34/S23, OPPO A58,
-realme C53, vivo Y27, HONOR X7b).
-
-La misura ha però fatto emergere un difetto che nessuno aveva segnalato.
-
-### Una sigla senza marca è ambigua, e veniva risolta in silenzio
-
-`a15` è insieme un **OPPO A15** e un **Galaxy A15**: esistono entrambi.
-L'app rispondeva «OPPO A15, patch 2022-04» — il più vecchio dei due — senza
-mai interrogare Samsung e senza dire che stava scegliendo.
-
-Due cause sovrapposte:
-
-1. la ricerca si ferma alla prima fonte che ha una versione, e l'ordine
-   delle fonti è per **costo**, non per pertinenza;
-2. la marca dedotta era una sola (Oppo), e questo **escludeva** il controllo
-   versione Samsung, che è costoso e parte solo a marca corrispondente.
-
-Ora, quando la marca non è scritta e il testo non è un codice, si uniscono
-gli ordini di tutte le marche implicate dalle forme espanse e si
-restituiscono **tutti i dispositivi distinti** trovati. Con la marca scritta
-o con un codice il comportamento è invariato: una domanda precisa merita una
-risposta sola.
-
-```
-a15         -> Galaxy A15 (Android 16) ; OPPO A15 (Patch 2022-04)
-samsung a15 -> Galaxy A15 (Android 16)
-oppo a15    -> OPPO A15 (Patch 2022-04)
-```
-
-32. **Una risposta sola a una domanda con due risposte è sbagliata anche
-    quando è verificata.** Vale ovunque l'input sia ambiguo: la scelta
-    silenziosa è peggio dell'ambiguità dichiarata.
-33. **Deduplicare con la chiave sbagliata cancella informazione.**
-    `_normalize_name` toglie la marca per far combaciare le forme dello
-    stesso telefono: usarla per distinguere telefoni diversi li fonde.
+1. **Copertura SoC di tutti i brand.** Resta il punto aperto: a mano non
+   si fa, e nessun dataset gratuito e senza registrazione risolve codice
+   modello → chip su tutta la fascia media. La strada è un caricatore che
+   scarichi un dataset vero all'avvio, con gli URL **verificati prima** di
+   scrivere il codice.
+2. **Filtro anti-rumore troppo permissivo**: invariato.
+3. **Verificare in produzione** lo User-Agent FOTA.

@@ -36,6 +36,24 @@ BRAND_KEYWORDS = {
 _AMBIGUOUS = {"vivo", "honor", "poco"}
 
 
+# Nomi di gamma inequivocabilmente Samsung anche senza la parola «Galaxy».
+#
+# «S24 Ultra» finiva sotto «Altri brand» e creava un dispositivo separato
+# accanto a «Samsung S24 Ultra»: lo stesso telefono in archivio due volte,
+# ciascuna copia con metà della storia.
+#
+# Sono volutamente solo le gamme che NON hanno omonimi presso altre marche:
+# la serie A è esclusa di proposito, perché «A15» è insieme un Galaxy A15 e
+# un OPPO A15 e indovinare sarebbe peggio che tacere.
+_SAMSUNG_SENZA_GALAXY = re.compile(
+    r"\b(?:s\d{2}\s*(?:ultra|plus|\+|fe)"      # S24 Ultra, S23 FE
+    r"|note\s?\d{1,2}"                          # Note20
+    r"|z\s*(?:fold|flip)\s*\d?"                 # Z Fold6, Z Flip
+    r"|tab\s+s\d)\b",                          # Tab S9
+    re.I,
+)
+
+
 def detect_brand(text: str) -> str | None:
     """Assegna uno dei brand supportati a partire da un testo libero."""
     low = f" {str(text or '').lower()} "
@@ -53,6 +71,8 @@ def detect_brand(text: str) -> str | None:
             # vince la keyword che compare prima nel titolo
             if pos < best_pos:
                 best, best_pos = brand, pos
+    if best is None and _SAMSUNG_SENZA_GALAXY.search(low):
+        return C.SAMSUNG
     return best
 
 

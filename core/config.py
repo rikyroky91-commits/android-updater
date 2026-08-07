@@ -265,7 +265,7 @@ MAX_PLAUSIBLE_IOS = env_int("MAX_PLAUSIBLE_IOS", 30)
 #       viene allegato a ogni risultato strutturato e non solo al ripiego;
 #       la ricerca da IMEI usa il codice esatto del database TAC invece
 #       del nome commerciale.
-DATA_LOGIC_VERSION = env_int("DATA_LOGIC_VERSION", 25)
+DATA_LOGIC_VERSION = env_int("DATA_LOGIC_VERSION", 26)
 
 
 # --- Tempo massimo di una ricerca interattiva ---------------------------

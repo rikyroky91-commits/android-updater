@@ -13,6 +13,32 @@ import unittest
 
 from core import imeicheck, modelcodes, scan, soc, sources
 
+# Indice minimo per i test che risolvono codici e nomi.
+#
+# Senza, queste prove scaricherebbero i dataset veri: passavano solo su una
+# macchina connessa e fallivano ovunque altro, in violazione della regola
+# per cui nessun test tocca la rete. Le voci sono poche e reali, scelte per
+# coprire i casi delle segnalazioni.
+INDICE_DI_PROVA = {
+    "SM-A325F": ["Galaxy A32"],
+    "SM-A325M": ["Galaxy A32"],
+    "SM-A325N": ["Galaxy A32"],
+    "SM-A326B": ["Galaxy A32 5G"],
+    "SM-A235F": ["Galaxy A23"],
+    "SM-S928B": ["Galaxy S24 Ultra"],
+    "CPH2333": ["OPPO A96"],
+    "CPH2377": ["OPPO A96 5G"],
+    "RMX3939": ["realme C61"],
+}
+
+
+def setUpModule():
+    modelcodes.carica_indice(INDICE_DI_PROVA)
+
+
+def tearDownModule():
+    modelcodes.reset_cache()
+
 
 class TestVersionePiuRecenteFraLeRegioni(unittest.TestCase):
     """1 — la versione di Android era quella SBAGLIATA, non assente.
