@@ -688,10 +688,32 @@ if unified_submitted and unified_query.strip():
     if imeicheck.is_valid_imei(query):
         found = imeicheck.identify(query)
         if not found:
+            tac_cercato = "".join(c for c in query if c.isdigit())[:8]
             st.warning(
-                f"IMEI valido ma codice non trovato nel database ({imeicheck.status()}). "
-                "Può capitare per modelli molto recenti o rari."
+                f"IMEI valido, ma il TAC **{tac_cercato}** non è in nessuno dei "
+                f"database consultati ({imeicheck.status()})."
             )
+            # NON È UN GUASTO, È UN BUCO DI COPERTURA — e vale la pena
+            # dirlo, perché sono due cose che l'utente vive allo stesso
+            # modo ma che si risolvono in modi opposti.
+            #
+            # I servizi commerciali hanno cataloghi più completi, ma
+            # bloccano l'accesso automatico e nei termini d'uso lo
+            # vietano: consultarli a mano è lecito, farlo dall'app no.
+            # Quindi si offre il collegamento invece di copiare il dato.
+            st.caption(
+                "I database pubblici gratuiti hanno buchi diversi fra loro e "
+                "nessuno è completo. Per questo TAC puoi verificare a mano: "
+                f"[imei.info](https://www.imei.info/it/?imei={query.strip()}) · "
+                "se il modello che trovi lì è giusto, dimmelo e lo aggiungo "
+                "alla tabella verificata."
+            )
+            if not imeicheck._chiave_api():
+                st.caption(
+                    "💡 Con una chiave gratuita in `TAC_API_KEY` (100 ricerche "
+                    "al mese) l'app può interrogare un catalogo più ampio "
+                    "inviando **solo le prime 8 cifre**, mai l'IMEI intero."
+                )
         else:
             brand_found, specs = found
             dettagli_imei = imeicheck.parse_specs(brand_found, specs)

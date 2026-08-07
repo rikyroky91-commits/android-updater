@@ -247,6 +247,73 @@ def _indice_fallback() -> dict[str, tuple[str, str]]:
     return indice
 
 
+# ======================================================================
+# Terza via: interrogazione puntuale del SOLO TAC
+# ======================================================================
+# Perché serve. I database scaricabili gratuiti hanno buchi diversi e
+# nessuno è completo: il TAC `35135531` è assente da entrambi quelli in
+# uso, mentre i servizi commerciali lo identificano. Quei servizi però o
+# bloccano l'accesso automatico (imei.info risponde con rilevamento bot) o
+# lo vietano nei termini d'uso, quindi non sono una strada percorribile.
+#
+# HiCellTek offre un piano gratuito (100 interrogazioni al mese) e —
+# differenza che qui conta più del prezzo — accetta il **solo TAC di 8
+# cifre**, non l'IMEI completo. Il resto del numero, che è la parte che
+# identifica il singolo telefono, non esce mai da questa macchina.
+#
+# È DISATTIVATA finché non c'è una chiave. Senza chiave l'app si comporta
+# esattamente come prima: nessuna chiamata, nessun errore.
+TAC_API_URL = "https://imei.hicelltek.com/api/v1/tac/lookup"
+
+
+def _chiave_api() -> str:
+    try:
+        import streamlit as st
+        return (st.secrets.get("TAC_API_KEY", "") or "").strip()
+    except Exception:
+        return ""
+
+
+def cerca_tac_online(tac: str) -> tuple[str, str] | None:
+    """Marca e modello per un TAC, chiedendoli al servizio esterno.
+
+    Ritorna None in ogni caso incerto: chiave assente, servizio non
+    raggiungibile, risposta inattesa, TAC sconosciuto. Un servizio a
+    pagamento che non risponde non deve mai diventare un dato inventato.
+    """
+    chiave = _chiave_api()
+    if not chiave or requests is None:
+        return None
+    tac = "".join(c for c in (tac or "") if c.isdigit())[:8]
+    if len(tac) != 8:
+        return None
+
+    try:
+        risposta = requests.post(
+            TAC_API_URL,
+            json={"query": tac},
+            headers={"X-Api-Key": chiave, "User-Agent": C.USER_AGENT},
+            timeout=C.HTTP_TIMEOUT,
+        )
+    except Exception:
+        return None
+    if getattr(risposta, "status_code", 0) != 200:
+        return None
+    try:
+        dati = risposta.json()
+    except Exception:
+        return None
+    if not isinstance(dati, dict):
+        return None
+
+    corpo = dati.get("data") if isinstance(dati.get("data"), dict) else dati
+    marca = str(corpo.get("manufacturer") or corpo.get("brand") or "").strip()
+    modello = str(corpo.get("model") or "").strip()
+    if not marca and not modello:
+        return None
+    return (marca or "Sconosciuto", modello)
+
+
 def is_valid_imei(imei: str) -> bool:
     """Controllo Luhn standard sui 15 cifre di un IMEI (solo formato, non
     verifica se è realmente assegnato/attivo)."""
@@ -278,7 +345,17 @@ def identify(imei: str) -> tuple[str, str] | None:
 
     if _memory_index is None:
         _memory_index = _build_index()
-    return _memory_index.get(tac)
+    trovato = _memory_index.get(tac)
+    if trovato:
+        return trovato
+
+    # Solo adesso, e solo se configurato, si chiede fuori: le
+    # interrogazioni gratuite sono cento al mese e vanno spese sui
+    # codici che i database locali non hanno.
+    esterno = cerca_tac_online(tac)
+    if esterno:
+        _memory_index[tac] = esterno
+    return esterno
 
 
 # Formati di codice modello riconosciuti, dal più specifico al più generico.

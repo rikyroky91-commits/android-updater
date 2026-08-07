@@ -107,3 +107,102 @@ class TestSecondaBaseDatiTac(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class TestRicercaTacOnline(unittest.TestCase):
+    """La terza via per i TAC che i database locali non hanno.
+
+    Vincolo che la rende accettabile: esce **solo il TAC di 8 cifre**, mai
+    l'IMEI intero. Le cifre restanti identificano il singolo telefono e
+    non devono lasciare la macchina.
+    """
+
+    def setUp(self):
+        self._chiave = imeicheck._chiave_api
+        self._requests = imeicheck.requests
+
+    def tearDown(self):
+        imeicheck._chiave_api = self._chiave
+        imeicheck.requests = self._requests
+        imeicheck.reset_cache()
+
+    def test_senza_chiave_non_esce_nessuna_richiesta(self):
+        """Comportamento predefinito: l'app funziona come prima."""
+        imeicheck._chiave_api = lambda: ""
+
+        class Sentinella:
+            def post(self, *a, **k):
+                raise AssertionError("nessuna richiesta doveva partire")
+
+        imeicheck.requests = Sentinella()
+        self.assertIsNone(imeicheck.cerca_tac_online("35135531"))
+
+    def test_esce_solo_il_tac_mai_l_imei_intero(self):
+        inviati = []
+
+        class Finto:
+            def post(self, url, json=None, headers=None, timeout=None):
+                inviati.append(json)
+
+                class R:
+                    status_code = 200
+
+                    @staticmethod
+                    def json():
+                        return {"manufacturer": "Samsung", "model": "Galaxy Test"}
+
+                return R()
+
+        imeicheck._chiave_api = lambda: "chiave-finta"
+        imeicheck.requests = Finto()
+        imeicheck.cerca_tac_online("351355315430630")
+        self.assertEqual(inviati, [{"query": "35135531"}])
+
+    def test_una_risposta_valida_diventa_marca_e_modello(self):
+        class Finto:
+            def post(self, *a, **k):
+                class R:
+                    status_code = 200
+
+                    @staticmethod
+                    def json():
+                        return {"data": {"manufacturer": "Samsung",
+                                         "model": "Galaxy A54 5G"}}
+
+                return R()
+
+        imeicheck._chiave_api = lambda: "k"
+        imeicheck.requests = Finto()
+        self.assertEqual(imeicheck.cerca_tac_online("35135531"),
+                         ("Samsung", "Galaxy A54 5G"))
+
+    def test_ogni_incertezza_diventa_nessuna_risposta(self):
+        """Un servizio che non risponde non deve diventare un dato
+        inventato."""
+        casi = [(500, {}), (200, {"manufacturer": "", "model": ""}), (200, [])]
+        for stato, corpo in casi:
+            with self.subTest(stato=stato, corpo=corpo):
+                class Finto:
+                    def post(self, *a, **k):
+                        class R:
+                            status_code = stato
+
+                            @staticmethod
+                            def json():
+                                return corpo
+
+                        return R()
+
+                imeicheck._chiave_api = lambda: "k"
+                imeicheck.requests = Finto()
+                self.assertIsNone(imeicheck.cerca_tac_online("35135531"))
+
+    def test_un_tac_malformato_non_viene_nemmeno_chiesto(self):
+        class Sentinella:
+            def post(self, *a, **k):
+                raise AssertionError("non doveva partire")
+
+        imeicheck._chiave_api = lambda: "k"
+        imeicheck.requests = Sentinella()
+        self.assertIsNone(imeicheck.cerca_tac_online("123"))
+        self.assertIsNone(imeicheck.cerca_tac_online(""))
