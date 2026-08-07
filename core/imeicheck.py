@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 import csv
 import io
+import os
 from datetime import datetime, timezone
 
 try:
@@ -147,6 +148,31 @@ def _cached_bytes_url(url: str, chiave_byte: str, chiave_data: str) -> bytes | N
     return None
 
 
+CARTELLA_DATI = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+FILE_TAC_CURATO = os.path.join(CARTELLA_DATI, "tac_modelli.csv")
+
+
+def carica_tac_curati(testo: str) -> dict[str, tuple[str, str]]:
+    """TAC verificati a mano. Le righe che iniziano con `#` sono commenti."""
+    righe = [r for r in (testo or "").splitlines() if not r.lstrip().startswith("#")]
+    indice: dict[str, tuple[str, str]] = {}
+    for riga in csv.DictReader(io.StringIO("\n".join(righe))):
+        tac = (riga.get("tac") or "").strip()
+        marca = (riga.get("marca") or "").strip()
+        modello = (riga.get("modello") or "").strip()
+        if len(tac) == 8 and tac.isdigit() and (marca or modello):
+            indice[tac] = (marca or "Sconosciuto", modello)
+    return indice
+
+
+def _indice_curato() -> dict[str, tuple[str, str]]:
+    try:
+        with open(FILE_TAC_CURATO, encoding="utf-8-sig") as f:
+            return carica_tac_curati(f.read())
+    except OSError:
+        return {}
+
+
 def _build_index() -> dict[str, tuple[str, str]]:
     global _status
     if openpyxl is None:  # pragma: no cover
@@ -191,10 +217,18 @@ def _build_index() -> dict[str, tuple[str, str]]:
         index.setdefault(tac, voce)
     aggiunti = len(index) - prima
 
+    # La tabella scritta a mano SOVRASCRIVE i database scaricati, non
+    # si limita a colmarne i buchi: se una riga è stata verificata di
+    # persona e contraddice il dato scaricato, quella verificata vince.
+    curati = _indice_curato()
+    index.update(curati)
+
     if not index:
         _status = "file interpretato ma nessuna riga valida trovata (formato cambiato?)"
     else:
         _status += f" — {prima} codici TAC indicizzati"
+        if curati:
+            _status += f" · {len(curati)} verificati a mano"
         if aggiunti:
             _status += f" (+{aggiunti} dalla base dati storica)"
     return index
@@ -307,11 +341,39 @@ def cerca_tac_online(tac: str) -> tuple[str, str] | None:
         return None
 
     corpo = dati.get("data") if isinstance(dati.get("data"), dict) else dati
-    marca = str(corpo.get("manufacturer") or corpo.get("brand") or "").strip()
-    modello = str(corpo.get("model") or "").strip()
+
+    # Il servizio dichiara esplicitamente l'esito con `found`: quando c'è,
+    # va creduto. Un `found: false` con i campi vuoti non è una risposta
+    # da interpretare, è un no.
+    if corpo.get("found") is False:
+        return None
+
+    marca = _testo_o_nome(corpo.get("brand") or corpo.get("manufacturer"))
+    modello = _testo_o_nome(corpo.get("model"))
     if not marca and not modello:
         return None
+
+    # Il chipset arriva solo con i piani a pagamento, ma se c'è si prende:
+    # è esattamente il dato che manca altrove, e viene da chi identifica il
+    # dispositivo, non da una tabella scritta a mano.
+    chipset = _testo_o_nome(corpo.get("chipset"))
+    if chipset:
+        modello = f"{modello}, {chipset}".strip(", ")
+
     return (marca or "Sconosciuto", modello)
+
+
+def _testo_o_nome(valore) -> str:
+    """Il servizio restituisce alcuni campi come oggetti annidati.
+
+    `brand` arriva come `{"name": "Samsung", "slug": "samsung"}`, non come
+    stringa: convertirlo con `str()` produrrebbe la rappresentazione del
+    dizionario dentro il nome del dispositivo. Altri campi sono stringhe
+    semplici, quindi vanno gestiti entrambi i casi.
+    """
+    if isinstance(valore, dict):
+        valore = valore.get("name") or valore.get("value") or ""
+    return str(valore or "").strip()
 
 
 def is_valid_imei(imei: str) -> bool:

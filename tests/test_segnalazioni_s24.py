@@ -206,3 +206,104 @@ class TestRicercaTacOnline(unittest.TestCase):
         imeicheck.requests = Sentinella()
         self.assertIsNone(imeicheck.cerca_tac_online("123"))
         self.assertIsNone(imeicheck.cerca_tac_online(""))
+
+
+class TestFormaRealeDellaRisposta(unittest.TestCase):
+    """La forma vera della risposta del servizio, non quella immaginata.
+
+    `brand` arriva come oggetto annidato: convertirlo con `str()` avrebbe
+    messo la rappresentazione di un dizionario dentro il nome del
+    dispositivo.
+    """
+
+    def setUp(self):
+        self._chiave = imeicheck._chiave_api
+        self._requests = imeicheck.requests
+        imeicheck._chiave_api = lambda: "k"
+
+    def tearDown(self):
+        imeicheck._chiave_api = self._chiave
+        imeicheck.requests = self._requests
+        imeicheck.reset_cache()
+
+    def _rispondi(self, corpo, stato=200):
+        class Finto:
+            def post(self, *a, **k):
+                class R:
+                    status_code = stato
+
+                    @staticmethod
+                    def json():
+                        return corpo
+
+                return R()
+
+        imeicheck.requests = Finto()
+
+    def test_brand_annidato(self):
+        self._rispondi({
+            "found": True, "tac": "35345678",
+            "brand": {"name": "Samsung", "slug": "samsung"},
+            "model": "Galaxy S24 Ultra", "year": "2024",
+        })
+        marca, modello = imeicheck.cerca_tac_online("35345678")
+        self.assertEqual(marca, "Samsung")
+        self.assertNotIn("{", marca)
+        self.assertEqual(modello, "Galaxy S24 Ultra")
+
+    def test_il_chipset_viene_usato_quando_c_e(self):
+        """Arriva solo con i piani a pagamento, ma se c'è è il dato che
+        manca altrove."""
+        self._rispondi({
+            "found": True, "brand": {"name": "Samsung"},
+            "model": "Galaxy S24 Ultra",
+            "chipset": "Qualcomm Snapdragon 8 Gen 3",
+        })
+        _, modello = imeicheck.cerca_tac_online("35345678")
+        self.assertIn("Snapdragon 8 Gen 3", modello)
+
+    def test_found_false_e_un_no(self):
+        self._rispondi({"found": False, "tac": "35135531"})
+        self.assertIsNone(imeicheck.cerca_tac_online("35135531"))
+
+
+class TestTabellaTacVerificata(unittest.TestCase):
+    """La via che non richiede registrazioni né chiavi.
+
+    I database TAC gratuiti hanno buchi diversi e nessuno è completo.
+    Consultare a mano un servizio commerciale è lecito; farlo dall'app no.
+    Quindi il risultato verificato si scrive in una tabella locale.
+    """
+
+    def test_una_riga_verificata_viene_letta(self):
+        testo = ("tac,marca,modello,nota\n"
+                 "35135531,Samsung,Galaxy A54 5G,verificato a mano\n")
+        indice = imeicheck.carica_tac_curati(testo)
+        self.assertEqual(indice["35135531"], ("Samsung", "Galaxy A54 5G"))
+
+    def test_i_commenti_non_diventano_dati(self):
+        testo = ("# commento, con, virgole\n"
+                 "tac,marca,modello,nota\n"
+                 "# altro commento\n"
+                 "35135531,Samsung,Galaxy A54 5G,\n")
+        self.assertEqual(set(imeicheck.carica_tac_curati(testo)), {"35135531"})
+
+    def test_righe_malformate_ignorate(self):
+        testo = ("tac,marca,modello,nota\n"
+                 "abc,Marca,Modello,\n"          # TAC non numerico
+                 "123,Marca,Modello,\n"          # TAC troppo corto
+                 "35135531,,,\n")                # né marca né modello
+        self.assertEqual(imeicheck.carica_tac_curati(testo), {})
+
+    def test_il_file_del_repo_non_contiene_esempi_attivi(self):
+        """L'esempio nel file è commentato: se diventasse una riga vera,
+        l'app affermerebbe un modello che nessuno ha verificato."""
+        self.assertEqual(imeicheck._indice_curato(), {})
+
+    def test_la_tabella_verificata_vince_sui_database_scaricati(self):
+        """Se una riga è stata controllata di persona e contraddice il
+        dato scaricato, quella controllata ha ragione."""
+        import inspect
+        codice = inspect.getsource(imeicheck._build_index)
+        self.assertIn("index.update(curati)", codice)
+        self.assertLess(codice.index("setdefault"), codice.index("index.update(curati)"))

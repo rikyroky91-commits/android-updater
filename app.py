@@ -705,9 +705,11 @@ if unified_submitted and unified_query.strip():
                 "I database pubblici gratuiti hanno buchi diversi fra loro e "
                 "nessuno è completo. Per questo TAC puoi verificare a mano: "
                 f"[imei.info](https://www.imei.info/it/?imei={query.strip()}) · "
-                "se il modello che trovi lì è giusto, dimmelo e lo aggiungo "
-                "alla tabella verificata."
+                "poi aggiungi una riga a `data/tac_modelli.csv` e quel "
+                "telefono è coperto per sempre."
             )
+            st.code(f"{tac_cercato},Marca,Nome del modello,verificato a mano",
+                    language="text")
             if not imeicheck._chiave_api():
                 st.caption(
                     "💡 Con una chiave gratuita in `TAC_API_KEY` (100 ricerche "
@@ -871,12 +873,35 @@ def render_dispositivi() -> None:
               help="Conta solo i modelli con una baseline di test: gli altri "
                    "non hanno un termine di paragone.")
 
+    def chip_di(riga) -> "soc.Soc | None":
+        """Il processore di una riga dispositivo.
+
+        Prova tutte le tracce disponibili, dalla più precisa alla meno:
+        il codice modello se c'è, poi il numero di build (che per Samsung
+        COMINCIA col codice modello: `A325F`XXSCDYB2), infine il nome
+        commerciale. Un solo punto per tutta l'interfaccia, così tabella,
+        scheda e ricerca non possono più dare risposte diverse sullo
+        stesso telefono.
+        """
+        return soc.per_modello(
+            riga.get("model_code") or riga.get("build"),
+            riga.get("model") or riga.get("device_model"),
+        )
+
+    # Risolto una volta sola per dispositivo: dentro la comprensione
+    # sarebbe stato chiamato due volte per riga, per nessun motivo.
+    chip_per_riga = {}
+    for _d in devices:
+        _chip = chip_di(_d)
+        chip_per_riga[_d["device_key"]] = _chip.etichetta if _chip else "—"
+
     st.dataframe(
         pd.DataFrame([
             {
                 "⭐": "⭐" if d["watched"] else "",
                 "Brand": d["brand"],
                 "Modello": d["model"],
+                "CPU": chip_per_riga.get(d["device_key"], "—"),
                 "Sistema": (f"Android {d['android_version']}" if d.get("android_version")
                             else (d["os_version"] or "—")),
                 "Versione completa": d["os_version"] or "—",
@@ -948,8 +973,7 @@ def render_dispositivi() -> None:
             # riga vuota: un campo assente sembra un guasto dell'app,
             # una frase esplicita dice che il dato manca e si puo'
             # aggiungere (data/soc_modelli.csv).
-            chip_device = soc.per_modello(
-                device.get("model_code") or device.get("build"), device["model"])
+            chip_device = chip_di(device)
             if chip_device:
                 identificativi.append(
                     f"SoC <span class='build'>{chip_device.etichetta}</span>")

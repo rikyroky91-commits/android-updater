@@ -40,6 +40,12 @@ import os
 import re
 from dataclasses import dataclass
 
+try:
+    import requests
+except ImportError:  # pragma: no cover
+    requests = None
+from datetime import datetime, timezone
+
 CARTELLA_DATI = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 FILE_CURATO = os.path.join(CARTELLA_DATI, "soc_modelli.csv")
 FILE_PLAY = os.path.join(CARTELLA_DATI, "play_device_catalog.csv")
@@ -274,6 +280,7 @@ def _soc_pixel(nome_dispositivo: str) -> Soc | None:
 # Dataset da file
 # ======================================================================
 _curato: dict[str, Soc] | None = None
+_dataset: dict[str, Soc] | None = None
 _play: dict[str, Soc] | None = None
 
 
@@ -450,6 +457,147 @@ def carica_play_catalog(testo: str) -> dict[str, Soc]:
     return indice
 
 
+# ======================================================================
+# Dataset esterno multi-marca
+# ======================================================================
+# Perché esiste. La tabella scritta a mano non può coprire decine di
+# migliaia di modelli, e nessun dataset gratuito risolve *codice modello →
+# chip* su tutta la fascia media. Questo però risolve *nome commerciale →
+# chip* per quasi tutte le marche, e il progetto ha già la catena che
+# porta dal codice al nome commerciale (~70.000 codici). Messi in fila,
+# coprono la gran parte delle ricerche reali.
+#
+# Tre limiti, tutti noti e dichiarati:
+#   1. È indicizzato per NOME COMMERCIALE, non per codice: le varianti
+#      regionali dello stesso nome (Galaxy S24 Exynos in Europa e
+#      Snapdragon negli USA) non si distinguono. Per questo la tabella
+#      curata VINCE sempre: è lì che vivono le varianti.
+#   2. È fermo intorno al 2021: sui modelli recenti non risponde.
+#   3. I valori sono letterali Python (`b'Exynos 980'`) e vanno ripuliti.
+#
+# Si può spegnere con SOC_DATASET_URL="" se un domani la fonte sparisse o
+# desse dati sbagliati.
+SOC_DATASET_URL = os.environ.get(
+    "SOC_DATASET_URL",
+    "https://raw.githubusercontent.com/foykes/gsm-arena-dataset/main/"
+    "gsm_arena_full_dataset.csv",
+)
+_META_DATASET_BYTES = "soc_dataset_bytes"
+_META_DATASET_FETCHED = "soc_dataset_fetched_at"
+_RINFRESCA_ORE = 24 * 30   # il chip di un modello non cambia mai
+
+_RE_LETTERALE = re.compile(r"^b['\"](.*)['\"]$", re.S)
+
+
+def _ripulisci_letterale(valore: str) -> str:
+    """`b'Exynos 980 (8 nm)'` → `Exynos 980 (8 nm)`."""
+    testo = (valore or "").strip()
+    match = _RE_LETTERALE.match(testo)
+    return (match.group(1) if match else testo).strip()
+
+
+def carica_dataset_esterno(testo: str) -> dict[str, Soc]:
+    """Indice nome commerciale → chip dal dataset multi-marca."""
+    lettore = csv.reader(io.StringIO(testo or ""))
+    try:
+        intestazione = [_ripulisci_letterale(c).strip().lower()
+                        for c in next(lettore)]
+    except StopIteration:
+        return {}
+
+    def colonna(*nomi):
+        for nome in nomi:
+            if nome in intestazione:
+                return intestazione.index(nome)
+        return None
+
+    i_nome = colonna("model name", "name", "model", "phone name")
+    i_chip = colonna("chipset")
+    i_marca = colonna("brand", "manufacturer")
+    if i_nome is None or i_chip is None:
+        return {}
+
+    indice: dict[str, Soc] = {}
+    for riga in lettore:
+        if max(i_nome, i_chip) >= len(riga):
+            continue
+        nome = _ripulisci_letterale(riga[i_nome])
+        grezzo = _ripulisci_letterale(riga[i_chip])
+        if not nome or not grezzo:
+            continue
+
+        # Il campo elenca a volte due chip separati da «/»: sono le
+        # varianti regionali dello stesso modello. Dichiararne una sola
+        # sarebbe una risposta sbagliata per metà dei telefoni, quindi si
+        # riportano entrambe e si dice che serve il codice esatto.
+        pezzi = [p.strip() for p in re.split(r"\s+/\s+|\s+or\s+", grezzo) if p.strip()]
+        ambiguo = len(pezzi) > 1
+
+        chip = chip_da_sigla(pezzi[0]) if pezzi else None
+        voce = Soc(
+            nome=" oppure ".join(pezzi) if ambiguo else (chip.nome if chip else grezzo),
+            produttore="" if ambiguo else (chip.produttore if chip else ""),
+            codice=None if ambiguo else (chip.codice if chip else None),
+            fonte="dataset specifiche multi-marca",
+            nota=("Questo nome esiste in più varianti con chip diverso: "
+                  "serve il codice esatto per sapere quale." if ambiguo else None),
+        )
+
+        marca = (_ripulisci_letterale(riga[i_marca])
+                 if i_marca is not None and i_marca < len(riga) else "")
+        for scritto in varianti_nome(nome) + (varianti_nome(f"{marca} {nome}") if marca else []):
+            indice.setdefault(scritto, voce)
+    return indice
+
+
+def _scarica_dataset() -> str | None:
+    if not SOC_DATASET_URL or requests is None:
+        return None
+    try:
+        risposta = requests.get(SOC_DATASET_URL, timeout=60,
+                                headers={"User-Agent": "Mozilla/5.0"})
+    except Exception:
+        return None
+    if getattr(risposta, "status_code", 0) != 200 or len(risposta.content) < 10_000:
+        return None
+    return risposta.text
+
+
+def _indice_dataset() -> dict[str, Soc]:
+    global _dataset
+    if _dataset is not None:
+        return _dataset
+
+    testo = None
+    try:
+        from . import storage
+        cache = storage.get_meta(_META_DATASET_BYTES)
+        quando = storage.get_meta(_META_DATASET_FETCHED)
+        fresca = False
+        if cache and quando:
+            try:
+                eta = (datetime.now(timezone.utc)
+                       - datetime.fromisoformat(quando)).total_seconds() / 3600
+                fresca = eta < _RINFRESCA_ORE
+            except ValueError:
+                fresca = False
+        if fresca:
+            testo = bytes.fromhex(cache).decode("utf-8", "replace")
+        else:
+            testo = _scarica_dataset()
+            if testo:
+                storage.set_meta(_META_DATASET_BYTES, testo.encode().hex())
+                storage.set_meta(_META_DATASET_FETCHED,
+                                 datetime.now(timezone.utc).isoformat())
+            elif cache:
+                testo = bytes.fromhex(cache).decode("utf-8", "replace")
+    except Exception:
+        testo = None
+
+    _dataset = carica_dataset_esterno(testo or "")
+    return _dataset
+
+
 def _indice_curato() -> dict[str, Soc]:
     global _curato
     if _curato is None:
@@ -465,9 +613,10 @@ def _indice_play() -> dict[str, Soc]:
 
 
 def reset_cache() -> None:
-    global _curato, _play
+    global _curato, _play, _dataset
     _curato = None
     _play = None
+    _dataset = None
 
 
 def catalogo_play_presente() -> bool:
@@ -586,9 +735,15 @@ def per_modello(model_code: str | None = None,
     if pixel:
         return pixel
 
-    if device_name:
-        chiave = device_name.strip().upper()
-        for indice in (_indice_play(), _indice_curato()):
+    # La ricerca per nome prova ENTRAMBI gli argomenti: chi cerca digita
+    # una cosa sola, e quella arriva qui come `model_code` anche quando è
+    # un nome commerciale. Guardare solo `device_name` faceva fallire
+    # «Redmi Note 10» digitato nella barra di ricerca.
+    for testo in (device_name, model_code):
+        if not testo:
+            continue
+        chiave = testo.strip().upper()
+        for indice in (_indice_play(), _indice_curato(), _indice_dataset()):
             trovato = indice.get(chiave)
             if trovato:
                 return trovato

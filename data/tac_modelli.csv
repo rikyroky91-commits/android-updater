@@ -1,0 +1,22 @@
+tac,marca,modello,nota
+# Tabella TAC VERIFICATA A MANO, consultata PRIMA dei database scaricati.
+#
+# A cosa serve. I database TAC pubblici e gratuiti hanno buchi diversi fra
+# loro e nessuno e' completo: capita che un IMEI perfettamente valido non
+# venga riconosciuto da nessuno dei due, mentre un servizio commerciale lo
+# identifica senza problemi. Quei servizi pero' bloccano l'accesso
+# automatico e nei loro termini d'uso lo vietano.
+#
+# Consultarli A MANO e' invece del tutto lecito. Quindi: quando un IMEI non
+# viene riconosciuto, l'app mostra il collegamento per verificarlo, e il
+# risultato si scrive qui. Una riga, e quel telefono e' coperto per sempre
+# — senza registrazioni, senza chiavi e senza limiti mensili.
+#
+# Ha la precedenza sui database scaricati proprio perche' e' verificata:
+# se una riga qui contraddice il dato scaricato, vince questa.
+#
+# FORMATO: le prime 8 cifre dell'IMEI, la marca, il modello. La nota e'
+# facoltativa ed e' il posto giusto per annotare dove hai verificato.
+#
+# ESEMPIO (togli il cancelletto e sostituisci con i tuoi dati):
+# 35135531,Samsung,Galaxy A54 5G,verificato su imei.info il 07/08/2026
