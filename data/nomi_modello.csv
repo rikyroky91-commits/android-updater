@@ -1,0 +1,26 @@
+codice,nome,nota
+# Tabella CURATA A MANO, corta di proposito — stessa filosofia di
+# `soc_modelli.csv`: contiene solo righe per cui la scelta e' verificata,
+# non "plausibile". Risolve un caso preciso che `nome_canonico()` (in
+# `core/modelcodes.py`) non puo' risolvere da solo: un codice con PIU' nomi
+# commerciali VERI, nessuno dei quali e' "sbagliato" — sono varianti
+# regionali dello stesso hardware — e per cui l'algoritmo (il piu' corto,
+# a parita' alfabetico) sceglie un nome tecnicamente corretto ma poco
+# riconoscibile per chi fa QA in Italia/Europa.
+#
+# UNA RIGA QUI NON INVENTA NIENTE: `nome_canonico()` la applica SOLO se il
+# nome scritto compare gia' fra quelli che `resolve()` restituisce per quel
+# codice — cioe' solo per SCEGLIERE fra nomi gia' verificati dal dataset,
+# mai per aggiungerne uno nuovo. Se il dataset smette di conoscere quel
+# nome (aggiornamento a monte), la riga smette di avere effetto invece di
+# imporre un nome ormai sbagliato.
+#
+# QUESTA TABELLA SOPRAVVIVE A UN RESET COMPLETO DEL REPOSITORY, a
+# differenza della correzione manuale salvata da un utente (tabella
+# `nomi_modello` di `tracker.db`, che vive sul disco effimero del servizio
+# e va persa a ogni riavvio se non c'e' ancora stato un backup — vedi
+# `_backup_subito` in `web/main.py`): questo file viaggia nel repository
+# come il codice, quindi in ogni build su Render, per sempre.
+#
+# `nota`: da dove viene la verifica, per poterla ricontrollare o smentire.
+CPH2781,OPPO A6 Pro,"Segnalato dall'utente: ""F31"" mostrato invece di ""A6 Pro"". Verificato (GSMArena CN/IN, oppo.com/en, DeviceAtlas, Gizmochina, GSMchoice, 2026-08-12): stesso hardware (Dimensity 6300, display 6.57"" 50MP+2MP, batteria 7000mAh) venduto come ""OPPO F31 5G"" in Cina e come ""OPPO A6 Pro 5G"" nei mercati Global/India/Medio Oriente — nessuno dei due e' ""sbagliato"". Scelto ""A6 Pro"" come nome di riferimento in un'app italiana perche' e' il nome del mercato Global/Europa; la variante cinese resta comunque visibile come ""gemello"" nel menu di correzione, per chi la riconosce con quel nome."

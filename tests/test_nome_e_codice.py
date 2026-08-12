@@ -714,6 +714,89 @@ class TestIdentitaDalCodice(BaseCodici):
         self.assertEqual(modelcodes.nome_canonico("SM-S921B"),
                          modelcodes.nome_canonico("SM-S921B"))
 
+    def test_un_nome_senza_lettere_si_ripara_con_la_marca_dichiarata(self):
+        """Segnalato dall'utente sul sito vero: un realme 7 (`RMX2151`)
+        mostrava solo «7» — l'unico nome vero che il dataset registra per
+        quel codice, senza marca. Verificato anche sul dataset live:
+        `resolve("RMX2151") == ['7']`. Qui si riproduce con dati sintetici
+        per non dipendere dalla rete: un nome che non ha UNA SOLA lettera
+        non identifica niente da solo, e va completato con la marca che
+        il dataset dichiara per quel codice (non indovinata)."""
+        modelcodes._memory_cache["ZZNUM1"] = ["7"]
+        modelcodes._ricorda_marca("ZZNUM1", "realme")
+        try:
+            self.assertEqual(modelcodes.nome_canonico("ZZNUM1"), "realme 7")
+        finally:
+            modelcodes._memory_cache.pop("ZZNUM1", None)
+
+    def test_un_nome_senza_lettere_senza_marca_dichiarata_resta_cosi(self):
+        """Nessuna marca nota per il codice: meglio mostrare il nome
+        nudo, onestamente incompleto, che ometterlo o inventare una
+        marca."""
+        modelcodes._memory_cache["ZZNUM2"] = ["9"]
+        try:
+            self.assertEqual(modelcodes.nome_canonico("ZZNUM2"), "9")
+        finally:
+            modelcodes._memory_cache.pop("ZZNUM2", None)
+
+    def test_un_nome_con_lettere_non_viene_toccato_anche_con_marca_nota(self):
+        """La riparazione vale SOLO per un nome senza lettere: «C61» o
+        «Note 60» restano tali e quali, marca dichiarata o no — è la
+        stessa scelta misurata di `_build_mobilemodels_index` (vedi il
+        suo commento), qui rispettata e non ripetuta per errore."""
+        modelcodes._memory_cache["ZZNUM3"] = ["C9"]
+        modelcodes._ricorda_marca("ZZNUM3", "realme")
+        try:
+            self.assertEqual(modelcodes.nome_canonico("ZZNUM3"), "C9")
+        finally:
+            modelcodes._memory_cache.pop("ZZNUM3", None)
+
+    def test_la_tabella_curata_vince_su_due_nomi_ugualmente_veri(self):
+        """Segnalato dall'utente sul sito vero: `CPH2781` mostrava «OPPO
+        F31» invece di «OPPO A6 Pro» — non un dato sbagliato (`resolve`
+        conferma entrambi i nomi, sono lo stesso hardware in due mercati),
+        solo la regola 4 (il più corto) che sceglie quello meno
+        riconoscibile per chi fa QA in Italia. `data/nomi_modello.csv`
+        esiste per questo: verificato con dati sintetici per non
+        dipendere né dalla rete né dal file vero su disco."""
+        modelcodes._memory_cache["ZZOVR1"] = ["ZZ Corto", "ZZ Nome Lungo Preferito"]
+        vecchio = modelcodes._override_nomi
+        modelcodes._override_nomi = {"ZZOVR1": "ZZ Nome Lungo Preferito"}
+        try:
+            self.assertEqual(modelcodes.nome_canonico("ZZOVR1"), "ZZ Nome Lungo Preferito")
+        finally:
+            modelcodes._memory_cache.pop("ZZOVR1", None)
+            modelcodes._override_nomi = vecchio
+
+    def test_la_tabella_curata_non_inventa_un_nome_che_il_dataset_non_conferma(self):
+        """LA GARANZIA CENTRALE del meccanismo: una riga della tabella
+        curata si applica SOLO se il nome scritto lì è ancora fra quelli
+        che `resolve()` restituisce. Se il dataset a monte cambia (o la
+        riga ha un refuso), la riga smette di avere effetto — si ricade
+        sulla scelta algoritmica normale (qui «ZZ Corto», il più corto fra
+        i due nomi veri) invece di imporre un nome che nessuna fonte
+        conferma più — «meglio saltare che indovinare»."""
+        modelcodes._memory_cache["ZZOVR2"] = ["ZZ Corto", "ZZ Alternativo Lungo"]
+        vecchio = modelcodes._override_nomi
+        modelcodes._override_nomi = {"ZZOVR2": "ZZ Nome Che Il Dataset Non Ha Mai Scritto"}
+        try:
+            self.assertEqual(modelcodes.nome_canonico("ZZOVR2"), "ZZ Corto")
+        finally:
+            modelcodes._memory_cache.pop("ZZOVR2", None)
+            modelcodes._override_nomi = vecchio
+
+    def test_il_file_vero_su_disco_analizza_e_conferma_cph2781(self):
+        """Collauda IL FILE VERO `data/nomi_modello.csv` (non solo il
+        meccanismo con dati sintetici) — così un refuso nel CSV vero
+        (nome scritto diverso da come lo scriverà `resolve()`, virgole non
+        chiuse, colonne sbagliate) fa fallire un test invece di sparire in
+        silenzio. Non passa da `nome_canonico`/`resolve()`: `BaseCodici`
+        sostituisce il dataset live con uno finto minuscolo per isolare i
+        test dalla rete, e CPH2781 non ci sta dentro — qui si controlla
+        solo che il file su disco esista e si legga come ci si aspetta."""
+        indice = modelcodes._indice_override_nomi()
+        self.assertEqual(indice.get("CPH2781"), "OPPO A6 Pro")
+
     def test_i_nomi_gemelli_si_dichiarano(self):
         """Quando un codice ha PIÙ di un nome commerciale vero, la scelta
         di `nome_canonico` è necessaria (una chiave sola per dispositivo)
@@ -832,6 +915,38 @@ class TestIdentitaDalCodice(BaseCodici):
             marca = sources.brand_from_code(f) or extract.detect_brand(f)
             if marca:
                 self.assertEqual(marca, C.OPPO, f"forma di un'altra marca: {f}")
+
+
+class TestCaricaOverrideNomi(unittest.TestCase):
+    """Il parser di `data/nomi_modello.csv`, collaudato su testo in
+    memoria — stessa idea di `specs.carica_da`: non dipende dal file vero
+    su disco, quindi collauda il formato e non un file che potrebbe
+    cambiare."""
+
+    def test_legge_codice_e_nome(self):
+        indice = modelcodes.carica_override_nomi(
+            "codice,nome,nota\nCPH2781,OPPO A6 Pro,verificato il 2026-08-12\n")
+        self.assertEqual(indice, {"CPH2781": "OPPO A6 Pro"})
+
+    def test_le_righe_di_commento_si_ignorano(self):
+        indice = modelcodes.carica_override_nomi(
+            "codice,nome,nota\n"
+            "# questo e' un commento, non una riga vera\n"
+            "CPH2781,OPPO A6 Pro,nota\n")
+        self.assertEqual(indice, {"CPH2781": "OPPO A6 Pro"})
+
+    def test_una_riga_senza_codice_o_senza_nome_si_scarta(self):
+        indice = modelcodes.carica_override_nomi(
+            "codice,nome,nota\n,Nome Senza Codice,nota\nZZ999,,nota\n")
+        self.assertEqual(indice, {})
+
+    def test_il_codice_si_normalizza_in_maiuscolo(self):
+        indice = modelcodes.carica_override_nomi("codice,nome,nota\ncph2781,OPPO A6 Pro,\n")
+        self.assertEqual(indice, {"CPH2781": "OPPO A6 Pro"})
+
+    def test_testo_vuoto_non_solleva(self):
+        self.assertEqual(modelcodes.carica_override_nomi(""), {})
+        self.assertEqual(modelcodes.carica_override_nomi(None), {})
 
 
 class TestOpzioniCorrezione(unittest.TestCase):

@@ -213,7 +213,11 @@ a { color: inherit; }
   letter-spacing: -.02em; font-weight: 700;
   text-wrap: balance;
 }
-.ingresso .ricerca { margin-bottom: 1rem; }
+.ingresso .ricerca { margin-bottom: .6rem; }
+/* Il tasto «cancella cronologia», inserito da `ricerche-recenti.js` solo
+   quando c'è qualcosa da cancellare — vedi il suo commento sul perché
+   solo sulla ricerca grande. */
+.ricerche-recenti-cancella { display: block; margin: 0 0 1rem; }
 .ingresso-nota {
   margin: 0 auto; max-width: 620px;
   font-size: .88rem; color: var(--neutral);

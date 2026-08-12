@@ -28,6 +28,7 @@ C61 Global, C63, C65s e NARZO N63 insieme).
 from __future__ import annotations
 
 import csv
+import os
 import re
 import io
 from datetime import datetime, timezone
@@ -45,6 +46,9 @@ _DOWNLOAD_TIMEOUT = C.HTTP_TIMEOUT + 45  # sono file unici da diversi MB
 
 MOBILEMODELS_URL = "https://raw.githubusercontent.com/KHwang9883/MobileModels-csv/refs/heads/main/models.csv"
 GOOGLE_PLAY_URL = "https://storage.googleapis.com/play_public/supported_devices.csv"
+
+CARTELLA_DATI = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+FILE_OVERRIDE_NOMI = os.path.join(CARTELLA_DATI, "nomi_modello.csv")
 
 _memory_cache: dict[str, list[str]] | None = None
 # Indice inverso nome commerciale -> codici tecnici, costruito su richiesta
@@ -64,6 +68,13 @@ _reverse_compatto: dict[str, list[str]] | None = None
 # Aggiungere una regex per ogni famiglia sarebbe una rincorsa senza fine.
 # I dataset dichiarano la marca riga per riga: la si legge e basta.
 _marca_di_codice: dict[str, str] | None = None
+
+# Codice tecnico -> nome commerciale scelto A MANO, verificato — vedi
+# `data/nomi_modello.csv` e `_indice_override_nomi()` più sotto. Risolve i
+# codici con più nomi commerciali VERI (varianti regionali dello stesso
+# hardware) dove l'algoritmo di `nome_canonico` sceglierebbe il nome più
+# corto anche quando non è il più riconoscibile — vedi CPH2781 nel CSV.
+_override_nomi: dict[str, str] | None = None
 
 # Sigle di CONNETTIVITÀ, non di gamma. La distinzione è tutta qui: «5G» in
 # «Galaxy A55 5G» non individua un telefono diverso da «Galaxy A55», mentre
@@ -204,6 +215,39 @@ def marca_dichiarata(codice: str) -> str | None:
     if _memory_cache is None:
         _memory_cache = _build_index()
     return (_marca_di_codice or {}).get((codice or "").strip().upper())
+
+
+def carica_override_nomi(testo: str) -> dict[str, str]:
+    """Legge `data/nomi_modello.csv`: codice modello -> nome preferito.
+
+    Stessa forma di `soc.carica_curato`: righe che iniziano con `#` sono
+    commenti (il CSV standard non li prevede, ma qui servono a spiegare
+    *perché* la tabella esiste, e quella spiegazione deve stare accanto ai
+    dati). Esiste come funzione a sé — invece di leggere il file dentro
+    `_indice_override_nomi()` — per poter essere collaudata con un testo
+    in memoria, senza toccare il disco (stesso motivo di `carica_da` in
+    `core/specs.py` e `core/aer_catalog.py`).
+    """
+    righe = [r for r in (testo or "").splitlines() if not r.lstrip().startswith("#")]
+    indice: dict[str, str] = {}
+    for riga in csv.DictReader(io.StringIO("\n".join(righe))):
+        codice = (riga.get("codice") or "").strip().upper()
+        nome = (riga.get("nome") or "").strip()
+        if codice and nome:
+            indice[codice] = nome
+    return indice
+
+
+def _indice_override_nomi() -> dict[str, str]:
+    global _override_nomi
+    if _override_nomi is None:
+        try:
+            with open(FILE_OVERRIDE_NOMI, encoding="utf-8-sig") as f:
+                testo = f.read()
+        except OSError:
+            testo = ""
+        _override_nomi = carica_override_nomi(testo)
+    return _override_nomi
 
 
 def _add_names(index: dict[str, list[str]], code: str, name: str) -> None:
@@ -469,18 +513,83 @@ def nome_canonico(codice: str) -> str | None:
     condiviso con un telefono diverso e uno no, scegliere quello condiviso
     è la scelta più confondibile delle due — e prima non c'era nessun
     motivo per preferire l'altro.
+
+    ## Un caso limite scoperto dopo: un nome senza UNA lettera
+
+    Segnalato dall'utente sul sito vero: un IMEI risolto a un realme 7
+    (`RMX2151`) mostrava come nome solo «7». Non un difetto di questa
+    funzione — «7» è per quel codice l'UNICO nome vero che
+    `resolve()` conosce, quindi non c'è nulla fra cui scegliere — ma il
+    dataset community (MobileModels) registra a volte il solo numero di
+    gamma, senza marca, per come alcuni produttori compilano il campo
+    `model_name`.
+
+    **Perché non si prefissa la marca a ogni nome di quel dataset.** È
+    già stato provato, ed è annotato in `_build_mobilemodels_index()`
+    (vedi il suo commento): farlo per OGNI riga fa PEGGIORARE la
+    coerenza fra ricerca per nome e per codice (misurato: Xiaomi
+    dall'83% al 49%), perché i due dataset finiscono per dare nomi di
+    lunghezza diversa per lo stesso codice e `resolve()` ne restituisce
+    uno solo. Quella scelta resta: `resolve()` non cambia.
+
+    **Cosa cambia invece, e perché è un caso diverso**: qui si ripara
+    SOLO il risultato finale, e SOLO quando non ha una sola lettera — un
+    nome così non identifica niente da solo, a differenza di «C61» o
+    «Note 60», che restano tali e quali. La marca aggiunta non è
+    indovinata: `marca_dichiarata()` legge la colonna che il dataset
+    dedica proprio a questo (indipendente dal nome commerciale, quindi
+    non soggetta alla stessa regressione), e `_nome_visualizzato()` è la
+    stessa funzione già usata per il dataset Google — non una seconda
+    euristica da tenere allineata alla prima.
+
+    ## Un altro caso limite: due nomi ugualmente veri, nessuno sbagliato
+
+    Segnalato dall'utente: `CPH2781` risolve a «OPPO F31» *e* «OPPO A6
+    Pro» — non un errore del dataset, ma lo stesso hardware venduto con
+    due nomi commerciali diversi in due mercati diversi (Cina la prima,
+    Global/India/Medio Oriente la seconda — verificato con più fonti
+    indipendenti, non assunto). Qui la regola 4 sceglie «F31» solo perché
+    è più corto: un criterio che funziona bene quando un nome è solo un
+    suffisso di mercato dell'altro («C61» vs «C61 Global»), ma qui sceglie
+    fra due nomi commerciali del tutto distinti, e non ha nessun modo di
+    sapere che per un'app usata in Italia il nome Global è quello
+    riconoscibile.
+
+    Non è un caso isolabile con una regola generale — è esattamente
+    l'ambiguità per cui esiste la correzione a mano (vedi
+    `web/main.py::_opzioni_correzione`) — ma chiedere a OGNI persona di
+    correggerlo a mano, per SEMPRE, per un caso già verificato una volta,
+    non è «alla radice»: è la stessa correzione ripetuta all'infinito.
+    `data/nomi_modello.csv` è la via di mezzo: una tabella curata a mano,
+    corta di proposito (stessa filosofia di `data/soc_modelli.csv`), che
+    SCEGLIE fra nomi che il dataset conferma già — non ne inventa mai uno
+    nuovo — e che viaggia col repository invece che nel database
+    effimero, quindi sopravvive a un reset completo. Ha la precedenza su
+    tutto il resto di questa funzione, ma si applica solo se il nome
+    scritto lì è ancora fra quelli che `resolve()` restituisce: se il
+    dataset a monte cambia, la riga smette di avere effetto invece di
+    imporre un nome ormai sbagliato.
     """
     nomi = resolve(codice)
     if not nomi:
         return None
     codice_pulito = (codice or "").strip().upper()
 
+    override = _indice_override_nomi().get(codice_pulito)
+    if override and override in nomi:
+        return override
+
     def rango(nome: str) -> tuple:
         ambiguo = codes_for_name(nome) != [codice_pulito]
         cinese = any("一" <= ch <= "鿿" for ch in nome)
         return (_e_il_codice(nome, codice_pulito), ambiguo, cinese, len(nome), nome)
 
-    return sorted(nomi, key=rango)[0]
+    scelto = sorted(nomi, key=rango)[0]
+    if not any(ch.isalpha() for ch in scelto):
+        marca = marca_dichiarata(codice_pulito)
+        if marca:
+            return _nome_visualizzato(marca, scelto)
+    return scelto
 
 
 def codici_per_prefisso(prefisso: str, limite: int = 12) -> list[str]:

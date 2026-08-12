@@ -65,6 +65,39 @@ class TestSuffissoDiVariante(unittest.TestCase):
                 self.assertEqual(sources.normalizza_codice_modello(codice), codice)
 
 
+class TestCodiceXiaomiStileClassico(unittest.TestCase):
+    """Regressione: `M1910F4G` (Xiaomi Mi Note 10) non aveva la forma di
+    un codice per `looks_like_model_code` — nessuna delle forme in
+    `_MODEL_CODE_SHAPES` comincia con UNA lettera sola seguita da cifre.
+
+    Segnalato dall'utente cercando quel codice esatto: la pagina diceva
+    «Nessun firmware per «m1910f4g»» senza mai nominare il telefono, pur
+    avendo `core/specs.py` trovato la scheda tecnica giusta (foto,
+    processore) — perché `specs.cerca` prova il testo SENZA validarne la
+    forma, mentre tutto il resto (instradamento verso il catalogo
+    Xiaomi, gemelli, correzione del nome) passa da qui e saltava.
+    """
+
+    def test_i_codici_xiaomi_a_lettera_singola_sono_validi(self):
+        for codice in ("M1910F4G", "M2007J20CG", "M2101K6G", "M2012K11AG",
+                       "M2003J15SC", "m1910f4g"):
+            with self.subTest(codice=codice):
+                self.assertTrue(sources.looks_like_model_code(codice))
+
+    def test_non_cattura_parole_qualunque_che_iniziano_per_m(self):
+        # «M123» non è in questa lista: ha GIÀ la forma di un Samsung
+        # senza prefisso («M»+tre cifre, vedi `_RE_SAMSUNG_SENZA_PREFISSO`)
+        # e risultava già `True` prima di questo fix, per una ragione
+        # del tutto indipendente — non è una regressione di questo
+        # pattern, è un altro pattern preesistente che se ne occupa.
+        for testo in ("MOTOROLA", "MODELLO", "M"):
+            with self.subTest(testo=testo):
+                self.assertFalse(sources.looks_like_model_code(testo))
+
+    def test_compare_fra_i_candidati_di_ricerca(self):
+        self.assertIn("M1910F4G", sources._code_candidates("m1910f4g"))
+
+
 class TestRegionSamsung(unittest.TestCase):
 
     def test_non_solo_europa(self):

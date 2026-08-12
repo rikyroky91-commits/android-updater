@@ -59,6 +59,19 @@
     <p>Il modello è riconosciuto, ma nessuna fonte ne pubblica la versione
        firmware attuale.</p>
     <p class="nota">{{ risultato.fonte }}</p>
+  {% elif risultato.nome and risultato.nome != risultato.query %}
+    {# STESSA ONESTÀ, UN GRADINO PIÙ INDIETRO. Qui non è nemmeno una
+       fonte firmware a riconoscere il modello: è la scheda tecnica (foto,
+       processore) che ha risolto un telefono vero dal codice scritto,
+       senza che nessuna fonte firmware ne sappia niente. Prima questo
+       ramo diceva solo «Nessun firmware per «m1910f4g»» — il codice
+       grezzo, ripetuto, sopra una scheda con la foto del telefono giusto:
+       a chi guardava sembrava che l'app non avesse capito il modello,
+       quando in realtà lo aveva capito benissimo e solo il firmware
+       mancava. #}
+    <h2>{{ risultato.nome }}</h2>
+    <p>Il modello è riconosciuto dalla scheda tecnica, ma nessuna fonte
+       firmware conosce il codice «{{ risultato.query }}».</p>
   {% else %}
     <h2>Nessun firmware per «{{ risultato.query }}»</h2>
   {% endif %}

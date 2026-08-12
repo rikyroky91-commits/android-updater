@@ -16,9 +16,20 @@
   {# `autofocus` SOLO sulla home: su una pagina di risultati sposterebbe
      la vista in cima ogni volta che si arriva, e chi sta leggendo un
      risultato non ha chiesto di riscrivere la domanda. #}
-  <input id="q" name="q" type="search" autocomplete="off"
+  {# `list="ricerche-recenti"` collega il campo a un `<datalist>` popolato
+     da `ricerche-recenti.js` con le ultime ricerche fatte in QUESTO
+     browser (localStorage, non l'archivio: sono comode per chi cerca, non
+     un dato del progetto). Un `<datalist>` risponde da solo alla freccia
+     giù quando il campo ha il fuoco — esattamente il gesto chiesto
+     dall'utente — senza bisogno di un menu disegnato a mano.
+     `autocomplete="off"` resta: senza, il suggerimento nativo del
+     browser (spesso gli stessi valori, ma senza il nostro controllo su
+     quanti tenerne o come cancellarli) comparirebbe INSIEME al nostro,
+     due elenchi sovrapposti per la stessa cosa. #}
+  <input id="q" name="q" type="search" autocomplete="off" list="ricerche-recenti"
          value="{{ query }}"{% if grande %} autofocus{% endif %}
          placeholder="Modello, codice o IMEI">
+  <datalist id="ricerche-recenti"></datalist>
   <button type="submit">Cerca</button>
   {# IL TASTO AI ACCANTO A «CERCA», non più solo dopo un fallimento.
      Il ragionamento di prima — nasconderlo finché la ricerca normale non

@@ -13,6 +13,7 @@ finché non la si guardava.
 import os
 import sys
 import tempfile
+import threading
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -790,6 +791,153 @@ class TestCorrezioneNomeScrittaAMano(_Sito):
         pagina = self.client.get("/", params={"q": "ZZ7001"}).text
         self.assertIn("Nome Scritto A Mano", pagina)
         self.assertIn("Nome corretto a mano", pagina)
+
+
+class TestNomeDallaSchedaSenzaFirmware(_Sito):
+    """Segnalato dall'utente cercando «m1910f4g» (Xiaomi Mi Note 10):
+    nessuna fonte firmware conosceva quel codice, ma la scheda tecnica
+    (foto, processore) lo trovava lo stesso — `specs.cerca` prova il
+    testo anche senza che abbia la forma di un codice riconosciuto. Il
+    risultato era «Nessun firmware per «m1910f4g»» sopra una scheda con
+    la foto del telefono giusto: nessun nome, solo il codice grezzo
+    ripetuto.
+
+    Qui si riproduce lo stesso scarto con un codice sintetico che NON è
+    nella forma di nessun codice riconosciuto (vedi
+    `TestCodiceXiaomiStileClassico` per il caso Xiaomi vero, dove la
+    causa era la forma del codice; qui la causa è più a monte — anche un
+    codice che non ha affatto la forma di uno vero, ma che la scheda
+    tecnica sa comunque risolvere) — per collaudare il ramo di
+    `_cerca_davvero` senza dipendere dal dataset Xiaomi vero.
+    """
+
+    _RIGA_SINTETICA = {
+        "nome": "Test Phone X9", "marca": "TestBrand",
+        "foto": "https://example.com/foto-test.jpg",
+        "codici": ("ZZFAKE001",), "rilascio": "2024, gennaio",
+        "chipset": "Test Chip 9000", "cpu": "Octa-core", "gpu": "Test GPU",
+        "ram_gb": (8,), "storage_gb": (128,),
+        "display": "6.5 pollici", "display_tipo": "AMOLED",
+        "batteria": "5000 mAh", "ricarica": "33W",
+        "camera_post": "50 MP", "camera_front": "16 MP",
+        "os_lancio": "Android 14", "peso": "190 g", "dimensioni": "160 x 75 x 8 mm",
+    }
+
+    def setUp(self):
+        from core import specs
+
+        from web.main import RICERCHE
+
+        RICERCHE.svuota()
+        # SI AGGIUNGE ALLA FIXTURE REALE, non la si sostituisce: `specs` è
+        # un catalogo globale condiviso da tutti i test di questo processo,
+        # e rimpiazzarla lascerebbe gli altri test senza le schede vere
+        # che si aspettano.
+        self._schede_originali = list(specs._schede)
+        specs.carica_da(self._schede_originali + [self._RIGA_SINTETICA],
+                        "fixture di test + scheda sintetica")
+
+    def tearDown(self):
+        from core import specs
+
+        from web.main import RICERCHE
+
+        specs.carica_da(self._schede_originali, "fixture di test")
+        RICERCHE.svuota()
+
+    def test_il_nome_risolto_dalla_scheda_compare_in_testata(self):
+        pagina = self.client.get("/", params={"q": "ZZFAKE001"}).text
+        self.assertIn("Test Phone X9", pagina)
+        self.assertNotIn("Nessun firmware per «ZZFAKE001»", pagina)
+
+    def test_dice_onestamente_che_manca_solo_il_firmware(self):
+        pagina = self.client.get("/", params={"q": "ZZFAKE001"}).text
+        self.assertIn("riconosciuto dalla scheda tecnica", pagina)
+
+    def test_un_codice_davvero_sconosciuto_resta_senza_nome(self):
+        """Il ramo nuovo non deve far comparire un nome dal nulla: senza
+        una scheda risolta, resta il messaggio onesto di sempre."""
+        pagina = self.client.get("/", params={"q": "ZZNONESISTE999"}).text
+        self.assertIn("Nessun firmware per «ZZNONESISTE999»", pagina)
+
+
+class TestCorrezioneAvviaSubitoIlBackup(_Sito):
+    """Segnalato dall'utente: «assicurati che quando correggo il nome il
+    risultato si salvi perché sembra che non lo faccia».
+
+    Il salvataggio in sé funzionava già (finisce nella tabella
+    `nomi_modello` di `tracker.db`), ma quel database vive in `/tmp`
+    (disco effimero per scelta, vedi `Dockerfile`) e l'unica copia
+    duratura è il backup su Gist — caricato prima SOLO a fine di ogni
+    scansione periodica, non più spesso di `BACKUP_EVERY_MINUTES` (30 di
+    default). Sul piano gratuito il servizio si addormenta dopo ~15
+    minuti, portando via con sé anche il thread di scansione: una
+    correzione fatta in quella finestra poteva restare solo nel database
+    locale e sparire al riavvio successivo. Qui si collauda che
+    `_backup_subito` (in `web/main.py`) faccia partire un salvataggio
+    subito dopo ogni correzione, senza aspettare quel giro.
+    """
+
+    def setUp(self):
+        from core import backup, modelcodes
+
+        from web.main import RICERCHE
+
+        RICERCHE.svuota()
+        if modelcodes._memory_cache is None:
+            modelcodes._memory_cache = {}
+        modelcodes._memory_cache["ZZ8001"] = ["Test Gamma"]
+        modelcodes._reverse_cache = None
+        modelcodes._reverse_senza_suffisso = None
+        modelcodes._reverse_compatto = None
+        type(self).RISPOSTA_RICERCA = staticmethod(lambda q: {"items": [{
+            "source": "official_lookup", "source_label": "Riconoscimento del codice modello",
+            "brand": "", "device_model": "Test Gamma",
+            "model_code": "ZZ8001", "title": "Test Gamma (ZZ8001)", "severity": "",
+            "color": "#00CC66", "os_version": "", "android_version": None,
+        }], "error": None})
+
+        self._salva_vera = backup.salva
+        self.chiamato = threading.Event()
+
+        def salva_finta():
+            self.chiamato.set()
+            return True, "ok (finto)"
+
+        backup.salva = salva_finta
+
+    def tearDown(self):
+        from core import backup, modelcodes, storage
+
+        from web.main import RICERCHE
+
+        backup.salva = self._salva_vera
+        type(self).RISPOSTA_RICERCA = staticmethod(
+            lambda q: {"items": [], "error": None})
+        modelcodes._memory_cache.pop("ZZ8001", None)
+        modelcodes._reverse_cache = None
+        modelcodes._reverse_senza_suffisso = None
+        modelcodes._reverse_compatto = None
+        storage.set_nome_modello("ZZ8001", "")
+        RICERCHE.svuota()
+
+    def test_la_correzione_del_nome_avvia_subito_un_backup(self):
+        self.client.post(
+            "/modello/correggi",
+            data={"codice": "ZZ8001", "nome": "Nome Corretto", "query": "ZZ8001"},
+            follow_redirects=False)
+        self.assertTrue(
+            self.chiamato.wait(timeout=2),
+            "backup.salva() non è stato chiamato entro 2 secondi dalla correzione")
+
+    def test_il_salvataggio_tac_avvia_subito_un_backup(self):
+        self.client.post(
+            "/tac/salva",
+            data={"tac": "12345678", "marca": "Test", "modello": "Test Gamma"},
+            follow_redirects=False)
+        self.assertTrue(
+            self.chiamato.wait(timeout=2),
+            "backup.salva() non è stato chiamato entro 2 secondi dal salvataggio TAC")
 
 
 class TestRicercaPerImei(_Sito):

@@ -3048,6 +3048,19 @@ _MODEL_CODE_SHAPES = [
     re.compile(r"^\d{4,5}[A-Z]{2,4}\d{2,3}[A-Z]{0,2}$", re.I),   # Xiaomi 2312DRA50C
     # Xiaomi vecchio stile: solo cifre più il suffisso di regione (22101316UG)
     re.compile(r"^\d{7,9}[A-Z]{1,3}$", re.I),
+    # Xiaomi stile classico, con la M davanti: M1910F4G (Mi Note 10),
+    # M2007J20CG (Redmi Note 9 Pro), M2101K6G (POCO F3). Mancava del
+    # tutto — nessuna delle forme sopra comincia con UNA lettera sola —
+    # quindi questi codici non "avevano la forma di un codice" per
+    # `looks_like_model_code`, e saltavano ogni instradamento che ne
+    # dipende: la ricerca sul catalogo Xiaomi, i gemelli, la correzione
+    # del nome. Restava solo `core/specs.py::cerca`, che prova il testo
+    # SENZA validarne la forma — ed è per questo che la scheda tecnica
+    # (foto, processore) trovava il telefono giusto mentre il resto
+    # della pagina si comportava come se il codice non fosse mai stato
+    # scritto: intestazione con la query grezza, nessuna correzione
+    # possibile, nessun instradamento verso il tracker Xiaomi.
+    re.compile(r"^M\d{4}[A-Z]\d{1,2}[A-Z]{0,3}$", re.I),
 ]
 
 

@@ -502,6 +502,44 @@ def parco_togli(chiave: str = Form(...)):
     return RedirectResponse(f"/dispositivo?k={quote(chiave)}", status_code=303)
 
 
+def _backup_subito() -> None:
+    """Manda SUBITO al Gist esterno una correzione fatta a mano da una
+    persona, invece di aspettare il prossimo giro di scansione.
+
+    IL BUG SEGNALATO: «assicurati che quando correggo il nome il
+    risultato si salvi perché sembra che non lo faccia». Il salvataggio
+    in sé funzionava — la correzione finiva nella tabella `nomi_modello`
+    di `tracker.db` — ma quel database vive in `/tmp` (`Dockerfile`,
+    `DB_PATH=/tmp/tracker.db`, disco effimero per scelta) e la SOLA copia
+    duratura è il backup su Gist, caricato da `backup.salva_se_serve()`
+    SOLO a fine di ogni scansione periodica, non più spesso di
+    `BACKUP_EVERY_MINUTES` (30 di default — vedi `core/backup.py`). Sul
+    piano gratuito il servizio si addormenta dopo ~15 minuti senza
+    visite, e il thread di scansione dorme con lui: una correzione fatta
+    poco dopo l'ultimo backup periodico può restare SOLO nel database
+    locale, e sparire al primo riavvio — che su questo piano è la norma,
+    non l'eccezione. Da fuori sembra un salvataggio che «non ha
+    funzionato», ma il salvataggio non era mai stato il problema: lo era
+    il tempismo del backup.
+
+    Una correzione verificata da una persona è rara e piccola: vale la
+    pena caricarla subito, ignorando l'intervallo minimo pensato per i
+    backup automatici dopo ogni scansione oraria. Gira in un thread,
+    stessa idea di `/scansione`: aspettare la risposta di GitHub dentro
+    la richiesta HTTP del modulo di correzione lo farebbe sembrare lento
+    per un salvataggio che l'utente non ha bisogno di stare a guardare.
+
+    Se il backup non è configurato (`BACKUP_GIST_ID`/`BACKUP_GITHUB_TOKEN`
+    assenti), `backup.salva()` torna semplicemente `False` senza fare
+    niente: qui non c'è nulla da controllare prima, e nessun errore da
+    mostrare per una funzione che l'utente non ha attivato.
+    """
+    import threading
+    from core import backup
+
+    threading.Thread(target=backup.salva, daemon=True).start()
+
+
 @app.post("/tac/salva")
 def tac_salva(tac: str = Form(...), marca: str = Form(""),
               modello: str = Form(""), imei: str = Form("")):
@@ -518,6 +556,8 @@ def tac_salva(tac: str = Form(...), marca: str = Form(""),
     # rimanderebbe indietro la risposta sbagliata che sei venuto a
     # correggere — e sembrerebbe che il salvataggio non abbia funzionato.
     RICERCHE.svuota()
+    # E VA MESSA AL SICURO SUBITO — vedi il docstring di `_backup_subito`.
+    _backup_subito()
     return RedirectResponse(f"/?q={quote(imei or tac)}", status_code=303)
 
 
@@ -536,6 +576,8 @@ def modello_correggi(codice: str = Form(...), nome: str = Form(""),
     # ricerca risponderebbe dalla cache col nome di prima, e sembrerebbe
     # che il salvataggio non abbia funzionato.
     RICERCHE.svuota()
+    # E VA MESSA AL SICURO SUBITO — vedi il docstring di `_backup_subito`.
+    _backup_subito()
     return RedirectResponse(f"/?q={quote(query or codice)}", status_code=303)
 
 
@@ -1093,13 +1135,53 @@ def _cerca_davvero(query: str) -> dict:
     if nome_corretto:
         nome = nome_corretto
 
+    # LA SCHEDA SI CALCOLA UNA VOLTA SOLA, PRIMA DEL NOME FINALE — perché
+    # può correggere il nome anche lei, non solo mostrarlo.
+    scheda = P.scheda_tecnica(nome, codice=codice or query,
+                              brand=(migliore or {}).get("brand", ""))
+
+    # QUANDO NON C'È UN FIRMWARE MA C'È UN TELEFONO VERO.
+    #
+    # Segnalato dall'utente cercando «m1910f4g» (Xiaomi Mi Note 10): nessuna
+    # fonte firmware conosceva quel codice, quindi `nome` restava la query
+    # grezza — ma `scheda_tecnica`, che prova il testo anche SENZA che
+    # abbia la forma di un codice riconosciuto, il telefono lo trovava lo
+    # stesso (foto, processore, tutto). Il risultato era una pagina con la
+    # scheda di un telefono vero sotto il titolo «Nessun firmware per
+    # «m1910f4g»» — nessun nome, solo il codice grezzo ripetuto, come se
+    # l'app non avesse capito niente pur avendo capito tutto.
+    #
+    # Qui si usa il titolo che la scheda ha già trovato, ma SOLO quando non
+    # c'è già un nome più autorevole (firmware, archivio o correzione a
+    # mano, tutti sopra) e la scheda ha davvero risolto qualcosa di diverso
+    # dalla query scritta — un titolo identico alla query non è una
+    # risoluzione, è un'eco.
+    if not migliore and not nome_corretto and scheda["trovata"]:
+        titolo_scheda = (scheda["titolo"] or "").strip()
+        if titolo_scheda and titolo_scheda.lower() != query.strip().lower():
+            nome = titolo_scheda
+            # Il nome è cambiato: il codice di correzione e un'eventuale
+            # correzione già salvata per QUEL nome vanno ricalcolati, stessa
+            # ragione del blocco sopra.
+            codice_per_correzione = (next(iter(_codici_del_risultato(query, nome)), "")
+                                     or codice_per_correzione)
+            nome_corretto = (storage.get_nome_modello(codice_per_correzione)
+                             if codice_per_correzione else None)
+            if nome_corretto:
+                nome = nome_corretto
+
     # Calcolati una volta sola: `opzioni_correzione` (vedi il suo
     # docstring) parte dagli stessi «gemelli» mostrati sopra come fatto
     # verificato, e può aggiungerne una forma sintetica in più — non il
     # contrario, per non ricalcolare due volte gli stessi gemelli.
-    gemelli_veri = _nomi_gemelli(query, nome) if migliore else []
+    #
+    # Si calcolano anche senza `migliore`, quando c'è comunque un codice da
+    # correggere (il caso qui sopra): senza, chi cercava «m1910f4g» vedeva
+    # finalmente il nome giusto ma nessun modo di correggerlo se sbagliato.
+    ha_un_risultato = bool(migliore) or bool(codice_per_correzione)
+    gemelli_veri = _nomi_gemelli(query, nome) if ha_un_risultato else []
     opzioni_correzione = (_opzioni_correzione(nome, gemelli_veri, codice_per_correzione)
-                          if migliore else [])
+                          if ha_un_risultato else [])
 
     return {
         "query": query,
@@ -1115,8 +1197,7 @@ def _cerca_davvero(query: str) -> dict:
         # trovato» in quel caso è peggio che non trovare nulla: fa credere
         # di avere una risposta che non c'è.
         "senza_firmware": bool(migliore) and not pezzi,
-        "scheda": P.scheda_tecnica(nome, codice=codice or query,
-                                   brand=(migliore or {}).get("brand", "")),
+        "scheda": scheda,
         "notizie": [P.riga_aggiornamento(n) for n in notizie[:6]],
         "quante_notizie": len(notizie),
         # IL «FORSE CERCAVI» ANCHE QUANDO LA RICERCA RIESCE.
