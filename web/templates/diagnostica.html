@@ -48,6 +48,79 @@
   </tbody>
 </table>
 
+{#
+  L'ESITO DELL'AZIONE APPENA FATTA, se c'è — vedi il docstring delle due
+  rotte `/diagnostica/backup/*` in `web/main.py`. Compare SOLO dopo un
+  invio del modulo sotto, mai al primo caricamento della pagina.
+#}
+{% if risultato_backup %}
+<div class="esito {{ 'trovato' if risultato_backup.prova_riuscita else 'incerto' }}">
+  {% if risultato_backup.prova_riuscita %}
+  <h2>Archivio creato e verificato</h2>
+  <p>{{ risultato_backup.messaggio }}.</p>
+  <p>Ultimo passaggio, su Render → il tuo servizio → Environment → Add
+    Environment Variable:</p>
+  <ul>
+    <li><code>BACKUP_GIST_ID</code> = <code>{{ risultato_backup.gist_id }}</code></li>
+    <li><code>BACKUP_GITHUB_TOKEN</code> = lo stesso token appena incollato qui sopra</li>
+  </ul>
+  <p class="nota">Render riavvia da solo il servizio dopo il salvataggio
+    delle variabili — non serve fare altro qui. Al riavvio, questa
+    sezione dovrebbe passare da «Non configurato» ad «Attivo».</p>
+  {% elif risultato_backup.token_valido == False %}
+  <h2>Il token non va bene</h2>
+  <p>{{ risultato_backup.messaggio }}.</p>
+  <p class="nota">Ricontrolla di aver creato un token «classic» con lo
+    scope <code>gist</code> selezionato, non scaduto.</p>
+  {% elif risultato_backup.gist_creato == False %}
+  <h2>Il token va bene, ma la creazione dell'archivio non è riuscita</h2>
+  <p>{{ risultato_backup.messaggio }}.</p>
+  {% else %}
+  <h2>Archivio creato, ma la verifica di scrittura non è riuscita</h2>
+  <p>{{ risultato_backup.messaggio }}.</p>
+  <p class="nota">L'archivio con id <code>{{ risultato_backup.gist_id }}</code>
+    esiste comunque: puoi riprovare, o usarlo lo stesso se il problema
+    sembra temporaneo.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if risultato_salva %}
+<div class="esito {{ 'trovato' if risultato_salva.ok else 'incerto' }}">
+  <p><strong>{{ "Salvataggio riuscito." if risultato_salva.ok else "Salvataggio non riuscito." }}</strong>
+    {{ risultato_salva.messaggio }}</p>
+</div>
+{% endif %}
+
+{#
+  IL MODULO CAMBIA A SECONDA DELLO STATO — non ha senso proporre di
+  «creare l'archivio» a chi ne ha già uno attivo, né un pulsante «salva
+  adesso» a chi non ha ancora nessuna configurazione da verificare.
+#}
+{% if backup.etichetta == "Non configurato" %}
+<details class="correzione-nome" {{ "open" if not risultato_backup else "" }}>
+  <summary>Configura il backup</summary>
+  <p class="nota">Incolla qui un token GitHub «classic» con il permesso
+    <code>gist</code> — si crea su github.com → icona del profilo →
+    Settings → Developer settings → Personal access tokens → Tokens
+    (classic) → Generate new token (classic). L'app verifica il token,
+    crea l'archivio privato dove verrà salvato il database, e controlla
+    che scrittura e lettura funzionino — tre passaggi manuali in uno. Il
+    token non viene salvato da nessuna parte: serve solo per questa
+    chiamata.</p>
+  <form method="post" action="/diagnostica/backup/crea" class="correzione-form">
+    <label class="sr-only" for="token-backup">Token GitHub</label>
+    <input id="token-backup" type="password" name="token"
+           placeholder="ghp_..." autocomplete="off" required>
+    <button type="submit">Verifica e crea l'archivio</button>
+  </form>
+</details>
+{% else %}
+<form method="post" action="/diagnostica/backup/salva" class="correzione-form">
+  <button type="submit" class="secondario">Salva adesso, per verificare</button>
+</form>
+{% endif %}
+
 <p class="nota">Archivio <code>{{ stats.db_path }}</code> ·
   {{ stats.updates_total }} record totali · logica dati v{{ logica }}</p>
 {% endblock %}

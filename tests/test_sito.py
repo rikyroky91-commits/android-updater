@@ -173,6 +173,122 @@ class TestLePagineSiDisegnano(_Sito):
         self.assertIn("Ultimo ripristino", pagina)
 
 
+class TestDiagnosticaConfigurazioneBackup(_Sito):
+    """Segnalato dall'utente: aveva seguito i passaggi manuali (creare il
+    token, creare il Gist, incollare due valori su Render) e la pagina
+    continuava a dire «Non configurato» — tre pagine diverse sono tre
+    occasioni di sbagliare o di non aver ancora aspettato il riavvio.
+    Queste rotte (`POST /diagnostica/backup/crea` e
+    `POST /diagnostica/backup/salva`, in `web/main.py`) tolgono di
+    mezzo la creazione manuale del Gist e danno un modo diretto di
+    verificare la configurazione attuale."""
+
+    def setUp(self):
+        from core import backup
+
+        self._configurato = backup.configurato
+        self._stato = backup.stato
+        self._verifica_token = backup.verifica_token
+        self._crea_archivio = backup.crea_archivio
+        self._prova_completa = backup.prova_completa
+        self._salva = backup.salva
+
+    def tearDown(self):
+        from core import backup
+
+        backup.configurato = self._configurato
+        backup.stato = self._stato
+        backup.verifica_token = self._verifica_token
+        backup.crea_archivio = self._crea_archivio
+        backup.prova_completa = self._prova_completa
+        backup.salva = self._salva
+
+    def _non_configurato(self):
+        from core import backup
+
+        backup.configurato = lambda: False
+        backup.stato = lambda: {"ultimo_esito": "non configurato",
+                                "ultimo_salvataggio": None, "ultimo_ripristino": None}
+
+    def _configurato_e_attivo(self):
+        from core import backup
+
+        backup.configurato = lambda: True
+        backup.stato = lambda: {"ultimo_esito": "salvato (12 KB compressi)",
+                                "ultimo_salvataggio": "2026-08-12T10:00:00+00:00",
+                                "ultimo_ripristino": None}
+
+    def test_il_modulo_di_configurazione_compare_solo_se_non_configurato(self):
+        self._non_configurato()
+        pagina = self.client.get("/diagnostica").text
+        self.assertIn("Configura il backup", pagina)
+        self.assertIn('name="token"', pagina)
+
+    def test_a_configurazione_attiva_compare_salva_adesso_non_il_modulo(self):
+        self._configurato_e_attivo()
+        pagina = self.client.get("/diagnostica").text
+        self.assertNotIn("Configura il backup", pagina)
+        self.assertIn("Salva adesso, per verificare", pagina)
+
+    def test_token_valido_crea_larchivio_e_mostra_i_due_valori_da_copiare(self):
+        from core import backup
+
+        self._non_configurato()
+        backup.verifica_token = lambda t: (True, "token valido (utente prova)")
+        backup.crea_archivio = lambda t: (True, "archivio creato", "abc123def456")
+        backup.prova_completa = lambda gid, t: (True, "scrittura e rilettura riuscite")
+
+        pagina = self.client.post(
+            "/diagnostica/backup/crea", data={"token": "ghp_finto"}).text
+        self.assertIn("Archivio creato e verificato", pagina)
+        self.assertIn("abc123def456", pagina)
+        self.assertIn("BACKUP_GIST_ID", pagina)
+        self.assertIn("BACKUP_GITHUB_TOKEN", pagina)
+        # IL TOKEN NON SI RISCRIVE IN CHIARO NELLA RISPOSTA: chi lo ha
+        # appena incollato lo riusa da dove lo ha preso, non da qui.
+        self.assertNotIn("ghp_finto", pagina)
+
+    def test_token_non_valido_mostra_lerrore_e_non_crea_niente(self):
+        from core import backup
+
+        self._non_configurato()
+        chiamato = {"crea": False}
+        backup.verifica_token = lambda t: (False, "token non valido o scaduto")
+
+        def crea_vietata(t):
+            chiamato["crea"] = True
+            return True, "non dovrebbe mai partire", "xxx"
+
+        backup.crea_archivio = crea_vietata
+
+        pagina = self.client.post(
+            "/diagnostica/backup/crea", data={"token": "ghp_scaduto"}).text
+        self.assertIn("Il token non va bene", pagina)
+        self.assertIn("token non valido o scaduto", pagina)
+        self.assertFalse(chiamato["crea"],
+                         "un token non valido non deve arrivare a creare l'archivio")
+
+    def test_salva_adesso_mostra_lesito_vero(self):
+        from core import backup
+
+        self._configurato_e_attivo()
+        backup.salva = lambda: (True, "salvato (9 KB compressi)")
+
+        pagina = self.client.post("/diagnostica/backup/salva").text
+        self.assertIn("Salvataggio riuscito", pagina)
+        self.assertIn("salvato (9 KB compressi)", pagina)
+
+    def test_salva_adesso_con_esito_negativo_lo_dice(self):
+        from core import backup
+
+        self._configurato_e_attivo()
+        backup.salva = lambda: (False, "GitHub ha risposto 401: token non valido")
+
+        pagina = self.client.post("/diagnostica/backup/salva").text
+        self.assertIn("Salvataggio non riuscito", pagina)
+        self.assertIn("401", pagina)
+
+
 class TestNotaCoperturaConChipTrovato(unittest.TestCase):
     """Il round di inserimento metodico ha esteso `data/soc_modelli.csv` a
     HONOR e realme: per quei codici `chip` si trova (tabella curata) ma

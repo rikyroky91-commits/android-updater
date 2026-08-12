@@ -443,8 +443,12 @@ def pagina_catalogo(request: Request):
     ))
 
 
-@app.get("/diagnostica", response_class=HTMLResponse)
-def pagina_diagnostica(request: Request):
+def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
+    """Il corpo comune della pagina Diagnostica — estratto perché le
+    rotte del backup (sotto) devono ririsegnare la STESSA pagina con in
+    più l'esito dell'azione appena fatta (creazione dell'archivio,
+    salvataggio di prova), non un'altra pagina o un semplice redirect
+    che perderebbe quel messaggio."""
     stati = storage.get_source_status()
     stats = storage.stats()
     return _rendi(request, "diagnostica.html", _contesto(
@@ -461,7 +465,83 @@ def pagina_diagnostica(request: Request):
         ],
         backup=P.stato_backup(),
         logica=C.DATA_LOGIC_VERSION,
+        **extra,
     ))
+
+
+@app.get("/diagnostica", response_class=HTMLResponse)
+def pagina_diagnostica(request: Request):
+    return _pagina_diagnostica(request)
+
+
+@app.post("/diagnostica/backup/crea", response_class=HTMLResponse)
+def diagnostica_backup_crea(request: Request, token: str = Form(...)):
+    """Crea da zero l'archivio (Gist privato) per il backup, a partire da
+    un token GitHub incollato qui — invece dei passaggi manuali (creare
+    il Gist a mano, copiarne l'id dall'indirizzo, capire se il token ha
+    il permesso giusto solo quando qualcosa fallisce) che sono il modo
+    più facile di sbagliare la configurazione.
+
+    Segnalato dall'utente: aveva seguito le istruzioni passo passo per
+    la via manuale e la pagina continuava a dire «Non configurato» — il
+    sospetto più concreto è che il valore incollato su Render non fosse
+    ancora arrivato a questo processo (serve un riavvio del servizio,
+    che Render fa da solo dopo il salvataggio, ma non è istantaneo), non
+    un errore nella configurazione in sé. Restare in balìa di tre pagine
+    diverse (GitHub per il token, GitHub per il Gist, Render per le
+    variabili) moltiplica le occasioni di un passaggio saltato o
+    frainteso: qui bastano il token e un clic.
+
+    NON PUÒ CONFIGURARE RENDER DA SOLA — l'app non ha né deve avere
+    accesso al pannello Render (servirebbe una API key con permessi ben
+    più ampi, ingiustificati solo per questo): verifica che il token
+    funzioni, crea l'archivio, e lo dice; il passaggio finale — incollare
+    i due valori su Render — resta all'utente, con l'identificativo già
+    pronto da copiare invece che da andare a cercare nell'indirizzo del
+    Gist.
+
+    Il token non si salva da nessuna parte (non nel database, non nei
+    log): serve solo per questa chiamata, e passa in un campo
+    `type="password"` nel modulo — comunque in chiaro nella richiesta
+    HTTP, come qualunque modulo su qualunque sito, ma mai scritto su
+    disco da questa funzione.
+    """
+    from core import backup
+
+    risultato_backup = {"token_valido": None, "gist_creato": None,
+                        "prova_riuscita": None, "gist_id": None, "messaggio": ""}
+    token_pulito = (token or "").strip()
+
+    ok_token, msg_token = backup.verifica_token(token_pulito)
+    risultato_backup["token_valido"] = ok_token
+    risultato_backup["messaggio"] = msg_token
+
+    if ok_token:
+        ok_gist, msg_gist, gist_id = backup.crea_archivio(token_pulito)
+        risultato_backup["gist_creato"] = ok_gist
+        risultato_backup["messaggio"] = msg_gist
+        risultato_backup["gist_id"] = gist_id
+
+        if ok_gist:
+            ok_prova, msg_prova = backup.prova_completa(gist_id, token_pulito)
+            risultato_backup["prova_riuscita"] = ok_prova
+            risultato_backup["messaggio"] = msg_prova
+
+    return _pagina_diagnostica(request, risultato_backup=risultato_backup)
+
+
+@app.post("/diagnostica/backup/salva", response_class=HTMLResponse)
+def diagnostica_backup_salva(request: Request):
+    """«Salva adesso»: forza un salvataggio vero con la configurazione
+    ATTUALE (le variabili d'ambiente già impostate), invece di aspettare
+    la prossima scansione o correzione — la verifica più diretta per
+    sapere se quello che è stato messo su Render funziona davvero, senza
+    aspettare un'ora o dover correggere un nome apposta per scoprirlo.
+    """
+    from core import backup
+
+    ok, messaggio = backup.salva()
+    return _pagina_diagnostica(request, risultato_salva={"ok": ok, "messaggio": messaggio})
 
 
 # LA CHIAVE VA IN QUERY, NON NEL PERCORSO. Le chiavi dispositivo hanno
