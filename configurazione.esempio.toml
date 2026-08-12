@@ -1,0 +1,41 @@
+# Copia questo file in .streamlit/secrets.toml e compila i valori.
+TELEGRAM_TOKEN = ""
+TELEGRAM_CHAT_ID = ""
+
+# Opzionali
+# TRACKER_DB = "tracker.db"
+# SCAN_INTERVAL_MINUTES = "60"
+# RELEVANCE_THRESHOLD = "3"
+# NOTIFY_MIN_SEVERITY = "SECURITY"    # MAJOR | FEATURE | SECURITY | BETA
+# NOTIFY_ONLY_WATCHLIST = "false"
+# DISABLED_SOURCES = ""
+# EXTRA_FEEDS = "https://esempio.it/feed/|Fonte mia|Samsung|curated"
+
+# Chiave gratuita per la ricerca del TAC quando i database scaricati non
+# hanno un codice (100 ricerche al mese, https://hicelltek.com/en/api/imei/).
+#
+# FACOLTATIVA: senza, l'app funziona come sempre e semplicemente dice
+# «TAC non trovato» invece di chiedere fuori.
+#
+# Escono SOLO le prime 8 cifre dell'IMEI, mai il numero intero.
+TAC_API_KEY = ""
+
+# Chiave per l'interprete AI della ricerca (il tasto ✨ accanto a «Cerca»).
+#
+# SE NE METTE UNA SOLA, e vince la prima presente in questo ordine:
+#   GEMINI_API_KEY     — Google AI Studio, quota gratuita permanente
+#   ANTHROPIC_API_KEY  — a consumo
+#   OPENAI_API_KEY     — a consumo
+#
+# COSA FA e cosa NON fa: traduce una domanda mal posta in un modello o in
+# un codice che l'app sa cercare, scegliendo fra i modelli che conosce
+# gia'. Non produce MAI dati tecnici — processore, RAM, versione software
+# continuano a venire dalle fonti di sempre. Quello che propone viene
+# ricontrollato contro i cataloghi e scartato se non c'e'.
+#
+# FACOLTATIVA: senza, il tasto non compare e il resto funziona uguale.
+GEMINI_API_KEY = ""
+
+# Il modello si sceglie da solo fra quelli con quota gratuita, provandoli
+# in ordine. Si indica a mano SOLO per puntarne uno preciso.
+# AI_QUERY_MODEL = "gemini-3.6-flash"
