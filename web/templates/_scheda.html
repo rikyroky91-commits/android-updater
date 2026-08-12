@@ -1,0 +1,87 @@
+{# La scheda tecnica: foto, hardware, supporto. Un solo blocco, usato sia
+   dal modello appena cercato sia da quello in archivio — così le due
+   pagine non possono dire cose diverse sullo stesso telefono. #}
+<section class="scheda">
+  <div class="scheda-foto">
+    {% if scheda.foto %}
+      <img src="{{ scheda.foto }}" alt="{{ scheda.titolo }}" loading="lazy">
+    {% else %}
+      <div class="foto-assente" aria-hidden="true">▭</div>
+    {% endif %}
+  </div>
+
+  <div class="scheda-dati">
+    {# `senza_intestazione`: passato solo da `ricerca.html`, dove il nome e
+       il codice li ha già detti il riquadro del risultato appena sopra —
+       ripeterli qui era la terza volta sulla stessa pagina. La pagina del
+       dispositivo in archivio (`dispositivo.html`) non passa il flag: lì
+       questo è l'UNICO punto che dice quale telefono è. #}
+    {% if not senza_intestazione %}
+    <h2>{{ scheda.titolo }}</h2>
+    <p class="sottotitolo">
+      {{ scheda.marca }}{% if scheda.codice %} · <code>{{ scheda.codice }}</code>{% endif %}
+      {%- if scheda.rilascio %} · uscito {{ scheda.rilascio }}{% endif %}
+    </p>
+    {% elif scheda.rilascio %}
+    {# L'UNICA COSA NUOVA di questa riga quando il nome non si ripete:
+       la data di uscita, che il riquadro sopra non dice. #}
+    <p class="sottotitolo">Uscito {{ scheda.rilascio }}</p>
+    {% endif %}
+
+    {# IL PROCESSORE PER PRIMO, E NON SOLO NELL'ORDINE DELL'HTML. Nella
+       griglia a quattro voci uguali si perdeva in mezzo a RAM e batteria
+       — tutte con lo stesso peso visivo, quindi nessuna spiccava. È il
+       dato che questa scheda esiste apposta per dare (un difetto legato
+       al SoC vive su una variante sola), quindi ha una riga sua, più
+       grande, prima della griglia con le altre tre. #}
+    <div class="cpu-in-evidenza">
+      <span class="etichetta">Processore</span>
+      <strong>{{ scheda.cpu or "—" }}</strong>
+    </div>
+    {% if scheda.cpu_nota %}<p class="nota">{{ scheda.cpu_nota }}</p>{% endif %}
+
+    <div class="misure">
+      <div><span class="etichetta">RAM</span><strong>{{ scheda.ram or "—" }}</strong></div>
+      <div><span class="etichetta">Archiviazione</span><strong>{{ scheda.storage or "—" }}</strong></div>
+      <div><span class="etichetta">Batteria</span><strong>{{ scheda.batteria or "—" }}</strong></div>
+    </div>
+
+    {% if scheda.voci %}
+    <dl class="specifiche">
+      {% for nome, valore in scheda.voci %}
+      <div><dt>{{ nome }}</dt><dd>{{ valore }}</dd></div>
+      {% endfor %}
+    </dl>
+    {% endif %}
+
+    {% if scheda.patch_fino_a %}
+    {# Dato operativo che non sta da nessun'altra parte: dice se un
+       dispositivo del parco è ancora vivo o è già fuori supporto. #}
+    <p class="supporto">Patch di sicurezza garantite fino al
+      <strong>{{ scheda.patch_fino_a }}</strong>
+      {%- if scheda.patch_cadenza %} · cadenza {{ scheda.patch_cadenza }}{% endif %}</p>
+    {% endif %}
+
+    {% if scheda.nota_copertura %}
+    <p class="nota lacuna">{{ scheda.nota_copertura }}</p>
+    {% endif %}
+  </div>
+</section>
+
+{% if scheda.sezioni %}
+<details class="completa">
+  <summary>Scheda tecnica completa</summary>
+  {% for titolo, campi in scheda.sezioni.items() %}
+  <table class="tabella minuta">
+    <caption>{{ titolo }}</caption>
+    <tbody>
+      {% for voce, valore in campi.items() %}
+      <tr><th scope="row">{{ voce }}</th><td>{{ valore }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endfor %}
+  <p class="nota">Fonte delle specifiche: {{ scheda.fonte }}. Il firmware
+    attuale viene invece dalle fonti ufficiali del produttore, non da qui.</p>
+</details>
+{% endif %}

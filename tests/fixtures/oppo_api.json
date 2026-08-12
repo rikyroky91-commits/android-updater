@@ -1,0 +1,470 @@
+{
+ "info_find_x2": {
+  "code": "1",
+  "msg": "SUCCESS!",
+  "data": [
+   {
+    "id": "1321986528822251527",
+    "machineSeries": "Find",
+    "machineSerieslMultilingual": "Find",
+    "prefix": "OPPO",
+    "machineModel": "Find X2",
+    "softwareVersion": "CPH2023_11_A.29",
+    "fileSize": "3934",
+    "versionPath": "https://assorted.downloads.oppo.com/firmware/CPH2023/CPH2023PU_11_OTA_0790_all_P08xy9ikPg81.ozip",
+    "downloadCount": 36485,
+    "status": true,
+    "releaseDate": "2020-08-18 01:05:00",
+    "content": "<p>[Security]<br /> &middot;Added the July 2020 Android security patch to enhance system security.</p>  <p>[System]<br /> &bull; Improved system performance and stability.<br /> &bull; Optimized power consumption to extend battery life.</p>  <p>[Camera]<br /> &bull; Improved camera effects and user experience.</p>  <p>[Communications]<br /> &bull; Optimized network and phone call performance.</p>",
+    "serialNumber": 740,
+    "upgradeContentBos": null,
+    "pages": null,
+    "size": null,
+    "total": null
+   },
+   {
+    "id": "1321986528818057220",
+    "machineSeries": "Find",
+    "machineSerieslMultilingual": "Find",
+    "prefix": "OPPO",
+    "machineModel": "Find X2",
+    "softwareVersion": "CPH2023_11_A.23",
+    "fileSize": "3907",
+    "versionPath": "https://assorted.downloads.oppo.com/firmware/CPH2023/CPH2023PU_11_OTA_0730_all_4b9m0wV9ioC8.ozip",
+    "downloadCount": 4078,
+    "status": true,
+    "releaseDate": "2020-06-30 00:30:00",
+    "content": "<p style=\"text-align:start\">[Security]<br /> &middot;Added the June 2020 Android security patch to enhance system security.<br /> &middot; You can now lock an app clone using the &quot;App lock&quot; feature.</p>  <p style=\"text-align:start\">&nbsp;</p>  <p style=\"text-align:start\">[System]<br /> &middot; Improved system performance and stability.<br /> &middot; Optimised power consumption to extend battery life.<br /> &middot; Optimised the accidental touch feature for &quot;Swipe gestures from both sides&quot; and &quot;Swipe-up gestures&quot;: In the landscape mode, swipe once to go back while you are watching a video, and swipe twice to go back while you are playing a game.</p>  <p style=\"text-align:start\">&nbsp;</p>  <p style=\"text-align:start\">[Communications]<br /> &middot; Optimised network and phone call performance.</p>",
+    "serialNumber": 651,
+    "upgradeContentBos": null,
+    "pages": null,
+    "size": null,
+    "total": null
+   },
+   {
+    "id": "1321986528830640137",
+    "machineSeries": "Find",
+    "machineSerieslMultilingual": "Find",
+    "prefix": "OPPO",
+    "machineModel": "Find X2",
+    "softwareVersion": "CPH2023_11_A.17",
+    "fileSize": "3865",
+    "versionPath": "https://assorted.downloads.oppo.com/firmware/CPH2023/CPH2023PU_11_OTA_0670_all_4rcM6xypDUtB.ozip",
+    "downloadCount": 2139,
+    "status": true,
+    "releaseDate": "2020-05-17 18:14:00",
+    "content": "<p>[Security]<br /> &bull; Added the May 2020 Android security patch to enhance system security.</p>  <p>[System]<br /> &bull; Improved system performance and stability.<br /> &bull; Improved touch sensitivity of the screen.<br /> &bull; Fixed an issue where auto-scroll of the phone screen would become slow when you captured a long screenshot.</p>  <p>[Communications]<br /> &bull; Optimised network and phone call performance.<br /> &bull; Fixed several Wi-Fi connection issues and optimised Wi-Fi performance.</p>  <p>[Camera]<br /> &bull; Improved camera effects and user experience.</p>",
+    "serialNumber": 596,
+    "upgradeContentBos": null,
+    "pages": null,
+    "size": null,
+    "total": null
+   }
+  ]
+ },
+ "info_reno4_pro": {
+  "code": "1",
+  "msg": "SUCCESS!",
+  "data": [
+   {
+    "id": "1321986522635653121",
+    "machineSeries": "Reno",
+    "machineSerieslMultilingual": "Reno",
+    "prefix": "OPPO",
+    "machineModel": "Reno4 Pro",
+    "softwareVersion": "CPH2109_11_A.17",
+    "fileSize": "3711",
+    "versionPath": "https://assorted.downloads.oppo.com/firmware/CPH2109/CPH2109PU_11_OTA_0170_all_7NOdzIxjBMXr.ozip",
+    "downloadCount": 26417,
+    "status": true,
+    "releaseDate": "2020-09-07 19:47:00",
+    "content": "<p>[Security]</p><p>· Added the September 2020 Android security patch to enhance system security.</p><p></p><p>[System]</p><p>· Improved system performance and stability.</p><p></p><p>[Camera]</p><p>· Improved camera effects and the user experience.</p>",
+    "serialNumber": 789,
+    "upgradeContentBos": null,
+    "pages": null,
+    "size": null,
+    "total": null
+   }
+  ]
+ },
+ "info_modello_moderno": {
+  "code": "1",
+  "msg": "SUCCESS!",
+  "data": []
+ },
+ "model_in": {
+  "code": "1",
+  "msg": "SUCCESS!",
+  "data": [
+   {
+    "series": "Find",
+    "seriesMultilingual": "Find X Series",
+    "prefix": "OPPO",
+    "models": [
+     {
+      "id": "1315833995715743750",
+      "machineModel": "Find X2",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994340012040",
+      "machineModel": "Find X",
+      "modelMultilingual": null
+     }
+    ]
+   },
+   {
+    "series": "Reno",
+    "seriesMultilingual": "Reno Series",
+    "prefix": "OPPO",
+    "models": [
+     {
+      "id": "1315833994436481029",
+      "machineModel": "Reno4 Pro",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833993991884805",
+      "machineModel": "Reno2",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994331623425",
+      "machineModel": "Reno2 F",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833995619274756",
+      "machineModel": "Reno2 Z",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833993907998724",
+      "machineModel": "Reno Z",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833995698966534",
+      "machineModel": "Reno 10x Zoom",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833993979301889",
+      "machineModel": "Reno",
+      "modelMultilingual": null
+     }
+    ]
+   },
+   {
+    "series": "A",
+    "seriesMultilingual": "A Series",
+    "prefix": "OPPO",
+    "models": [
+     {
+      "id": "1383969222619303937",
+      "machineModel": "A54",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1337207291724517377",
+      "machineModel": "A33",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1326733458932584450",
+      "machineModel": "A15s",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1326733353885700098",
+      "machineModel": "A15",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1324274408235536386",
+      "machineModel": "A73(CPH2095)",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994289680390",
+      "machineModel": "A52",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994243543043",
+      "machineModel": "A11k",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994272903177",
+      "machineModel": "A53",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833993870249987",
+      "machineModel": "A91",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994079965193",
+      "machineModel": "A12",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833993807335429",
+      "machineModel": "A9",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994096742404",
+      "machineModel": "A31",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994109325319",
+      "machineModel": "A9 2020",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994444869637",
+      "machineModel": "A5 2020",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833995652829186",
+      "machineModel": "A5s",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994126102537",
+      "machineModel": "A1k",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833993794752519",
+      "machineModel": "A7",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994360983556",
+      "machineModel": "A3s(CPH1853)",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833993786363905",
+      "machineModel": "A5",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833995682189320",
+      "machineModel": "A3s(CPH1803)",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994058993667",
+      "machineModel": "A83(3G+16G)(3G+32G)(4G+64G)",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994038022146",
+      "machineModel": "A83 (2G + 16G)",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833995673800708",
+      "machineModel": "A71",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994256125954",
+      "machineModel": "A37",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833995623469066",
+      "machineModel": "A57",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994423898120",
+      "machineModel": "A71 (2018)",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833993828306948",
+      "machineModel": "A77",
+      "modelMultilingual": null
+     }
+    ]
+   },
+   {
+    "series": "F",
+    "seriesMultilingual": "F Series",
+    "prefix": "OPPO",
+    "models": [
+     {
+      "id": "1348881366858866690",
+      "machineModel": "F9 Pro",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1323589644360945665",
+      "machineModel": "F17",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994142879750",
+      "machineModel": "F17 Pro",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994419703811",
+      "machineModel": "F15",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994310651906",
+      "machineModel": "F11 Pro",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994394537992",
+      "machineModel": "F11",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994205794313",
+      "machineModel": "F9",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994407120901",
+      "machineModel": "F7 128G",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994197405699",
+      "machineModel": "F7",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833993719255041",
+      "machineModel": "F5 Pro",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994168045570",
+      "machineModel": "F3",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833993924775939",
+      "machineModel": "F3 Plus",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994184822785",
+      "machineModel": "F5",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833995636051971",
+      "machineModel": "F5 Youth",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833993748615169",
+      "machineModel": "F1s",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833993761198084",
+      "machineModel": "F1 Plus",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994151268354",
+      "machineModel": "F1",
+      "modelMultilingual": null
+     }
+    ]
+   },
+   {
+    "series": "R",
+    "seriesMultilingual": "R Series",
+    "prefix": "OPPO",
+    "models": [
+     {
+      "id": "1315833993941553158",
+      "machineModel": "R17 Pro",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994176434178",
+      "machineModel": "RX17 Neo",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833993937358851",
+      "machineModel": "R17",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994302263302",
+      "machineModel": "R15 Pro",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833995665412098",
+      "machineModel": "R7 Plus",
+      "modelMultilingual": null
+     }
+    ]
+   },
+   {
+    "series": "K",
+    "seriesMultilingual": "K Series",
+    "prefix": "OPPO",
+    "models": [
+     {
+      "id": "1315833995615080451",
+      "machineModel": "K3",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833995610886152",
+      "machineModel": "K1",
+      "modelMultilingual": null
+     }
+    ]
+   },
+   {
+    "series": "Others",
+    "seriesMultilingual": "Others",
+    "prefix": null,
+    "models": [
+     {
+      "id": "1315833994323234819",
+      "machineModel": "Joy 3",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994050605061",
+      "machineModel": "Neo 5",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833993840889860",
+      "machineModel": "Neo 5s",
+      "modelMultilingual": null
+     },
+     {
+      "id": "1315833994025439236",
+      "machineModel": "Neo 7",
+      "modelMultilingual": null
+     }
+    ]
+   }
+  ]
+ }
+}

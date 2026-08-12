@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block titolo %}Parco di test · {{ titolo_sito }}{% endblock %}
+{% block corpo %}
+<h3 class="occhiello">Parco di test · {{ righe | length }} dispositivi</h3>
+{% if righe %}
+<table class="tabella">
+  <thead><tr><th>Brand</th><th>Modello</th><th>Provato il</th>
+             <th>Rispetto all'ultima prova</th><th>Cosa fare</th></tr></thead>
+  <tbody>
+    {% for r in righe %}
+    <tr>
+      <td class="tenue">{{ r.brand }}</td>
+      <td><a href="/dispositivo?k={{ r.chiave | urlencode }}">{{ r.modello }}</a></td>
+      <td class="tenue">{{ r.provato_il or "mai" }}</td>
+      <td>{% if r.confronto %}{{ r.confronto.etichetta }}{% else %}—{% endif %}</td>
+      <td class="tenue">{% if r.confronto %}{{ r.confronto.azione }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="vuoto">Il parco è vuoto. Apri un dispositivo e aggiungilo: da quel
+  momento il sito dice quando è cambiato qualcosa da quando lo hai provato.</p>
+{% endif %}
+{% endblock %}

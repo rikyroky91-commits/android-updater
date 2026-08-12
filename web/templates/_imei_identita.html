@@ -1,0 +1,30 @@
+{# La riga che dice «questo risultato viene da un IMEI», dentro lo STESSO
+   riquadro del risultato — non un riquadro suo. Il nome e il codice del
+   telefono li dice già `risultato.nome`/`risultato.riga` qui sotto: questa
+   riga aggiunge solo il TAC, che altrove non compare. #}
+{% if imei.riconosciuto %}
+<p class="etichetta-imei">IMEI riconosciuto · TAC <code>{{ imei.tac }}</code></p>
+{% else %}
+<p class="etichetta-imei etichetta-imei-incerta">IMEI valido, modello sconosciuto
+  · TAC <code>{{ imei.tac }}</code></p>
+{% endif %}
+
+{# I 4 SITI DI VERIFICA STANNO QUI, SEMPRE VISIBILI — non dentro il
+   `<details>` di `_imei_confronto.html`. Prima erano lì insieme alla
+   tabella di confronto, e chi cercava un IMEI non li vedeva senza aprire
+   quel riquadro: la funzione c'era nel codice ma non si vedeva, che per
+   chi la usa è la stessa cosa di non esserci. Il confronto dettagliato
+   fra i database (la tabella, la correzione manuale) resta nel
+   `<details>`, perché quello sì è materiale da consultare solo a
+   bisogno; questi link sono l'azione più comune di chi ha appena
+   cercato un IMEI — controllarlo su un'altra fonte — e vanno a un clic,
+   non a due. #}
+{% if imei.siti %}
+<p class="nota">Controlla lo stesso IMEI su un'altra fonte:</p>
+<p class="proposte">
+  {% for nome, url, nota in imei.siti %}
+  <a class="proposta" href="{{ url }}" title="{{ nota }}" rel="noopener"
+     target="_blank">{{ nome }}</a>
+  {% endfor %}
+</p>
+{% endif %}

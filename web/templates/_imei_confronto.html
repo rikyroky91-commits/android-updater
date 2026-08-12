@@ -1,0 +1,68 @@
+{# Il confronto fra i database TAC, e la correzione manuale: dettagli di
+   una ricerca per IMEI, non l'identità del telefono. Prima stavano in un
+   riquadro proprio, in cima alla pagina, ripetendo nome e codice che il
+   risultato appena sotto diceva già — qui restano disponibili ma non
+   competono più con la risposta per l'attenzione di chi guarda. #}
+<details class="completa">
+  <summary>Confronto fra le fonti IMEI{% if imei.voci %} ({{ imei.voci | length }}){% endif %}</summary>
+
+  {% if not imei.riconosciuto %}
+  {# NON È UN GUASTO, È UN BUCO DI COPERTURA. Sono due cose che si vivono
+     allo stesso modo ma si risolvono in modi opposti, e dirlo evita di
+     cercare un difetto che non c'è. #}
+  <p>Il TAC <code>{{ imei.tac }}</code> non è in nessuno dei database
+     consultati ({{ imei.stato_database }}).</p>
+  <p class="nota">I database gratuiti hanno buchi diversi fra loro e
+    nessuno è completo — misurato: aggiungerne un terzo ha portato lo 0,3%
+    di codici in più. Controlla su uno dei siti qui sotto, poi cerca
+    direttamente il nome del modello.</p>
+  {% endif %}
+
+  {% if imei.discordi %}
+  <p class="avviso">Le fonti <strong>non concordano</strong> su questo TAC. Non è
+    un guasto: è normale, e per questo la verifica su un sito esterno vale la
+    pena.</p>
+  {% endif %}
+
+  {% if imei.voci %}
+  <table class="tabella minuta">
+    <thead><tr><th>Fonte</th><th>Marca</th><th>Modello</th><th>Codice</th><th>Anno</th></tr></thead>
+    <tbody>
+      {% for v in imei.voci %}
+      <tr>
+        <td class="tenue">{{ v.fonte }}</td>
+        <td>{{ v.marca }}</td>
+        <td>{{ v.modello }}</td>
+        <td>{% if v.codice %}<code>{{ v.codice }}</code>{% else %}—{% endif %}</td>
+        <td class="tenue">{{ v.anno or "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="nota">La prima riga è la risposta che l'app usa: l'ordine è la
+    precedenza, non la fortuna.</p>
+  {% else %}
+  <p class="vuoto">Nessuna delle basi dati locali conosce il TAC
+    <code>{{ imei.tac or "—" }}</code>.</p>
+  {% endif %}
+
+  {# I 4 link ai siti di verifica non stanno più qui: sono sempre visibili
+     in `_imei_identita.html`, subito sotto il riquadro del risultato — non
+     dentro questo `<details>` che si apre solo a bisogno. #}
+  <p class="nota">Correggi o salva tu il modello per questo TAC. Vale
+    subito per il TAC <code>{{ imei.tac }}</code>, cioè per tutti gli IMEI
+    di quel modello. Ha la precedenza su ogni database scaricato: se lo
+    hai verificato tu, hai ragione tu.</p>
+  <form method="post" action="/tac/salva" class="modulo">
+    <input type="hidden" name="tac" value="{{ imei.tac }}">
+    <input type="hidden" name="imei" value="{{ imei.imei }}">
+    <input type="text" name="marca" placeholder="Marca — es. Samsung">
+    <input type="text" name="modello" placeholder="Modello — es. Galaxy A54 5G">
+    <button type="submit" class="secondario">Salva questo modello</button>
+  </form>
+  {# Il salvataggio vive nell'archivio, quindi sopravvive ai riavvii ma non
+     a un archivio ricostruito da zero. La riga nel file del progetto è la
+     forma definitiva: le due strade non si escludono, si completano. #}
+  <p class="nota">Per renderlo permanente, aggiungi la riga corrispondente a
+    <code>data/tac_modelli.csv</code>.</p>
+</details>

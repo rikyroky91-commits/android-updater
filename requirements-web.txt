@@ -1,0 +1,21 @@
+# Il sito (web/) e il worker headless. Nient'altro.
+#
+# QUESTO FILE, NON `requirements.txt`, È QUELLO CHE LEGGE IL DOCKERFILE
+# (vedi `COPY requirements-web.txt` lì dentro). La separazione è nata
+# l'11/08/2026 quando `app.py` — il prototipo Streamlit — è tornato nel
+# repository su richiesta esplicita, da mantenere IN PARALLELO al sito,
+# non al suo posto: Streamlit Cloud legge `requirements.txt` (streamlit,
+# niente pandas — `app.py` non lo importa) e Render legge questo. Le due
+# app hanno dipendenze diverse; tenerle in un file solo significa che
+# ogni volta l'una installa i pacchetti dell'altra senza usarli — per
+# Render, streamlit e la sua dozzina di dipendenze indirette a ogni
+# build, per niente.
+requests>=2.31
+feedparser>=6.0
+pyyaml>=6.0
+openpyxl>=3.1
+
+fastapi>=0.110
+uvicorn[standard]>=0.27
+jinja2>=3.1
+python-multipart>=0.0.9   # i moduli POST (parco di test, interprete AI)

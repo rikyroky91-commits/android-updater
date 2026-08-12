@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block titolo %}Diagnostica · {{ titolo_sito }}{% endblock %}
+{% block corpo %}
+<h3 class="occhiello">Fonti</h3>
+<table class="tabella">
+  <thead><tr><th>Fonte</th><th>Stato</th><th>Voci</th><th>Dettaglio</th><th>Controllata</th></tr></thead>
+  <tbody>
+    {% for r in righe %}
+    <tr>
+      <td>{{ r.nome }}</td>
+      <td><span class="tag {{ r.classe }}">{{ r.etichetta }}</span></td>
+      <td>{{ r.voci }}</td>
+      <td class="tenue">{{ r.dettaglio }}</td>
+      <td class="tenue">{{ r.controllata }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 class="occhiello">Cataloghi</h3>
+<table class="tabella">
+  <tbody>
+    {% for nome, stato in cataloghi %}
+    <tr><th scope="row">{{ nome }}</th><td class="tenue">{{ stato }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<p class="nota">Archivio <code>{{ stats.db_path }}</code> ·
+  {{ stats.updates_total }} record totali · logica dati v{{ logica }}</p>
+{% endblock %}

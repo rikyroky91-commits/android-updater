@@ -1,0 +1,68 @@
+{#
+  L'IMPALCATURA DI OGNI PAGINA.
+
+  Dal prototipo di Claude Design arrivano: la barra con marchio e
+  navigazione separata da un filo di 2px, la ricerca a pastiglia come
+  unico elemento davvero prominente, la trama di rete sullo sfondo.
+
+  Qui l'HTML lo scriviamo noi, quindi il prototipo si può seguire alla
+  lettera invece di essere approssimato dall'esterno. Le uniche differenze
+  sono deliberate e annotate dove stanno.
+#}<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titolo %}{{ titolo_sito }}{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  {# La trama vive in un canvas dietro tutto. Qui si può davvero, perché
+     la pagina è nostra: nessun sanificatore, nessun iframe. #}
+  <canvas id="rete" aria-hidden="true"></canvas>
+
+  <header class="testata">
+    <div class="testata-interno">
+      {# Il marchio riporta alla home, che è la pagina della sola
+         ricerca: è il gesto che si fa per ricominciare da capo, e deve
+         riportare al punto di partenza, non all'elenco. #}
+      <a class="marchio" href="/">{{ titolo_sito }}</a>
+      <nav class="nav">
+        <a href="/" class="{{ 'attiva' if attiva == 'cerca' }}">Cerca</a>
+        <a href="/dispositivi" class="{{ 'attiva' if attiva == 'dispositivi' }}">Dispositivi</a>
+        <a href="/aggiornamenti" class="{{ 'attiva' if attiva == 'aggiornamenti' }}">Aggiornamenti</a>
+        <a href="/parco" class="{{ 'attiva' if attiva == 'parco' }}">Parco di test</a>
+        <a href="/catalogo" class="{{ 'attiva' if attiva == 'catalogo' }}">Catalogo</a>
+        <a href="/diagnostica" class="{{ 'attiva' if attiva == 'diagnostica' }}">Diagnostica</a>
+      </nav>
+      {# Nel prototipo questo numero è scritto a mano. Qui è vero, e
+         questo ne cambia la natura: non decora la testata, è la prima
+         riga di diagnostica, leggibile da qualunque pagina. #}
+      <a class="stato-fonti" href="/diagnostica">
+        {% if fonti_totali %}{{ fonti_ok }}/{{ fonti_totali }} fonti attive
+        {% else %}nessuna scansione ancora{% endif %}
+      </a>
+    </div>
+  </header>
+
+  <main class="contenuto">
+    {% block ricerca %}{% include "_ricerca.html" %}{% endblock %}
+
+    {% block corpo %}{% endblock %}
+  </main>
+
+  <footer class="pieduccio">
+    <span>{{ titolo_sito }}</span>
+    <span>I dati vengono dalle fonti dei produttori. Le lacune sono dichiarate, non riempite.</span>
+  </footer>
+
+  <script src="/static/rete.js" defer></script>
+  <script src="/static/ricerca.js" defer></script>
+  {% if ai_attiva %}<script src="/static/ai.js" defer></script>{% endif %}
+  {% block script %}{% endblock %}
+</body>
+</html>

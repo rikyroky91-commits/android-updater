@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block titolo %}{{ device.modello }} · {{ titolo_sito }}{% endblock %}
+{% block corpo %}
+<p class="briciole"><a href="/">Dispositivi</a> · {{ device.brand }}</p>
+
+{% include "_scheda.html" %}
+
+<section class="riquadro">
+  <h3 class="occhiello">Stato software</h3>
+  <div class="misure">
+    <div><span class="etichetta">Sistema</span><strong>{{ device.sistema or "—" }}</strong></div>
+    <div><span class="etichetta">Build</span><strong>{{ device.build or "—" }}</strong></div>
+    <div><span class="etichetta">Patch</span><strong>{{ device.patch or "—" }}</strong></div>
+    <div><span class="etichetta">Ultimo aggiornamento</span><strong>{{ device.aggiornato }}</strong></div>
+  </div>
+  <p><span class="tag {{ device.stato.classe }}">{{ device.stato.etichetta }}</span>
+     {{ device.impatto }}</p>
+
+  <form method="post" action="{{ '/parco/togli' if device.in_parco else '/parco/aggiungi' }}">
+    <input type="hidden" name="chiave" value="{{ device.chiave }}">
+    <input type="hidden" name="brand" value="{{ device.brand }}">
+    <input type="hidden" name="modello" value="{{ device.modello }}">
+    <button type="submit" class="secondario">
+      {{ "Togli dal parco di test" if device.in_parco else "Aggiungi al parco di test" }}
+    </button>
+  </form>
+</section>
+
+<h3 class="occhiello">Storico</h3>
+{% if storico %}
+<table class="tabella">
+  <thead><tr><th>Data</th><th>Versione</th><th>Build</th><th>Severità</th><th>Fonte</th></tr></thead>
+  <tbody>
+    {% for v in storico %}
+    <tr>
+      <td class="tenue">{{ v.data }}</td>
+      <td>{{ v.versione or "—" }}</td>
+      <td>{% if v.build %}<code>{{ v.build }}</code>{% else %}—{% endif %}</td>
+      <td><span class="tag" style="--tinta: {{ v.colore }}">{{ v.severita }}</span></td>
+      <td class="tenue">{{ v.fonte }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="vuoto">Nessuna voce ancora per questo modello.</p>
+{% endif %}
+{% endblock %}

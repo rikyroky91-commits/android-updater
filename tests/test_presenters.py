@@ -1,0 +1,148 @@
+"""Test di `web/presenters.py`.
+
+Questo file nasce da un bug reale, segnalato dall'utente sul sito in
+produzione: cercando «rmx 3933» (un codice realme) la scheda tecnica non
+compariva; cercando «realme Note 60» — lo STESSO identico telefono, stesso
+codice — compariva. La causa è descritta per esteso nel docstring di
+`core.specs._ripiego_esterno`: il ripiego su versus.com (l'unica fonte di
+scheda per realme/HONOR/Huawei/Nothing, vedi `core/versus.py`) decide la
+marca guardando la PRIMA PAROLA del testo che riceve, e un codice o un nome
+canonico corto («Note 60s», scelto da `modelcodes.nome_canonico` perché è
+il più corto dei nomi veri di quel codice) non la scrivono mai.
+
+`web/presenters.py::scheda_tecnica` è il punto giusto per collaudare il
+fix: è lui a conoscere una marca affidabile — quella del catalogo AER
+ufficiale (`aer_catalog.lookup(...).get("brand_aer")`), non indovinata dal
+testo — ed è lui che prima di questo fix la calcolava ma non la passava
+mai a `specs.cerca`/`soc.per_modello`.
+"""
+import os
+import sys
+import unittest
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from core import aer_catalog, modelcodes, specs, soc  # noqa: E402
+from web import presenters as P  # noqa: E402
+
+
+def _voce_aer(nome: str, codici: str, marca: str) -> dict:
+    """Una voce del catalogo AER, nella forma grezza che `parse_device` si
+    aspetta (`displayName`/`brand`/`models`) — non un dizionario a caso:
+    è la stessa forma con cui `aer_catalog._indicizza` la legge davvero."""
+    return {"displayName": nome, "brand": marca, "models": codici,
+            "hardwareFeatures": {}, "imageUrls": {}}
+
+
+class TestMarcaAerPassataAlleFontiEsterne(unittest.TestCase):
+    """Non verifica una scheda vera (niente rete nei test, vedi
+    `versus._scarica` in `test_sito.py`): verifica solo che l'argomento
+    `marca`, calcolato dal catalogo AER, arrivi fino a `specs.cerca` e
+    `soc.per_modello` — il collegamento che prima mancava."""
+
+    def setUp(self):
+        aer_catalog.carica_da(
+            [_voce_aer("Note Test 60s", "RMXTEST1", "realme")],
+            "fixture di test")
+        self._cerca_vera = specs.cerca
+        self._per_modello_vero = soc.per_modello
+        self.chiamate_cerca = []
+        self.chiamate_soc = []
+
+        def finto_cerca(*testi, marca=None):
+            self.chiamate_cerca.append(marca)
+            return None
+
+        def finto_per_modello(model_code=None, device_name=None, marca=None):
+            self.chiamate_soc.append(marca)
+            return None
+
+        specs.cerca = finto_cerca
+        soc.per_modello = finto_per_modello
+
+    def tearDown(self):
+        specs.cerca = self._cerca_vera
+        soc.per_modello = self._per_modello_vero
+        aer_catalog.reset_cache()
+
+    def test_la_marca_aer_arriva_a_specs_cerca(self):
+        P.scheda_tecnica("Note Test 60s", codice="RMXTEST1",
+                         brand="Oppo / Realme / OnePlus")
+        self.assertEqual(self.chiamate_cerca, ["realme"])
+
+    def test_la_marca_aer_arriva_a_soc_per_modello(self):
+        P.scheda_tecnica("Note Test 60s", codice="RMXTEST1",
+                         brand="Oppo / Realme / OnePlus")
+        self.assertEqual(self.chiamate_soc, ["realme"])
+
+    def test_senza_voce_aer_la_marca_e_none_non_indovinata(self):
+        """Un codice che il catalogo AER non conosce non deve inventare
+        una marca: `specs.cerca`/`soc.per_modello` restano liberi di
+        provare con il testo grezzo, come facevano prima di questo fix."""
+        P.scheda_tecnica("Telefono Che Non Esiste 9000", codice="ZZ0000",
+                         brand="Samsung")
+        self.assertEqual(self.chiamate_cerca, [None])
+        self.assertEqual(self.chiamate_soc, [None])
+
+    def test_il_codice_e_il_nome_trovano_entrambi_la_stessa_voce_aer(self):
+        """Cercare per codice o per nome è la stessa domanda: deve
+        produrre la stessa marca, non una marca diversa a seconda della
+        forma scritta — è esattamente l'incoerenza segnalata."""
+        P.scheda_tecnica("Note Test 60s", codice="RMXTEST1", brand="")
+        P.scheda_tecnica("Note Test 60s", codice="", brand="")
+        self.assertEqual(self.chiamate_cerca, ["realme", "realme"])
+
+
+class TestMarcaDaiNomiVeriQuandoLAerNonBasta(unittest.TestCase):
+    """Secondo giro sullo stesso bug, segnalato di nuovo dall'utente:
+    RMX3933 non è nel catalogo AER (non tutti i modelli realme lo sono —
+    è un programma a cui il produttore aderisce modello per modello), e
+    senza una voce AER `marca_aer` restava vuota per QUALSIASI forma del
+    nome, non solo per quelle senza marca in testa. Il ripiego: guardare
+    tutti i nomi VERI del codice (`modelcodes.resolve`, la stessa fonte
+    già usata per i "gemelli") e prendere la marca dal primo che la
+    dichiara — non indovinata, letta da un nome commerciale verificato.
+    """
+
+    def setUp(self):
+        aer_catalog.reset_cache()  # nessuna voce AER per questo codice
+        modelcodes._memory_cache = modelcodes._memory_cache or {}
+        self._cerca_vera = specs.cerca
+        self.chiamate_cerca = []
+
+        def finto_cerca(*testi, marca=None):
+            self.chiamate_cerca.append(marca)
+            return None
+
+        specs.cerca = finto_cerca
+
+    def tearDown(self):
+        specs.cerca = self._cerca_vera
+        modelcodes._memory_cache.pop("ZZ4321", None)
+        aer_catalog.reset_cache()
+
+    def test_la_marca_si_trova_in_un_nome_vero_col_prefisso(self):
+        """Nessuna voce AER, ma uno dei nomi veri del codice porta la
+        marca in testa: si usa quella, non ci si arrende."""
+        modelcodes._memory_cache["ZZ4321"] = ["Note Test", "realme Note Test"]
+        P.scheda_tecnica("Note Test", codice="ZZ4321", brand="")
+        self.assertEqual(self.chiamate_cerca, ["Realme"])
+
+    def test_la_marca_si_trova_anche_senza_il_prefisso_esplicito(self):
+        """NARZO è un caso reale (RMX3933 risolve anche a «NARZO N61»):
+        `versus.marca_scoperta` riconosce «narzo» come sinonimo di
+        realme anche senza la parola «realme» scritta da nessuna parte."""
+        modelcodes._memory_cache["ZZ4321"] = ["Note Test", "NARZO Test"]
+        P.scheda_tecnica("Note Test", codice="ZZ4321", brand="")
+        self.assertEqual(self.chiamate_cerca, ["Realme"])
+
+    def test_nessun_nome_vero_con_marca_riconosciuta_resta_none(self):
+        """Nessuna voce AER e nessuno dei nomi veri porta una marca che
+        versus.com copre: `marca` resta `None`, non un valore inventato."""
+        modelcodes._memory_cache["ZZ4321"] = ["Galaxy Test", "Samsung Galaxy Test"]
+        P.scheda_tecnica("Galaxy Test", codice="ZZ4321", brand="")
+        self.assertEqual(self.chiamate_cerca, [None])
+
+
+if __name__ == "__main__":
+    unittest.main()

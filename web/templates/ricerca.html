@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block titolo %}{{ risultato.nome or query }} · {{ titolo_sito }}{% endblock %}
+
+{#
+  LA PAGINA DI UN MODELLO CERCATO.
+
+  Prima questo blocco stava in cima all'elenco dell'archivio, e sotto
+  ricompariva la tabella di millecinquecento righe: il risultato che si
+  era chiesto e millecinquecento cose che non c'entravano. Ora la
+  ricerca ha una pagina sua, e ci sta dentro tutto quello che si sa di
+  quel telefono — scheda tecnica, aggiornamenti, notizie — nell'ordine
+  in cui si guardano.
+#}
+{% block corpo %}
+{# L'AI HA GIÀ CERCATO. Non un elenco di link da scegliere: il tasto fa
+   partire la ricerca vera sull'interpretazione migliore, e qui si dice
+   cosa è stato interpretato — con le alternative a un clic, per quando
+   ha capito il telefono sbagliato. #}
+{% if interpretato_da %}
+<p class="interpretato">
+  <span class="segno-ai" aria-hidden="true">✦</span>
+  Hai scritto «{{ interpretato_da }}», ho cercato <strong>{{ query }}</strong>.
+  {% if interpretato_perche %}<span class="tenue">{{ interpretato_perche }}</span>{% endif %}
+  {% if alternative %}
+  <span class="alternative">Oppure:
+    {% for voce in alternative %}<a href="/?q={{ voce | urlencode }}&amp;ai={{ interpretato_da | urlencode }}">{{ voce }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+  </span>
+  {% endif %}
+</p>
+{% endif %}
+
+{#
+  UN RISULTATO SOLO, NON TRE RIQUADRI IMPILATI.
+
+  Prima l'IMEI aveva il suo riquadro rosso in cima («IMEI riconosciuto:
+  Galaxy A07 (SM-A075F)»), l'esito il suo subito sotto (di nuovo «Galaxy
+  A07», di nuovo il codice) e la scheda tecnica il suo ancora più sotto
+  (di nuovo il nome, di nuovo il codice, stavolta con la variante «4G»):
+  stesso telefono, la stessa informazione ripetuta tre volte con un bordo
+  rosso diverso ogni volta, e il dato tecnico — il processore — annegato
+  in fondo al terzo riquadro. Ora il nome si dice UNA volta sola in cima,
+  e tutto quello che riguarda quel nome — IMEI, firmware, scheda — sta
+  in un unico blocco visivo sotto la ricerca. Il confronto fra i database
+  TAC resta disponibile ma non compete più per l'attenzione: è un
+  dettaglio da aprire, non un secondo risultato.
+#}
+<section class="esito {{ 'trovato' if risultato.trovato and not risultato.senza_firmware else 'incerto' }}{{ ' esito-con-scheda' if risultato.scheda.trovata or risultato.trovato }}">
+  {% if imei %}{% include "_imei_identita.html" %}{% endif %}
+
+  {% if risultato.trovato and not risultato.senza_firmware %}
+    <h2>{{ risultato.nome }}</h2>
+    <p class="riga-esito">{{ risultato.riga }}</p>
+    <p class="nota">{{ risultato.fonte }}</p>
+  {% elif risultato.senza_firmware %}
+    {# ONESTÀ DEL RISULTATO. La fonte conferma che il modello esiste ma
+       non pubblica la versione. Scrivere «trovato» qui farebbe credere
+       di avere una risposta che non c'è. #}
+    <h2>{{ risultato.nome }}</h2>
+    <p>Il modello è riconosciuto, ma nessuna fonte ne pubblica la versione
+       firmware attuale.</p>
+    <p class="nota">{{ risultato.fonte }}</p>
+  {% else %}
+    <h2>Nessun firmware per «{{ risultato.query }}»</h2>
+  {% endif %}
+
+  {# QUESTO CODICE HA PIÙ DI UN NOME COMMERCIALE VERO, NON UN «FORSE».
+     `RMX3933` è insieme «C61», «Note 60», «Note 60s» e «NARZO N61»: la
+     stessa piattaforma venduta con nomi diversi in mercati diversi. Il
+     nome scelto sopra è uno solo, per necessità — l'archivio ha bisogno
+     di una chiave sola per dispositivo — ma dirlo esplicitamente evita
+     che chi ha in mano un «Note 60» pensi che l'app abbia sbagliato
+     telefono, quando ha solo scelto un altro nome vero per lo stesso. #}
+  {% if risultato.gemelli %}
+  <p class="nota">
+    Questo codice è noto anche come:
+  </p>
+  <p class="proposte">
+    {% for voce in risultato.gemelli %}
+    <a class="proposta" href="/?q={{ voce | urlencode }}">{{ voce }}</a>
+    {% endfor %}
+  </p>
+  {% endif %}
+
+  {# LA SCELTA A CHI HA IL TELEFONO IN MANO, NON ALL'EURISTICA.
+     Nasce dallo stesso bug dei gemelli qui sopra: quando un codice ha
+     più nomi commerciali veri, `modelcodes.nome_canonico` ne sceglie uno
+     solo (il più corto) — una scelta arbitraria che può non essere il
+     nome di chi sta testando quel telefono. Qui si può dire quale dei
+     nomi è quello giusto, e l'app lo ricorda per ogni ricerca futura di
+     questo codice — con qualsiasi dei suoi nomi.
+
+     LE OPZIONI SONO `risultato.opzioni_correzione`, NON `risultato.gemelli`
+     — sono quasi sempre le stesse, ma non sempre: vedi il docstring di
+     `_opzioni_correzione` in `web/main.py`. Può contenere in più una forma
+     con la marca scritta davanti (per RMX3933, «Realme Note 60») che il
+     dataset non scrive mai per esteso, ma che resta comunque collegata
+     alla stessa scheda tecnica di ogni altra forma — mai un campo di
+     testo libero, per non rischiare di salvare un refuso come se fosse
+     un dato ufficiale. Compare solo quando c'è un codice a cui agganciare
+     la scelta: senza, non c'è niente da correggere. #}
+  {% if risultato.codice_per_correzione and risultato.opzioni_correzione %}
+  <details class="correzione-nome">
+    <summary>{{ "Nome corretto a mano — cambia" if risultato.corretto_a_mano
+                else "Non è il nome giusto?" }}</summary>
+    <form method="post" action="/modello/correggi" class="correzione-form">
+      <input type="hidden" name="codice" value="{{ risultato.codice_per_correzione }}">
+      <input type="hidden" name="query" value="{{ risultato.query }}">
+      <label class="sr-only" for="correzione-nome">Nome commerciale</label>
+      <select id="correzione-nome" name="nome">
+        <option value="{{ risultato.nome }}" selected>{{ risultato.nome }}</option>
+        {% for voce in risultato.opzioni_correzione %}
+        <option value="{{ voce }}">{{ voce }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit">Salva come nome principale</button>
+    </form>
+    {% if risultato.corretto_a_mano %}
+    <form method="post" action="/modello/correggi" class="correzione-reset">
+      <input type="hidden" name="codice" value="{{ risultato.codice_per_correzione }}">
+      <input type="hidden" name="query" value="{{ risultato.query }}">
+      <input type="hidden" name="nome" value="">
+      <button type="submit" class="link-discreto">Torna alla scelta automatica</button>
+    </form>
+    {% endif %}
+    <p class="nota">Vale per ogni ricerca futura di questo codice, con
+      qualsiasi dei suoi nomi — non solo con quello scritto ora.</p>
+  </details>
+  {% endif %}
+
+  {# IL «FORSE CERCAVI» ANCHE QUANDO LA RICERCA RIESCE.
+     Stava solo nel ramo del fallimento, ed era il posto sbagliato: le
+     forme vicine servono di più proprio quando una risposta è arrivata
+     ma non è quella giusta — «Galaxy S24» quando si voleva l'Ultra, un
+     codice a una lettera di distanza dal proprio. Nel fallimento totale
+     è un ripiego; qui è una correzione di rotta. #}
+  {% if risultato.forse %}
+  <p class="{{ 'nota' if risultato.trovato }}">
+    {{ "Forse cercavi anche:" if risultato.trovato else "Forse cercavi:" }}
+  </p>
+  <p class="proposte">
+    {% for voce in risultato.forse %}
+    <a class="proposta {{ 'attiva' if voce == risultato.nome }}"
+       href="/?q={{ voce | urlencode }}">{{ voce }}</a>
+    {% endfor %}
+  </p>
+  {% endif %}
+
+  {% if not risultato.trovato and ai_attiva %}
+  <p class="nota">Se il nome che cerchi è scritto a modo tuo, prova il
+    tasto <strong>AI</strong> accanto a «Cerca»: traduce quello che hai
+    scritto in un modello che l'app conosce.</p>
+  {% endif %}
+
+  {# L'INGRESSO AL CONFRONTO. Il primo modello è già scritto — quello che
+     è stato appena cercato — e manca solo il secondo: un clic in meno
+     rispetto a scrivere due nomi da zero sulla pagina di confronto. #}
+  <p class="nota"><a href="/confronto?a={{ risultato.query | urlencode }}">Confronta
+    con un altro modello →</a></p>
+</section>
+
+{# La scheda si mostra solo se c'è qualcosa da mostrare. Una scheda di
+   soli trattini sotto un «nessun firmware trovato» non aggiunge niente e
+   fa sembrare guasto quello che è un modello inesistente.
+
+   `senza_intestazione`: il nome e il codice li ha già detti il riquadro
+   qui sopra. Ripeterli in un secondo `<h2>` è la ripetizione che questa
+   pagina doveva togliere — qui la scheda entra a dare solo quello che
+   non c'è ancora: la foto e le misure, processore per primo. #}
+{% if risultato.scheda.trovata or risultato.trovato %}
+{% with scheda = risultato.scheda, senza_intestazione = true %}{% include "_scheda.html" %}{% endwith %}
+{% endif %}
+
+{% if imei %}{% include "_imei_confronto.html" %}{% endif %}
+
+{# GLI AGGIORNAMENTI DI QUESTO MODELLO, se il telefono è già in archivio.
+   È la seconda metà della domanda: «che telefono è» la risponde la
+   scheda, «cosa gli è arrivato e quando» la risponde questa. #}
+{% if risultato.storico %}
+<h3 class="occhiello">Aggiornamenti di {{ risultato.nome }}</h3>
+<table class="tabella">
+  <thead>
+    <tr><th>Data</th><th>Versione</th><th>Build</th><th>Patch</th>
+        <th>Tipo</th><th>Cosa è successo</th></tr>
+  </thead>
+  <tbody>
+    {% for r in risultato.storico %}
+    <tr>
+      <td class="tenue">{{ r.data }}</td>
+      <td>{{ r.versione or "—" }}</td>
+      <td>{% if r.build %}<code>{{ r.build }}</code>{% else %}—{% endif %}</td>
+      <td class="tenue">{{ r.patch or "—" }}</td>
+      <td><span class="tag" style="--tinta: {{ r.colore }}">{{ r.severita }}</span></td>
+      <td class="tenue">
+        {% if r.link %}<a href="{{ r.link }}" target="_blank" rel="noopener">{{ r.titolo }}</a>
+        {% else %}{{ r.titolo }}{% endif %}
+        <span class="nota">{{ r.fonte }}</span>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if risultato.chiave %}
+<p class="nota"><a href="/dispositivo?k={{ risultato.chiave | urlencode }}">Scheda
+  completa del dispositivo in archivio →</a></p>
+{% endif %}
+{% endif %}
+
+{% with notizie = risultato.notizie %}{% include "_notizie.html" %}{% endwith %}
+
+{% if risultato.quante_notizie %}
+<p class="nota">Verifica online: {{ risultato.quante_notizie }} notizie trovate.</p>
+{% endif %}
+{% endblock %}

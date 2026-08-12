@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block titolo %}Aggiornamenti · {{ titolo_sito }}{% endblock %}
+{% block corpo %}
+<h3 class="occhiello">Ultimi {{ giorni }} giorni · {{ righe | length }} voci</h3>
+<p class="proposte">
+  {% for g in [7, 30, 90] %}
+  <a class="proposta {{ 'attiva' if g == giorni }}" href="/aggiornamenti?giorni={{ g }}">{{ g }} giorni</a>
+  {% endfor %}
+</p>
+{% if righe %}
+<table class="tabella">
+  <thead><tr><th>Data</th><th>Brand</th><th>Modello</th><th>Notizia</th>
+             <th>Build</th><th>Severità</th><th>Fonte</th></tr></thead>
+  <tbody>
+    {% for r in righe %}
+    <tr>
+      <td class="tenue">{{ r.data }}</td>
+      <td class="tenue">{{ r.brand }}</td>
+      <td>{{ r.modello }}</td>
+      <td>{% if r.link %}<a href="{{ r.link }}" rel="noopener" target="_blank">{{ r.titolo }}</a>
+          {% else %}{{ r.titolo }}{% endif %}</td>
+      <td>{% if r.build %}<code>{{ r.build }}</code>{% else %}—{% endif %}</td>
+      <td><span class="tag" style="--tinta: {{ r.colore }}">{{ r.severita }}</span></td>
+      <td class="tenue">{{ r.fonte }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="vuoto">Nessun aggiornamento in questo intervallo.</p>
+{% endif %}
+{% endblock %}

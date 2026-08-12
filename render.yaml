@@ -1,0 +1,53 @@
+# Distribuzione su Render, piano gratuito.
+#
+# PERCHÉ RENDER E NON UN ALTRO. Il vincolo che decide non è il prezzo — a
+# zero euro ce ne sono diversi — ma cosa deve fare questa applicazione:
+#
+#   * un THREAD DI SCANSIONE che gira per conto suo  → esclude tutto ciò
+#     che è «serverless» (Vercel, Cloudflare Workers, le funzioni): lì il
+#     processo vive il tempo di una richiesta;
+#   * CHIAMATE HTTP verso decine di domini diversi   → esclude il piano
+#     gratuito di PythonAnywhere, che le limita a una lista consentita, e
+#     che per giunta non regge ASGI (FastAPI non parte);
+#   * un DATABASE su file                            → sta bene ovunque,
+#     purché si sappia che il disco è effimero: qui lo è, e il
+#     salvataggio su Gist esiste apposta.
+#
+# Render regge tutti e tre, distribuisce direttamente da GitHub come già
+# si faceva, e tiene il repository privato. Il difetto è dichiarato sotto.
+services:
+  - type: web
+    name: mobile-update-tracker
+    runtime: docker
+    plan: free
+    region: frankfurt          # il più vicino all'Italia fra quelli gratuiti
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: DB_PATH
+        value: /tmp/tracker.db
+      # I segreti NON stanno qui: si inseriscono dal pannello di Render.
+      # `sync: false` significa esattamente questo — la variabile esiste,
+      # il valore lo metti a mano e non finisce nel repository.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: BACKUP_GIST_ID
+        sync: false
+      - key: BACKUP_GITHUB_TOKEN
+        sync: false
+
+# IL DIFETTO DEL PIANO GRATUITO, detto prima e non dopo: il servizio si
+# addormenta dopo circa 15 minuti senza visite, e la prima richiesta al
+# risveglio impiega dai 30 ai 60 secondi. Mentre dorme, il thread di
+# scansione dorme con lui.
+#
+# È la stessa identica condizione di Streamlit Community Cloud, quindi non
+# si perde niente rispetto a oggi. Se serve la scansione puntuale, la cura
+# è un controllo esterno gratuito (UptimeRobot, o un'azione pianificata su
+# GitHub) che chiama /health ogni dieci minuti: costa zero e tiene sveglio
+# il servizio.

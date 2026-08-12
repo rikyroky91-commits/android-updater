@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block titolo %}
+{%- if confronto.pronto -%}
+Confronta {{ confronto.a.nome }} e {{ confronto.b.nome }} · {{ titolo_sito }}
+{%- else -%}
+Confronta due modelli · {{ titolo_sito }}
+{%- endif -%}
+{% endblock %}
+
+{#
+  DUE MODELLI, FIANCO A FIANCO.
+
+  Nasce dal bug «RMX3939 rispondeva coi dati di RMX3930» (vedi FONTI.md):
+  la domanda che quel bug ha reso concreta — "questi due nomi sono
+  davvero lo stesso telefono?" — qui la si dà in mano a chi guarda,
+  invece di lasciare che il sistema la indovini da solo scegliendo un
+  nome equivalente al posto dell'altro.
+
+  Riusa la STESSA ricerca della pagina principale (`_confronta` in
+  `web/main.py` chiama `_esito_ricerca` due volte, non una versione sua):
+  quello che vedi qui non può dire una cosa diversa da quello che dice
+  cercando un modello alla volta.
+#}
+{% block corpo %}
+<h3 class="occhiello">Confronta due modelli</h3>
+
+<form class="confronto-form" method="get" action="/confronto">
+  <label class="sr-only" for="confronto-a">Primo modello</label>
+  <input id="confronto-a" name="a" type="search" autocomplete="off"
+         value="{{ confronto.query_a }}" placeholder="Primo modello, es. realme C63">
+  <span class="confronto-contro">contro</span>
+  <label class="sr-only" for="confronto-b">Secondo modello</label>
+  <input id="confronto-b" name="b" type="search" autocomplete="off"
+         value="{{ confronto.query_b }}" placeholder="Secondo modello, es. RMX3939">
+  <button type="submit">Confronta</button>
+</form>
+
+{% if not confronto.query_a or not confronto.query_b %}
+<p class="vuoto">Scrivi un nome o un codice modello in entrambi i campi per
+  vederli fianco a fianco — utile quando due telefoni con nomi vicini
+  potrebbero essere lo stesso hardware, o due dispositivi del tutto
+  diversi.</p>
+{% else %}
+
+{% if confronto.stesso_modello %}
+<p class="nota">«{{ confronto.query_a }}» e «{{ confronto.query_b }}»
+  risolvono allo stesso identico modello — {{ confronto.a.nome }}{% if
+  confronto.a.codice %}, <code>{{ confronto.a.codice }}</code>{% endif %} —
+  non due telefoni diversi: la stessa scheda, cercata con due nomi.</p>
+{% endif %}
+
+{#
+  UNA SOLA TABELLA, non una griglia sopra e una tabella sotto.
+
+  Segnalato dall'utente: la vecchia struttura (due blocchi separati, uno
+  con foto e nome, uno sotto con le righe) rendeva confuso capire dove
+  finisse un modello e cominciasse l'altro — niente teneva insieme, in
+  verticale, la colonna di A e quella di B dalla foto fino all'ultima
+  caratteristica. Mettendo foto e nome DENTRO lo stesso <table> (come
+  righe di `<thead>`, con `<colgroup>` a fissare le larghezze) il divisore
+  fra le due colonne diventa un'unica linea continua, non due allineamenti
+  che il CSS deve sperare combacino.
+#}
+<div class="confronto-tabella-scroll">
+<table class="tabella minuta tabella-confronto">
+  <colgroup>
+    <col class="col-etichetta">
+    <col class="col-modello">
+    <col class="col-modello">
+  </colgroup>
+  <thead>
+    <tr class="riga-foto">
+      <th class="cella-etichetta" scope="col"><span class="sr-only">Foto</span></th>
+      {% for lato in (confronto.a, confronto.b) %}
+      <th class="cella-foto">
+        <div class="confronto-foto">
+          {% if lato.scheda.foto %}
+          <img src="{{ lato.scheda.foto }}" alt="{{ lato.nome }}" loading="lazy">
+          {% else %}
+          <div class="foto-assente" aria-hidden="true">▭</div>
+          {% endif %}
+        </div>
+      </th>
+      {% endfor %}
+    </tr>
+    <tr class="riga-nome">
+      <th class="cella-etichetta" scope="col">Caratteristica</th>
+      {% for lato in (confronto.a, confronto.b) %}
+      <th class="cella-nome">
+        <span class="nome-modello">
+          {% if lato.trovato or lato.scheda.trovata %}
+          <a href="/?q={{ lato.query | urlencode }}">{{ lato.nome }}</a>
+          {% else %}
+          {{ lato.nome }}
+          {% endif %}
+        </span>
+        <span class="sottotitolo">
+          {% if lato.codice %}<code>{{ lato.codice }}</code>{% endif %}
+          {%- if not lato.trovato %} · nessun firmware trovato{% endif %}
+        </span>
+      </th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in confronto.righe %}
+    <tr class="{{ 'diversi' if r.diversi }}">
+      <th scope="row">{{ r.etichetta }}</th>
+      <td>{{ r.a }}</td>
+      <td>{{ r.b }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="nota">Le righe evidenziate differiscono fra i due modelli. Il
+  confronto è testuale: due modi diversi di scrivere lo stesso dato (per
+  esempio «128GB» e «128 GB») risultano comunque «diversi» — meglio una
+  differenza segnalata in più che una vera lasciata passare.</p>
+
+{% endif %}
+{% endblock %}

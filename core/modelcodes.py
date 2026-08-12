@@ -1,0 +1,651 @@
+"""Risoluzione codice modello → nome commerciale.
+
+Perché serve: i codici tecnici interni (RMX3939, ANA-AL00, CPH2513...) non
+compaiono quasi mai nei titoli delle notizie — i giornalisti scrivono
+"Realme C63", non "RMX3939" — quindi cercarli alla lettera su Google News
+non trova nulla anche quando il modello esiste ed è stato aggiornato di
+recente. Questo modulo risolve il codice al nome commerciale prima che la
+ricerca live parta, combinando DUE dataset pubblici indipendenti:
+
+1. KHwang9883/MobileModels-csv — community, copre bene i brand cinesi/globali
+   con le loro varianti regionali (colonne: model = codice, model_name = nome).
+2. La lista ufficiale di Google dei dispositivi certificati Play Store
+   (storage.googleapis.com/play_public/supported_devices.csv) — enorme
+   (ogni dispositivo Android mai certificato), colonne: Retail Branding,
+   Marketing Name, Device (nome in codice), Model (stringa modello).
+   ATTENZIONE: questo file è codificato in UTF-16, non UTF-8 — va decodificato
+   esplicitamente, altrimenti (esperienza già fatta con un bug simile sul BOM
+   dell'altro CSV) il parsing fallisce silenziosamente senza errori evidenti.
+
+I risultati delle due fonti vengono uniti: uno stesso codice può comparire
+in una, nell'altra, o in entrambe con nomi leggermente diversi — meglio
+mostrarli tutti che sceglierne uno arbitrariamente.
+
+Un codice può risolvere a PIÙ nomi commerciali: lo stesso numero di modello
+viene spesso riusato per varianti regionali diverse (es. RMX3939 = Realme
+C61 Global, C63, C65s e NARZO N63 insieme).
+"""
+from __future__ import annotations
+
+import csv
+import re
+import io
+from datetime import datetime, timezone
+
+try:
+    import requests
+except ImportError:  # pragma: no cover
+    requests = None
+
+from . import config as C
+from . import storage
+
+_REFRESH_HOURS = 24 * 7  # dataset che cambiano raramente: un refresh a settimana basta
+_DOWNLOAD_TIMEOUT = C.HTTP_TIMEOUT + 45  # sono file unici da diversi MB
+
+MOBILEMODELS_URL = "https://raw.githubusercontent.com/KHwang9883/MobileModels-csv/refs/heads/main/models.csv"
+GOOGLE_PLAY_URL = "https://storage.googleapis.com/play_public/supported_devices.csv"
+
+_memory_cache: dict[str, list[str]] | None = None
+# Indice inverso nome commerciale -> codici tecnici, costruito su richiesta
+# a partire da `_memory_cache` (vedi codes_for_name).
+_reverse_cache: dict[str, list[str]] | None = None
+_reverse_senza_suffisso: dict[str, list[str]] | None = None
+_reverse_compatto: dict[str, list[str]] | None = None
+# Codice tecnico -> nome della marca COME LO SCRIVE IL DATASET.
+#
+# LA MARCA ERA GIÀ NEL FILE, e veniva buttata via. `brand_from_code` la
+# deduceva da una manciata di espressioni regolari scritte a mano (`RMX`,
+# `CPH`, `SM-`, `XT`…), quindi ogni famiglia non prevista finiva sotto
+# «Altri brand»: `PCET00` (Oppo), `V2283A` (vivo), `CLT-L04` (Huawei),
+# `G020E` (Pixel). E un brand sbagliato è un `device_key` diverso, cioè
+# due schede per lo stesso telefono a seconda di come lo si cerca.
+#
+# Aggiungere una regex per ogni famiglia sarebbe una rincorsa senza fine.
+# I dataset dichiarano la marca riga per riga: la si legge e basta.
+_marca_di_codice: dict[str, str] | None = None
+
+# Sigle di CONNETTIVITÀ, non di gamma. La distinzione è tutta qui: «5G» in
+# «Galaxy A55 5G» non individua un telefono diverso da «Galaxy A55», mentre
+# «Ultra», «Pro», «Plus» e «FE» sì. Togliere anche quelle unirebbe modelli
+# distinti e restituirebbe il codice sbagliato — molto peggio di nessun
+# codice, perché un dato falso non si nota.
+_SUFFISSI_CONNETTIVITA = ("5g", "4g", "lte", "wifi", "wi fi", "ds", "dual sim")
+
+
+def _senza_suffissi(chiave_normalizzata: str) -> str:
+    """«galaxy a55 5g» → «galaxy a55». Lavora sulla chiave già normalizzata.
+
+    Lo spazio va ripulito a ogni giro: senza, il risultato è «galaxy a55 »
+    con lo spazio in coda, che non combacia con niente — il ripiego
+    sembrava attivo e non trovava nulla lo stesso.
+    """
+    testo = (chiave_normalizzata or "").strip()
+    cambiato = True
+    while cambiato:
+        cambiato = False
+        for suffisso in _SUFFISSI_CONNETTIVITA:
+            for forma in (suffisso, suffisso.replace(" ", "")):
+                if len(testo) > len(forma) + 2 and testo.endswith(forma):
+                    testo = testo[: -len(forma)].strip()
+                    cambiato = True
+    return " ".join(testo.split())
+
+# Stato leggibile dell'ultimo caricamento di ciascuna fonte, per distinguere
+# "database non raggiungibile" da "codice non presente" invece di un
+# fallimento silenzioso indistinguibile (bug già preso una volta: il
+# download riusciva ma il parsing falliva senza errori visibili).
+_status = {"mobilemodels": "non ancora caricato", "google_play": "non ancora caricato"}
+
+
+def status() -> str:
+    """Diagnostica leggibile sull'ultimo tentativo di caricare entrambi i
+    database dei codici modello. Usato dalla scheda Diagnostica e nei
+    messaggi di errore della ricerca."""
+    return f"MobileModels: {_status['mobilemodels']} | Google Play: {_status['google_play']}"
+
+
+def _download(url: str, source_key: str) -> bytes | None:
+    if requests is None:  # pragma: no cover
+        _status[source_key] = "libreria 'requests' non disponibile"
+        return None
+    try:
+        response = requests.get(url, timeout=_DOWNLOAD_TIMEOUT, headers={"User-Agent": C.USER_AGENT})
+    except Exception as exc:
+        _status[source_key] = f"connessione fallita: {exc}"
+        return None
+    if response.status_code != 200:
+        _status[source_key] = f"HTTP {response.status_code}"
+        return None
+    if not response.content or len(response.content) < 1000:
+        # Questi file sono sempre da diversi MB: una risposta minuscola
+        # indica quasi certamente una pagina di errore, non i dati veri.
+        _status[source_key] = f"risposta sospettosamente corta ({len(response.content)} byte)"
+        return None
+    _status[source_key] = f"scaricato con successo ({len(response.content) // 1024} KB)"
+    return response.content
+
+
+def _cached_bytes(url: str, source_key: str, bytes_meta_key: str, fetched_meta_key: str) -> bytes | None:
+    """Bytes grezzi da cache se abbastanza freschi, altrimenti riscaricati;
+    se la rete non risponde ricade sulla cache anche se vecchia."""
+    fetched_at = storage.get_meta(fetched_meta_key)
+    in_cache = storage.get_blob(bytes_meta_key)
+    if in_cache and fetched_at:
+        try:
+            age_h = (datetime.now(timezone.utc) - datetime.fromisoformat(fetched_at)).total_seconds() / 3600
+        except ValueError:
+            age_h = _REFRESH_HOURS + 1
+        if age_h < _REFRESH_HOURS:
+            _status[source_key] = f"da cache (aggiornata {age_h:.0f}h fa)"
+            return in_cache
+
+    fresh = _download(url, source_key)
+    if fresh:
+        storage.set_blob(bytes_meta_key, fresh)
+        storage.set_meta(fetched_meta_key, datetime.now(timezone.utc).isoformat())
+        return fresh
+    if in_cache:
+        _status[source_key] += " — uso la cache precedente (non aggiornatissima)"
+        return in_cache
+    _status[source_key] += " — nessuna cache precedente disponibile"
+    return None
+
+
+def _nome_visualizzato(marca: str, commerciale: str) -> str:
+    """«Retail Branding» + «Marketing Name», senza ripetere la marca.
+
+    UNDICIMILA NOMI SBAGLIATI, E LI SCRIVEVAMO NOI. Il CSV di Google tiene
+    la marca e il nome in due colonne, ma il nome spesso la contiene già:
+    unirli sempre produceva «POCO POCO M4 Pro», «Nokia Nokia C32», «Honor
+    HONOR Magic6» — 11 251 voci su questa forma.
+
+    Non è un problema estetico. Il nome finisce nella chiave del
+    dispositivo: chi cercava «POCO M4 Pro» e chi arrivava dal codice
+    `FLEUR` — che risolve al nome duplicato — ottenevano due schede
+    diverse per lo stesso telefono. Lo stesso difetto della v40, prodotto
+    dal nostro modo di leggere il file invece che dalle grafie delle fonti.
+    """
+    marca = " ".join((marca or "").split())
+    commerciale = " ".join((commerciale or "").split())
+    if not commerciale:
+        return marca
+    if not marca:
+        return commerciale
+    # Il confronto è per PAROLE INTERE, non per prefisso: «Tecno» e
+    # «TECNOPOP 5C» non sono una ripetizione — «TECNOPOP» è una gamma, e
+    # togliere la marca lascerebbe un nome che il catalogo non usa.
+    parole_marca = marca.lower().split()
+    parole_nome = commerciale.lower().split()
+    if parole_nome[:len(parole_marca)] == parole_marca:
+        return commerciale
+    return f"{marca} {commerciale}"
+
+
+def _ricorda_marca(codice: str, marca: str) -> None:
+    """Annota la marca dichiarata dal dataset per questo codice."""
+    global _marca_di_codice
+    codice = (codice or "").strip().upper()
+    marca = (marca or "").strip()
+    if not codice or not marca:
+        return
+    if _marca_di_codice is None:
+        _marca_di_codice = {}
+    _marca_di_codice.setdefault(codice, marca)
+
+
+def marca_dichiarata(codice: str) -> str | None:
+    """La marca che i dataset attribuiscono a questo codice, o None.
+
+    Risponde solo per un codice ESATTO: su un testo qualsiasi tacere è
+    l'unica risposta onesta, e chi chiama ha altri modi per dedurla.
+    """
+    global _memory_cache
+    if _memory_cache is None:
+        _memory_cache = _build_index()
+    return (_marca_di_codice or {}).get((codice or "").strip().upper())
+
+
+def _add_names(index: dict[str, list[str]], code: str, name: str) -> None:
+    code = code.strip().upper()
+    name = name.strip()
+    if not code or not name:
+        return
+    names = index.setdefault(code, [])
+    if name not in names:
+        names.append(name)
+
+
+def _build_mobilemodels_index() -> dict[str, list[str]]:
+    raw = _cached_bytes(
+        MOBILEMODELS_URL, "mobilemodels", "modelcodes_mm_bytes", "modelcodes_mm_fetched_at"
+    )
+    if not raw:
+        return {}
+    # UTF-8 con BOM iniziale ("\ufeffmodel,dtype,..."): va tolto o il nome
+    # della prima colonna letto da DictReader diventa "\ufeffmodel" invece
+    # di "model", scartando ogni riga silenziosamente (bug già preso una volta).
+    text = raw.decode("utf-8-sig", errors="replace")
+    index: dict[str, list[str]] = {}
+    try:
+        for row in csv.DictReader(io.StringIO(text)):
+            # QUI LA MARCA NON SI AGGIUNGE, ed è una scelta misurata.
+            # Provato il contrario — usare `_nome_visualizzato` come fa il
+            # parser di Google — la coerenza fra ricerca per nome e per
+            # codice PEGGIORA (Xiaomi dall'83% al 49%): i due dataset
+            # finiscono per dare nomi di lunghezza diversa per lo stesso
+            # codice, e `resolve()` ne restituisce uno solo. Il prefisso di
+            # marca si toglie invece nella CHIAVE, dove non distingue
+            # niente (vedi `extract.radice_modello`).
+            _add_names(index, row.get("model") or "", row.get("model_name") or "")
+            _ricorda_marca(row.get("model") or "",
+                           row.get("brand_title") or row.get("brand") or "")
+    except csv.Error as exc:
+        _status["mobilemodels"] = f"CSV scaricato ma non interpretabile: {exc}"
+        return {}
+    _status["mobilemodels"] += f" — {len(index)} codici indicizzati"
+    return index
+
+
+def _build_google_play_index() -> dict[str, list[str]]:
+    raw = _cached_bytes(
+        GOOGLE_PLAY_URL, "google_play", "modelcodes_gp_bytes", "modelcodes_gp_fetched_at"
+    )
+    if not raw:
+        return {}
+    # Questo file è UTF-16 (LE, con BOM), non UTF-8: decodificarlo come UTF-8
+    # produce testo con un carattere ogni due sbagliato invece di un errore
+    # esplicito — un fallimento silenzioso, esattamente il tipo di bug già
+    # preso una volta col CSV precedente. "utf-16" (senza suffisso) rileva
+    # da solo LE/BE dal BOM.
+    try:
+        text = raw.decode("utf-16")
+    except UnicodeError:
+        text = raw.decode("utf-8", errors="replace")
+    index: dict[str, list[str]] = {}
+    try:
+        for row in csv.DictReader(io.StringIO(text)):
+            brand = (row.get("Retail Branding") or "").strip()
+            marketing = (row.get("Marketing Name") or "").strip()
+            display = _nome_visualizzato(brand, marketing)
+            if not display:
+                continue
+            _add_names(index, row.get("Device") or "", display)
+            _add_names(index, row.get("Model") or "", display)
+            _ricorda_marca(row.get("Device") or "", brand)
+            _ricorda_marca(row.get("Model") or "", brand)
+    except csv.Error as exc:
+        _status["google_play"] = f"CSV scaricato ma non interpretabile: {exc}"
+        return {}
+    _status["google_play"] += f" — {len(index)} codici indicizzati"
+    return index
+
+
+def carica_indice(indice: dict[str, list[str]]) -> None:
+    """Sostituisce l'indice in memoria con uno dato.
+
+    Serve ai test: senza questo seme, ogni prova sulla risoluzione dei
+    codici scaricherebbe i dataset veri, e la suite fallirebbe su una
+    macchina senza rete — cosa che è puntualmente successa. Il progetto ha
+    la regola che nessun test tocchi la rete, e senza un punto di innesto
+    quella regola non è applicabile a questo modulo.
+    """
+    global _memory_cache
+    _memory_cache = dict(indice)
+
+
+def _build_index() -> dict[str, list[str]]:
+    merged: dict[str, list[str]] = {}
+    for code, names in _build_mobilemodels_index().items():
+        for name in names:
+            _add_names(merged, code, name)
+    for code, names in _build_google_play_index().items():
+        for name in names:
+            _add_names(merged, code, name)
+    return merged
+
+
+def resolve(code: str) -> list[str]:
+    """Nomi commerciali noti per un codice modello (es. 'RMX3939' →
+    ['realme C61 Global', 'realme C63', 'realme C65s', 'realme NARZO N63']),
+    combinando entrambi i dataset. Lista vuota se il codice non è in nessuno
+    dei due — probabilmente perché il testo passato non è affatto un codice
+    tecnico, ma già un nome per esteso. Usa `status()` per sapere se i
+    database si sono anche solo caricati.
+    """
+    global _memory_cache
+    if _memory_cache is None:
+        _memory_cache = _build_index()
+    codice = (code or "").strip().upper()
+    nomi = _memory_cache.get(codice, [])
+    if len(nomi) < 2:
+        return nomi
+
+    # IL NOME COMMERCIALE PRIMA DEL CODICE RIPETUTO.
+    #
+    # Ottomila nomi su 89 342 (l'8%) non sono nomi: sono il codice scritto
+    # una seconda volta, perché il dataset non aveva altro da mettere in
+    # quella colonna. Per 582 codici però il nome vero c'è — solo che
+    # arriva DOPO, e chi legge prende il primo.
+    #
+    # L'effetto si vedeva su OPPO: cercando `CPH2385` si otteneva «OPPO
+    # A57s», cercando «Oppo CPH2385» — che è il nome messo lì dal dataset —
+    # si otteneva un dispositivo chiamato come un codice. Due schede per lo
+    # stesso telefono, e una con un nome che nessuno riconoscerebbe.
+    #
+    # Non se ne butta via nessuno: chi non ha alternative tiene il suo.
+    return sorted(nomi, key=lambda n: _e_il_codice(n, codice))
+
+
+def resolve_senza_ambiguita(code: str) -> list[str]:
+    """Come `resolve()`, ma **senza i nomi condivisi con un telefono diverso**.
+
+    ## Il bug che questa funzione esiste per evitare
+
+    Cercando «realme c63» il sito rispondeva con la scheda di «C61»: niente
+    foto, niente CPU, aggiornamenti di un modello (RMX3930) diverso da
+    quello cercato (RMX3939, che questo stesso progetto ha verificato a
+    mano come "realme C63" — vedi `data/soc_modelli.csv`). La causa non è
+    un dato inventato, è un nome AMBIGUO usato come se non lo fosse:
+
+        resolve("RMX3939")   -> [..., "C61", "C63", ...]
+        codes_for_name("C61") -> ["RMX3930", "RMX3933", "RMX3939"]
+
+    Il dataset MobileModels (community, non verificato) assegna "C61" a
+    TRE codici diversi. `forme_equivalenti()` prendeva ogni nome restituito
+    da `resolve()` e lo usava come se identificasse senza ambiguità lo
+    stesso identico telefono del codice di partenza — vero per "C63",
+    "C65s", "NARZO N63" (che risolvono a un solo codice, proprio questo),
+    falso per "C61" (che ne risolve a tre). Provando "C61" come forma
+    equivalente di RMX3939, la ricerca trovava il piano ufficiale
+    Android Enterprise Recommended del VERO C61 (RMX3930, fonte Google,
+    non il dataset community) e lo presentava come se fosse la risposta
+    alla domanda su RMX3939.
+
+    ## Il punto 2, e perché la prima versione era troppo severa
+
+    La prima versione teneva un nome solo se `codes_for_name(nome)`
+    tornava **esattamente** `[code]` — un solo codice al mondo. Misurato
+    sui dati veri, questo buttava via anche i casi INNOCUI: Samsung vende
+    lo stesso «Galaxy A32» sotto tre codici regionali,
+
+        resolve("SM-A325F") -> ["Galaxy A32"]
+        resolve("SM-A325M") -> ["Galaxy A32"]
+        resolve("SM-A325N") -> ["Galaxy A32"]
+        codes_for_name("Galaxy A32") -> ["SM-A325F", "SM-A325M", "SM-A325N"]
+
+    tre codici, stesso identico telefono — non un'ambiguità, è la normale
+    variante di mercato. La versione precedente scartava "Galaxy A32" per
+    tutti e tre, e una ricerca su «SM-A325F» smetteva di arrivare al nome
+    commerciale. Misurato con un test che prova ogni grafia dello stesso
+    telefono (`test_quattro_segnalazioni.py`), fallito appena introdotto.
+
+    La differenza vera fra i due casi non è "quanti codici condividono
+    questo nome", è "quei codici sono davvero lo stesso telefono". Un
+    codice fratello che ha ESATTAMENTE lo stesso insieme di nomi (come i
+    tre A325) è una variante regionale innocua. Un codice fratello con
+    un insieme di nomi DIVERSO (RMX3933 risolve anche a "Note 60", "Note
+    60s", "NARZO N61" — non solo "C61") sta usando quel nome come alias
+    di un telefono che, per il resto della sua identità, è un altro
+    dispositivo: lì il nome va scartato.
+
+    Un nome resta valido come forma di ricerca solo se OGNI codice
+    fratello che lo rivendica ha, complessivamente, lo stesso insieme di
+    nomi di questo codice — altrimenti il nome punta a dispositivi con
+    un'identità diversa e va scartato: è lo stesso principio "meglio
+    saltare che indovinare" già applicato al catalogo specifiche. Il
+    codice nudo non passa da questo filtro e resta sempre utilizzabile:
+    è l'unica forma che il dataset non può rendere ambigua.
+    """
+    codice_pulito = code.strip().upper()
+    nomi = resolve(code)
+    proprio = set(nomi)
+    risultato = []
+    for nome in nomi:
+        fratelli = [c for c in codes_for_name(nome) if c != codice_pulito]
+        ambiguo = any(set(resolve(fratello)) != proprio for fratello in fratelli)
+        if not ambiguo:
+            risultato.append(nome)
+    return risultato
+
+
+def _e_il_codice(nome: str, codice: str) -> bool:
+    """True se questo «nome» è in realtà il codice ripetuto.
+
+    Conta anche «Oppo CPH2385», cioè il codice con davanti la marca: è la
+    forma più frequente, e guardando solo l'inizio della stringa sfuggiva
+    tutta. Ciò che resta dopo aver tolto il codice deve però essere corto —
+    una parola di marca, non un nome vero: «Galaxy A54 SM-A546B» resta un
+    nome, perché senza il codice dice ancora «Galaxy A54».
+    """
+    n = re.sub(r"[^A-Za-z0-9]", "", nome or "").upper()
+    c = re.sub(r"[^A-Za-z0-9]", "", codice or "").upper()
+    if len(c) < 4 or not n:
+        return False
+    if n.startswith(c) or c.startswith(n):
+        return True
+    return c in n and len(n.replace(c, "", 1)) <= 8
+
+
+def nome_canonico(codice: str) -> str | None:
+    """UN nome solo per un codice, scelto sempre allo stesso modo.
+
+    **QUESTA È LA RADICE DI META' DEI DIFETTI DI QUESTE VERSIONI.**
+
+    L'identità di un dispositivo la costruiamo dal NOME, ma le fonti
+    identificano i telefoni per CODICE — e il 17% dei codici ha più di un
+    nome. `CPH2423` è insieme «一加 10R», «OnePlus 10R» e «OnePlus 10R 5G»:
+    lo stesso identico telefono, tre grafie, e con una chiave costruita sul
+    nome diventava tre dispositivi.
+
+    Ogni correzione fatta finora — le parole di marca, i nomi cinesi, le
+    parentesi, la marca ripetuta, il confronto per parole intere — cercava
+    di far collassare grafie diverse su una chiave sola. È una partita che
+    non si vince: le grafie sono un dato della realtà, non un errore da
+    normalizzare.
+
+    Qui si fa il contrario: quando il codice è noto, **è il codice a
+    decidere il nome**, sempre lo stesso, e tutte le strade che arrivano a
+    quel telefono arrivano alla stessa identità.
+
+    La scelta è deterministica e motivata, non arbitraria:
+      1. mai un nome che è il codice ripetuto;
+      2. mai un nome che il dataset condivide con un ALTRO codice, se ne
+         esiste uno che non lo condivide — vedi sotto;
+      3. alfabeto latino prima dei caratteri cinesi — l'app è in italiano e
+         confronta con fonti occidentali;
+      4. il più corto, che è la forma senza suffissi di mercato;
+      5. a parità, l'ordine alfabetico, perché due esecuzioni diverse non
+         devono dare due nomi diversi.
+
+    ## Il punto 2, e perché è stato aggiunto
+
+    Misurato in produzione: cercando «realme c63» (RMX3939, verificato a
+    mano come "realme C63" in `data/soc_modelli.csv`) il nome scelto era
+    «realme C61» — non sbagliato di per sé (il dataset registra anche
+    questo come un nome di RMX3939), ma quel nome è REGISTRATO ALLO STESSO
+    MODO anche per RMX3930, il vero C61 secondo Android Enterprise
+    Recommended. Fra due nomi ugualmente validi per lo stesso codice, uno
+    condiviso con un telefono diverso e uno no, scegliere quello condiviso
+    è la scelta più confondibile delle due — e prima non c'era nessun
+    motivo per preferire l'altro.
+    """
+    nomi = resolve(codice)
+    if not nomi:
+        return None
+    codice_pulito = (codice or "").strip().upper()
+
+    def rango(nome: str) -> tuple:
+        ambiguo = codes_for_name(nome) != [codice_pulito]
+        cinese = any("一" <= ch <= "鿿" for ch in nome)
+        return (_e_il_codice(nome, codice_pulito), ambiguo, cinese, len(nome), nome)
+
+    return sorted(nomi, key=rango)[0]
+
+
+def codici_per_prefisso(prefisso: str, limite: int = 12) -> list[str]:
+    """Codici completi che cominciano per `prefisso`.
+
+    Serve per il CODICE INCOMPLETO, che è come le persone lo scrivono
+    davvero: chi cerca «a325» intende il Galaxy A32, ma nel dataset non
+    esiste `SM-A325` — esistono `SM-A325F`, `SM-A325M`, `SM-A325N`, perché
+    l'ultima lettera indica il mercato. Senza questa espansione la ricerca
+    non trovava nulla pur avendo il dato a un carattere di distanza.
+
+    Il prefisso deve essere già abbastanza specifico (almeno una lettera e
+    tre cifre): su un dataset da 68.000 voci un prefisso corto
+    restituirebbe decine di modelli diversi, e la ricerca peggiorerebbe
+    invece di migliorare.
+    """
+    global _memory_cache
+    if _memory_cache is None:
+        _memory_cache = _build_index()
+    chiave = (prefisso or "").strip().upper()
+    if not _RE_PREFISSO_UTILE.match(chiave):
+        return []
+    trovati = sorted(k for k in _memory_cache if k.startswith(chiave) and k != chiave)
+    return trovati[:limite]
+
+
+# Un prefisso utile ha una radice riconoscibile: `SM-A325`, `CPH264`,
+# `RMX393`. Sotto questa soglia si pescherebbe nel mucchio.
+_RE_PREFISSO_UTILE = re.compile(r"^(?:SM-[A-Z]\d{3}|[A-Z]{2,3}\d{3,4}|[A-Z]\d{3})[A-Z0-9]*$")
+
+
+# FRA PARENTESI CI PUÒ ESSERE UNA PRECISAZIONE O IL MODELLO STESSO.
+#
+# La regola nata per «Oppo A6x (CPH2819)» — buttare via tutto ciò che sta
+# fra parentesi — cancellava anche il numero di «Nothing Phone (2)», e con
+# lui la differenza fra (1), (2), (3a) e (4b): **tutti i telefoni Nothing
+# finivano sullo stesso modello**, e cercando «Phone (2)» si otteneva la
+# scheda del Phone (1). Vale per CMF e per chiunque altro usi le parentesi
+# come numero di gamma.
+#
+# La distinzione è la lunghezza, e non è un caso: un codice tecnico è lungo
+# (`CPH2819`, `SM-A546B`), un numero di gamma è corto (`2`, `2a`, `3a`).
+# Sotto i quattro caratteri quello che c'è fra parentesi È il modello.
+_RE_PARENTESI_CODICE = re.compile(r"\(\s*[^)]{4,}\s*\)")
+
+
+def _normalize_name(name: str) -> str:
+    """Chiave di confronto tollerante per un nome commerciale: minuscolo,
+    senza punteggiatura, spazi normalizzati, senza prefisso di marca
+    ('Samsung Galaxy S24 Ultra' e 'Galaxy S24 Ultra' devono combaciare).
+
+    Unisce anche una sigla breve alle cifre che la seguono: «C 63» e «C63»
+    sono lo stesso modello, e le persone scrivono in entrambi i modi. Il
+    taglio a due lettere è voluto: unire anche parole più lunghe
+    trasformerebbe «Note 13» in «Note13», che non corrisponde a nulla.
+    Le precisazioni fra parentesi vengono scartate: «Oppo A6x (CPH2819)» e
+    «OPPO A6x» sono lo stesso telefono. Serve anche come difesa verso i
+    dati già in archivio, dove un nome decorato impediva ogni
+    corrispondenza con il catalogo delle fonti ufficiali.
+    """
+    senza_parentesi = _RE_PARENTESI_CODICE.sub(" ", name or "")
+    text = re.sub(r"[^a-z0-9+]+", " ", senza_parentesi.lower()).strip()
+    for prefix in ("samsung ", "xiaomi ", "honor ", "huawei ", "motorola ",
+                   "oneplus ", "oppo ", "realme ", "vivo ", "google "):
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+            break
+    text = re.sub(r"\b([a-z]{1,2})\s+(\d)", r"\1\2", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def codes_for_name(name: str) -> list[str]:
+    """Indice INVERSO: codici tecnici noti per un nome commerciale
+    (es. 'Galaxy S24 Ultra' → ['SM-S928B', 'SM-S928U', ...]).
+
+    Serve per interrogare on-demand gli endpoint ufficiali che accettano
+    solo il codice modello e non il nome commerciale — in particolare il
+    controllo versione Samsung, che con questo indice funziona per
+    qualunque modello presente nei dataset invece che solo per quelli di
+    una tabella scritta a mano.
+    """
+    global _reverse_cache, _reverse_senza_suffisso, _reverse_compatto, _memory_cache
+    if _memory_cache is None:
+        _memory_cache = _build_index()
+    if _reverse_cache is None:
+        reverse: dict[str, list[str]] = {}
+        senza: dict[str, list[str]] = {}
+        compatto: dict[str, list[str]] = {}
+        for code, names in _memory_cache.items():
+            for candidate in names:
+                key = _normalize_name(candidate)
+                if not key:
+                    continue
+                bucket = reverse.setdefault(key, [])
+                if code not in bucket:
+                    bucket.append(code)
+                stretta = _compatta(key)
+                if stretta:
+                    bucket3 = compatto.setdefault(stretta, [])
+                    if code not in bucket3:
+                        bucket3.append(code)
+                ridotta = _senza_suffissi(key)
+                if ridotta and ridotta != key:
+                    bucket2 = senza.setdefault(ridotta, [])
+                    if code not in bucket2:
+                        bucket2.append(code)
+        _reverse_cache = reverse
+        _reverse_senza_suffisso = senza
+        _reverse_compatto = compatto
+
+    chiave = _normalize_name(name)
+    trovati = _reverse_cache.get(chiave)
+    if trovati:
+        return trovati
+
+    # LO SPAZIO FRA LA GAMMA E IL NUMERO NON DISTINGUE NIENTE.
+    # Il catalogo scrive «OPPO Reno14», le persone scrivono «oppo reno 14»,
+    # ed erano due telefoni diversi: cercando per nome non si arrivava a
+    # nessun codice, quindi nessuna fonte ufficiale veniva interrogata,
+    # mentre cercando «CPH2737» si otteneva la risposta. Stessa domanda,
+    # stesso telefono, due esiti — e quello sbagliato toccava alla forma
+    # più naturale.
+    #
+    # La regola in `_normalize_name` unisce solo sigle di UNA o DUE
+    # lettere («C 63» → «c63») perché unire di più avrebbe rotto i nomi in
+    # cui lo spazio conta. Qui non si sceglie: si prova anche la forma
+    # tutta attaccata, come RIPIEGO, dopo il confronto esatto. Nessun nome
+    # che oggi funziona cambia comportamento.
+    stretta = _compatta(chiave)
+    if stretta:
+        trovati = (_reverse_compatto or {}).get(stretta)
+        if trovati:
+            return trovati
+    # RIPIEGO SUI SUFFISSI COMMERCIALI. Il catalogo scrive «Galaxy A55 5G»,
+    # le persone cercano «Galaxy A55»: con il solo confronto esatto quel
+    # modello non aveva NESSUN codice, e senza codice il controllo versione
+    # Samsung — che è generico e funzionerebbe — non poteva partire. Su
+    # sedici nomi comuni ne mancavano tre, tutti per questo motivo.
+    #
+    # Si tolgono solo le sigle di connettività, mai le sigle di gamma:
+    # «Ultra», «Pro», «Plus», «FE» distinguono telefoni diversi e unirli
+    # produrrebbe il codice sbagliato, che è molto peggio di nessun codice.
+    ridotta = _senza_suffissi(chiave)
+    if ridotta and ridotta != chiave:
+        trovati = _reverse_cache.get(ridotta)
+        if trovati:
+            return trovati
+        trovati = (_reverse_compatto or {}).get(_compatta(ridotta))
+        if trovati:
+            return trovati
+    return (_reverse_senza_suffisso or {}).get(ridotta or chiave, [])
+
+
+def _compatta(chiave: str) -> str:
+    """Il nome senza spazi: «reno 14» e «reno14» danno la stessa chiave."""
+    return re.sub(r"\s+", "", chiave or "")
+
+
+def reset_cache() -> None:
+    """Usato dai test per forzare una nuova build dell'indice."""
+    global _memory_cache, _reverse_cache, _reverse_senza_suffisso, _status
+    global _reverse_compatto, _marca_di_codice
+    _marca_di_codice = None
+    _memory_cache = None
+    _reverse_cache = None
+    _reverse_senza_suffisso = None
+    _reverse_compatto = None
+    _status = {"mobilemodels": "non ancora caricato", "google_play": "non ancora caricato"}

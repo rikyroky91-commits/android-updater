@@ -1,0 +1,192 @@
+model_code,nome_commerciale,soc_nome,produttore,soc_codice,nota
+# Tabella CURATA A MANO. Corta di proposito: contiene solo modelli per cui
+# l'abbinamento codice-chip e' verificato, non "plausibile". Chi legge un
+# risultato non puo' distinguere una riga giusta da una ricordata male, e un
+# Exynos scritto al posto di uno Snapdragon fa cercare un bug su un telefono
+# che non ce l'ha. Per tutto il resto vale il catalogo Play (vedi FONTI.md).
+#
+# Il caso per cui questa tabella esiste e' la serie Galaxy S: stesso nome
+# commerciale, stesso firmware, chip diverso per mercato. E la ripartizione
+# cambia a ogni generazione, quindi NON esiste una regola sul suffisso B/U
+# che si possa applicare alla cieca.
+SM-S931B,Galaxy S25,Snapdragon 8 Elite for Galaxy,Qualcomm,SM8750-AC,Variante Europa/Global
+SM-S931U,Galaxy S25,Snapdragon 8 Elite for Galaxy,Qualcomm,SM8750-AC,Variante USA
+SM-S936B,Galaxy S25+,Snapdragon 8 Elite for Galaxy,Qualcomm,SM8750-AC,Variante Europa/Global
+SM-S938B,Galaxy S25 Ultra,Snapdragon 8 Elite for Galaxy,Qualcomm,SM8750-AC,Variante Europa/Global
+SM-S938U,Galaxy S25 Ultra,Snapdragon 8 Elite for Galaxy,Qualcomm,SM8750-AC,Variante USA
+SM-S921B,Galaxy S24,Exynos 2400,Samsung,S5E9945,Variante Europa/Global — la USA monta Snapdragon
+SM-S921U,Galaxy S24,Snapdragon 8 Gen 3 for Galaxy,Qualcomm,SM8650-AC,Variante USA — la europea monta Exynos
+SM-S926B,Galaxy S24+,Exynos 2400,Samsung,S5E9945,Variante Europa/Global — la USA monta Snapdragon
+SM-S926U,Galaxy S24+,Snapdragon 8 Gen 3 for Galaxy,Qualcomm,SM8650-AC,Variante USA — la europea monta Exynos
+SM-S928B,Galaxy S24 Ultra,Snapdragon 8 Gen 3 for Galaxy,Qualcomm,SM8650-AC,Ultra: Snapdragon in tutti i mercati
+SM-S928U,Galaxy S24 Ultra,Snapdragon 8 Gen 3 for Galaxy,Qualcomm,SM8650-AC,Ultra: Snapdragon in tutti i mercati
+SM-S911B,Galaxy S23,Snapdragon 8 Gen 2 for Galaxy,Qualcomm,SM8550-AC,Snapdragon in tutti i mercati
+SM-S916B,Galaxy S23+,Snapdragon 8 Gen 2 for Galaxy,Qualcomm,SM8550-AC,Snapdragon in tutti i mercati
+SM-S918B,Galaxy S23 Ultra,Snapdragon 8 Gen 2 for Galaxy,Qualcomm,SM8550-AC,Snapdragon in tutti i mercati
+SM-S901B,Galaxy S22,Exynos 2200,Samsung,S5E9925,Variante Europa/Global — la USA monta Snapdragon
+SM-S901U,Galaxy S22,Snapdragon 8 Gen 1,Qualcomm,SM8450,Variante USA — la europea monta Exynos
+SM-S906B,Galaxy S22+,Exynos 2200,Samsung,S5E9925,Variante Europa/Global — la USA monta Snapdragon
+SM-S906U,Galaxy S22+,Snapdragon 8 Gen 1,Qualcomm,SM8450,Variante USA — la europea monta Exynos
+SM-S908B,Galaxy S22 Ultra,Exynos 2200,Samsung,S5E9925,Variante Europa/Global — la USA monta Snapdragon
+SM-S908U,Galaxy S22 Ultra,Snapdragon 8 Gen 1,Qualcomm,SM8450,Variante USA — la europea monta Exynos
+SM-A325F,Galaxy A32 4G,Helio G80,MediaTek,MT6769V,Variante 4G — la 5G monta Dimensity 720
+SM-A326B,Galaxy A32 5G,Dimensity 720,MediaTek,MT6853,Variante 5G — la 4G monta Helio G80
+SM-A528B,Galaxy A52s 5G,Snapdragon 778G,Qualcomm,SM7325,
+SM-A525F,Galaxy A52 4G,Snapdragon 720G,Qualcomm,SM7125,
+SM-A526B,Galaxy A52 5G,Snapdragon 750G,Qualcomm,SM7225,
+SM-A536B,Galaxy A53 5G,Exynos 1280,Samsung,S5E8825,
+SM-A546B,Galaxy A54 5G,Exynos 1380,Samsung,S5E8835,
+SM-A556B,Galaxy A55 5G,Exynos 1480,Samsung,S5E8845,
+SM-A566B,Galaxy A56 5G,Exynos 1580,Samsung,S5E8855,
+SM-A346B,Galaxy A34 5G,Dimensity 1080,MediaTek,MT6877V,
+SM-A356B,Galaxy A35 5G,Exynos 1380,Samsung,S5E8835,
+SM-A366B,Galaxy A36 5G,Snapdragon 6 Gen 3,Qualcomm,SM6475,
+SM-A256B,Galaxy A25 5G,Exynos 1280,Samsung,S5E8825,
+SM-A156B,Galaxy A15 5G,Dimensity 6100+,MediaTek,MT6835,
+SM-A155F,Galaxy A15 4G,Helio G99,MediaTek,MT6789,
+SM-G991B,Galaxy S21,Exynos 2100,Samsung,S5E9840,Variante Europa/Global — la USA monta Snapdragon 888
+SM-G991U,Galaxy S21,Snapdragon 888,Qualcomm,SM8350,Variante USA — la europea monta Exynos
+SM-G998B,Galaxy S21 Ultra,Exynos 2100,Samsung,S5E9840,Variante Europa/Global — la USA monta Snapdragon 888
+SM-G998U,Galaxy S21 Ultra,Snapdragon 888,Qualcomm,SM8350,Variante USA — la europea monta Exynos
+# --- Serie A: le varianti 4G e 5G montano quasi sempre chip DIVERSI, e in
+# --- alcuni casi lo stesso nome commerciale cambia chip a seconda del
+# --- suffisso di mercato (A14: /F e /P montano Helio G80, /R monta Exynos
+# --- 850). Per questo la chiave e' il codice completo e mai il nome.
+SM-A035F,Galaxy A03,Unisoc T606,Unisoc,T606,
+SM-A037F,Galaxy A03s,Helio P35,MediaTek,MT6765,
+SM-A045F,Galaxy A04,Helio P35,MediaTek,MT6765,
+SM-A047F,Galaxy A04s,Exynos 850,Samsung,S5E3830,
+SM-A055F,Galaxy A05,Helio G85,MediaTek,MT6769,
+SM-A057F,Galaxy A05s,Snapdragon 680,Qualcomm,SM6225,
+SM-A135F,Galaxy A13 4G,Exynos 850,Samsung,S5E3830,Variante 4G — la 5G monta Dimensity 700
+SM-A136B,Galaxy A13 5G,Dimensity 700,MediaTek,MT6833,Variante 5G — la 4G monta Exynos 850
+SM-A145F,Galaxy A14 4G,Helio G80,MediaTek,MT6769V,Variante /F e /P — la /R monta Exynos 850
+SM-A145P,Galaxy A14 4G,Helio G80,MediaTek,MT6769V,Variante /F e /P — la /R monta Exynos 850
+SM-A145R,Galaxy A14 4G,Exynos 850,Samsung,S5E3830,Variante /R — le /F e /P montano Helio G80
+SM-A146B,Galaxy A14 5G,Exynos 1330,Samsung,S5E8535,
+SM-A165F,Galaxy A16 4G,Helio G99,MediaTek,MT6789,Variante 4G — la 5G monta Exynos 1330
+SM-A166B,Galaxy A16 5G,Exynos 1330,Samsung,S5E8535,Variante 5G — la 4G monta Helio G99
+SM-A235F,Galaxy A23 4G,Snapdragon 680,Qualcomm,SM6225,
+SM-A236B,Galaxy A23 5G,Snapdragon 695,Qualcomm,SM6375,
+SM-A245F,Galaxy A24,Helio G99,MediaTek,MT6789,
+SM-A266B,Galaxy A26 5G,Exynos 1380,Samsung,S5E8835,
+SM-A336B,Galaxy A33 5G,Exynos 1280,Samsung,S5E8825,
+SM-A515F,Galaxy A51,Exynos 9611,Samsung,S5E9611,
+SM-A715F,Galaxy A71,Snapdragon 730,Qualcomm,SM7150,
+SM-A725F,Galaxy A72,Snapdragon 720G,Qualcomm,SM7125,
+SM-A736B,Galaxy A73 5G,Snapdragon 778G,Qualcomm,SM7325,
+# --- Serie S e pieghevoli non gia' coperti sopra
+SM-G980F,Galaxy S20,Exynos 990,Samsung,S5E9830,Variante Europa/Global — la USA monta Snapdragon 865
+SM-G981B,Galaxy S20 5G,Exynos 990,Samsung,S5E9830,Variante Europa/Global — la USA monta Snapdragon 865
+SM-G988B,Galaxy S20 Ultra,Exynos 990,Samsung,S5E9830,Variante Europa/Global — la USA monta Snapdragon 865
+SM-N980F,Galaxy Note20,Exynos 990,Samsung,S5E9830,Variante Europa/Global
+SM-N986B,Galaxy Note20 Ultra,Exynos 990,Samsung,S5E9830,Variante Europa/Global
+SM-S711B,Galaxy S23 FE,Exynos 2200,Samsung,S5E9925,
+SM-S721B,Galaxy S24 FE,Exynos 2400e,Samsung,S5E9945,
+SM-F731B,Galaxy Z Flip5,Snapdragon 8 Gen 2 for Galaxy,Qualcomm,SM8550-AC,
+SM-F946B,Galaxy Z Fold5,Snapdragon 8 Gen 2 for Galaxy,Qualcomm,SM8550-AC,
+SM-F741B,Galaxy Z Flip6,Snapdragon 8 Gen 3 for Galaxy,Qualcomm,SM8650-AC,
+SM-F956B,Galaxy Z Fold6,Snapdragon 8 Gen 3 for Galaxy,Qualcomm,SM8650-AC,
+# --- HONOR, HUAWEI, realme, Nothing: le quattro marche fuori dal
+# --- perimetro di specs.py (vedi FONTI.md, "Undici marche"). Prima riga
+# --- scritta qui l'11/08/2026, verificata a mano su GSMArena una scheda
+# --- alla volta — stesso metodo della serie Galaxy S sopra, non uno
+# --- scarico bulk. Copre i modelli piu' recenti/diffusi, non il catalogo
+# --- storico: vedi FONTI.md per la lista di cosa manca ancora.
+PTP-AN10,Honor Magic7 Pro,Snapdragon 8 Elite,Qualcomm,SM8750-AB,Verificato su GSMArena 11/08/2026
+PTP-N49,Honor Magic7 Pro,Snapdragon 8 Elite,Qualcomm,SM8750-AB,Variante Cina — verificato su GSMArena 11/08/2026
+ELP-AN00,Honor 200 Pro,Snapdragon 8s Gen 3,Qualcomm,SM8635,Verificato su GSMArena 11/08/2026
+ELP-NX9,Honor 200 Pro,Snapdragon 8s Gen 3,Qualcomm,SM8635,Variante Cina — verificato su GSMArena 11/08/2026
+HBN-LX9,Huawei Pura 70 Pro,Kirin 9010,HiSilicon,KIRIN9010,Variante internazionale (EMUI 14.2) — verificato su GSMArena 11/08/2026
+HBN-AL00,Huawei Pura 70 Pro,Kirin 9010,HiSilicon,KIRIN9010,Variante Cina (HarmonyOS 4.2 — ancora su base AOSP) — verificato su GSMArena 11/08/2026
+RMX5010,realme GT 7 Pro,Snapdragon 8 Elite,Qualcomm,SM8750-AB,Verificato su GSMArena 11/08/2026
+RMX5011,realme GT 7 Pro,Snapdragon 8 Elite,Qualcomm,SM8750-AB,Variante regionale — verificato su GSMArena 11/08/2026
+RMX3920,realme 13 Pro+,Snapdragon 7s Gen 2,Qualcomm,SM7435-AB,Verificato su GSMArena 11/08/2026
+RMX3921,realme 13 Pro+,Snapdragon 7s Gen 2,Qualcomm,SM7435-AB,Variante regionale — verificato su GSMArena 11/08/2026
+A024,Nothing Phone (3),Snapdragon 8s Gen 4,Qualcomm,SM8735,Verificato su GSMArena 11/08/2026
+A059,Nothing Phone (3a),Snapdragon 7s Gen 3,Qualcomm,SM7635,Verificato su GSMArena 11/08/2026
+# --- Secondo lotto, stesso metodo, 11/08/2026 — su richiesta esplicita di
+# --- allargare la copertura HONOR/realme. RMX3933 e' il modello del
+# --- caso reale gia' discusso in sessione (l'utente lo possiede: cercarlo
+# --- ora risolve anche il chip, non solo il nome "Note 60").
+RMX3933,realme Note 60,Tiger T612,Unisoc,T612,Verificato su GSMArena 11/08/2026
+BVL-AN16,Honor Magic6 Pro,Snapdragon 8 Gen 3,Qualcomm,SM8650-AB,Verificato su GSMArena 11/08/2026
+BVL-N49,Honor Magic6 Pro,Snapdragon 8 Gen 3,Qualcomm,SM8650-AB,Variante Cina — verificato su GSMArena 11/08/2026
+RMX5051,realme 14 Pro+,Snapdragon 7s Gen 3,Qualcomm,SM7635,Verificato su GSMArena 11/08/2026
+# --- Terzo lotto, stesso metodo, 11/08/2026 — durante la discussione sul
+# --- tasto AI, per non fermare il lavoro mentre si valuta il resto.
+DNP-NX9,Honor 400 Pro,Snapdragon 8 Gen 3,Qualcomm,SM8650-AB,Verificato su GSMArena 11/08/2026
+RMX5210,realme GT 8 Pro,Snapdragon 8 Elite Gen 5,Qualcomm,SM8850-AC,Variante Cina — verificato su GSMArena 11/08/2026
+MBH-AN10,Honor Magic V5,Snapdragon 8 Elite,Qualcomm,SM8750-AB,Verificato su GSMArena 11/08/2026
+MHG-AN00,Honor Magic V5,Snapdragon 8 Elite,Qualcomm,SM8750-AB,Variante regionale — verificato su GSMArena 11/08/2026
+MBH-N49,Honor Magic V5,Snapdragon 8 Elite,Qualcomm,SM8750-AB,Variante Cina — verificato su GSMArena 11/08/2026
+# --- RMX3939: chiesto direttamente dall'utente (lo stava cercando senza
+# --- risultato). GSMArena ha risposto 429 (troppe richieste da questa
+# --- sessione), quindi qui la verifica e' incrociata su due fonti
+# --- indipendenti invece di una sola: GSMchoice per il nome e il chip,
+# --- Geekbench per l'ID hardware reale ("ums9230_latte" = il nome
+# --- interno Unisoc del Tiger T612, coerente con quanto detto da GSMchoice).
+RMX3939,realme C63,Tiger T612,Unisoc,T612,Verificato su GSMchoice + Geekbench (incrociato, GSMArena 429) 11/08/2026
+# --- Inserimento metodico realme, su richiesta esplicita — round 1
+# --- (11/08/2026), stesso metodo: una scheda alla volta su GSMArena.
+# NOTA: per i due chip MediaTek sotto, GSMArena non pubblica una sigla
+# interna distinta dal nome commerciale (a differenza di es. "Dimensity
+# 6100+" = MT6835 nelle righe Samsung sopra) — si e' cercato apposta prima
+# di scrivere qualcosa, e non c'e' una fonte che la dia. Meglio lasciare
+# soc_codice vuoto che indovinarla: un MTxxxx sbagliato scritto qui
+# sarebbe esattamente l'errore che questa tabella esiste per evitare.
+RMX5078,realme 14T,Dimensity 6300,MediaTek,,Verificato su GSMArena 11/08/2026 — nessuna sigla interna pubblicata
+RMX5303,realme C71,T7250,Unisoc,T7250,Verificato su GSMArena 11/08/2026
+RMX5085,realme GT 7T,Dimensity 8400 Max,MediaTek,,Verificato su GSMArena 11/08/2026 — nessuna sigla interna pubblicata
+RMX5101,realme 15 Pro,Snapdragon 7 Gen 4,Qualcomm,SM7750-AB,Verificato su GSMArena 11/08/2026
+RMX3943,realme C75 5G,Dimensity 6300,MediaTek,,Verificato su GSMArena 11/08/2026 — nessuna sigla interna pubblicata
+RMX5106,realme 15 5G,Dimensity 7300+,MediaTek,,Verificato su GSMArena 11/08/2026 — nessuna sigla interna pubblicata
+RMX5107,realme P4 Power,Dimensity 7400 Ultra,MediaTek,,Verificato su GSMArena 11/08/2026 — nessuna sigla interna pubblicata
+RMX5253,realme C85 5G,Dimensity 6300,MediaTek,,Verificato su GSMArena 11/08/2026 — nessuna sigla interna pubblicata
+RMX5171,realme 16 5G,Dimensity 6400 Turbo,MediaTek,,Verificato su GSMArena 11/08/2026 — nessuna sigla interna pubblicata
+RMX5116,realme P4 Pro,Snapdragon 7 Gen 4,Qualcomm,SM7750-AB,Verificato su GSMArena 11/08/2026
+# --- Inserimento metodico HONOR, su richiesta esplicita — round 1
+# --- (11/08/2026), stesso metodo dopo realme.
+DNY-NX9,Honor 400,Snapdragon 7 Gen 3,Qualcomm,SM7550-AB,Verificato su GSMArena 11/08/2026
+VKJ-NX9,Honor 600,Snapdragon 7 Gen 4,Qualcomm,SM7750-AB,Verificato su GSMArena 11/08/2026
+MTN-NX1,Honor X9d,Snapdragon 6 Gen 4,Qualcomm,,Verificato su GSMArena 11/08/2026 — nessuna sigla SM pubblicata
+PTP-AN00,Honor Magic7,Snapdragon 8 Elite,Qualcomm,SM8750-AB,Verificato su GSMArena 11/08/2026
+LNA-LX2,Honor X8d,Snapdragon 6s 4G Gen 2,Qualcomm,,Verificato su GSMArena 11/08/2026 — nessuna sigla SM pubblicata
+LNA-LX3,Honor X8d,Snapdragon 6s 4G Gen 2,Qualcomm,,Variante regionale — verificato su GSMArena 11/08/2026 — nessuna sigla SM pubblicata
+# --- Round 2 (11/08/2026): ripresa dei due saltati per 429 + altri nuovi.
+# --- Honor 600 Pro verificato su UNA sola fonte (GSMchoice, GSMArena
+# --- ancora 429): coerente con il pattern gia' visto (VKJ-NX9 base ->
+# --- VKP-NX9 Pro, stesso schema di altre coppie base/Pro HONOR), ma
+# --- dichiarato come verifica singola e non incrociata, a differenza
+# --- delle altre righe.
+VKP-NX9,Honor 600 Pro,Snapdragon 8 Elite,Qualcomm,SM8750-AB,Verificato su GSMchoice (fonte singola — GSMArena 429) 11/08/2026
+PTP-AN20,Honor Magic7 RSR Porsche Design,Snapdragon 8 Elite,Qualcomm,SM8750-AB,Verificato su GSMArena 11/08/2026
+PTP-N59,Honor Magic7 RSR Porsche Design,Snapdragon 8 Elite,Qualcomm,SM8750-AB,Variante Cina — verificato su GSMArena 11/08/2026
+RMX5131,realme 16 Pro+,Snapdragon 7 Gen 4,Qualcomm,SM7750-AB,Verificato su GSMArena 11/08/2026
+ELI-AN00,Honor 200,Snapdragon 7 Gen 3,Qualcomm,SM7550-AB,Verificato su GSMArena 11/08/2026
+ELI-NX9,Honor 200,Snapdragon 7 Gen 3,Qualcomm,SM7550-AB,Variante Cina — verificato su GSMArena 11/08/2026
+BRP-NX1,Honor Magic7 Lite,Snapdragon 6 Gen 1,Qualcomm,SM6450,Verificato su GSMArena 11/08/2026
+# NOTA: RMX5061 (realme GT 7 base/global) e' un modello distinto sia da
+# RMX5010/RMX5011 (GT 7 Pro, gia' presente sopra) sia dalla variante Cina
+# del GT7 base, che GSMArena segnala esistere ("Not to be confused with
+# Realme GT7 for China") ma senza un model code proprio nella pagina letta.
+RMX5061,realme GT 7,Dimensity 9400e,MediaTek,,Verificato su GSMArena 11/08/2026 — nessuna sigla interna pubblicata
+# NOTA: RMX5111/RMX5112 (realme 15T) non compaiono nella pagina GSMArena
+# (nessuna riga "Models" pubblicata li'). Codici presi da GSMchoice, nome
+# chip incrociato su 3 fonti indipendenti (GSMArena stesso, Gizbot,
+# TechNave) che concordano su "Dimensity 6400 Max"; solo GSMchoice lo
+# scrive senza "Max" — scartato come refuso minore, non come conflitto
+# reale (a differenza del caso realme P4 Lite, scartato perche' le fonti
+# davano famiglie di chip diverse, non solo un suffisso).
+RMX5111,realme 15T,Dimensity 6400 Max,MediaTek,,Verificato su GSMArena (chip) + GSMchoice (codici) 11/08/2026 — nessuna sigla interna pubblicata
+RMX5112,realme 15T,Dimensity 6400 Max,MediaTek,,Variante regionale — verificato su GSMArena (chip) + GSMchoice (codici) 11/08/2026 — nessuna sigla interna pubblicata
+ABR-NX1,Honor 400 Lite,Dimensity 7025 Ultra,MediaTek,,Verificato su GSMArena 11/08/2026 — nessuna sigla interna pubblicata
+ABR-N31C1,Honor 400 Lite,Dimensity 7025 Ultra,MediaTek,,Variante regionale — verificato su GSMArena 11/08/2026 — nessuna sigla interna pubblicata
+ABR-AN00,Honor X70i,Dimensity 7025 Ultra,MediaTek,,Verificato su GSMArena 11/08/2026 — nessuna sigla interna pubblicata
+# NOTA: MTN-AN00 risulta lo stesso codice sia per "Honor X70" sia per
+# "Honor X70 Pro Max" (confermato anche da GSMchoice) — stesso chipset in
+# entrambi i casi, quindi nessun conflitto per questa tabella (indicizzata
+# per codice, non per nome commerciale); si e' scelto "Honor X70" come
+# nome canonico della riga.
+MTN-AN00,Honor X70,Snapdragon 6 Gen 4,Qualcomm,,Verificato su GSMArena + GSMchoice 11/08/2026 — nessuna sigla SM pubblicata (nome condiviso con Honor X70 Pro Max)
+MTN-AN80,Honor X70,Snapdragon 6 Gen 4,Qualcomm,,Variante regionale — verificato su GSMchoice 11/08/2026 — nessuna sigla SM pubblicata

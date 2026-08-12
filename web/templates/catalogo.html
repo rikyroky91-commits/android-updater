@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block titolo %}Catalogo · {{ titolo_sito }}{% endblock %}
+{% block corpo %}
+<h3 class="occhiello">Copertura per marca</h3>
+{# Le note di copertura sono il punto in cui il progetto dice cosa NON sa.
+   Stanno in tabella accanto ai numeri, non in fondo alla pagina, perché
+   un conteggio senza il suo limite è un conteggio che inganna. #}
+<table class="tabella">
+  <thead><tr><th>Marca</th><th>Modelli in archivio</th><th>Limiti noti</th></tr></thead>
+  <tbody>
+    {% for r in righe %}
+    <tr><td>{{ r.marca }}</td><td>{{ r.modelli }}</td>
+        <td class="tenue">{{ r.nota or "—" }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

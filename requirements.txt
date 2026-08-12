@@ -1,0 +1,14 @@
+# Il prototipo Streamlit (`app.py`), letto da Streamlit Cloud.
+#
+# Streamlit Cloud cerca `requirements.txt` alla radice del repository (o
+# nella cartella del file principale): è per questo che le dipendenze del
+# sito FastAPI (`web/`), che Render legge dal Dockerfile, stanno in un
+# file separato — `requirements-web.txt` — invece che qui insieme.
+# Mescolarle avrebbe fatto installare a ciascuna delle due app i
+# pacchetti dell'altra, inutilmente.
+#
+# `app.py` non importa pandas: solo streamlit, requests, feedparser e la
+# libreria standard.
+streamlit>=1.32
+requests>=2.31
+feedparser>=6.0

@@ -1,0 +1,18 @@
+{% if notizie %}
+<h3 class="occhiello">Ultime notizie di aggiornamento</h3>
+<ul class="notizie">
+  {% for n in notizie %}
+  <li>
+    <div>
+      {% if n.link %}<a href="{{ n.link }}" rel="noopener" target="_blank">{{ n.titolo }}</a>
+      {% else %}{{ n.titolo }}{% endif %}
+      <p class="nota">{{ n.fonte }}{% if n.build %} · <code>{{ n.build }}</code>{% endif %}</p>
+    </div>
+    <div class="notizia-coda">
+      <span class="tag" style="--tinta: {{ n.colore }}">{{ n.severita }}</span>
+      <span class="nota">{{ n.data }}</span>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}

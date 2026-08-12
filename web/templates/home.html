@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block titolo %}{{ titolo_sito }}{% endblock %}
+
+{#
+  LA HOME È LA SOLA BARRA DI RICERCA.
+
+  Prima qui c'era anche l'elenco di millecinquecento dispositivi, e le
+  due cose si davano fastidio a vicenda: la ricerca — che è quello per
+  cui si apre il sito — stava schiacciata in cima a una tabella che
+  nessuno aveva chiesto, e la tabella si portava dietro il suo costo
+  anche per chi voleva solo digitare un modello.
+
+  Ora l'elenco ha una pagina sua (`/dispositivi`) e questa non ha
+  nient'altro: il campo è più in basso, più grande, e prende il fuoco da
+  solo, così si può digitare senza toccare il mouse.
+#}
+{% block ricerca %}
+<section class="ingresso">
+  {# UN TITOLO SOLO. Erano due frasi che dicevano la stessa cosa in due
+     modi, e la seconda era anche scritta male — «Che telefono è, e a che
+     versione sta»: dopo la virgola quella congiunzione non ci va. Resta
+     quella giusta, che è anche quella che descrive il sito. #}
+  <h1 class="ingresso-titolo">{{ sottotitolo }}</h1>
+  {% with grande = true %}{% include "_ricerca.html" %}{% endwith %}
+  <p class="ingresso-nota">
+    Scrivi un nome («Galaxy S24»), un codice modello («SM-S921B») o un
+    IMEI di 15 cifre, e premi Invio.
+    {% if ai_attiva %}Se non ti viene il nome esatto, il tasto
+    <strong>AI</strong> interpreta quello che hai scritto.{% endif %}
+  </p>
+
+  {# I tre numeri restano: dicono, in una riga, se l'archivio è vivo.
+     Una home che non dice niente non si distingue da una home rotta. #}
+  <p class="ingresso-cifre">
+    <span><strong>{{ stats.devices }}</strong> dispositivi</span>
+    <span><strong>{{ stats.updates_relevant }}</strong> aggiornamenti</span>
+    {% if stats.last_scan %}
+    <span>ultima scansione <strong>{{ fmt_relative(stats.last_scan.finished_at) }}</strong></span>
+    {% endif %}
+  </p>
+
+  {% if archivio_vuoto %}
+  <p class="nota">L'archivio è ancora vuoto: la prima scansione lo popola.
+    La ricerca qui sopra funziona lo stesso, perché interroga le fonti sul
+    momento.</p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block corpo %}{% endblock %}

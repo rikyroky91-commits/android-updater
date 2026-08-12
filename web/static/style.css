@@ -1,0 +1,722 @@
+/* ======================================================================
+   Sistema visivo «Modernist» — dal prototipo di Claude Design
+   ======================================================================
+
+   QUESTA VOLTA L'HTML È NOSTRO, e cambia tutto. Nella versione Streamlit
+   ogni regola era un tentativo di raggiungere dei `div` generati da altri,
+   con nomi che cambiavano a ogni versione: quando sbagliavo non ottenevo
+   un errore, ottenevo un pezzo di pagina rimasto indietro in silenzio.
+   Qui i nomi delle classi sono scritti nei template a fianco.
+
+   LE TRE REGOLE DEL SISTEMA
+   1. Il colore è riservato al significato. Il rosso è azione e voce
+      attiva; le severità tengono il loro colore perché è la cosa che si
+      legge per prima e da lontano. Niente tinte decorative: in uno
+      strumento diagnostico competono col segnale da leggere al volo.
+   2. Spigoli vivi ovunque, tranne dove serve invitare — la ricerca e il
+      suo pulsante, e le pastiglie di stato. È la deroga voluta del
+      sistema, non una svista.
+   3. Il peso tipografico fa la gerarchia, non la dimensione: due pesi di
+      Archivo e una scala corta.
+
+   Elemento caratterizzante: la stringa di build (S928BXXU5CYA1) trattata
+   come oggetto tipografico di prima classe, monospaziata e incorniciata,
+   invece che come testo qualsiasi. È il dato che si copia più spesso.
+   ====================================================================== */
+
+:root {
+  --ink:      #201e1d;
+  --paper:    #f3f2f2;
+  --carta:    #ffffff;
+  --accent:   #ec3013;
+  --accent-scuro: #b3240e;
+  --neutral:  #5c5a59;
+  /* I due tasti della ricerca. Verde = fai la ricerca, indaco = falla
+     interpretare. Sono deliberatamente FUORI dalla scala del rosso: il
+     rosso qui significa «🔴 MAJOR, retest completo», e un pulsante che
+     usa lo stesso colore di un allarme indebolisce l'allarme. */
+  --cerca:        #1f7a5a;
+  --cerca-scuro:  #176046;
+  --ai:           #3f3d9e;
+  --ai-scuro:     #302e7d;
+  /* Una riga del confronto che differisce non è un errore né una
+     severità: è un'informazione neutra. Stesso motivo di --cerca/--ai
+     sopra — fuori dalla scala del rosso, che qui significa MAJOR. */
+  --differenza:       #a3690a;
+  --differenza-tenue: rgba(163, 105, 10, .10);
+  --filo:     rgba(32, 30, 29, 0.14);
+  --regola:   rgba(32, 30, 29, 0.88);
+  --superficie: rgba(32, 30, 29, 0.045);
+  --ombra:    0 2px 12px rgba(32, 30, 29, .10);
+  --colonna:  1180px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+/* IL PIEDE STA IN FONDO ALLA PAGINA, non sotto l'ultima riga di testo.
+   Su una pagina corta — la home, una ricerca a vuoto — il piede saliva
+   fin sotto il contenuto e restava mezzo schermo bianco sotto di lui.
+   Con la colonna flessibile il contenuto si prende lo spazio che avanza
+   e il piede scende dove ci si aspetta di trovarlo. */
+body {
+  margin: 0;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+}
+.contenuto { flex: 1 0 auto; }
+.pieduccio { flex-shrink: 0; margin-top: 2.5rem; width: 100%; }
+
+a { color: inherit; }
+
+/* --- La trama di sfondo ------------------------------------------------
+   Il canvas sta dietro tutto e non intercetta i clic. L'opacità resta
+   bassa di proposito: sotto una tabella di 1500 righe con dentro sigle
+   di build da leggere carattere per carattere, una trama marcata non è
+   un'atmosfera, è un ostacolo.
+
+   Da .5 a .62 il 2026-08-10, su richiesta: si vede un po' di più senza
+   entrare in competizione con il testo. Si alza QUESTO numero e non i
+   tre dentro `rete.js` — righe, nodi e loro sfumatura sono già in
+   equilibrio fra loro, e ritoccarli uno per uno lo romperebbe. */
+#rete {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 0; pointer-events: none; opacity: .62;
+}
+
+/* --- Testata ---------------------------------------------------------- */
+.testata {
+  position: relative; z-index: 1;
+  background: var(--paper);
+  border-bottom: 2px solid var(--regola);
+}
+.testata-interno {
+  max-width: var(--colonna); margin: 0 auto;
+  padding: .9rem 1.5rem;
+  display: flex; align-items: center; gap: 2rem;
+}
+.marchio {
+  font-size: 1.1rem; font-weight: 700; letter-spacing: -.01em;
+  text-decoration: none; white-space: nowrap;
+}
+.nav { display: flex; gap: 1.5rem; flex: 1; flex-wrap: wrap; }
+.nav a {
+  text-decoration: none; color: var(--neutral); font-size: .92rem;
+  padding: .2rem 0; border-bottom: 3px solid transparent;
+}
+.nav a:hover { color: var(--accent); }
+.nav a.attiva {
+  color: var(--ink); font-weight: 700; border-bottom-color: var(--accent);
+}
+.stato-fonti {
+  font-size: .78rem; color: var(--neutral); text-decoration: none;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.stato-fonti:hover { color: var(--accent); }
+
+/* --- Impaginato -------------------------------------------------------
+   `width: 100%` NON È RIDONDANTE, ed è la stessa trappola del tasto
+   grande: da quando `body` è una colonna flessibile (serve al piede in
+   fondo pagina), un `margin: 0 auto` assorbe lo spazio libero invece di
+   centrare un blocco largo, e l'elemento si dimensiona al contenuto.
+   Misurato: `main` largo 1180px dentro una finestra da 660, cioè la
+   pagina che scorre in orizzontale — proprio ciò che il progetto vieta.
+   Si vede solo su schermi stretti. */
+.contenuto {
+  position: relative; z-index: 1;
+  width: 100%;
+  max-width: var(--colonna); margin: 0 auto; padding: 2rem 1.5rem 4rem;
+}
+
+/* --- Ricerca: l'unico elemento davvero prominente ----------------------
+   PIÙ LARGA DI PRIMA. A 720px il campo si mangiava il proprio testo di
+   aiuto: fra il pulsante «Cerca» e il tasto ✨ restavano poco più di
+   300px, e il segnaposto veniva troncato a metà — cioè proprio
+   l'istruzione che dice cosa si può scrivere lì dentro. */
+.ricerca {
+  display: flex; gap: .6rem; align-items: center;
+  width: 100%; max-width: 940px; margin: 0 auto 2rem;
+}
+.ricerca input {
+  flex: 1 1 auto; min-width: 20ch;
+  font: inherit; font-size: 1rem;
+  padding: .75rem 1.25rem;
+  text-overflow: ellipsis;
+  border: 2px solid var(--ink); border-radius: 999px;
+  background: var(--carta); color: inherit;
+  box-shadow: var(--ombra);
+  transition: box-shadow .18s ease;
+}
+.ricerca input:focus {
+  outline: none; box-shadow: 0 0 0 4px rgba(32, 30, 29, .12);
+}
+/* I DUE TASTI, PIÙ PICCOLI E DISTINGUIBILI A COLPO D'OCCHIO.
+   Erano due pastiglie grosse quasi uguali, una piena e una vuota, che
+   rubavano larghezza al campo e si somigliavano troppo per capire al
+   volo quale fa cosa. Ora sono compatti e di due colori diversi: il
+   verde è la ricerca, l'indaco è l'AI. Il rosso del sistema resta alle
+   severità, dove significa «retest completo» e non deve competere con
+   un pulsante. */
+/* IL SELETTORE È `button[type="submit"]`, non `button`. La forma
+   generica colpiva anche il tasto AI e — avendo una specificità più alta
+   di `.tasto-ai` — gli ridipingeva sopra il colore, qualunque cosa
+   dicesse la regola dedicata: due tasti verdi identici invece di due
+   colori diversi. Si vede solo guardando la pagina. */
+.ricerca button[type="submit"] {
+  font: inherit; font-weight: 600; font-size: .9rem;
+  color: var(--carta); letter-spacing: .01em;
+  padding: .5rem 1.15rem; line-height: 1.35;
+  background: var(--cerca); border: 1px solid var(--cerca);
+  border-radius: 8px; cursor: pointer; white-space: nowrap;
+  transition: background .15s ease, border-color .15s ease;
+}
+.ricerca button[type="submit"]:hover { background: var(--cerca-scuro); border-color: var(--cerca-scuro); }
+.ricerca button:active { transform: translateY(1px); }
+/* Il tasto mentre la ricerca è partita (vedi `ricerca.js`): stesso
+   principio del tasto ✨ AI (rotellina + testo che cambia), colori
+   invertiti perché qui lo sfondo è già colorato, non bianco. */
+.ricerca button[type="submit"][disabled] { opacity: .8; cursor: progress; }
+.ricerca button[type="submit"] .rotella-chiara {
+  width: 14px; height: 14px; flex: none;
+  border: 2px solid rgba(255, 255, 255, .4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  display: inline-block; vertical-align: -2px; margin-right: .35em;
+  animation: gira .7s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ricerca button[type="submit"] .rotella-chiara { animation-duration: 2.4s; }
+}
+
+/* --- La home: solo la ricerca ------------------------------------------
+   Il campo scende verso il centro della pagina invece di stare
+   schiacciato sotto la testata, e cresce: qui è l'unica cosa da fare, e
+   deve sembrarlo. `min-height` col `svh` perché su telefono la barra del
+   browser entra ed esce, e con `vh` il blocco saltellerebbe. */
+.ingresso {
+  width: 100%; max-width: 980px; margin: 0 auto;
+  min-height: min(62svh, 560px);
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 3.5rem 0 2.5rem; text-align: center;
+}
+.ingresso-titolo {
+  margin: 0 0 1.8rem;
+  font-size: clamp(1.6rem, 3.8vw, 2.4rem); line-height: 1.15;
+  letter-spacing: -.02em; font-weight: 700;
+  text-wrap: balance;
+}
+.ingresso .ricerca { margin-bottom: 1rem; }
+.ingresso-nota {
+  margin: 0 auto; max-width: 620px;
+  font-size: .88rem; color: var(--neutral);
+}
+.ingresso-cifre {
+  display: flex; justify-content: center; flex-wrap: wrap;
+  gap: 1.6rem; margin: 2.2rem 0 0;
+  font-size: .84rem; color: var(--neutral);
+}
+.ingresso-cifre strong {
+  color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+
+/* La barra ingrandita. Stessa forma, taglia maggiore: è lo stesso
+   elemento della testata, non un secondo elemento che gli somiglia.
+
+   `width: 100%` è OBBLIGATORIO, non ridondante: `.ingresso` è una
+   colonna flessibile, e in un contenitore flessibile un `margin: 0 auto`
+   assorbe lo spazio libero invece di centrare un blocco largo. Il
+   risultato misurato era una barra di 473px dentro una colonna da 980,
+   cioè il difetto che si stava correggendo. */
+.ricerca-grande { width: 100%; max-width: 100%; }
+.ricerca-grande input {
+  font-size: 1.08rem; padding: .8rem 1.4rem;
+}
+/* Sulla home il campo cresce, i tasti no: restano compatti e sono il
+   campo a prendersi lo spazio, che è quello che si usa. */
+.ricerca-grande button[type="submit"] {
+  font-size: .95rem; padding: .62rem 1.35rem;
+}
+.ricerca-grande .tasto-ai { font-size: .95rem; padding: .62rem 1.05rem; }
+
+@media (max-width: 620px) {
+  .ingresso { min-height: auto; padding: 2rem 0 1.5rem; }
+  .ricerca-grande { flex-wrap: wrap; }
+  .ricerca-grande input { flex: 1 1 100%; }
+  .ricerca-grande button[type="submit"] { flex: 1; }
+}
+
+/* --- Riga delle cifre -------------------------------------------------- */
+.cifre {
+  display: flex; flex-wrap: wrap; gap: 1.8rem;
+  padding-bottom: .9rem; margin-bottom: 1.6rem;
+  border-bottom: 1px solid var(--filo);
+  font-size: .86rem; color: var(--neutral);
+}
+.cifre strong {
+  font-size: 1.15rem; color: var(--ink); font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Esito della ricerca ----------------------------------------------- */
+.esito {
+  background: var(--carta); padding: 1.1rem 1.3rem;
+  border-left: 4px solid var(--neutral);
+  border-radius: 0 12px 12px 0;
+  box-shadow: 0 1px 3px rgba(32, 30, 29, .07);
+  margin-bottom: 1.8rem;
+}
+.esito.trovato { border-left-color: var(--accent); }
+.esito h2 { margin: 0 0 .3rem; font-size: 1.2rem; }
+.riga-esito { margin: 0; font-size: 1rem; }
+
+/* L'IMEI dentro il risultato, non sopra come un secondo risultato: una
+   riga d'etichetta, non un titolo con lo stesso peso di `.esito h2`. */
+.etichetta-imei {
+  margin: 0 0 .5rem; font-size: .74rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em; color: var(--neutral);
+}
+.etichetta-imei code { text-transform: none; letter-spacing: normal; }
+.etichetta-imei-incerta { color: var(--accent-scuro); }
+
+/* UN RISULTATO SOLO, NON DUE RIQUADRI ATTACCATI CON UNA GIUNTURA VISIBILE.
+   Quando l'esito ha una scheda tecnica subito sotto, i due si fondono in
+   un unico pannello: l'esito perde gli angoli e l'ombra sul lato basso,
+   la scheda perde il bordo e il margine sopra, e resta solo una riga
+   sottile a separare «cosa dice la fonte» da «come è fatto il telefono». */
+.esito-con-scheda {
+  border-radius: 0 12px 0 0; box-shadow: none; margin-bottom: 0;
+}
+.esito-con-scheda + .scheda {
+  border-top: 0; border-radius: 0 0 12px 12px; margin-top: 0;
+  box-shadow: 0 1px 3px rgba(32, 30, 29, .07);
+  padding-top: 1rem;
+}
+.esito-con-scheda + .scheda::before {
+  content: ""; display: block; grid-column: 1 / -1;
+  border-top: 1px solid var(--filo); margin: 0 0 1.4rem;
+}
+
+.proposte { display: flex; flex-wrap: wrap; gap: .5rem; margin: .6rem 0 0; }
+.proposta {
+  display: inline-block; text-decoration: none;
+  border: 1px solid var(--filo); padding: .25rem .7rem;
+  font-size: .85rem; background: var(--paper);
+}
+.proposta:hover { border-color: var(--accent); color: var(--accent); }
+.proposta.attiva { border-color: var(--ink); font-weight: 700; }
+
+/* --- Correzione a mano del nome commerciale -----------------------------
+   Chiusa di default (`<details>`): è una via d'uscita per il caso in cui
+   la scelta automatica ha preso il nome «sbagliato» secondo chi ha il
+   telefono in mano, non qualcosa che deve competere per l'attenzione con
+   il risultato della ricerca. */
+.correzione-nome {
+  margin: .8rem 0 0; font-size: .88rem; color: var(--neutral);
+}
+.correzione-nome summary {
+  cursor: pointer; color: var(--ai); font-weight: 600;
+}
+.correzione-nome summary:hover { color: var(--ai-scuro); }
+.correzione-form {
+  display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
+  margin: .6rem 0;
+}
+.correzione-form select {
+  font: inherit; font-size: .88rem; padding: .4rem .6rem;
+  border: 1px solid var(--filo); background: var(--carta); color: inherit;
+}
+.correzione-form button[type="submit"] {
+  font: inherit; font-weight: 600; font-size: .85rem;
+  color: var(--carta); padding: .4rem .9rem;
+  background: var(--ai); border: 1px solid var(--ai);
+  border-radius: 6px; cursor: pointer;
+}
+.correzione-form button[type="submit"]:hover { background: var(--ai-scuro); }
+.correzione-reset { margin: 0 0 .4rem; }
+.link-discreto {
+  font: inherit; font-size: .82rem; color: var(--neutral);
+  background: none; border: none; text-decoration: underline;
+  cursor: pointer; padding: 0;
+}
+.link-discreto:hover { color: var(--accent); }
+
+.ai { margin-top: 1rem; }
+.ai button, button.secondario {
+  font: inherit; font-weight: 600; cursor: pointer;
+  background: transparent; color: var(--ink);
+  border: 2px solid var(--ink); padding: .45rem 1.1rem;
+}
+.ai button:hover, button.secondario:hover { background: var(--ink); color: var(--carta); }
+.ai button[disabled] { opacity: .55; cursor: progress; }
+
+/* --- Scheda tecnica ---------------------------------------------------- */
+.scheda {
+  display: grid; grid-template-columns: 200px 1fr; gap: 1.8rem;
+  background: var(--carta); padding: 1.4rem;
+  border: 2px solid var(--regola); margin-bottom: 1.2rem;
+}
+.scheda-foto img { width: 100%; height: auto; display: block; }
+.foto-assente {
+  display: flex; align-items: center; justify-content: center;
+  height: 180px; background: var(--superficie);
+  color: var(--neutral); font-size: 2.5rem;
+}
+.scheda-dati h2 { margin: 0; font-size: 1.4rem; letter-spacing: -.015em; }
+.sottotitolo { margin: .15rem 0 1rem; color: var(--neutral); font-size: .86rem; }
+
+/* IL PROCESSORE, DA SOLO, PRIMA DI TUTTO IL RESTO. Nella griglia a quattro
+   voci identiche (RAM, archiviazione, batteria, processore) nessuna delle
+   quattro spiccava — «c'è ma è così disordinato che non l'ho visto al
+   primo colpo», il difetto esatto che questa riga corregge dandogli un
+   corpo suo, più grande delle altre misure. */
+.cpu-in-evidenza {
+  display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap;
+  margin-bottom: .9rem; padding-bottom: .9rem;
+  border-bottom: 1px solid var(--filo);
+}
+.cpu-in-evidenza .etichetta {
+  text-transform: uppercase; letter-spacing: .08em;
+  font-size: .68rem; font-weight: 700; color: var(--neutral);
+}
+.cpu-in-evidenza strong { font-size: 1.22rem; font-weight: 700; line-height: 1.25; }
+
+.misure {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem; margin-bottom: 1rem;
+}
+.misure .etichetta {
+  display: block; text-transform: uppercase; letter-spacing: .08em;
+  font-size: .66rem; font-weight: 700; color: var(--neutral);
+}
+.misure strong { font-size: 1.02rem; font-weight: 700; }
+
+.specifiche { margin: 0; display: grid; gap: .3rem; }
+.specifiche > div { display: grid; grid-template-columns: 150px 1fr; gap: .8rem; }
+.specifiche dt { font-weight: 600; font-size: .86rem; }
+.specifiche dd { margin: 0; font-size: .86rem; color: var(--neutral); }
+
+.supporto { margin: 1rem 0 0; font-size: .88rem; }
+.completa { margin-bottom: 1.8rem; }
+.completa summary { cursor: pointer; font-weight: 600; padding: .5rem 0; }
+
+/* --- Riquadri e testo -------------------------------------------------- */
+.riquadro {
+  background: var(--carta); border: 2px solid var(--regola);
+  padding: 1.2rem 1.3rem; margin-bottom: 1.8rem;
+}
+.occhiello {
+  text-transform: uppercase; letter-spacing: .09em;
+  font-size: .7rem; font-weight: 700; color: var(--neutral);
+  margin: 2rem 0 .7rem;
+}
+.nota { font-size: .82rem; color: var(--neutral); margin: .35rem 0 0; }
+.nota.lacuna { border-left: 3px solid var(--filo); padding-left: .7rem; }
+.tenue { color: var(--neutral); }
+.vuoto {
+  background: var(--carta); border: 1px dashed var(--filo);
+  padding: 1.1rem 1.3rem; color: var(--neutral);
+}
+.briciole { font-size: .82rem; color: var(--neutral); margin: 0 0 1rem; }
+
+code {
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  font-size: .82rem; letter-spacing: .01em;
+  background: var(--superficie); border: 1px solid var(--filo);
+  padding: .08rem .38rem; white-space: nowrap;
+}
+
+/* --- Pastiglie di stato ------------------------------------------------ */
+.tag {
+  display: inline-block; border-radius: 999px; padding: .1rem .6rem;
+  font-size: .74rem; font-weight: 600; white-space: nowrap;
+  border: 1px solid transparent;
+}
+.tag-accent  { background: rgba(236, 48, 19, .10); color: var(--accent-scuro); }
+.tag-neutral { background: var(--superficie); color: var(--neutral); }
+.tag-outline { border-color: var(--filo); color: var(--neutral); }
+/* Le severità portano il proprio colore: uniformarle alle tre pastiglie
+   toglierebbe l'unica informazione che quel colore trasmette. */
+.tag[style*="--tinta"] {
+  background: color-mix(in srgb, var(--tinta) 14%, transparent);
+  color: color-mix(in srgb, var(--tinta) 78%, var(--ink));
+}
+
+/* --- Tabelle ----------------------------------------------------------- */
+.tabella {
+  width: 100%; border-collapse: collapse;
+  background: var(--carta); font-size: .88rem;
+}
+.tabella caption {
+  text-align: left; font-weight: 700; padding: .8rem 0 .3rem;
+  font-size: .82rem;
+}
+.tabella th {
+  text-align: left; font-weight: 700; font-size: .68rem;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--neutral);
+  padding: .55rem .7rem; border-bottom: 2px solid var(--regola);
+  white-space: nowrap;
+}
+.tabella td {
+  padding: .55rem .7rem; border-bottom: 1px solid var(--filo);
+  vertical-align: top;
+}
+.tabella tbody tr:hover { background: var(--superficie); }
+.tabella a { text-decoration: none; font-weight: 600; }
+.tabella a:hover { color: var(--accent); }
+.tabella.minuta th { text-transform: none; letter-spacing: 0; width: 190px; }
+
+/* --- Notizie ----------------------------------------------------------- */
+.notizie { list-style: none; margin: 0; padding: 0; }
+.notizie li {
+  display: flex; justify-content: space-between; gap: 1.2rem;
+  padding: .8rem 0; border-bottom: 1px solid var(--filo);
+}
+.notizie a { text-decoration: none; font-weight: 600; }
+.notizie a:hover { color: var(--accent); }
+.notizia-coda { text-align: right; white-space: nowrap; }
+
+/* --- Piede ------------------------------------------------------------- */
+.pieduccio {
+  position: relative; z-index: 1;
+  max-width: var(--colonna); margin: 0 auto; padding: 1.5rem;
+  border-top: 1px solid var(--filo);
+  display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  font-size: .78rem; color: var(--neutral);
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* --- Schermi stretti ---------------------------------------------------
+   Le tabelle scorrono in orizzontale invece di comprimersi: una sigla di
+   build spezzata su due righe non è più una sigla che si copia. */
+@media (max-width: 860px) {
+  .testata-interno { flex-wrap: wrap; gap: .8rem 1.2rem; }
+  .nav { order: 3; width: 100%; gap: 1.1rem; }
+  .scheda { grid-template-columns: 1fr; }
+  .scheda-foto { max-width: 200px; }
+  .tabella { display: block; overflow-x: auto; white-space: nowrap; }
+  .notizie li { flex-direction: column; gap: .3rem; }
+  .notizia-coda { text-align: left; }
+}
+
+/* --- Avviso ------------------------------------------------------------
+   Le fonti TAC che si contraddicono non sono un errore dell'app: è una
+   cosa da SAPERE, non da temere. Quindi si distingue dal testo normale
+   senza usare il rosso, che qui significa azione. */
+.avviso {
+  background: var(--carta); border-left: 4px solid var(--neutral);
+  padding: .8rem 1.1rem; margin: .8rem 0;
+}
+
+/* --- Moduli ------------------------------------------------------------ */
+.modulo { display: flex; flex-wrap: wrap; gap: .5rem; margin: .6rem 0; }
+.modulo input {
+  font: inherit; padding: .4rem .7rem; border: 1px solid var(--filo);
+  background: var(--carta); color: inherit; min-width: 190px;
+}
+.modulo input:focus { outline: 2px solid var(--ink); outline-offset: -2px; }
+.in-riga { display: inline; margin: 0; }
+button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
+
+/* --- Il tasto AI accanto a «Cerca» -------------------------------------
+   C'È SCRITTO «AI» DENTRO. Prima era una stellina sola: per sapere cosa
+   facesse bisognava passarci sopra col mouse e leggere il suggerimento,
+   e su un telefono il mouse non c'è — quindi era un pulsante che non
+   diceva niente.
+
+   Indaco e non verde: affianca la ricerca, non la sostituisce, e la
+   differenza si deve vedere prima di leggere l'etichetta. Stessa forma e
+   stessa altezza di «Cerca», così restano evidentemente una coppia. */
+.tasto-ai {
+  display: inline-flex; align-items: center; gap: .3rem;
+  font: inherit; font-weight: 700; font-size: .9rem;
+  letter-spacing: .04em; line-height: 1.35;
+  padding: .5rem .9rem; cursor: pointer; white-space: nowrap;
+  background: var(--ai); color: var(--carta);
+  border: 1px solid var(--ai); border-radius: 8px;
+  transition: background .15s ease, border-color .15s ease;
+}
+.tasto-ai:hover { background: var(--ai-scuro); border-color: var(--ai-scuro); }
+.tasto-ai:active { transform: translateY(1px); }
+.tasto-ai .scintilla { font-size: .95em; line-height: 1; opacity: .9; }
+.tasto-ai[disabled] { opacity: .55; cursor: progress; }
+.tasto-ai.in-corso .scintilla {
+  display: inline-block; animation: pulsa 1.1s ease-in-out infinite;
+}
+@keyframes pulsa {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .45; transform: scale(.85); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tasto-ai.in-corso .scintilla { animation: none; }
+}
+
+.esito-ai {
+  width: 100%; max-width: 940px; margin: -1.2rem auto 2rem;
+  background: var(--carta); border: 1px solid var(--filo);
+  padding: .9rem 1.1rem;
+}
+
+/* --- L'attesa: una rotellina, non una frase ----------------------------
+   «Interpreto…» scritto sotto il campo spostava la pagina e somigliava a
+   un messaggio d'errore. La rotellina dice la stessa cosa senza dire
+   altro, e sta ferma dove si sta guardando. */
+.in-attesa {
+  display: flex; align-items: center; gap: .7rem;
+  margin: 0; font-size: .9rem; color: var(--neutral);
+}
+.rotella {
+  width: 18px; height: 18px; flex: none;
+  border: 2px solid rgba(63, 61, 158, .22);
+  border-top-color: var(--ai);
+  border-radius: 50%;
+  animation: gira .7s linear infinite;
+}
+@keyframes gira { to { transform: rotate(360deg); } }
+
+/* Il tasto mentre lavora: la scintilla pulsa, così l'attesa si vede
+   anche senza spostare lo sguardo sul riquadro. */
+@media (prefers-reduced-motion: reduce) {
+  .rotella { animation-duration: 2.4s; }
+}
+
+/* --- «Ho cercato questo al posto tuo» ---------------------------------- */
+/* NON è un contenitore flessibile, e la ragione si vede solo a schermo:
+   in un flex ogni pezzo di testo diventa un elemento a sé, e il `gap`
+   gli si mette attorno — «ho cercato Galaxy A56 5G .», con il punto
+   staccato dalla frase. Qui il testo è una frase, e va scritta come
+   tale. */
+.interpretato {
+  width: 100%; max-width: 940px; margin: -1rem auto 1.6rem;
+  padding: .6rem .9rem; font-size: .88rem; line-height: 1.6;
+  background: rgba(63, 61, 158, .06);
+  border-left: 3px solid var(--ai);
+}
+.interpretato .segno-ai { color: var(--ai); font-weight: 700; margin-right: .3rem; }
+.interpretato .alternative { color: var(--neutral); display: block; margin-top: .2rem; }
+.interpretato .alternative a { color: var(--ai); font-weight: 600; }
+
+/* --- Confronto fra due modelli ------------------------------------------
+   Nasce dal bug «RMX3939 rispondeva con i dati di RMX3930» (vedi
+   FONTI.md): la domanda "questi due nomi sono lo stesso telefono?" è
+   quella che ha causato quel bug. Qui la si dà in mano a chi guarda,
+   invece di lasciare che il sistema la indovini da solo. */
+.confronto-form {
+  display: flex; gap: .6rem; align-items: center; flex-wrap: wrap;
+  margin: 0 0 1.6rem;
+}
+.confronto-form input {
+  flex: 1 1 220px; min-width: 160px;
+  font: inherit; font-size: .95rem;
+  padding: .65rem 1.1rem;
+  border: 2px solid var(--ink); border-radius: 999px;
+  background: var(--carta); color: inherit;
+  transition: box-shadow .18s ease;
+}
+.confronto-form input:focus {
+  outline: none; box-shadow: 0 0 0 4px rgba(32, 30, 29, .12);
+}
+.confronto-contro {
+  font-size: .74rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--neutral);
+}
+.confronto-form button[type="submit"] {
+  font: inherit; font-weight: 600; font-size: .9rem;
+  color: var(--carta); letter-spacing: .01em;
+  padding: .55rem 1.2rem;
+  background: var(--cerca); border: 1px solid var(--cerca);
+  border-radius: 8px; cursor: pointer; white-space: nowrap;
+  transition: background .15s ease, border-color .15s ease;
+}
+.confronto-form button[type="submit"]:hover {
+  background: var(--cerca-scuro); border-color: var(--cerca-scuro);
+}
+
+/* UNA DIVISORIA NETTA, non due blocchi che il CSS deve solo sperare
+   restino allineati. Segnalato dall'utente: la vecchia pagina — foto e
+   nome in una griglia sopra, i dati in una tabella separata sotto —
+   sembrava confusa perché niente teneva insieme, in verticale, «tutto
+   ciò che appartiene ad A» rispetto a «tutto ciò che appartiene a B».
+
+   Foto, nome e ogni caratteristica vivono ORA nella STESSA <table>
+   (vedi `confronto.html`), a `table-layout: fixed` con le larghezze
+   fissate dal `<colgroup>`: la riga verticale fra le colonne (il bordo
+   sinistro di `.col-modello`) diventa così un'unica linea continua che
+   parte dalla foto e arriva fino all'ultima riga, non un allineamento
+   che si spezza se una foto è più alta di un'altra. */
+.confronto-tabella-scroll { overflow-x: auto; margin-bottom: .6rem; }
+.tabella-confronto {
+  table-layout: fixed; min-width: 480px;
+  border: 2px solid var(--regola);
+}
+/* La generica «tabella su schermi stretti diventa un blocco che scorre»
+   (vedi `@media (max-width: 860px) .tabella` più sotto) va bene per le
+   tabelle a elenco, ma qui spezzerebbe proprio la struttura a due
+   colonne che è il punto della pagina: si scorre il contenitore invece,
+   la tabella resta una tabella vera a qualunque larghezza. */
+.tabella-confronto { display: table; white-space: normal; }
+.tabella-confronto.tabella.minuta th { width: auto; }
+.col-etichetta { width: 32%; }
+.col-modello { width: 34%; }
+
+.tabella-confronto .riga-foto .cella-etichetta { border-bottom: none; }
+.tabella-confronto .riga-foto th,
+.tabella-confronto .riga-nome th { background: var(--carta); }
+
+.tabella-confronto .cella-foto {
+  padding: 1rem .7rem .4rem; text-align: center; vertical-align: bottom;
+}
+.confronto-foto {
+  height: 120px; display: flex; align-items: center; justify-content: center;
+}
+.confronto-foto img { max-height: 120px; max-width: 100%; object-fit: contain; }
+.confronto-foto .foto-assente { height: 100%; width: 100%; }
+
+.tabella-confronto .cella-nome {
+  padding: .3rem .7rem 1rem; text-align: center; vertical-align: top;
+  border-bottom: 2px solid var(--regola);
+}
+.nome-modello {
+  display: block; font-size: 1.05rem; font-weight: 700; line-height: 1.3;
+  text-transform: none; letter-spacing: 0; color: var(--ink);
+}
+.nome-modello a { color: inherit; text-decoration: none; }
+.nome-modello a:hover { color: var(--accent); }
+.tabella-confronto .cella-nome .sottotitolo {
+  display: block; margin-top: .2rem; font-size: .74rem; font-weight: 500;
+  color: var(--neutral);
+}
+
+/* LA DIVISORIA VERA E PROPRIA: un bordo sinistro sulla seconda e sulla
+   terza colonna di OGNI riga della tabella (foto, nome, e ogni
+   caratteristica) — essendo la stessa tabella dall'inizio alla fine
+   (vedi la nota sopra), i bordi di righe consecutive si allineano da
+   soli in un'unica linea continua, senza bisogno di calcolarne
+   l'altezza. Un bordo tenue separa l'etichetta dalla colonna A; uno
+   marcato, il vero «contro», separa A da B. */
+.tabella-confronto th:nth-child(2),
+.tabella-confronto td:nth-child(2) { border-left: 1px solid var(--filo); }
+.tabella-confronto th:nth-child(3),
+.tabella-confronto td:nth-child(3) { border-left: 3px solid var(--ink); }
+
+/* Le righe che differiscono, in evidenza — colore dedicato, vedi la nota
+   su `--differenza` in cima al file: non è un errore, è un'informazione. */
+.tabella-confronto tbody th[scope="row"] {
+  font-weight: 600; color: var(--ink);
+}
+.tabella-confronto tr.diversi th,
+.tabella-confronto tr.diversi td { background: var(--differenza-tenue); }
+.tabella-confronto tr.diversi td {
+  font-weight: 700; color: color-mix(in srgb, var(--differenza) 82%, var(--ink));
+}

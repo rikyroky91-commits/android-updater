@@ -1,0 +1,743 @@
+"""Scheda tecnica di un dispositivo: chip, RAM, schermo, batteria, foto.
+
+## Perché esiste
+
+Fino alla v44 il progetto sapeva rispondere a «a che versione sta questo
+telefono» ma non a «che telefono è». Mancavano due cose che per il QA non
+sono un contorno:
+
+* **il processore**, perché un difetto legato al SoC si riproduce solo su
+  una delle varianti — ed era assente proprio sui modelli recenti, che sono
+  quelli che si testano;
+* **la RAM**, perché è la prima cosa che si guarda quando un'app va in OOM
+  o è lenta solo su un dispositivo del parco.
+
+La tabella curata a mano (`data/soc_modelli.csv`) copre venti modelli di
+punta, e il dataset multi-marca già in uso è fermo al 2021: `SM-A075F`, un
+Galaxy A07 uscito nel 2025, non era in nessuno dei due. Da qui questa fonte.
+
+## Che cos'è la fonte
+
+`bytecharts/device_specs_gsmarena` è una copia in JSON del catalogo
+GSMArena, un file per modello, aggiornata di continuo. Si scarica in un
+colpo solo come archivio (**circa 1,6 MB compressi**, 4700 schede) e
+contiene, per ogni dispositivo:
+
+    Misc.Models       SM-A075B, SM-A075F, SM-A075M, ...   ← i CODICI
+    Platform.Chipset  Mediatek Helio G99 (6 nm)
+    Memory.Internal   64GB 4GB RAM, 128GB 6GB RAM, ...
+    imageUrl          la foto del modello
+    release_date, Display, Battery, Main Camera, ...
+
+Il campo `Misc.Models` è quello che la rende utilizzabile qui: permette di
+indicizzare **per codice modello**, che è la chiave con cui questo progetto
+ragiona ovunque, invece che per nome commerciale. Il dataset del 2021
+espone la stessa colonna ma non veniva letta: era indicizzato per nome, e
+per questo non sapeva distinguere le varianti regionali.
+
+## Due limiti, dichiarati
+
+1. **Le marche coperte sono undici** (Samsung, Xiaomi, OPPO, OnePlus, vivo,
+   Motorola, Google, Apple, Sony, Nokia). HONOR, realme, Huawei e Nothing
+   non ci sono: per loro restano le fonti precedenti. Non è un difetto da
+   correggere qui, è il perimetro della fonte, e `status()` lo dice.
+2. **Un chip per scheda, non per codice.** Dove GSMArena elenca due chip
+   («Snapdragon negli USA, Exynos altrove») la scheda è una sola e i codici
+   stanno tutti insieme: da qui non si può sapere quale codice monta quale.
+   In quel caso si riporta l'ambiguità invece di scegliere — e la tabella
+   curata, che le varianti le distingue davvero, **viene prima di questa**.
+
+Nessun dato di questo modulo entra in archivio: si legge al momento di
+mostrare una scheda. Per questo `DATA_LOGIC_VERSION` non cambia.
+"""
+from __future__ import annotations
+
+import gzip
+import html
+import io
+import json
+import re
+import tarfile
+import threading
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+
+try:
+    import requests
+except ImportError:  # pragma: no cover
+    requests = None
+
+from . import config as C
+
+# L'archivio del branch principale. `codeload` è l'host che GitHub usa per
+# gli archivi: risponde senza autenticazione e non consuma il rate limit
+# dell'API, che è la ragione per cui non si passa da `api.github.com`.
+ARCHIVIO_URL = (
+    "https://codeload.github.com/bytecharts/device_specs_gsmarena/"
+    "tar.gz/refs/heads/main"
+)
+FONTE_LABEL = "catalogo specifiche GSMArena (mirror JSON)"
+
+# Le schede cambiano quando esce un modello nuovo: qualche volta al mese.
+_RINFRESCA_ORE = 24 * 14
+_BLOB_SCHEDE = "specs_schede_gz"
+_META_SCARICATO = "specs_scaricato_at"
+
+# Un archivio più piccolo di così non è l'archivio: è una pagina di errore.
+_DIMENSIONE_MINIMA = 200_000
+
+_lock = threading.Lock()
+_schede: list[dict] | None = None
+_per_codice: dict[str, dict] = {}
+_per_nome: dict[str, dict] = {}
+_status = "non ancora caricato"
+
+
+# ======================================================================
+# Pulizia del testo
+# ======================================================================
+# I valori arrivano come frammenti di HTML: entità (`&amp;`, `&nbsp;`),
+# tag di formattazione (`<sup>2</sup>`) e link interni al sito. Mostrarli
+# tali e quali significa scrivere «Octa-core (2x2.4 GHz Cortex-A76 &amp;»
+# in interfaccia.
+_RE_TAG = re.compile(r"<[^>]+>")
+_RE_SPAZI = re.compile(r"[ \t\u00a0]+")
+
+
+def pulisci(valore) -> str:
+    testo = _RE_TAG.sub(" ", str(valore or ""))
+    testo = html.unescape(testo).replace("\u00a0", " ")
+    righe = [_RE_SPAZI.sub(" ", r).strip() for r in testo.splitlines()]
+    return "\n".join(r for r in righe if r).strip()
+
+
+# ======================================================================
+# La scheda
+# ======================================================================
+@dataclass(frozen=True)
+class Scheda:
+    """Quello che si sa dell'hardware di un modello."""
+    nome: str
+    marca: str = ""
+    foto: str | None = None
+    codici: tuple[str, ...] = ()
+    rilascio: str | None = None
+    chipset: str | None = None
+    cpu: str | None = None
+    gpu: str | None = None
+    ram_gb: tuple[int, ...] = ()
+    storage_gb: tuple[int, ...] = ()
+    memoria: str | None = None          # la riga grezza, con tutti i tagli
+    display: str | None = None
+    display_tipo: str | None = None
+    batteria: str | None = None
+    ricarica: str | None = None
+    camera_post: str | None = None
+    camera_front: str | None = None
+    os_lancio: str | None = None
+    peso: str | None = None
+    dimensioni: str | None = None
+    # LA SCHEDA COMPLETA STA RIPIEGATA IN UNA STRINGA, non sparsa in
+    # mille dizionari. Vedi la nota su `_ripiega_sezioni`: sono 47 MB
+    # tenuti sempre per un pannello che si apre di rado, e `sezioni` qui
+    # sotto li rende senza che chi legge debba saperlo.
+    sezioni_json: str = ""
+    fonte: str = FONTE_LABEL
+
+    @property
+    def sezioni(self) -> dict:
+        """Le specifiche complete, ricostruite al momento di mostrarle."""
+        return _espandi_sezioni(self.sezioni_json)
+
+    # ---- comodità per l'interfaccia -----------------------------------
+    @property
+    def ram_etichetta(self) -> str | None:
+        """«4 / 6 / 8 GB» — tutti i tagli, perché il parco di test ne ha
+        più di uno e sapere quale si ha in mano è metà della diagnosi."""
+        if not self.ram_gb:
+            return None
+        return " / ".join(f"{v:g}" for v in self.ram_gb) + " GB"
+
+    @property
+    def storage_etichetta(self) -> str | None:
+        if not self.storage_gb:
+            return None
+        return " / ".join(f"{v} GB" if v < 1024 else f"{v // 1024} TB"
+                          for v in self.storage_gb)
+
+    @property
+    def chip_varianti(self) -> list[str]:
+        """I chip elencati, uno per riga nel dato originale.
+
+        Più di uno significa che il modello esiste in versioni con chip
+        diverso: è un'informazione, non un problema da nascondere.
+        """
+        if not self.chipset:
+            return []
+        return [r.strip() for r in self.chipset.splitlines() if r.strip()]
+
+    @property
+    def chip_ambiguo(self) -> bool:
+        return len(self.chip_varianti) > 1
+
+
+# ======================================================================
+# Lettura di una singola scheda
+# ======================================================================
+_RE_TAGLI = re.compile(r"(\d+(?:\.\d+)?)\s*(GB|MB|TB)(?:\s+(\d+(?:\.\d+)?)\s*(GB|MB)\s*RAM)?",
+                       re.IGNORECASE)
+_MOLTIPLICATORE = {"MB": 1 / 1024, "GB": 1.0, "TB": 1024.0}
+
+
+def leggi_memoria(riga: str) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    """`"64GB 4GB RAM, 128GB 6GB RAM"` → storage (64, 128), RAM (4, 6).
+
+    La riga di GSMArena mescola due grandezze nello stesso campo e in un
+    ordine fisso: prima l'archiviazione, poi la RAM. Le forme senza RAM
+    («64GB», i telefoni vecchi) restano valide per l'archiviazione: si
+    legge quello che c'è invece di scartare tutta la riga.
+    """
+    storage: list[int] = []
+    ram: list[float] = []
+    for quanto, unita, quanta_ram, unita_ram in _RE_TAGLI.findall(riga or ""):
+        valore = float(quanto) * _MOLTIPLICATORE.get(unita.upper(), 1.0)
+        if valore >= 1:
+            storage.append(int(round(valore)))
+        if quanta_ram:
+            ram.append(float(quanta_ram) * _MOLTIPLICATORE.get(unita_ram.upper(), 1.0))
+    ordina = lambda valori: tuple(sorted({round(v, 1) if v < 1 else int(v)
+                                          for v in valori}))
+    return ordina(storage), ordina(ram)
+
+
+_RE_CODICE = re.compile(r"[A-Z0-9]{2,}[A-Z0-9\-]*", re.IGNORECASE)
+
+
+def leggi_codici(riga: str) -> list[str]:
+    """`"SM-A075F, SM-A075F/DS"` → `["SM-A075F"]`.
+
+    Il suffisso `/DS` (dual SIM) e simili si tolgono: identificano una
+    confezione, non un telefono diverso, e chi digita il codice lo scrive
+    quasi sempre senza. Tenerli come chiavi separate raddoppierebbe
+    l'indice senza aggiungere un solo dispositivo.
+    """
+    codici: list[str] = []
+    for pezzo in re.split(r"[,\n;]+", riga or ""):
+        radice = pezzo.strip().upper().split("/")[0].strip()
+        if len(radice) < 4 or not _RE_CODICE.fullmatch(radice):
+            continue
+        if not any(c.isdigit() for c in radice):
+            continue
+        if radice not in codici:
+            codici.append(radice)
+    return codici
+
+
+_MARCHE = {
+    "samsung": C.SAMSUNG,
+    "xiaomi": C.XIAOMI, "redmi": C.XIAOMI, "poco": C.XIAOMI,
+    "google": C.PIXEL,
+    "oppo": C.OPPO, "oneplus": C.OPPO, "realme": C.OPPO,
+    "vivo": C.VIVO, "iqoo": C.VIVO, "motorola": C.VIVO,
+    "honor": C.HUAWEI, "huawei": C.HUAWEI,
+    "apple": C.APPLE,
+}
+
+
+def marca_da_cartella(percorso: str) -> tuple[str, str]:
+    """`samsung-phones-9` → («samsung», brand del tracker)."""
+    grezza = percorso.split("-phones-")[0].split("/")[-1].strip().lower()
+    return grezza, _MARCHE.get(grezza, C.OTHER)
+
+
+_SEZIONI_VUOTE: dict = {}
+
+
+def _ripiega_sezioni(sezioni: dict) -> str:
+    """Le specifiche complete, in UNA stringa invece che in mille oggetti.
+
+    QUARANTASETTE MEGABYTE, ed è il numero che ha motivato questa
+    funzione. Misurato il 2026-08-10 caricando il catalogo vero: le 4766
+    schede tenute in chiaro costano 47 MB di memoria perenne, su un host
+    che ne ha 512 in tutto e che ha già riavviato il servizio d'ufficio
+    per averli superati. Ogni riavvio è un avvio a freddo: il costo non
+    si paga in memoria, si paga in lentezza.
+
+    ## Perché una stringa e non un gzip
+
+    Il primo tentativo comprimeva ogni scheda e la teneva in base64.
+    Funzionava in memoria e **peggiorava l'archivio**: `tracker.db`
+    passava da 10,6 a 12,2 MB, perché il base64 di dati già compressi
+    non si ricomprime, e quel file la compressione esterna se
+    l'aspettava. Misurato, non previsto.
+
+    La stringa semplice va meglio su tutti e due i fronti, e il motivo
+    è che il peso non era nel testo ma negli OGGETTI: quindici sezioni
+    per scheda, dieci voci per sezione, fanno circa settecentomila
+    stringhe e dizionari Python: 47 MB di intestazioni per una manciata
+    di megabyte di contenuto. Una stringa sola per scheda toglie quelle
+    intestazioni senza costare un solo ciclo di compressione — e
+    l'archivio la comprime come ha sempre fatto, perché è testo.
+    """
+    if not sezioni:
+        return ""
+    return json.dumps(sezioni, ensure_ascii=False, separators=(",", ":"))
+
+
+def _espandi_sezioni(ripiegate: str) -> dict:
+    """Il giro inverso. Una scheda illeggibile rende un dizionario vuoto:
+    la pagina mostra una sezione in meno invece di non aprirsi."""
+    if not ripiegate:
+        return _SEZIONI_VUOTE
+    try:
+        return json.loads(ripiegate)
+    except Exception:
+        return _SEZIONI_VUOTE
+
+
+def leggi_scheda(dati: dict, marca_grezza: str = "", marca: str = "") -> dict | None:
+    """Da una `details.json` alla forma compatta che teniamo in memoria.
+
+    Si conserva **tutto** il blocco delle specifiche, non solo i campi che
+    l'interfaccia usa oggi: è quello che permette di mostrare una scheda
+    tecnica completa senza dover riscaricare o ri-parsare niente. Il
+    blocco però si tiene COMPRESSO — vedi `_comprimi_sezioni`.
+    """
+    corpo = (dati or {}).get("data") or {}
+    nome = pulisci(corpo.get("model"))
+    if not nome:
+        return None
+
+    grezze = corpo.get("specifications") or {}
+    sezioni: dict[str, dict[str, str]] = {}
+    for titolo, campi in grezze.items():
+        if not isinstance(campi, dict):
+            continue
+        puliti = {pulisci(k): pulisci(v) for k, v in campi.items() if pulisci(v)}
+        if puliti:
+            sezioni[pulisci(titolo)] = puliti
+
+    def campo(sezione: str, chiave: str) -> str | None:
+        return (sezioni.get(sezione) or {}).get(chiave) or None
+
+    memoria = campo("Memory", "Internal") or ""
+    storage_gb, ram_gb = leggi_memoria(memoria)
+    codici = leggi_codici(campo("Misc", "Models") or "")
+
+    foto = pulisci(corpo.get("imageUrl")) or None
+    if not foto:
+        immagini = corpo.get("device_images") or []
+        if immagini and isinstance(immagini, list):
+            foto = pulisci((immagini[0] or {}).get("url")) or None
+
+    return {
+        "nome": nome,
+        "marca": marca or _MARCHE.get(marca_grezza, C.OTHER),
+        "foto": foto,
+        "codici": codici,
+        "rilascio": (campo("Launch", "Announced")
+                     or pulisci(corpo.get("release_date")) or None),
+        "chipset": campo("Platform", "Chipset"),
+        "cpu": campo("Platform", "CPU"),
+        "gpu": campo("Platform", "GPU"),
+        "ram_gb": list(ram_gb),
+        "storage_gb": list(storage_gb),
+        "memoria": memoria or None,
+        "display": campo("Display", "Size"),
+        "display_tipo": campo("Display", "Type"),
+        "batteria": campo("Battery", "Type"),
+        "ricarica": campo("Battery", "Charging"),
+        "camera_post": (campo("Main Camera", "Triple") or campo("Main Camera", "Quad")
+                        or campo("Main Camera", "Dual") or campo("Main Camera", "Single")),
+        "camera_front": (campo("Selfie camera", "Single")
+                         or campo("Selfie camera", "Dual")),
+        "os_lancio": campo("Platform", "OS"),
+        "peso": campo("Body", "Weight"),
+        "dimensioni": campo("Body", "Dimensions"),
+        "sezioni_json": _ripiega_sezioni(sezioni),
+    }
+
+
+def _a_scheda(riga: dict) -> Scheda:
+    return Scheda(
+        nome=riga["nome"], marca=riga.get("marca", ""), foto=riga.get("foto"),
+        codici=tuple(riga.get("codici") or ()),
+        rilascio=riga.get("rilascio"), chipset=riga.get("chipset"),
+        cpu=riga.get("cpu"), gpu=riga.get("gpu"),
+        ram_gb=tuple(riga.get("ram_gb") or ()),
+        storage_gb=tuple(riga.get("storage_gb") or ()),
+        memoria=riga.get("memoria"), display=riga.get("display"),
+        display_tipo=riga.get("display_tipo"), batteria=riga.get("batteria"),
+        ricarica=riga.get("ricarica"), camera_post=riga.get("camera_post"),
+        camera_front=riga.get("camera_front"), os_lancio=riga.get("os_lancio"),
+        peso=riga.get("peso"), dimensioni=riga.get("dimensioni"),
+        sezioni_json=riga.get("sezioni_json") or "",
+        # La fonte si legge dalla riga e non si dà per scontata: dalla v49
+        # le schede non arrivano più tutte da qui (vedi `_ripiego_esterno`),
+        # e una scheda presa altrove non deve dichiarare GSMArena in fondo
+        # alla pagina — è l'unica riga che dice a chi legge da dove viene
+        # quello che sta guardando.
+        fonte=riga.get("fonte") or FONTE_LABEL,
+    )
+
+
+# ======================================================================
+# Archivio → elenco di schede
+# ======================================================================
+def leggi_archivio(dati: bytes) -> list[dict]:
+    """Estrae le schede dal `tar.gz` scaricato, senza scriverlo su disco.
+
+    Le voci illeggibili si saltano una per una: un file corrotto su 4700
+    non deve far perdere le altre 4699.
+    """
+    schede: list[dict] = []
+    try:
+        archivio = tarfile.open(fileobj=io.BytesIO(dati), mode="r:gz")
+    except (tarfile.TarError, OSError, EOFError):
+        return schede
+    with archivio:
+        for membro in archivio:
+            if not membro.isfile() or not membro.name.endswith("details.json"):
+                continue
+            pezzi = membro.name.split("/")
+            cartella = pezzi[1] if len(pezzi) > 2 else ""
+            if "-phones-" not in cartella:
+                continue
+            marca_grezza, marca = marca_da_cartella(cartella)
+            try:
+                estratto = archivio.extractfile(membro)
+                if estratto is None:
+                    continue
+                dati_json = json.loads(estratto.read().decode("utf-8", "replace"))
+            except (tarfile.TarError, OSError, ValueError):
+                continue
+            letta = leggi_scheda(dati_json, marca_grezza, marca)
+            if letta:
+                schede.append(letta)
+    return schede
+
+
+# ======================================================================
+# Indici
+# ======================================================================
+def _forme_nome(nome: str) -> list[str]:
+    """Tutti i modi in cui la gente scrive lo stesso nome.
+
+    Si riusa la funzione di `soc`, che è già collaudata su questo: l'import
+    è qui dentro e non in cima al file perché `soc` a sua volta consulta
+    questo modulo, e a livello di modulo i due si aspetterebbero a vicenda.
+    """
+    from . import soc
+    return soc.varianti_nome(nome)
+
+
+# Sotto questa lunghezza un nome non identifica un telefono: la forma
+# abbreviata di «OnePlus 2» è «2».
+_LUNGHEZZA_MINIMA = 3
+
+
+def indicizza(schede: list[dict]) -> tuple[dict[str, dict], dict[str, dict]]:
+    """(per codice, per nome). I nomi contesi si buttano, i codici no.
+
+    Un codice modello identifica un telefono e uno solo: se due schede se
+    lo contendono vince la prima, che nella pratica non capita.
+
+    Un nome abbreviato invece no. `varianti_nome` genera anche la forma
+    senza marca, ed è quello che rende utile l'indice — «Samsung S24
+    Ultra» trova «Galaxy S24 Ultra» — ma la stessa abbreviazione accorpa
+    telefoni che non c'entrano niente. Quando due schede DIVERSE reclamano
+    la stessa forma breve, la chiave si toglie: meglio non rispondere che
+    rispondere a caso. È la stessa regola già applicata al dataset del 2021.
+    """
+    per_codice: dict[str, dict] = {}
+    per_nome: dict[str, dict] = {}
+    contese: set[str] = set()
+
+    for riga in schede:
+        for codice in riga.get("codici") or ():
+            per_codice.setdefault(codice.upper(), riga)
+
+        for forma in _forme_nome(riga["nome"]):
+            if len(forma) < _LUNGHEZZA_MINIMA or forma in contese:
+                continue
+            precedente = per_nome.get(forma)
+            if precedente is None:
+                per_nome[forma] = riga
+            elif precedente["nome"] != riga["nome"]:
+                contese.add(forma)
+                per_nome.pop(forma, None)
+    return per_codice, per_nome
+
+
+# ======================================================================
+# Rete e cache
+# ======================================================================
+def _scarica() -> bytes | None:
+    if requests is None:  # pragma: no cover
+        return None
+    try:
+        risposta = requests.get(ARCHIVIO_URL, timeout=90,
+                                headers={"User-Agent": C.USER_AGENT})
+    except Exception:
+        return None
+    if getattr(risposta, "status_code", 0) != 200:
+        return None
+    contenuto = risposta.content
+    if not contenuto or len(contenuto) < _DIMENSIONE_MINIMA:
+        return None
+    return contenuto
+
+
+def carica_da(schede: list[dict], etichetta: str = "elenco fornito") -> list[dict]:
+    """Indicizza schede già in mano, **senza toccare la rete**.
+
+    Esiste per i test e per un'eventuale copia locale: la stessa porta
+    aperta da `aer_catalog.carica_da`, e per lo stesso motivo — collaudare
+    un parser non deve dipendere da cosa risponde un server oggi.
+    """
+    global _schede, _per_codice, _per_nome, _status
+    with _lock:
+        _schede = list(schede)
+        _per_codice, _per_nome = indicizza(_schede)
+        _status = (f"{len(_schede)} schede, {len(_per_codice)} codici modello "
+                   f"({etichetta})")
+        return _schede
+
+
+def carica() -> list[dict]:
+    """Le schede, dalla cache se è fresca, altrimenti dalla rete.
+
+    Se il download fallisce ma una copia in archivio c'è, si usa quella:
+    un catalogo vecchio è enormemente meglio di nessun catalogo, e la
+    differenza fra i due la vede solo chi cerca un modello uscito la
+    settimana scorsa.
+    """
+    global _schede, _per_codice, _per_nome, _status
+    if _schede is not None:
+        return _schede
+
+    with _lock:
+        if _schede is not None:
+            return _schede
+
+        grezzo = None
+        etichetta = ""
+        try:
+            from . import storage
+            cache = storage.get_blob(_BLOB_SCHEDE)
+            quando = storage.get_meta(_META_SCARICATO)
+            fresca = False
+            if cache and quando:
+                try:
+                    eta = (datetime.now(timezone.utc)
+                           - datetime.fromisoformat(quando)).total_seconds() / 3600
+                    fresca = eta < _RINFRESCA_ORE
+                except ValueError:
+                    fresca = False
+            if fresca and cache:
+                grezzo = json.loads(gzip.decompress(cache).decode("utf-8"))
+                etichetta = "da archivio"
+            else:
+                scaricato = _scarica()
+                if scaricato:
+                    grezzo = leggi_archivio(scaricato)
+                    etichetta = "scaricato"
+                    if grezzo:
+                        storage.set_blob(
+                            _BLOB_SCHEDE,
+                            gzip.compress(json.dumps(
+                                grezzo, ensure_ascii=False).encode("utf-8"), 6),
+                        )
+                        storage.set_meta(_META_SCARICATO,
+                                         datetime.now(timezone.utc).isoformat())
+                elif cache:
+                    grezzo = json.loads(gzip.decompress(cache).decode("utf-8"))
+                    etichetta = "da archivio (download fallito)"
+        except Exception as errore:
+            _status = f"non disponibile: {errore}"
+            grezzo = None
+
+        _schede = list(grezzo or [])
+        _per_codice, _per_nome = indicizza(_schede)
+        if _schede:
+            _status = (f"{len(_schede)} schede, {len(_per_codice)} codici modello "
+                       f"({etichetta})")
+        elif _status == "non ancora caricato":
+            _status = "non disponibile (download fallito)"
+        return _schede
+
+
+def reset_cache() -> None:
+    global _schede, _per_codice, _per_nome, _status
+    with _lock:
+        _schede = None
+        _per_codice = {}
+        _per_nome = {}
+        _status = "non ancora caricato"
+
+
+def status() -> str:
+    return _status
+
+
+# ======================================================================
+# Ricerca
+# ======================================================================
+def per_codice(codice: str) -> Scheda | None:
+    chiave = (codice or "").strip().upper().split("/")[0]
+    if not chiave:
+        return None
+    carica()
+    riga = _per_codice.get(chiave)
+    return _a_scheda(riga) if riga else None
+
+
+# Suffissi che distinguono due confezioni dello stesso telefono, non due
+# telefoni. Chi cerca «Galaxy A07» intende il Galaxy A07, e il catalogo lo
+# chiama «Galaxy A07 4G» perché ne esiste anche una versione 5G.
+_SUFFISSI_CONNETTIVITA = ("4G", "5G", "LTE", "5G UW")
+
+
+def per_nome(nome: str) -> Scheda | None:
+    testo = (nome or "").strip()
+    if not testo:
+        return None
+    carica()
+    forme = _forme_nome(testo)
+    for forma in forme:
+        riga = _per_nome.get(forma)
+        if riga:
+            return _a_scheda(riga)
+
+    # RIPIEGO, e solo se non è ambiguo. Si accetta una scheda il cui nome
+    # è quello cercato più un suffisso di connettività — ma **una sola**:
+    # se il catalogo ne ha due (la 4G e la 5G) scegliere sarebbe indovinare,
+    # e le due montano spesso chip diversi.
+    for forma in forme:
+        candidate = []
+        for suffisso in _SUFFISSI_CONNETTIVITA:
+            riga = _per_nome.get(f"{forma} {suffisso}")
+            if riga is not None and riga not in candidate:
+                candidate.append(riga)
+        if len(candidate) == 1:
+            return _a_scheda(candidate[0])
+    return None
+
+
+# Il ripiego per le marche fuori perimetro. È una variabile e non una
+# costante perché i test la spengono: una scheda che dipende da cosa
+# risponde un server di terzi non è collaudabile.
+RIPIEGO_ESTERNO = True
+
+
+def _ripiego_esterno(*indizi: str | None, marca: str | None = None) -> Scheda | None:
+    """La scheda di un modello HONOR/realme/Huawei/Nothing, da versus.com.
+
+    Il limite n. 1 dichiarato in testa a questo file — «le marche coperte
+    sono dieci» — era vero e resta vero per QUESTA fonte, ma non doveva
+    restare vero per il progetto: sono le due marche che il tracker segue
+    con una fonte ufficiale dedicata (le pagine AER di HONOR e realme) a
+    non avere una scheda tecnica, cioè si sapeva a che Android sta un
+    telefono senza sapere che telefono è. Vedi `core/versus.py`.
+
+    Sta DOPO il catalogo e non prima: il mirror GSMArena è indicizzato per
+    codice modello e distingue le varianti regionali, versus no.
+
+    ## Il bug reale trovato dall'utente: «RMX3933» senza scheda, «realme
+    Note 60» con la scheda — stesso telefono
+
+    `versus.marca_scoperta` guarda **solo la prima parola** del testo: le
+    accetta «realme Note 60» e rifiuta sia «RMX3933» (un codice, nessuna
+    parola di marca) sia «Note 60s» — che è il nome CANONICO scelto da
+    `modelcodes.nome_canonico` per quello stesso codice, perché fra i nomi
+    commerciali veri di RMX3933 (C61, Note 60, Note 60s, NARZO N61) sceglie
+    il più corto, e nessuno di questi porta «realme» in testa. Risultato:
+    cercando per codice, o per uno qualsiasi dei nomi brevi, la scheda
+    spariva; cercando col nome completo con la marca, appariva. Due forme
+    dello stesso identico telefono con due risposte diverse — la stessa
+    famiglia di incoerenza che questo progetto ha già dovuto correggere
+    altrove (vedi FONTI.md).
+
+    **Non si può indovinare la marca da un nome corto**: «C61» da solo non
+    dice se è realme o un prodotto di un'altra marca con lo stesso nome. Ma
+    chi chiama questa funzione la marca spesso la sa già — dal catalogo AER
+    (`aer_catalog.lookup(codice).get("brand_aer")`), che è una fonte
+    ufficiale, non un'induzione dal testo. Il parametro `marca`, quando
+    c'è, si usa SOLO al secondo giro, dopo che il testo da solo non ha
+    prodotto niente: prima si tenta quello che il testo dice da sé (più
+    affidabile, perché non dipende da chi chiama), poi si prova a
+    costruire il nome con la marca esplicita (`versus.con_marca`) prima di
+    arrendersi.
+    """
+    if not RIPIEGO_ESTERNO:
+        return None
+    try:
+        from . import versus
+    except ImportError:  # pragma: no cover
+        return None
+    testi = [str(t).strip() for t in indizi if t and str(t).strip()]
+    if not testi:
+        return None
+
+    for testo in testi:
+        trovata = versus.marca_scoperta(testo)
+        if not trovata:
+            continue
+        riga = versus.scheda_grezza(testo, _MARCHE.get(trovata.lower(), C.OTHER))
+        if riga:
+            return _a_scheda(riga)
+
+    marca_nota = versus.marca_scoperta(marca) if marca else None
+    if not marca_nota:
+        return None
+    for testo in testi:
+        completo = versus.con_marca(testo, marca_nota)
+        riga = versus.scheda_grezza(completo, _MARCHE.get(marca_nota.lower(), C.OTHER))
+        if riga:
+            return _a_scheda(riga)
+    return None
+
+
+def cerca(*indizi: str | None, marca: str | None = None) -> Scheda | None:
+    """La scheda del dispositivo, provando ogni traccia disponibile.
+
+    L'ordine non è casuale: prima i **codici modello** trovati in una
+    qualsiasi delle stringhe (il codice identifica un telefono preciso),
+    poi i nomi commerciali (che identificano una famiglia). Chi cerca
+    digita una cosa sola, e quella arriva qui indifferentemente come nome
+    o come codice: si prova in tutti e due i modi invece di pretendere che
+    l'utente sappia quale campo sta riempiendo.
+
+    `marca`, quando c'è, non serve al catalogo GSMArena o a `per_nome`
+    (indicizzati per codice/nome, non per marca): serve solo al ripiego
+    versus.com, come marca esplicita quando il nome canonico non la porta
+    in testa (vedi il docstring di `_ripiego_esterno`).
+    """
+    from . import soc
+
+    testi = [t for t in indizi if t and str(t).strip()]
+    if not testi:
+        return None
+
+    visti: list[str] = []
+    for testo in testi:
+        for codice in soc.codici_da_testo(str(testo)):
+            if codice not in visti:
+                visti.append(codice)
+        diretto = str(testo).strip().upper()
+        if diretto not in visti:
+            visti.append(diretto)
+
+    carica()
+    for codice in visti:
+        riga = _per_codice.get(codice.split("/")[0])
+        if riga:
+            return _a_scheda(riga)
+
+    for testo in testi:
+        trovata = per_nome(str(testo))
+        if trovata:
+            return trovata
+
+    # Solo qui, quando il catalogo ha già detto di no su tutte le tracce.
+    return _ripiego_esterno(*testi, marca=marca)

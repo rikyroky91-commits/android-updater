@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block titolo %}Dispositivi · {{ titolo_sito }}{% endblock %}
+
+{#
+  SOLO L'ARCHIVIO. Il risultato di una ricerca vive in `ricerca.html`:
+  qui restava attaccato sopra la tabella, e chi cercava un modello si
+  ritrovava sotto la risposta millecinquecento righe che non c'entravano.
+#}
+{% block corpo %}
+{% if scansione_avviata %}
+<p class="avviso">Scansione avviata. Dura una trentina di secondi: ricarica
+  la pagina fra poco per vedere i risultati.</p>
+{% endif %}
+
+<div class="cifre">
+  <div><strong>{{ stats.devices }}</strong> dispositivi</div>
+  <div><strong>{{ stats.updates_relevant }}</strong> aggiornamenti</div>
+  <div><strong>{{ stats.watched }}</strong> nel parco di test</div>
+  {% if stats.last_scan %}
+  <div>ultima scansione <strong>{{ fmt_relative(stats.last_scan.finished_at) }}</strong></div>
+  {% endif %}
+  <form method="post" action="/scansione" class="in-riga">
+    <button type="submit" class="secondario minuto">Scansiona adesso</button>
+  </form>
+</div>
+
+<h3 class="occhiello">In archivio{% if filtro %} · filtrato per «{{ filtro }}»{% endif %}</h3>
+
+{% if righe %}
+<table class="tabella">
+  <thead>
+    <tr><th>Brand</th><th>Modello</th><th>CPU</th><th>Sistema</th>
+        <th>Build</th><th>Ultimo aggiornamento</th><th>Stato</th></tr>
+  </thead>
+  <tbody>
+    {% for r in righe %}
+    <tr>
+      <td class="tenue">{{ r.brand }}</td>
+      <td><a href="/dispositivo?k={{ r.chiave | urlencode }}">{{ r.modello }}</a></td>
+      <td class="tenue">{{ r.cpu or "—" }}</td>
+      <td>{{ r.sistema or "—" }}</td>
+      <td>{% if r.build %}<code>{{ r.build }}</code>{% else %}—{% endif %}</td>
+      <td class="tenue">{{ r.aggiornato }}</td>
+      <td><span class="tag {{ r.stato.classe }}">{{ r.stato.etichetta }}</span></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if totale > in_pagina %}
+<p class="nota">Mostrati i primi {{ in_pagina }} di {{ totale }}. Restringi con il filtro.</p>
+{% endif %}
+
+{% elif archivio_vuoto %}
+<p class="vuoto">L'archivio è vuoto: la prima scansione lo popola. Nel
+  frattempo la <a href="/">ricerca</a> interroga le fonti sul momento.</p>
+{% else %}
+<p class="vuoto">Nessun dispositivo in archivio corrisponde a «{{ filtro }}».
+  La <a href="/?q={{ filtro | urlencode }}">ricerca</a> però lo interroga
+  comunque online.</p>
+{% endif %}
+{% endblock %}
