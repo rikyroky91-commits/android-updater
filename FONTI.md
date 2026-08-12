@@ -2059,3 +2059,121 @@ l'esito vero sia in successo che in fallimento).
 
 Suite completa dopo questo giro: **1024 test passati, 416 subtest
 passati, 0 falliti** (era 1018 all'inizio di questo giro).
+
+## Stato «Errore» senza via d'uscita: chi sbaglia un valore restava bloccato (2026-08-12, stesso giorno, dopo il primo deploy del v58)
+
+Appena il v58 è arrivato in produzione, l'utente ha provato «Salva
+adesso» e ha ricevuto `Errore` — `GitHub ha risposto 401: {"message":
+"Bad credentials"}`. Screenshot del pannello Environment di Render:
+`BACKUP_GIST_ID` e `BACKUP_GITHUB_TOKEN` avevano **lo stesso identico
+valore**, un ID di Gist (32 caratteri esadecimali) incollato in
+entrambe le variabili invece che un vero token GitHub (che comincia
+per `ghp_` o `github_pat_`) nella seconda.
+
+Non era un bug nel codice: il token era davvero sbagliato, e GitHub ha
+correttamente rifiutato la richiesta. Il problema stava nell'interfaccia
+appena costruita: lo stato «Errore» mostrava SOLO il pulsante «Salva
+adesso» (la stessa condizione `else` che copriva anche «Attivo» e
+«Configurato, in attesa...»), che riprova con la STESSA configurazione
+sbagliata e fallisce sempre allo stesso modo — nessun modo, da quella
+pagina, di rifare la configurazione senza uscire e modificare Render a
+mano, senza nemmeno sapere quale dei due valori fosse quello sbagliato.
+Esattamente il tipo di vicolo cieco che «semplifica tutto» (la
+richiesta che ha originato il punto precedente) doveva evitare.
+
+**Fix**: `diagnostica.html`, la condizione sul modulo di configurazione
+passa da un `if/else` a due `if` indipendenti — il modulo "Configura il
+backup"/"Rifai la configurazione" ora compare per DUE stati
+(`Non configurato` **e** `Errore`), il pulsante "Salva adesso" per
+tutti tranne `Non configurato`. In stato `Errore` compaiono entrambi:
+"Salva adesso" per riprovare (utile se l'errore era temporaneo, per
+esempio un problema di rete lato GitHub) e "Rifai la configurazione"
+(stesso modulo di prima, titolo diverso, più una nota che spiega
+esplicitamente il sospetto più probabile — valori scambiati o
+duplicati) per ripartire da un token nuovo senza dover indovinare quale
+dei due valori salvati fosse sbagliato.
+
+Test nuovo: `tests/test_sito.py::TestDiagnosticaConfigurazioneBackup::
+test_in_errore_compaiono_sia_salva_adesso_sia_rifai_la_configurazione`.
+Aggiornato anche `test_a_configurazione_attiva_compare_salva_adesso_non_il_modulo`
+per verificare che "Rifai la configurazione" NON compaia quando il
+backup è già attivo (nessuna ragione di riproporre il modulo a chi
+funziona).
+
+### Verificato, non solo scritto
+
+Suite completa dopo questo giro: **1025 test passati, 416 subtest
+passati, 0 falliti** (era 1024 all'inizio di questo giro).
+
+## La ricerca priorizza la variante europea, non quella con la build più recente (2026-08-12, stesso giorno)
+
+Richiesta esplicita dell'utente: «per migliorare la ricerca potresti
+mettere in priorità i modelli europei? così se cerco un modello non mi
+spunta un modello a caso ma in priorità quello europeo».
+
+**Cosa succedeva prima, verificato non dedotto**: per Samsung la
+priorità europea esisteva GIÀ, da tempo (`_ORDINE_MERCATI_SAMSUNG`,
+codici che finiscono per `B`/`F`/`E`) — un fix precedente, documentato
+più sopra in questo file. Per OnePlus/OPPO no: il tracker ARB
+(`core/oplus_arb.py`) restituisce, per lo stesso telefono, una riga per
+regione — «OnePlus 13» è `CPH2653` in Europa/Global e `CPH2649` in
+India, con build che non procedono di pari passo, ESATTAMENTE il caso
+che l'utente descrive. `_lookup_oplus_arb` (`core/sources.py`)
+ordinava quelle righe per build più recente, non per regione: con la
+fixture registrata (`tests/fixtures/oplus_arb_readme.md`), l'India ha
+`16.0.7.201` contro `16.0.5.703` dell'Europa, quindi vinceva l'India —
+verificato con uno script che riproduce l'intera catena fino a
+`web/main.py::_cerca_davvero` (`migliore = strutturati[0]`), non solo
+letto sul codice.
+
+**Fix**: `_rango_regione_arb()`, stessa idea di
+`_rango_mercato_samsung()` ma sulla colonna `Region` del tracker (che
+scrive per esteso «Europe», «Global», «India»...). Ordine dichiarato:
+Europa, poi Global (la build senza mercato specifico, la più vicina a
+un telefono europeo quando l'Europa non ha una riga propria), poi le
+altre nell'ordine di prima (build più recente). TUTTE le regioni
+restano nel risultato — nessuna sparisce, l'informazione multi-regione
+resta il valore di questa fonte per un parco di test misto — cambia
+solo QUALE diventa il risultato principale mostrato dalla ricerca.
+
+**Un dettaglio verificato prima di fidarsi, non assunto**: l'app somma
+i risultati di più fonti e li riordina per data
+(`core/scan.py::search_model`, `items.sort(...)`); c'era il rischio
+concreto che quel riordino successivo cancellasse l'ordine appena
+scelto qui. Verificato con lo stesso script end-to-end che
+`core/util.py::now_iso()` tronca ai secondi (`replace(microsecond=0)`),
+quindi tutte le righe normalizzate nella stessa richiesta ottengono lo
+STESSO `first_seen`, e l'ordinamento a parità di data in Python è
+stabile: l'ordine per regione sopravvive intatto fino alla pagina.
+Senza questa verifica il fix sarebbe sembrato scritto ma silenziosamente
+inefficace.
+
+**Controllato ma non toccato, con la ragione**:
+* **Catalogo Android Enterprise Recommended** (realme, HONOR, Motorola,
+  alcuni Samsung/Xiaomi/OPPO) — ha già un campo `regions` per
+  dispositivo, ma verificato sul fixture vero
+  (`tests/fixtures/aer_devices.json`): ogni riga del catalogo elenca
+  GIÀ tutte le regioni di un modello insieme (`["APAC", "Europe",
+  "MEA", ...]`), non una riga separata per regione. Non c'è
+  un'ambiguità da risolvere: nessun fix necessario qui.
+* **Xiaomi** (`_lookup_xiaomi`/`_piu_vicini`) — il tracker usa nomi con
+  parole di zona («Global», «India», «Indonesia»...) che il codice
+  tratta già come equivalenti fra loro (non «un altro telefono»,
+  `_PAROLE_VARIANTE`), quindi in teoria la stessa ambiguità potrebbe
+  esistere. Non c'è però un fixture o un accesso di rete per
+  verificarlo su dati veri in questa sessione: applicare qui la stessa
+  regola senza aver visto un caso reale sarebbe indovinare, non
+  correggere. Da riprendere se emerge un caso concreto.
+* **HONOR, Motorola, realme (fonti non-AER)** — nessuna convenzione di
+  codice o campo di dati nota per il mercato, verificata o no: stesso
+  motivo di sopra.
+
+Test nuovi: `tests/test_oplus_arb.py::TestFonteInSources::
+test_leuropa_viene_prima_delle_altre_regioni`,
+`test_global_viene_dopo_leuropa_ma_prima_delle_altre`,
+`test_senza_europa_ne_global_lordine_resta_per_build` (3).
+
+### Verificato, non solo scritto
+
+Suite completa dopo questo giro: **1028 test passati, 416 subtest
+passati, 0 falliti** (era 1025 all'inizio di questo giro).
