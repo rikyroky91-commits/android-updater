@@ -160,6 +160,18 @@ class TestLePagineSiDisegnano(_Sito):
         pagina = self.client.get("/dispositivi").text
         self.assertIn("Helio G99", pagina)
 
+    def test_la_diagnostica_mostra_lo_stato_del_backup(self):
+        """Segnalato dall'utente: non c'era nessun modo di vedere da fuori
+        se il backup esterno fosse configurato e funzionante — la pagina
+        elencava fonti e cataloghi ma taceva sul backup, l'unica risposta
+        concreta a «la correzione che ho salvato sopravviverà a un
+        riavvio?». Vedi `P.stato_backup` e `TestStatoBackup` in
+        `test_presenters.py` per i dettagli dei quattro stati."""
+        pagina = self.client.get("/diagnostica").text
+        self.assertIn("Backup esterno", pagina)
+        self.assertIn("Ultimo salvataggio riuscito", pagina)
+        self.assertIn("Ultimo ripristino", pagina)
+
 
 class TestNotaCoperturaConChipTrovato(unittest.TestCase):
     """Il round di inserimento metodico ha esteso `data/soc_modelli.csv` a

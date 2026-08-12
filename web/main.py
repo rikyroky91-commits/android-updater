@@ -459,6 +459,7 @@ def pagina_diagnostica(request: Request):
             ("Specifiche hardware", specs.status()),
             ("Interprete AI della ricerca", aiquery.status()),
         ],
+        backup=P.stato_backup(),
         logica=C.DATA_LOGIC_VERSION,
     ))
 

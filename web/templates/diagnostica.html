@@ -26,6 +26,28 @@
   </tbody>
 </table>
 
+{#
+  BACKUP ESTERNO. L'archivio (`tracker.db`) vive su disco effimero — vedi
+  la nota nel Dockerfile — e l'unica copia che sopravvive a un riavvio è
+  questo backup su Gist. Senza una riga qui non c'era NESSUN modo di
+  vedere da fuori se fosse configurato e se l'ultimo salvataggio fosse
+  davvero riuscito: la stessa domanda che ha reso «la correzione sembra
+  non salvarsi» difficile da diagnosticare da fuori.
+#}
+<h3 class="occhiello">Backup esterno</h3>
+<table class="tabella">
+  <tbody>
+    <tr><th scope="row">Stato</th>
+        <td><span class="tag {{ backup.classe }}">{{ backup.etichetta }}</span></td></tr>
+    <tr><th scope="row">Ultimo salvataggio riuscito</th>
+        <td class="tenue">{{ backup.ultimo_salvataggio }}</td></tr>
+    <tr><th scope="row">Ultimo ripristino</th>
+        <td class="tenue">{{ backup.ultimo_ripristino }}</td></tr>
+    <tr><th scope="row">Ultimo esito</th>
+        <td class="tenue">{{ backup.dettaglio }}</td></tr>
+  </tbody>
+</table>
+
 <p class="nota">Archivio <code>{{ stats.db_path }}</code> ·
   {{ stats.updates_total }} record totali · logica dati v{{ logica }}</p>
 {% endblock %}

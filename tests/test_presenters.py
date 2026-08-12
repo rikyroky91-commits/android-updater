@@ -22,7 +22,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core import aer_catalog, modelcodes, specs, soc  # noqa: E402
+from core import aer_catalog, backup, modelcodes, specs, soc  # noqa: E402
 from web import presenters as P  # noqa: E402
 
 
@@ -142,6 +142,63 @@ class TestMarcaDaiNomiVeriQuandoLAerNonBasta(unittest.TestCase):
         modelcodes._memory_cache["ZZ4321"] = ["Galaxy Test", "Samsung Galaxy Test"]
         P.scheda_tecnica("Galaxy Test", codice="ZZ4321", brand="")
         self.assertEqual(self.chiamate_cerca, [None])
+
+
+class TestStatoBackup(unittest.TestCase):
+    """Nato da una domanda dell'utente: dopo il fix che avvia un backup
+    subito a ogni correzione, la pagina Diagnostica non diceva NIENTE sul
+    backup — nessun modo di vedere da fuori se fosse configurato e se
+    l'ultimo salvataggio fosse davvero riuscito. Vedi `P.stato_backup`.
+    """
+
+    def setUp(self):
+        self._configurato = backup.configurato
+        self._stato = backup.stato
+
+    def tearDown(self):
+        backup.configurato = self._configurato
+        backup.stato = self._stato
+
+    def test_non_configurato(self):
+        backup.configurato = lambda: False
+        backup.stato = lambda: {"ultimo_esito": "non configurato",
+                                "ultimo_salvataggio": None, "ultimo_ripristino": None}
+        stato = P.stato_backup()
+        self.assertEqual(stato["etichetta"], "Non configurato")
+        self.assertEqual(stato["classe"], "tag-outline")
+
+    def test_configurato_e_funzionante(self):
+        backup.configurato = lambda: True
+        backup.stato = lambda: {"ultimo_esito": "salvato (12 KB compressi)",
+                                "ultimo_salvataggio": "2026-08-12T10:00:00+00:00",
+                                "ultimo_ripristino": "2026-08-12T09:00:00+00:00"}
+        stato = P.stato_backup()
+        self.assertEqual(stato["etichetta"], "Attivo")
+        self.assertEqual(stato["classe"], "tag-accent")
+        self.assertIn("salvato", stato["dettaglio"])
+
+    def test_configurato_ma_mai_ancora_tentato_in_questa_sessione(self):
+        """Il caso che ha generato questo presenter: `_stato['ultimo_esito']`
+        di `core/backup.py` parte da "non configurato" a ogni avvio del
+        processo, anche quando la configurazione C'È — mostrarlo alla
+        lettera farebbe credere che manchi la configurazione, quando è
+        solo che non è ancora successo niente da riportare."""
+        backup.configurato = lambda: True
+        backup.stato = lambda: {"ultimo_esito": "non configurato",
+                                "ultimo_salvataggio": None, "ultimo_ripristino": None}
+        stato = P.stato_backup()
+        self.assertNotEqual(stato["etichetta"], "Non configurato")
+        self.assertIn("attesa", stato["etichetta"])
+        self.assertNotIn("non configurato", stato["dettaglio"])
+
+    def test_configurato_ma_in_errore(self):
+        backup.configurato = lambda: True
+        backup.stato = lambda: {"ultimo_esito": "GitHub ha risposto 401: token non valido",
+                                "ultimo_salvataggio": None, "ultimo_ripristino": None}
+        stato = P.stato_backup()
+        self.assertEqual(stato["etichetta"], "Errore")
+        self.assertEqual(stato["classe"], "tag-outline")
+        self.assertIn("401", stato["dettaglio"])
 
 
 if __name__ == "__main__":

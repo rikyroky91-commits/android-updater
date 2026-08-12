@@ -129,6 +129,52 @@ def riga_aggiornamento(item: dict) -> dict:
     }
 
 
+def stato_backup() -> dict:
+    """Lo stato del salvataggio esterno (Gist o URL), per la scheda
+    Diagnostica.
+
+    Nato da una domanda dell'utente, dopo il fix che avvia un backup
+    subito a ogni correzione a mano (`_backup_subito` in `web/main.py`):
+    non c'era NESSUN modo di vedere da fuori se il backup fosse davvero
+    configurato e funzionante — la pagina Diagnostica elencava fonti e
+    cataloghi ma non diceva niente sul backup, che è esattamente
+    l'informazione che serve per rispondere «la correzione che ho appena
+    salvato sopravviverà al prossimo riavvio?».
+
+    `core/backup.py::_stato["ultimo_esito"]` parte da `"non configurato"`
+    a ogni avvio del processo, e resta così finché `salva()`/`ripristina()`
+    non girano almeno una volta — quindi un backup CONFIGURATO ma non
+    ancora tentato in questa sessione (appena riavviato, nessuna
+    correzione o scansione ancora passata di lì) mostrerebbe alla lettera
+    "non configurato", che è fuorviante: non è che manchi la
+    configurazione, è solo che non è ancora successo niente da riportare.
+    Qui si distingue esplicitamente questo caso.
+    """
+    from core import backup
+
+    configurato = backup.configurato()
+    stato = backup.stato()
+    mai_tentato = configurato and stato.get("ultimo_esito") == "non configurato"
+
+    if not configurato:
+        classe, etichetta = "tag-outline", "Non configurato"
+    elif stato.get("ultimo_salvataggio"):
+        classe, etichetta = "tag-accent", "Attivo"
+    elif mai_tentato:
+        classe, etichetta = "tag-neutral", "Configurato, in attesa del primo salvataggio"
+    else:
+        classe, etichetta = "tag-outline", "Errore"
+
+    return {
+        "classe": classe,
+        "etichetta": etichetta,
+        "dettaglio": ("nessun salvataggio o ripristino ancora in questa sessione"
+                     if mai_tentato else (stato.get("ultimo_esito") or "—")),
+        "ultimo_salvataggio": fmt_relative(stato.get("ultimo_salvataggio")),
+        "ultimo_ripristino": fmt_relative(stato.get("ultimo_ripristino")),
+    }
+
+
 def riga_fonte(stato: dict) -> dict:
     degrado = stato.get("degrado")
     if not stato.get("ok"):
