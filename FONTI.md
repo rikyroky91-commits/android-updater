@@ -1994,3 +1994,68 @@ TestLePagineSiDisegnano::test_la_diagnostica_mostra_lo_stato_del_backup`
 
 Suite completa dopo questo giro: **1018 test passati, 416 subtest
 passati, 0 falliti** (era 1013 all'inizio di questo giro).
+
+## Configurare il backup da tre pagine a una (2026-08-12, stesso giorno)
+
+Segnalato dall'utente subito dopo il fix precedente: **"dice che non è
+configurato nonostante abbia ascoltato le tue istruzioni. metti il tool
+in diagnostica e semplifica tutto"**. La configurazione manuale
+richiedeva tre passaggi su tre siti diversi (creare un token su GitHub,
+creare a mano un Gist privato, incollare due valori su Render) — tre
+occasioni distinte di sbagliare qualcosa o di non aver ancora aspettato
+il riavvio del servizio, e nessun modo diretto di distinguere "ho
+sbagliato un passaggio" da "ho fatto tutto giusto ma Render non si è
+ancora riavviato".
+
+**Fix**: `core/backup.py` aveva già da tempo tre funzioni scritte ma mai
+collegate a nessuna route (`verifica_token`, `crea_archivio`,
+`prova_completa` — confermato con `grep -rln` che non comparivano fuori
+da `backup.py` e dai suoi test). Questo giro le collega:
+
+- `POST /diagnostica/backup/crea` — incolli un token, la rotta lo
+  verifica, crea l'archivio privato su Gist e ci scrive/rilegge un
+  valore di prova per confermare che funziona davvero, tutto in una
+  chiamata. Il modulo compare in Diagnostica solo quando lo stato è
+  "Non configurato" — a configurazione già attiva non ha senso
+  riproporlo.
+- `POST /diagnostica/backup/salva` — un pulsante "Salva adesso, per
+  verificare" che esegue `backup.salva()` in modo sincrono (a differenza
+  di `_backup_subito()` nel percorso di ricerca, che è volutamente
+  fire-and-forget: qui invece è un'azione diagnostica esplicita, ha
+  senso aspettare l'esito vero).
+
+**Quello che resta manuale, e perché**: l'ultimo passaggio — incollare
+`BACKUP_GIST_ID` e `BACKUP_GITHUB_TOKEN` nel pannello Environment di
+Render — non si può automatizzare da qui: non c'è accesso alle API di
+Render, ed è fuori scopo (richiederebbe un secondo insieme di
+credenziali, quelle di Render, con più privilegi di quanto serva).
+Restano quindi due passaggi invece di sei, con l'esito di ognuno
+mostrato subito invece di scoprirlo solo al prossimo riavvio.
+
+**Sicurezza**: il token non viene mai scritto su disco né loggato —
+vive solo nella singola richiesta HTTP che lo verifica; il campo del
+modulo è `type="password"`; il token non viene mai ririnviato nella
+pagina di risposta (si dice solo "riusa lo stesso token appena
+incollato qui sopra" invece di ripeterlo).
+
+**Perché probabilmente il tentativo manuale dell'utente mostrava
+ancora "Non configurato"**: due spiegazioni più probabili, non
+verificabili da qui — (a) questa sessione non ha accesso a Render o al
+repository reale, quindi il fix precedente (la sezione "Backup
+esterno" stessa) potrebbe non essere ancora stato applicato lì, oppure
+(b) le variabili sono state salvate ma Render non aveva ancora finito
+il riavvio automatico. Il nuovo pulsante "Salva adesso" serve proprio a
+questo: dà un modo diretto di controllare la configurazione attuale
+invece di aspettare il prossimo ciclo di scansione.
+
+Test nuovi: `tests/test_sito.py::TestDiagnosticaConfigurazioneBackup`
+(6 — il modulo compare solo se non configurato, il pulsante "Salva
+adesso" compare solo se configurato, token valido crea l'archivio e
+mostra i due valori da copiare senza mai rimostrare il token, token
+non valido mostra l'errore e non crea niente, "Salva adesso" mostra
+l'esito vero sia in successo che in fallimento).
+
+### Verificato, non solo scritto
+
+Suite completa dopo questo giro: **1024 test passati, 416 subtest
+passati, 0 falliti** (era 1018 all'inizio di questo giro).
