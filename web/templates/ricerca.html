@@ -89,19 +89,19 @@
      nomi è quello giusto, e l'app lo ricorda per ogni ricerca futura di
      questo codice — con qualsiasi dei suoi nomi.
 
-     LE OPZIONI SONO `risultato.opzioni_correzione`, NON `risultato.gemelli`
-     — sono quasi sempre le stesse, ma non sempre: vedi il docstring di
-     `_opzioni_correzione` in `web/main.py`. Può contenere in più una forma
-     con la marca scritta davanti (per RMX3933, «Realme Note 60») che il
-     dataset non scrive mai per esteso, ma che resta comunque collegata
-     alla stessa scheda tecnica di ogni altra forma — mai un campo di
-     testo libero, per non rischiare di salvare un refuso come se fosse
-     un dato ufficiale. Compare solo quando c'è un codice a cui agganciare
-     la scelta: senza, non c'è niente da correggere. #}
-  {% if risultato.codice_per_correzione and risultato.opzioni_correzione %}
+     LE OPZIONI DEL MENU A TENDINA SONO `risultato.opzioni_correzione`,
+     NON `risultato.gemelli` — sono quasi sempre le stesse, ma non
+     sempre: vedi il docstring di `_opzioni_correzione` in `web/main.py`.
+     Può contenere in più una forma con la marca scritta davanti (per
+     RMX3933, «Realme Note 60») che il dataset non scrive mai per
+     esteso, ma che resta comunque collegata alla stessa scheda tecnica
+     di ogni altra forma. Compare solo quando c'è un codice a cui
+     agganciare la scelta: senza, non c'è niente da correggere. #}
+  {% if risultato.codice_per_correzione %}
   <details class="correzione-nome">
     <summary>{{ "Nome corretto a mano — cambia" if risultato.corretto_a_mano
                 else "Non è il nome giusto?" }}</summary>
+    {% if risultato.opzioni_correzione %}
     <form method="post" action="/modello/correggi" class="correzione-form">
       <input type="hidden" name="codice" value="{{ risultato.codice_per_correzione }}">
       <input type="hidden" name="query" value="{{ risultato.query }}">
@@ -114,6 +114,31 @@
       </select>
       <button type="submit">Salva come nome principale</button>
     </form>
+    {% endif %}
+    {# LA VIA D'USCITA QUANDO NEMMENO QUESTE FORME VANNO BENE — stessa
+       idea del modulo «Correggi o salva tu il modello» per un TAC
+       sconosciuto (`_imei.html`), stesso testo libero. Segnalato
+       dall'utente: senza questa via, chi non riconosce il proprio
+       telefono in NESSUNA delle forme proposte non aveva modo di
+       correggere il nome. A differenza delle forme sopra — tutte
+       verificate o costruite dalla marca nota, sempre collegate a una
+       scheda — un nome scritto qui non ha questa garanzia: il testo lo
+       dice esplicitamente. #}
+    <details class="correzione-libera">
+      <summary>Non trovi il nome giusto? Scrivilo tu</summary>
+      <p class="nota">Usalo solo se nessuna delle forme sopra è quella
+        giusta: a differenza di quelle — verificate dal dataset o
+        costruite dalla marca nota — un nome scritto qui non è garantito
+        trovare una scheda tecnica.</p>
+      <form method="post" action="/modello/correggi" class="correzione-form">
+        <input type="hidden" name="codice" value="{{ risultato.codice_per_correzione }}">
+        <input type="hidden" name="query" value="{{ risultato.query }}">
+        <label class="sr-only" for="correzione-nome-libero">Nome commerciale, scritto a mano</label>
+        <input id="correzione-nome-libero" type="text" name="nome"
+               placeholder="Nome commerciale, es. realme Note 60">
+        <button type="submit" class="secondario">Salva questo nome</button>
+      </form>
+    </details>
     {% if risultato.corretto_a_mano %}
     <form method="post" action="/modello/correggi" class="correzione-reset">
       <input type="hidden" name="codice" value="{{ risultato.codice_per_correzione }}">

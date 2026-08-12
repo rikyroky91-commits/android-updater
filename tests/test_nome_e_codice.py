@@ -855,28 +855,46 @@ class TestOpzioniCorrezione(unittest.TestCase):
         for codice in ("ZZ4001", "ZZ4002", "ZZ4003", "ZZ4004"):
             modelcodes._memory_cache.pop(codice, None)
 
-    def test_aggiunge_la_forma_con_la_marca_quando_nessun_gemello_la_scrive(self):
+    def test_aggiunge_una_forma_con_la_marca_per_ogni_nome_vero(self):
         """Nessuno dei nomi veri porta «realme» per esteso (solo il
-        sinonimo NARZO): la forma sintetica va aggiunta in coda."""
+        sinonimo NARZO): una forma sintetica va aggiunta per ciascuno —
+        il nome mostrato e ogni gemello — non solo per uno a caso."""
         from web import main as M
 
         modelcodes._memory_cache["ZZ4001"] = [
             "Nota Test 60", "Nota Test 60s", "NARZO Nota Test"]
         gemelli = M._nomi_gemelli("ZZ4001", "Nota Test 60s")
         opzioni = M._opzioni_correzione("Nota Test 60s", gemelli, "ZZ4001")
-        self.assertIn("Realme Nota Test 60", opzioni)
-        self.assertEqual(opzioni, gemelli + ["Realme Nota Test 60"])
+        self.assertIn("Realme Nota Test 60s", opzioni)  # dal nome mostrato
+        self.assertIn("Realme Nota Test 60", opzioni)   # da un gemello
+        self.assertIn("Realme NARZO Nota Test", opzioni)  # dall'altro gemello
 
-    def test_non_duplica_se_una_forma_gia_scrive_la_marca(self):
-        """Se una delle forme già proposte porta la marca in testa, non se
-        ne aggiunge una seconda sintetica identica — guardia diretta,
-        indipendente da come quella forma sia arrivata nell'elenco."""
+    def test_non_sceglie_a_caso_la_forma_piu_corta_come_unica_base(self):
+        """Il bug reale segnalato dall'utente su RMX3933: prima di questo
+        fix si generava UNA sola forma sintetica, scelta come la più
+        corta fra tutti i nomi veri — «C61» (3 lettere) invece di «Note
+        60» (7), che però è il nome con cui chi ha il telefono lo
+        riconosce. Non c'è un modo di indovinare quale nome vero sia
+        «quello giusto»: si generano tutte le forme, non se ne sceglie
+        una sola per lunghezza."""
         from web import main as M
 
-        modelcodes._memory_cache["ZZ4002"] = ["Nota Prova", "NARZO Nota Prova"]
-        gemelli = ["Realme Nota Prova"]
-        opzioni = M._opzioni_correzione("Nota Prova", gemelli, "ZZ4002")
-        self.assertEqual(opzioni, gemelli)
+        modelcodes._memory_cache["ZZ4004"] = [
+            "C61", "Note Test 60", "Note Test 60s", "NARZO Test N61"]
+        gemelli = M._nomi_gemelli("ZZ4004", "Note Test 60s")
+        opzioni = M._opzioni_correzione("Note Test 60s", gemelli, "ZZ4004")
+        self.assertIn("Realme Note Test 60", opzioni,
+                     "la forma riconoscibile deve esserci, non solo quella più corta")
+
+    def test_non_duplica_una_forma_che_gia_scrive_la_marca(self):
+        """Se la forma stessa porta già la marca in testa, `con_marca` la
+        restituisce invariata: non deve comparire come doppione di se
+        stessa."""
+        from web import main as M
+
+        modelcodes._memory_cache["ZZ4002"] = ["NARZO Nota Prova"]
+        opzioni = M._opzioni_correzione("Realme Nota Prova", [], "ZZ4002")
+        self.assertEqual(opzioni, [])
 
     def test_senza_marca_riconosciuta_le_opzioni_restano_i_soli_gemelli(self):
         """Nessuna voce AER e nessun nome vero con una marca che

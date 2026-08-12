@@ -329,10 +329,12 @@ a { color: inherit; }
   display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
   margin: .6rem 0;
 }
-.correzione-form select {
+.correzione-form select,
+.correzione-form input[type="text"] {
   font: inherit; font-size: .88rem; padding: .4rem .6rem;
   border: 1px solid var(--filo); background: var(--carta); color: inherit;
 }
+.correzione-form input[type="text"] { flex: 1 1 220px; min-width: 160px; }
 .correzione-form button[type="submit"] {
   font: inherit; font-weight: 600; font-size: .85rem;
   color: var(--carta); padding: .4rem .9rem;
@@ -341,6 +343,20 @@ a { color: inherit; }
 }
 .correzione-form button[type="submit"]:hover { background: var(--ai-scuro); }
 .correzione-reset { margin: 0 0 .4rem; }
+
+/* Il testo libero è annidato dentro un secondo <details>, chiuso di
+   default: è la via d'uscita per il caso raro (nessuna delle forme
+   proposte va bene), non la prima cosa che si vede aprendo il menu
+   principale — vedi il commento in `ricerca.html` sul perché esiste. */
+.correzione-libera {
+  margin: .5rem 0 0; padding-left: .1rem; font-size: .85rem;
+}
+.correzione-libera summary { cursor: pointer; color: var(--neutral); }
+.correzione-libera summary:hover { color: var(--ink); }
+.correzione-libera .nota { margin: .4rem 0; }
+.correzione-libera button.secondario {
+  font-size: .82rem; padding: .35rem .8rem; border-width: 1px;
+}
 .link-discreto {
   font: inherit; font-size: .82rem; color: var(--neutral);
   background: none; border: none; text-decoration: underline;

@@ -858,6 +858,18 @@ def _opzioni_correzione(nome: str, gemelli: list[str], codice: str) -> list[str]
     la marca dal CODICE, non dal nome mostrato — quindi anche la forma
     sintetica è comunque collegabile a una scheda, non solo quella scritta
     a mano.
+
+    UNA FORMA SINTETICA PER OGNI NOME VERO, non solo per il più corto.
+    Segnalato di nuovo dall'utente: con un unico «base» scelto per
+    lunghezza (`min(..., key=len)`), su RMX3933 usciva «Realme C61» — «C61»
+    è il più corto dei nomi veri, ma non è quello con cui l'utente
+    riconosce il telefono, che voleva «Realme Note 60». Non c'è un modo
+    di indovinare QUALE dei nomi veri sia quello «giusto» da vestire con
+    la marca — è esattamente il problema che questa funzionalità esiste
+    per risolvere — quindi si genera una forma sintetica per ciascuno
+    (nome mostrato compreso), scartando solo i doppioni: chi cerca la
+    riconosce comunque, qualunque sia la forma di partenza che aveva in
+    mente.
     """
     opzioni = list(gemelli)
     if not codice:
@@ -865,10 +877,13 @@ def _opzioni_correzione(nome: str, gemelli: list[str], codice: str) -> list[str]
     marca = P.marca_probabile(codice, nome)
     if not marca:
         return opzioni
-    base = min([nome, *gemelli], key=len) if gemelli else nome
-    sintetica = versus.con_marca(base, marca)
-    presenti = {(nome or "").strip().lower(), *(g.strip().lower() for g in gemelli)}
-    if sintetica.strip().lower() not in presenti:
+    presenti = {(f or "").strip().lower() for f in (nome, *gemelli)}
+    for forma in (nome, *gemelli):
+        sintetica = versus.con_marca(forma, marca)
+        chiave = sintetica.strip().lower()
+        if chiave in presenti:
+            continue
+        presenti.add(chiave)
         opzioni.append(sintetica)
     return opzioni
 

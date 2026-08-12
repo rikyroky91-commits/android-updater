@@ -732,6 +732,66 @@ class TestCorrezioneNomeModelloConMarcaSintetica(_Sito):
         self.assertIn("Nome corretto a mano", pagina)
 
 
+class TestCorrezioneNomeScrittaAMano(_Sito):
+    """Il testo libero, ultima via d'uscita per chi non riconosce il
+    proprio telefono in NESSUNA delle forme proposte — segnalato
+    dall'utente, che chiedeva la stessa cosa già disponibile per un TAC
+    sconosciuto (vedi `_imei.html` e `imeicheck.aggiungi_tac`). Stesso
+    campo `nome` del menu a tendina, solo un widget diverso: il backend
+    (`POST /modello/correggi`) non ha bisogno di sapere da quale dei due
+    è arrivato.
+    """
+
+    def setUp(self):
+        from core import modelcodes
+
+        from web.main import RICERCHE
+
+        RICERCHE.svuota()
+        if modelcodes._memory_cache is None:
+            modelcodes._memory_cache = {}
+        modelcodes._memory_cache["ZZ7001"] = ["Test Alpha", "Test Beta"]
+        modelcodes._reverse_cache = None
+        modelcodes._reverse_senza_suffisso = None
+        modelcodes._reverse_compatto = None
+        type(self).RISPOSTA_RICERCA = staticmethod(lambda q: {"items": [{
+            "source": "official_lookup", "source_label": "Riconoscimento del codice modello",
+            "brand": "", "device_model": "Test Alpha",
+            "model_code": "ZZ7001", "title": "Test Alpha (ZZ7001)", "severity": "",
+            "color": "#00CC66", "os_version": "", "android_version": None,
+        }], "error": None})
+
+    def tearDown(self):
+        from core import modelcodes, storage
+
+        from web.main import RICERCHE
+
+        type(self).RISPOSTA_RICERCA = staticmethod(
+            lambda q: {"items": [], "error": None})
+        modelcodes._memory_cache.pop("ZZ7001", None)
+        modelcodes._reverse_cache = None
+        modelcodes._reverse_senza_suffisso = None
+        modelcodes._reverse_compatto = None
+        storage.set_nome_modello("ZZ7001", "")
+        RICERCHE.svuota()
+
+    def test_il_campo_di_testo_libero_compare_nella_pagina(self):
+        pagina = self.client.get("/", params={"q": "ZZ7001"}).text
+        self.assertIn("Non trovi il nome giusto? Scrivilo tu", pagina)
+        self.assertIn('id="correzione-nome-libero"', pagina)
+
+    def test_si_puo_salvare_un_nome_scritto_a_mano(self):
+        risposta = self.client.post(
+            "/modello/correggi",
+            data={"codice": "ZZ7001", "nome": "Nome Scritto A Mano", "query": "ZZ7001"},
+            follow_redirects=False)
+        self.assertEqual(risposta.status_code, 303)
+
+        pagina = self.client.get("/", params={"q": "ZZ7001"}).text
+        self.assertIn("Nome Scritto A Mano", pagina)
+        self.assertIn("Nome corretto a mano", pagina)
+
+
 class TestRicercaPerImei(_Sito):
     """IL RAMO CHE ERA RIMASTO INDIETRO NEL PASSAGGIO AL SITO.
 
