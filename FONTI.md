@@ -1721,3 +1721,67 @@ Nessun test Python è interessato da questo fix (è un cambiamento solo
 al Dockerfile); verificato direttamente con una build Docker isolata
 (`FROM scratch`, per non dipendere dall'accesso di rete a un registro
 che questa sandbox non ha).
+
+## RMX3933, quarto giro: la forma sintetica sceglieva la marca sul nome sbagliato (2026-08-12)
+
+Segnalato dall'utente con screenshot del sito vero: nel menu «Non è il
+nome giusto?» compariva «Realme C61», non «Realme Note 60» come
+richiesto in precedenza.
+
+**Causa**: il fix del terzo giro (vedi sopra) generava UNA SOLA forma
+sintetica, scegliendo come base il nome vero più corto fra tutti
+(`min(..., key=len)`) — pensato per imitare la stessa preferenza di
+`modelcodes.nome_canonico`. Ma «C61» (3 lettere) è più corto di «Note
+60» (7), e per RMX3933 nel dataset live risultavano entrambi nomi veri:
+la funzione sceglieva «C61» come base e produceva «Realme C61», che non
+è il nome con cui chi ha il telefono lo riconosce. Non c'è un modo di
+indovinare algoritmicamente QUALE dei nomi veri sia «quello giusto» per
+chi cerca — è esattamente il problema che la correzione a mano esiste
+per risolvere, quindi scegliere una singola base è già la scelta
+sbagliata in partenza.
+
+**Fix**: `_opzioni_correzione` ora genera una forma sintetica per
+CIASCUN nome vero (il nome mostrato e ogni gemello), non una sola.
+Risultato per RMX3933: sia «Realme C61» sia «Realme Note 60» sia «Realme
+Note 60s» sia «Realme NARZO N61» compaiono come opzioni — chi cerca
+trova quella che riconosce, qualunque fosse la forma di partenza che
+aveva in mente.
+
+Test aggiornati: `tests/test_nome_e_codice.py::TestOpzioniCorrezione`
+(riscritti per riflettere la generazione per-candidato, +1 test che
+riproduce esattamente il bug segnalato: «Realme Note 60» deve comparire
+anche quando «C61» è il nome vero più corto).
+
+## Nome commerciale scritto a mano, quando nessuna forma proposta va bene (2026-08-12)
+
+Richiesta esplicita dell'utente: la stessa via d'uscita già disponibile
+per un TAC sconosciuto (`_imei.html`, campo di testo libero — vedi
+`imeicheck.aggiungi_tac`) mancava per il nome di un modello. Il menu di
+correzione offriva SOLO una scelta fra forme verificate o costruite
+dalla marca nota: se nessuna di quelle corrispondeva a quello che
+l'utente aveva in mano, non c'era modo di correggere.
+
+**Design**: stesso pattern del TAC — un `<details>` annidato, chiuso di
+default («Non trovi il nome giusto? Scrivilo tu»), con un `<input
+type="text">` che posta allo STESSO `POST /modello/correggi` e allo
+STESSO campo `nome` del menu a tendina: zero cambi lato server, perché
+`storage.set_nome_modello` accetta già testo libero (esattamente come
+`imeicheck.aggiungi_tac`). A differenza delle forme proposte nel menu —
+sempre garantite collegabili a una scheda tecnica (vedi sopra) — un nome
+scritto a mano non ha questa garanzia, e il testo nella pagina lo dice
+esplicitamente: è un compromesso consapevole, non un effetto collaterale
+non dichiarato.
+
+Compare sempre quando c'è un codice a cui agganciare una correzione,
+anche se il menu a tendina non ha nessuna alternativa da proporre (un
+codice con un solo nome vero e nessuna marca riconosciuta): prima quel
+caso non mostrava NESSUNA via di correzione.
+
+Test nuovi: `tests/test_sito.py::TestCorrezioneNomeScrittaAMano` (2,
+end-to-end: il campo compare in pagina, un nome scritto a mano si
+salva e diventa il nome mostrato).
+
+### Verificato, non solo scritto
+
+Suite completa dopo questo quarto giro: **994 test passati, 407
+subtest passati, 0 falliti** (era 991 dopo il terzo giro).
