@@ -48,7 +48,18 @@ COPY --chown=app data ./data
 # momento della build è vecchio al massimo di un'ora. Non sostituisce il
 # salvataggio su Gist: `web/main._semina_archivio()` lo usa SOLO quando
 # non c'è già un archivio, e mai sopra uno esistente.
-COPY --chown=app tracker.db ./tracker.db
+#
+# `tracker.db*` (CON L'ASTERISCO), non `tracker.db`: il file è normale
+# che manchi — non viaggia negli zip di consegna (contiene dati veri di
+# produzione, non c'entra col codice), e lo stesso vale la prima volta
+# che il repository viene ricreato da zero, prima che il workflow orario
+# lo committi. Un `COPY` sul nome esatto fa fallire l'intera build se il
+# file non c'è ("not found"), portando giù il sito per un file che
+# `_semina_archivio()` sopra sa già gestire da solo (vedi il suo
+# docstring: "nessuna copia nell'immagine" non è un errore, è un ramo
+# previsto). Con l'asterisco il file si copia se c'è e non succede
+# niente se non c'è — mai un build che fallisce per questo.
+COPY --chown=app tracker.db* ./
 
 USER app
 ENV PYTHONUNBUFFERED=1 \

@@ -1675,3 +1675,49 @@ esplicitamente nel messaggio di consegna, non solo nei documenti.
 
 Suite completa dopo questo terzo giro: **991 test passati, 407 subtest
 passati, 0 falliti** (era 985 dopo il secondo giro).
+
+## Il build su Render falliva quando il repository viene ricreato da zero (2026-08-12)
+
+Segnalato dall'utente con lo screenshot del log di Render: dopo aver
+cancellato l'intero repository GitHub e ricaricato tutti i file da capo
+(«Add files via upload»), il build Docker falliva con:
+
+```
+failed to calculate checksum of ref ...: "/tracker.db": not found
+error: exit status 1
+```
+
+**Causa**: `Dockerfile` aveva `COPY --chown=app tracker.db ./tracker.db`
+— un nome di file ESATTO, non un pattern. `COPY` su un nome esatto
+pretende che il file esista nel contesto della build, altrimenti la
+build intera fallisce. `tracker.db` normalmente esiste nel repository
+perché un workflow di GitHub Actions lo committa ogni ora (vedi il
+commento sopra quella riga) — ma un repository appena ricreato da zero
+non ce l'ha ancora, e il caricamento manuale di file (né gli zip di
+consegna di questa sessione, che lo escludono di proposito perché
+contiene dati veri di produzione, non codice) non lo ripristina da
+solo.
+
+**La parte importante**: questo file NON serve al funzionamento
+dell'app. `web/main._semina_archivio()` (il codice che lo legge
+all'avvio) gestisce già perfettamione la sua assenza — vedi il suo
+docstring: "nessuna copia nell'immagine" è un ramo previsto, non un
+errore, e l'app riparte comunque (da un archivio vuoto che si ripopola
+con le scansioni, o dal salvataggio su Gist se configurato). Il file è
+solo un'ottimizzazione per evitare un avvio a freddo con l'archivio
+vuoto — utile, ma la sua assenza non doveva MAI far fallire l'intera
+build e portare giù il sito.
+
+**Fix**: `COPY --chown=app tracker.db* ./` — l'asterisco rende il file
+opzionale. Verificato con un test isolato usando lo stesso motore
+Docker/BuildKit (non solo letto sulla documentazione): la build
+completa con successo sia quando il file manca sia quando è presente
+(e in quel caso viene copiato correttamente). Questo chiude anche il
+caso più ampio: da ora in poi un repository ricreato da zero, o un
+primissimo deploy prima che il workflow orario abbia mai girato, non fa
+più fallire il build per questo motivo.
+
+Nessun test Python è interessato da questo fix (è un cambiamento solo
+al Dockerfile); verificato direttamente con una build Docker isolata
+(`FROM scratch`, per non dipendere dall'accesso di rete a un registro
+che questa sandbox non ha).
