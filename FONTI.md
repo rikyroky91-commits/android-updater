@@ -1785,3 +1785,212 @@ salva e diventa il nome mostrato).
 
 Suite completa dopo questo quarto giro: **994 test passati, 407
 subtest passati, 0 falliti** (era 991 dopo il terzo giro).
+
+## Un realme 7 senza lettere, e i nomi che il firmware non conosce (2026-08-12)
+
+Segnalato dall'utente facendo dei test veri: un IMEI risolto a un realme 7
+mostrava solo «7» come nome, e cercare `m1910f4g` (Xiaomi Mi Note 10)
+mostrava «Nessun firmware per «m1910f4g»» sopra una scheda tecnica con la
+foto del telefono giusto — nessun nome da nessuna parte, solo il codice
+grezzo ripetuto.
+
+### Il realme «7» (`RMX2151`)
+
+**Causa**: non un difetto dell'algoritmo di scelta — «7» è l'UNICO nome
+vero che `resolve()` conosce per quel codice (il dataset community
+MobileModels registra a volte solo il numero di gamma, senza marca).
+
+**Fix**: `nome_canonico()` ora ripara SOLO il caso in cui il nome scelto
+non ha UNA SOLA lettera (quindi non identifica niente da solo), aggiungendo
+la marca che il dataset dichiara per quel codice (`marca_dichiarata()`,
+mai indovinata). Non tocca `resolve()` né `_build_mobilemodels_index()`:
+prefissare la marca a OGNI nome di quel dataset è già stato provato e
+misurato peggiorare la coerenza nome/codice (Xiaomi 83% → 49%, vedi il
+commento in `_build_mobilemodels_index()`) — qui si ripara solo il
+risultato finale, nel solo caso in cui non c'è nulla da confondere perché
+non c'è già un nome vero. Verificato sul dataset live: `RMX2151` e
+`RMX2155` → «realme 7» (erano «7»); `RMX3933` → «Note 60» e `SM-S921B` →
+«Galaxy S24» (nomi con lettere) restano invariati.
+
+### Il codice Xiaomi che non aveva la forma di un codice (`M1910F4G`)
+
+**Causa, più a monte**: `_MODEL_CODE_SHAPES` (`core/sources.py`) non
+copriva lo stile classico dei codici Xiaomi — `M` + 4 cifre + lettera +
+cifre (`M1910F4G`, `M2007J20CG`, `M2101K6G`...). Nessuna forma comincia
+con UNA lettera sola: `looks_like_model_code("M1910F4G")` rispondeva
+`False`. Questo non è un dettaglio cosmetico: `looks_like_model_code` e
+`_code_candidates` decidono l'instradamento in tutta l'app — la ricerca
+sul catalogo firmware Xiaomi, i «gemelli», la correzione del nome — quindi
+un codice Xiaomi vero, scritto esattamente come sta sotto la batteria del
+telefono, non attivava NESSUNO di questi percorsi. Solo `core/specs.py`
+prova il testo senza validarne la forma, ed è per questo che la scheda
+tecnica (foto, processore) trovava il telefono giusto mentre il resto
+della pagina si comportava come se il codice non fosse mai stato scritto.
+
+**Fix**: aggiunta la forma mancante a `_MODEL_CODE_SHAPES` —
+`^M\d{4}[A-Z]\d{1,2}[A-Z]{0,3}$`. Riapre tre percorsi in un colpo solo:
+la ricerca firmware Xiaomi per questi codici (prima invisibile), il
+riconoscimento «senza firmware» via `modelcodes.resolve()` (già esistente,
+ma mai raggiunto), e la correzione del nome.
+
+**Fix complementare, in `_cerca_davvero` (`web/main.py`)**: anche con la
+forma del codice riconosciuta, resta possibile che nessuna fonte firmware
+E nessun `modelcodes.resolve()` sappia niente di un codice, mentre la
+scheda tecnica (un catalogo diverso, con la sua indicizzazione) lo
+risolve lo stesso — è il caso letterale di `m1910f4g` prima del fix sopra,
+e resta un caso limite possibile anche dopo. Ora, quando non c'è nessun
+risultato con firmware ma la scheda tecnica HA risolto un nome diverso
+dalla query scritta, quel nome diventa l'intestazione della pagina, con un
+messaggio onesto («riconosciuto dalla scheda tecnica, ma nessuna fonte
+firmware conosce il codice») invece del solo codice grezzo ripetuto.
+Attiva anche i «gemelli» e la correzione del nome per questo caso, prima
+disponibili solo quando una fonte firmware rispondeva.
+
+Test nuovi: `tests/test_regressione_ricerca_codice.py::TestCodiceXiaomiStileClassico`
+(3, sulla forma del codice) e `tests/test_sito.py::TestNomeDallaSchedaSenzaFirmware`
+(3, end-to-end sulla pagina, con una scheda sintetica per non dipendere dal
+dataset Xiaomi vero).
+
+## La correzione del nome non sopravviveva a un riavvio (2026-08-12)
+
+Segnalato dall'utente: «assicurati che quando correggo il nome il
+risultato si salvi perché sembra che non lo faccia».
+
+**Causa**: il salvataggio in sé funzionava — la correzione finiva subito
+nella tabella `nomi_modello` di `tracker.db` — ma quel database vive in
+`/tmp` (`Dockerfile`, `DB_PATH=/tmp/tracker.db`, disco effimero per
+scelta dichiarata) e la SOLA copia duratura è il backup su Gist
+(`core/backup.py`), caricato prima SOLO a fine di ogni scansione
+periodica tramite `salva_se_serve()`, non più spesso di
+`BACKUP_EVERY_MINUTES` (30 di default). Sul piano gratuito di Render il
+servizio si addormenta dopo circa 15 minuti senza visite, e il thread di
+scansione dorme con lui (`render.yaml` lo dichiara esplicitamente): una
+correzione fatta poco dopo l'ultimo backup periodico poteva restare SOLO
+nel database locale ed essere persa al primo riavvio successivo — che su
+questo piano è la norma, non l'eccezione. Da fuori sembrava un
+salvataggio «che non funziona», ma il salvataggio non era mai stato il
+problema: lo era il tempismo del backup, sganciato dalla correzione.
+
+**Fix**: `POST /modello/correggi` e `POST /tac/salva` ora fanno partire
+subito un `backup.salva()` in un thread separato (`_backup_subito()` in
+`web/main.py`), invece di aspettare il prossimo giro di scansione — stessa
+idea di `/scansione`, che non blocca la richiesta HTTP in attesa. Una
+correzione verificata da una persona è rara e piccola: vale la pena
+caricarla subito, ignorando l'intervallo minimo pensato per i backup
+automatici. Se il backup non è configurato (`BACKUP_GIST_ID`/
+`BACKUP_GITHUB_TOKEN` assenti nel pannello Render), `backup.salva()` torna
+`False` senza fare niente — non cambia niente per chi non ha attivato
+questa funzione, ma **è la condizione da cui dipende tutto questo fix**:
+senza quei due segreti configurati su Render, nessuna correzione
+sopravvive a un riavvio, con o senza questo fix, perché non esiste nessuna
+copia duratura da nessuna parte.
+
+Test nuovi: `tests/test_sito.py::TestCorrezioneAvviaSubitoIlBackup` (2,
+verificano che `backup.salva` venga chiamato entro 2 secondi da entrambe
+le rotte, con `backup.salva` sostituito da una finta per non parlare con
+GitHub durante i test).
+
+## `CPH2781` mostrava «F31» invece di «A6 Pro»: una tabella curata per le ambiguità vere (2026-08-12)
+
+Segnalato dall'utente, con un'istruzione esplicita: «sistema dalla
+radice». Terza volta che la stessa CLASSE di problema si presenta (dopo
+RMX3933/C61 e la sua correzione a mano) — e la richiesta, ragionevole, è
+di non dover ricorrere alla correzione manuale ogni volta che capita un
+codice con più nomi commerciali veri.
+
+**Verifica, non supposizione**: `resolve("CPH2781")` restituisce
+`['OPPO F31', 'OPPO A6 Pro']` — non un errore del dataset. Confermato con
+più fonti indipendenti (GSMArena Cina/India, oppo.com/en, DeviceAtlas,
+Gizmochina, GSMchoice): stesso hardware (Dimensity 6300, display 6.57"
+50MP+2MP, batteria 7000mAh) venduto come «OPPO F31 5G» in Cina e come
+«OPPO A6 Pro 5G» nei mercati Global/India/Medio Oriente. Nessuno dei due
+nomi è sbagliato — `nome_canonico()` sceglieva «F31» solo perché è più
+corto (regola 4), un criterio che funziona quando un nome è un suffisso
+di mercato dell'altro ma non quando sono due nomi commerciali del tutto
+distinti, e che non ha modo di sapere che per un'app usata in Italia il
+nome Global è quello riconoscibile.
+
+**La scelta, e perché non è "la correzione manuale, di nuovo"**: chiedere
+a ogni persona di correggere a mano lo stesso codice, verificato una
+volta, per sempre, non è una radice — è la stessa toppa ripetuta
+all'infinito. **Nuovo file `data/nomi_modello.csv`**, stessa filosofia di
+`data/soc_modelli.csv` («curata a mano, corta di proposito, solo righe
+verificate»): una tabella che SCEGLIE fra nomi che il dataset conferma
+già, senza mai inventarne uno nuovo — `nome_canonico()` applica una riga
+SOLO se il nome scritto è ancora fra quelli che `resolve()` restituisce
+per quel codice, quindi un aggiornamento del dataset a monte disattiva da
+solo una riga ormai sbagliata invece di imporla ciecamente. A differenza
+della correzione manuale di un utente (tabella `nomi_modello` di
+`tracker.db`, sul disco effimero — vedi la sezione sopra), questo file
+viaggia nel repository come il codice: sopravvive a un reset completo
+della repo, per sempre, in ogni build.
+
+Prima riga: `CPH2781 → OPPO A6 Pro`. Il nome cinese («OPPO F31») resta
+comunque visibile come «gemello» nel menu di correzione, per chi lo
+riconosce con quel nome.
+
+**Sulla richiesta più ampia** — «fatti aiutare in parallelo da Google
+search... per migliorare mano a mano» — questo file è la risposta
+scelta, non un rifiuto della richiesta: la ricerca (fatta con più fonti
+indipendenti, non una sola pagina) è esattamente il lavoro da fare in
+parallelo, ma il risultato entra nell'app come RIGA VERIFICATA E
+FIRMATA in un file che chiunque può rileggere e contestare — non come
+un suggerimento AI applicato silenziosamente in tempo reale. È lo stesso
+principio già scritto in `core/aiquery.py` per il tasto «+AI»: un
+sistema esterno (una persona con Google, o un modello linguistico) non
+diventa mai una fonte da sola — può solo scegliere fra candidati che i
+cataloghi del progetto hanno già, e quella scelta viene ricontrollata,
+mai presa alla lettera. Aggiungere righe a questo file resta un lavoro
+da fare consapevolmente, una alla volta, non un processo automatico — ma
+è un lavoro che si fa UNA volta per codice, non a ogni ricerca.
+
+Test nuovi: `tests/test_nome_e_codice.py::TestIdentitaDalCodice`
+(+3: la tabella vince su due nomi ugualmente veri, non inventa un nome
+che il dataset non conferma più, il file vero su disco contiene
+davvero la riga CPH2781) e `tests/test_nome_e_codice.py::TestCaricaOverrideNomi`
+(5, il parser del CSV: lettura, righe di commento, righe incomplete,
+maiuscole, testo vuoto).
+
+### Verificato, non solo scritto
+
+Suite completa dopo questo giro: **1013 test passati, 416 subtest
+passati, 0 falliti** (era 997 all'inizio di questo giro).
+
+## La pagina Diagnostica non diceva niente sul backup esterno (2026-08-12)
+
+Segnalato dall'utente con screenshot della pagina Diagnostica vera, dopo
+il fix del backup immediato (sezione sopra): non c'era NESSUN modo di
+vedere da fuori se il backup fosse configurato e se l'ultimo salvataggio
+fosse davvero riuscito. Va detto con chiarezza: la risposta precedente di
+questa sessione affermava che una sezione così esistesse già in
+Diagnostica — non era vero, era un'assunzione sbagliata (l'esistenza di
+`core/backup.py::stato()` non implica che qualcosa la mostri), e questo
+screenshot l'ha corretta.
+
+**Fix**: nuovo presenter `web/presenters.py::stato_backup()`, nuova
+sezione «Backup esterno» in `diagnostica.html` (stessa forma a righe
+`<th>/<td>` delle altre due tabelle della pagina — nessun elemento
+nuovo da imparare). Mostra stato (Non configurato / Attivo / Errore /
+Configurato ma in attesa del primo salvataggio), ultimo salvataggio
+riuscito, ultimo ripristino, ultimo esito testuale.
+
+**Un dettaglio non ovvio, gestito esplicitamente**: `core/backup.py`
+inizializza `_stato["ultimo_esito"]` a `"non configurato"` a ogni avvio
+del processo, e resta così finché `salva()`/`ripristina()` non girano
+almeno una volta in quella sessione — quindi un backup CONFIGURATO ma
+non ancora tentato da quando il servizio si è riavviato mostrerebbe
+alla lettera "non configurato", che è fuorviante: sembra un problema di
+configurazione quando è solo che non è ancora successo niente da
+riportare. Il presenter distingue esplicitamente questo terzo stato
+("Configurato, in attesa del primo salvataggio") da "Non configurato"
+vero e da "Errore" (un tentativo c'è stato, ma non è riuscito).
+
+Test nuovi: `tests/test_presenters.py::TestStatoBackup` (4, i quattro
+stati), `tests/test_sito.py::
+TestLePagineSiDisegnano::test_la_diagnostica_mostra_lo_stato_del_backup`
+(1, end-to-end).
+
+### Verificato, non solo scritto
+
+Suite completa dopo questo giro: **1018 test passati, 416 subtest
+passati, 0 falliti** (era 1013 all'inizio di questo giro).
