@@ -1793,6 +1793,34 @@ def _chiave_versione(rilascio) -> tuple:
         return (0,)
 
 
+# QUALE REGIONE DIVENTA «IL» RISULTATO, quando la ricerca ne trova più di
+# una per lo stesso telefono. Segnalato dall'utente: cercando un modello
+# non deve comparire una variante a caso, ma la europea in priorità — lo
+# stesso principio già applicato a Samsung (`_ORDINE_MERCATI_SAMSUNG`),
+# qui esteso alla fonte che nomina esplicitamente «Europe»/«Global» come
+# regione (vedi il docstring di `_lookup_oplus_arb`: OnePlus 13 è
+# `CPH2653` in Europa e `CPH2649` in India, con build che non procedono di
+# pari passo — prima di questo fix vinceva quella con la build più
+# recente, non quella europea, ed è esattamente il "modello a caso"
+# segnalato).
+#
+# «Global» subito dopo «Europe»: è la build che OnePlus/OPPO distribuisce
+# fuori da un mercato specifico, quella più vicina a un dispositivo
+# comprato in Europa quando non esiste una riga «Europe» dedicata.
+_ORDINE_REGIONI_ARB = ("EUROPE", "GLOBAL")
+
+
+def _rango_regione_arb(regione: str) -> int:
+    chiave = (regione or "").strip().upper()
+    try:
+        return _ORDINE_REGIONI_ARB.index(chiave)
+    except ValueError:
+        # Regione non elencata (India, North America, China, ...): dopo
+        # quelle note, in qualunque ordine avessero fra loro — build più
+        # recente prima, come già era prima di questo fix.
+        return len(_ORDINE_REGIONI_ARB)
+
+
 def _arb_item(rilascio, con_regione: bool = True) -> RawItem:
     descrizione = ["Tracker ARB OnePlus/OPPO (non ufficiale)", rilascio.model_code]
     if con_regione and rilascio.region:
@@ -1862,6 +1890,15 @@ def _lookup_oplus_arb(model_name: str) -> list[RawItem]:
     CPH2653 in Europa e CPH2649 in India, con build che non procedono di
     pari passo. Per un parco di test misto, sapere quale delle due si ha
     in mano è metà del lavoro.
+
+    TUTTE le regioni trovate restano nel risultato — nessuna sparisce —
+    ma **la prima è la europea**, quando c'è: `web/main.py::
+    _cerca_davvero` mostra come risultato principale il primo elemento
+    strutturato, quindi l'ordine qui decide quale variante regionale
+    diventa «il» risultato di una ricerca generica. Prima di questo fix
+    vinceva la build più recente qualunque fosse la regione — segnalato
+    dall'utente come «mi spunta un modello a caso» — vedi
+    `_rango_regione_arb`.
     """
     testo = (model_name or "").strip()
     if not testo:
@@ -1887,7 +1924,12 @@ def _lookup_oplus_arb(model_name: str) -> list[RawItem]:
         if per_codice or per_nome:
             trovati.append(rilascio)
 
+    # Due passaggi, entrambi stabili: prima la build più recente decide
+    # l'ordine ALL'INTERNO di ogni regione, poi la regione (Europa, poi
+    # Global, poi le altre) decide l'ordine FRA le regioni — senza
+    # scartare né mescolare a caso chi arriva dopo.
     trovati.sort(key=_chiave_versione, reverse=True)
+    trovati.sort(key=lambda r: _rango_regione_arb(r.region))
     return [_arb_item(r) for r in trovati[:5]]
 
 

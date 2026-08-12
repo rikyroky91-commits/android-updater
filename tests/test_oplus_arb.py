@@ -228,6 +228,33 @@ class TestFonteInSources(unittest.TestCase):
         self.assertTrue(any("[India]" in i.title for i in items))
         self.assertTrue(any("[Europe]" in i.title for i in items))
 
+    def test_leuropa_viene_prima_delle_altre_regioni(self):
+        # Segnalato dall'utente: cercando un modello non deve comparire
+        # una variante a caso, ma quella europea in priorità. Nella
+        # fixture l'India ha la build più recente (16.0.7.201 contro
+        # 16.0.5.703 dell'Europa) — prima di questo fix vinceva l'India,
+        # perché l'ordine era solo per build. `_cerca_davvero` (web/
+        # main.py) mostra come risultato principale il primo elemento di
+        # questa lista, quindi l'ordine qui è quello che l'utente vede.
+        items = self.sources._lookup_oplus_arb("OnePlus 13")
+        self.assertIn("[Europe]", items[0].title)
+
+    def test_global_viene_dopo_leuropa_ma_prima_delle_altre(self):
+        # «Global» è la build più vicina a un telefono europeo quando non
+        # esiste una riga «Europe» dedicata — vedi `_rango_regione_arb`.
+        items = self.sources._lookup_oplus_arb("OnePlus 13")
+        regioni = [i.title.rsplit("[", 1)[1].rstrip("]") for i in items]
+        self.assertEqual(regioni[0], "Europe")
+        self.assertEqual(regioni[1], "Global")
+        self.assertEqual(set(regioni[2:]), {"India", "China", "North America"})
+
+    def test_senza_europa_ne_global_lordine_resta_per_build(self):
+        # CPH2525 (Oppo Reno10 Pro) nella fixture ha Singapore/Europe/India:
+        # con l'Europa presente deve comunque vincere lei, non la build più
+        # recente delle altre due.
+        items = self.sources._lookup_oplus_arb("CPH2525")
+        self.assertIn("Europe", items[0].size_info)
+
     def test_ricerca_per_codice_esatto(self):
         items = self.sources._lookup_oplus_arb("CPH2649")
         self.assertTrue(items)
