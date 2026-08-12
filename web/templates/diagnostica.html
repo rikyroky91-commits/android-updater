@@ -96,10 +96,30 @@
   IL MODULO CAMBIA A SECONDA DELLO STATO — non ha senso proporre di
   «creare l'archivio» a chi ne ha già uno attivo, né un pulsante «salva
   adesso» a chi non ha ancora nessuna configurazione da verificare.
+
+  Lo stato «Errore» mostra ENTRAMBI: sia «Salva adesso» (per riprovare
+  con la configurazione attuale, utile se l'errore era temporaneo) sia
+  il modulo di configurazione (per rifarla da capo, utile se uno dei
+  due valori su Render è sbagliato — il caso reale che ha fatto
+  emergere questa scelta: un utente aveva incollato lo stesso valore
+  sia in `BACKUP_GIST_ID` sia in `BACKUP_GITHUB_TOKEN`). Senza
+  quest'ultimo, chi ha sbagliato un valore restava bloccato: vedeva solo
+  «Salva adesso», che fallisce sempre allo stesso modo, senza nessuna
+  via per correggere se non uscire dalla pagina e modificare Render a
+  mano senza sapere quale dei due valori fosse quello sbagliato.
 #}
-{% if backup.etichetta == "Non configurato" %}
+{% if backup.etichetta in ("Non configurato", "Errore") %}
 <details class="correzione-nome" {{ "open" if not risultato_backup else "" }}>
-  <summary>Configura il backup</summary>
+  <summary>{{ "Configura il backup" if backup.etichetta == "Non configurato" else "Rifai la configurazione" }}</summary>
+  {% if backup.etichetta == "Errore" %}
+  <p class="nota">Lo stato attuale è «Errore»: molto probabilmente uno
+    dei due valori salvati su Render (<code>BACKUP_GIST_ID</code> o
+    <code>BACKUP_GITHUB_TOKEN</code>) non è quello giusto — per esempio
+    se sono stati scambiati fra loro, o se coincidono quando invece
+    dovrebbero essere due valori diversi. Rifare la configurazione qui
+    sotto crea un archivio nuovo con due valori freschi da incollare su
+    Render, senza dover indovinare quale dei due sia sbagliato.</p>
+  {% endif %}
   <p class="nota">Incolla qui un token GitHub «classic» con il permesso
     <code>gist</code> — si crea su github.com → icona del profilo →
     Settings → Developer settings → Personal access tokens → Tokens
@@ -115,7 +135,8 @@
     <button type="submit">Verifica e crea l'archivio</button>
   </form>
 </details>
-{% else %}
+{% endif %}
+{% if backup.etichetta != "Non configurato" %}
 <form method="post" action="/diagnostica/backup/salva" class="correzione-form">
   <button type="submit" class="secondario">Salva adesso, per verificare</button>
 </form>

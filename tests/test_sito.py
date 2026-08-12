@@ -218,6 +218,19 @@ class TestDiagnosticaConfigurazioneBackup(_Sito):
                                 "ultimo_salvataggio": "2026-08-12T10:00:00+00:00",
                                 "ultimo_ripristino": None}
 
+    def _configurato_con_errore(self):
+        # Segnalato dall'utente sul sito vero: aveva incollato lo stesso
+        # valore sia in BACKUP_GIST_ID sia in BACKUP_GITHUB_TOKEN — GitHub
+        # rispondeva 401 Bad credentials. `configurato()` torna True (le
+        # due variabili sono valorizzate, l'app non sa che sono sbagliate),
+        # ma non è mai stato salvato niente: questo È lo stato «Errore».
+        from core import backup
+
+        backup.configurato = lambda: True
+        backup.stato = lambda: {
+            "ultimo_esito": 'GitHub ha risposto 401: { "message": "Bad credentials" }',
+            "ultimo_salvataggio": None, "ultimo_ripristino": None}
+
     def test_il_modulo_di_configurazione_compare_solo_se_non_configurato(self):
         self._non_configurato()
         pagina = self.client.get("/diagnostica").text
@@ -228,6 +241,18 @@ class TestDiagnosticaConfigurazioneBackup(_Sito):
         self._configurato_e_attivo()
         pagina = self.client.get("/diagnostica").text
         self.assertNotIn("Configura il backup", pagina)
+        self.assertNotIn("Rifai la configurazione", pagina)
+        self.assertIn("Salva adesso, per verificare", pagina)
+
+    def test_in_errore_compaiono_sia_salva_adesso_sia_rifai_la_configurazione(self):
+        # Il caso reale: valori sbagliati su Render (per esempio lo stesso
+        # valore incollato in entrambe le variabili) producono «Errore»,
+        # non «Non configurato» — chi lo vede deve poter sia riprovare sia
+        # rifare la configurazione da capo, senza restare bloccato.
+        self._configurato_con_errore()
+        pagina = self.client.get("/diagnostica").text
+        self.assertIn("Rifai la configurazione", pagina)
+        self.assertIn('name="token"', pagina)
         self.assertIn("Salva adesso, per verificare", pagina)
 
     def test_token_valido_crea_larchivio_e_mostra_i_due_valori_da_copiare(self):
