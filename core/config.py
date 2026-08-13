@@ -362,7 +362,11 @@ MAX_PLAUSIBLE_IOS = env_int("MAX_PLAUSIBLE_IOS", 30)
 #  32 → la fiducia di una fonte e il tipo di dato diventano distinti. Le
 #       versioni di fabbrica, cataloghi di supporto e beta non possono più
 #       dichiarare l'ultimo firmware stabile; l'archivio va ricostruito.
-DATA_LOGIC_VERSION = env_int("DATA_LOGIC_VERSION", 32)
+#  33 → la ricerca conserva questa distinzione, ma visualizza sempre la
+#       versione Android certa più recente disponibile: un dato di fabbrica
+#       resta dichiarato come tale, invece di sparire lasciando la pagina
+#       senza alcuna versione.
+DATA_LOGIC_VERSION = env_int("DATA_LOGIC_VERSION", 33)
 
 
 # --- Tempo massimo di una ricerca interattiva ---------------------------
