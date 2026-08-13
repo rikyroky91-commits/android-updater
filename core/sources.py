@@ -80,15 +80,12 @@ class RawItem:
     size_info: str = ""
     summary: str = ""
     # Livello di fiducia dichiarato dalla fonte che ha prodotto l'item.
-    # Serve SOLO alle ricerche a comando: `scan._lookup_structured_for`
-    # etichettava d'ufficio come STRUCTURED tutto ciò che usciva da
-    # `lookup_model_structured`, perché fino a ieri lì dentro c'erano solo
-    # fonti ufficiali. Con una fonte CURATED nell'elenco quella
-    # scorciatoia diventerebbe una bugia — e per giunta la peggiore, dato
-    # che il trust è ciò che decide quale dato vince quando due fonti si
-    # contraddicono. `None` significa «quello predefinito del chiamante»,
-    # così nessuna fonte esistente cambia comportamento.
+    # `None` significa «quello predefinito del chiamante».
     trust: str | None = None
+    # Non confondere attendibilità e semantica: una fonte può essere
+    # ufficiale e dire soltanto la versione di fabbrica. Solo CURRENT può
+    # diventare la risposta «ultimo firmware stabile».
+    firmware_kind: str | None = None
 
     @property
     def text(self) -> str:
@@ -112,6 +109,35 @@ class Source:
     # non è collegabile a nessun device, quindi va scartato a prescindere
     # dal punteggio testuale (vedi scan.normalize).
     is_web_search: bool = False
+    # current / factory / support / beta / reported. Le fonti registrate
+    # ricevono il valore dalla mappa sotto; questo campo serve alle ricerche
+    # dirette, che hanno una semantica propria.
+    firmware_kind: str = C.FW_REPORTED
+
+
+# Una chiave sorgente non può descrivere da sola la qualità del dato.
+# Questa mappa resta intenzionalmente piccola e verificabile: ciò che non è
+# esplicitamente un firmware corrente è solo una segnalazione o metadato.
+_FIRMWARE_KIND_BY_SOURCE = {
+    "apple_devices": C.FW_CURRENT,
+    "xiaomi_tracker": C.FW_CURRENT,
+    "samsung_fus": C.FW_CURRENT,
+    "motorola_lolinet": C.FW_CURRENT,
+    "oppo_official": C.FW_CURRENT,
+    "oplus_arb": C.FW_CURRENT,
+    "oplus_telegram": C.FW_CURRENT,
+    "pixel_ota": C.FW_BETA,
+    "oppo_aer": C.FW_SUPPORT,
+    "aer_catalog": C.FW_SUPPORT,
+    "realme_aer": C.FW_FACTORY,
+    "honor_aer": C.FW_FACTORY,
+    "vivo_aer": C.FW_FACTORY,
+}
+
+
+def firmware_kind_for(source: Source) -> str:
+    """Semantica effettiva del dato, senza promuovere i default a firmware."""
+    return _FIRMWARE_KIND_BY_SOURCE.get(source.key, source.firmware_kind)
 
 
 # ======================================================================
@@ -3520,6 +3546,9 @@ class StructuredLookup:
     # Predefinito STRUCTURED perché fino a ieri qui c'erano solo fonti
     # ufficiali; da quando ce n'è una CURATED, il valore va dichiarato.
     trust: str = C.TRUST_STRUCTURED
+    # Il dato attuale è la norma per questi lookup; le eccezioni (schede,
+    # supporto e beta) sono dichiarate esplicitamente in elenco.
+    firmware_kind: str = C.FW_CURRENT
 
 
 _STRUCTURED_LOOKUPS_LIST = [
@@ -3527,10 +3556,12 @@ _STRUCTURED_LOOKUPS_LIST = [
     StructuredLookup(C.APPLE, _lookup_apple, "alto", "firmware Apple per dispositivo"),
     StructuredLookup(C.VIVO, _lookup_motorola, "alto", "mirror firmware Motorola"),
     StructuredLookup(C.PIXEL, _lookup_pixel, "basso", "immagini OTA ufficiali Pixel",
-                     fetch_pixel_ota),
-    StructuredLookup(C.VIVO, _lookup_vivo, "basso", "piano ufficiale vivo", fetch_vivo_aer),
+                     fetch_pixel_ota, firmware_kind=C.FW_BETA),
+    StructuredLookup(C.VIVO, _lookup_vivo, "basso", "piano ufficiale vivo",
+                     fetch_vivo_aer, firmware_kind=C.FW_FACTORY),
     StructuredLookup(C.XIAOMI, _lookup_xiaomi, "basso", "catalogo Xiaomi", fetch_xiaomi),
-    StructuredLookup(C.HUAWEI, _lookup_honor, "basso", "piano ufficiale Honor", fetch_honor_aer),
+    StructuredLookup(C.HUAWEI, _lookup_honor, "basso", "piano ufficiale Honor",
+                     fetch_honor_aer, firmware_kind=C.FW_FACTORY),
     # Prima delle due fonti Oppo che danno la versione di fabbrica: questa
     # dà quella davvero rilasciata.
     #
@@ -3556,15 +3587,18 @@ _STRUCTURED_LOOKUPS_LIST = [
     # `oplus_telegram` tolta di qui l'11/08/2026 insieme al resto della
     # fonte — vedi il commento sopra `RETIRED_SOURCES` per il motivo e come
     # riportarla.
-    StructuredLookup(C.OPPO, _lookup_realme, "basso", "piano ufficiale realme", fetch_realme_aer),
-    StructuredLookup(C.OPPO, _lookup_oppo, "basso", "elenco ufficiale Oppo", fetch_oppo_aer),
+    StructuredLookup(C.OPPO, _lookup_realme, "basso", "piano ufficiale realme",
+                     fetch_realme_aer, firmware_kind=C.FW_FACTORY),
+    StructuredLookup(C.OPPO, _lookup_oppo, "basso", "elenco ufficiale Oppo",
+                     fetch_oppo_aer, firmware_kind=C.FW_SUPPORT),
     # In fondo alle economiche, appena prima di GSMArena: le pagine
     # ufficiali di marca hanno la versione di fabbrica e vanno provate
     # prima. Questa risponde per QUALSIASI marca — comprese quelle senza
     # fonte dedicata, OnePlus in testa — e riconosce anche i codici
     # tecnici, che è il motivo più frequente di ricerca a vuoto.
     StructuredLookup(None, _lookup_aer_catalog, "basso",
-                     "catalogo Android Enterprise Recommended", fetch_aer_catalog),
+                     "catalogo Android Enterprise Recommended", fetch_aer_catalog,
+                     firmware_kind=C.FW_SUPPORT),
 ]
 
 # Ripiego universale: vale per QUALSIASI marca, comprese quelle senza
@@ -3577,6 +3611,7 @@ def _gsmarena_lookup() -> StructuredLookup:
     return StructuredLookup(
         brand=None, funzione=_lookup_gsmarena, costo="medio",
         etichetta="scheda tecnica GSMArena",
+        firmware_kind=C.FW_FACTORY,
     )
 
 # Mantenuta per compatibilità con il codice esistente e i test.
@@ -4070,6 +4105,9 @@ def lookup_model_structured(model_name: str, brand: str | None = None):
             if brand:
                 break
 
+    # Le fonti che parlano di catalogo/supporto devono conservare la loro
+    # semantica fino alla UI: il RawItem è il veicolo tra questo lookup e
+    # `scan.normalize`.
     ordinati = _lookup_order(brand)
     if not ordinati:
         return [], "nessuna fonte ufficiale disponibile"
@@ -4182,6 +4220,9 @@ def lookup_model_structured(model_name: str, brand: str | None = None):
             items = _scarta_sottomarca_sbagliata(items, forma)
             if not items:
                 continue
+            for item in items:
+                if item.firmware_kind is None:
+                    item.firmware_kind = voce.firmware_kind
             # SI SCEGLIE IL RISULTATO MIGLIORE, NON IL PRIMO.
             # Alcune fonti confermano che un modello esiste ma non ne
             # pubblicano la versione (l'elenco Oppo, per esempio).
@@ -4189,7 +4230,7 @@ def lookup_model_structured(model_name: str, brand: str | None = None):
             # «esiste» e non interrogare mai una fonte che avrebbe la
             # versione: è esattamente ciò che rendeva la ricerca inutile
             # per Oppo, pur essendo andata a buon fine.
-            if _ha_versione(items[0]):
+            if voce.firmware_kind == C.FW_CURRENT and _ha_versione(items[0]):
                 if not ambigua:
                     return items, None
                 raccolti.extend(items)
