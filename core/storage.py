@@ -61,6 +61,9 @@ CREATE TABLE IF NOT EXISTS updates (
     source          TEXT,
     source_label    TEXT,
     source_trust    TEXT,
+    -- current/factory/support/beta/reported: only current enters the
+    -- device view, history and notifications.
+    firmware_kind   TEXT NOT NULL DEFAULT 'reported',
     published       TEXT,
     first_seen      TEXT NOT NULL,
     last_seen       TEXT NOT NULL,
@@ -359,11 +362,10 @@ def init_db() -> None:
             conn.row_factory = sqlite3.Row
             _local.conn = conn
         conn.executescript(SCHEMA)
-        # Migrazione difensiva: i database creati prima dell'introduzione di
-        # `source_trust` non hanno questa colonna, e CREATE TABLE IF NOT
-        # EXISTS non la aggiunge da sola a una tabella già esistente.
+        # Migrazione difensiva: i database creati prima delle nuove colonne
+        # non le hanno, e CREATE TABLE IF NOT EXISTS non le aggiunge da sola.
         existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(updates)")}
-        for colonna in ("source_trust", "model_code"):
+        for colonna in ("source_trust", "model_code", "firmware_kind"):
             if colonna not in existing_cols:
                 conn.execute(f"ALTER TABLE updates ADD COLUMN {colonna} TEXT")
         conn.commit()
@@ -404,7 +406,7 @@ _UPDATE_FIELDS = [
     "id", "brand", "device_model", "device_key", "model_code", "title", "os_version",
     "android_version", "skin_name", "skin_version", "build", "patch_level",
     "severity", "color", "severity_reason", "size_info", "link", "source",
-    "source_label", "source_trust", "published", "is_relevant", "relevance_score", "relevance_note",
+    "source_label", "source_trust", "firmware_kind", "published", "is_relevant", "relevance_score", "relevance_note",
 ]
 
 
@@ -486,6 +488,9 @@ def get_updates(
     params: list = []
     if only_relevant:
         sql.append("AND is_relevant = 1")
+    # Il feed è dedicato agli aggiornamenti stabili: metadati, beta e
+    # notizie restano disponibili alla ricerca ma non sono un firmware.
+    sql.append("AND firmware_kind = 'current'")
     if brands:
         sql.append(f"AND brand IN ({','.join('?' * len(brands))})")
         params += brands
@@ -532,7 +537,8 @@ def get_updates(
 
 def count_updates(only_relevant: bool = True) -> int:
     conn = connect()
-    sql = "SELECT COUNT(*) AS n FROM updates" + (" WHERE is_relevant = 1" if only_relevant else "")
+    sql = ("SELECT COUNT(*) AS n FROM updates WHERE firmware_kind = 'current'"
+           + (" AND is_relevant = 1" if only_relevant else ""))
     return conn.execute(sql).fetchone()["n"]
 
 
@@ -554,7 +560,7 @@ def get_devices(brands: list[str] | None = None, search: str | None = None) -> l
                    ORDER BY (published IS NULL) ASC, published DESC, first_seen DESC
                ) AS rn
           FROM updates
-         WHERE device_key IS NOT NULL AND device_key <> '' AND is_relevant = 1
+         WHERE device_key IS NOT NULL AND device_key <> '' AND is_relevant = 1 AND firmware_kind = 'current'
     ),
     agg AS (
         SELECT device_key,
@@ -571,7 +577,7 @@ def get_devices(brands: list[str] | None = None, search: str | None = None) -> l
                -- dispositivo per chi lo chiama con l'altro nome.
                GROUP_CONCAT(DISTINCT device_model) AS nomi_noti
           FROM updates
-         WHERE device_key IS NOT NULL AND device_key <> '' AND is_relevant = 1
+         WHERE device_key IS NOT NULL AND device_key <> '' AND is_relevant = 1 AND firmware_kind = 'current'
          GROUP BY device_key
     )
     SELECT r.device_key, r.brand,
@@ -582,7 +588,7 @@ def get_devices(brands: list[str] | None = None, search: str | None = None) -> l
            -- («Samsung S24 Ultra»): è lo stesso criterio già usato qui
            -- sotto per versione, build e patch.
            COALESCE((SELECT u.device_model FROM updates u
-                      WHERE u.device_key = r.device_key AND u.is_relevant = 1
+                      WHERE u.device_key = r.device_key AND u.is_relevant = 1 AND u.firmware_kind = 'current'
                         AND u.device_model IS NOT NULL AND u.device_model <> ''
                       ORDER BY CASE u.source_trust WHEN 'structured' THEN 0 WHEN 'curated' THEN 1 WHEN 'noisy' THEN 2 ELSE 3 END ASC,
                                COALESCE(u.published, u.first_seen) DESC LIMIT 1),
@@ -594,14 +600,14 @@ def get_devices(brands: list[str] | None = None, search: str | None = None) -> l
            -- recente, e una notizia rumorosa con un dato sbagliato poteva
            -- sovrascrivere quello corretto di una fonte ufficiale.
            COALESCE((SELECT u.os_version FROM updates u
-                      WHERE u.device_key = r.device_key AND u.is_relevant = 1
+                      WHERE u.device_key = r.device_key AND u.is_relevant = 1 AND u.firmware_kind = 'current'
                         AND (u.android_version IS NOT NULL OR u.skin_name IS NOT NULL)
                       ORDER BY CASE u.source_trust WHEN 'structured' THEN 0 WHEN 'curated' THEN 1 WHEN 'noisy' THEN 2 ELSE 3 END ASC,
                                COALESCE(u.android_version, -1) DESC,
                                COALESCE(u.published, u.first_seen) DESC LIMIT 1),
                     r.os_version) AS os_version,
            (SELECT u.android_version FROM updates u
-             WHERE u.device_key = r.device_key AND u.is_relevant = 1 AND u.android_version IS NOT NULL
+             WHERE u.device_key = r.device_key AND u.is_relevant = 1 AND u.firmware_kind = 'current' AND u.android_version IS NOT NULL
              -- A PARITA' DI AFFIDABILITA' VINCE LA VERSIONE PIU' ALTA,
              -- non la piu' recentemente vista. Un telefono Android non
              -- torna indietro di major: se due fonti ugualmente
@@ -614,17 +620,17 @@ def get_devices(brands: list[str] | None = None, search: str | None = None) -> l
              -- dice 14.
              ORDER BY CASE u.source_trust WHEN 'structured' THEN 0 WHEN 'curated' THEN 1 WHEN 'noisy' THEN 2 ELSE 3 END ASC, u.android_version DESC, COALESCE(u.published, u.first_seen) DESC LIMIT 1) AS android_version,
            (SELECT u.build FROM updates u
-             WHERE u.device_key = r.device_key AND u.is_relevant = 1 AND u.build IS NOT NULL
+             WHERE u.device_key = r.device_key AND u.is_relevant = 1 AND u.firmware_kind = 'current' AND u.build IS NOT NULL
              ORDER BY CASE u.source_trust WHEN 'structured' THEN 0 WHEN 'curated' THEN 1 WHEN 'noisy' THEN 2 ELSE 3 END ASC, COALESCE(u.published, u.first_seen) DESC LIMIT 1) AS build,
            (SELECT u.patch_level FROM updates u
-             WHERE u.device_key = r.device_key AND u.is_relevant = 1 AND u.patch_level IS NOT NULL
+             WHERE u.device_key = r.device_key AND u.is_relevant = 1 AND u.firmware_kind = 'current' AND u.patch_level IS NOT NULL
              ORDER BY CASE u.source_trust WHEN 'structured' THEN 0 WHEN 'curated' THEN 1 WHEN 'noisy' THEN 2 ELSE 3 END ASC, COALESCE(u.published, u.first_seen) DESC LIMIT 1) AS patch_level,
            -- Il codice della variante da cui viene il dato. Serve al chip:
            -- risolto per codice è esatto, risolto per nome può solo dire
            -- «Exynos oppure Snapdragon». `app.chip_di()` lo leggeva già,
            -- ma la colonna non esisteva e la lettura era morta.
            (SELECT u.model_code FROM updates u
-             WHERE u.device_key = r.device_key AND u.is_relevant = 1
+             WHERE u.device_key = r.device_key AND u.is_relevant = 1 AND u.firmware_kind = 'current'
                AND u.model_code IS NOT NULL AND u.model_code <> ''
              ORDER BY CASE u.source_trust WHEN 'structured' THEN 0 WHEN 'curated' THEN 1 WHEN 'noisy' THEN 2 ELSE 3 END ASC, COALESCE(u.published, u.first_seen) DESC LIMIT 1) AS model_code,
            -- Affidabilità della fonte che ha dato il dato "vincente" sopra:
@@ -633,7 +639,7 @@ def get_devices(brands: list[str] | None = None, search: str | None = None) -> l
            -- una notizia, così una ricerca live può fidarsi di quello che
            -- ha già in archivio invece di ripeterne la ricerca sul web.
            (SELECT u.source_trust FROM updates u
-             WHERE u.device_key = r.device_key AND u.is_relevant = 1
+             WHERE u.device_key = r.device_key AND u.is_relevant = 1 AND u.firmware_kind = 'current'
              ORDER BY CASE u.source_trust WHEN 'structured' THEN 0 WHEN 'curated' THEN 1 WHEN 'noisy' THEN 2 ELSE 3 END ASC, COALESCE(u.published, u.first_seen) DESC LIMIT 1) AS best_source_trust,
            r.severity, r.color, r.link, r.title, r.source_label,
            a.updates_total, a.updates_30d, a.updates_90d, a.last_update_at,
@@ -670,7 +676,7 @@ def get_device_history(device_key: str, limit: int = 50) -> list[dict]:
     rows = rows_to_dicts(
         conn.execute(
             """SELECT * FROM updates
-                WHERE device_key = ?
+                WHERE device_key = ? AND firmware_kind = 'current'
              ORDER BY (published IS NULL) ASC, published DESC, first_seen DESC
                 LIMIT ?""",
             (device_key, limit),
@@ -1316,7 +1322,7 @@ def stats() -> dict:
               (SELECT COUNT(*) FROM updates WHERE is_relevant = 1) AS updates_relevant,
               (SELECT COUNT(*) FROM updates) AS updates_total,
               (SELECT COUNT(DISTINCT device_key) FROM updates
-                WHERE device_key IS NOT NULL AND device_key <> '' AND is_relevant = 1) AS devices,
+                WHERE device_key IS NOT NULL AND device_key <> '' AND is_relevant = 1 AND firmware_kind = 'current') AS devices,
               (SELECT COUNT(*) FROM watchlist) AS watched,
               (SELECT COUNT(*) FROM notifications) AS notifications,
               (SELECT COUNT(*) FROM updates WHERE notified_at IS NOT NULL) AS notified_items
