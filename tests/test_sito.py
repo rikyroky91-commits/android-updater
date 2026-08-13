@@ -1134,7 +1134,8 @@ class TestRicercaPerImei(_Sito):
         """
         pagina = self.client.get("/", params={"q": "861206074094914"}).text
         self.assertIn("IMEI riconosciuto: <strong>Note 50</strong>", pagina)
-        self.assertIn("Nessun firmware per «Note 50»", pagina)
+        self.assertIn("<h2>realme Note 50</h2>", pagina)
+        self.assertIn("Versione Android verificata: Android 13", pagina)
 
     def test_l_imei_non_puo_essere_rinominato_dalla_ricerca_firmware(self):
         """Il TAC Note 50 non deve finire con un titolo C60 nella pagina."""
@@ -1145,7 +1146,7 @@ class TestRicercaPerImei(_Sito):
                 "source_label": "fonte finta",
             }], "error": None})
         pagina = self.client.get("/", params={"q": "861206074094914"}).text
-        self.assertIn("<h2>Note 50</h2>", pagina)
+        self.assertIn("<h2>realme Note 50</h2>", pagina)
         self.assertNotIn("<h2>C60</h2>", pagina)
 
     def test_il_tac_del_galaxy_a16_ha_modello_e_codice(self):
@@ -1162,6 +1163,30 @@ class TestRicercaPerImei(_Sito):
         self.assertIn("5000 mAh", pagina)
         self.assertIn("6,74 pollici", pagina)
         self.assertIsNone(specs._schede)
+
+    def test_imei_mantiene_marca_modello_e_android_della_scheda(self):
+        """Il codice è una chiave tecnica, non il titolo della pagina."""
+        tipo(self).RISPOSTA_RICERCA = staticmethod(lambda q: {
+            "items": [{
+                "source": "official_lookup", "source_label": "fonte finta",
+                "brand": "Samsung", "device_model": "A-16 4G",
+                "model_code": "SM-A165F",
+            }], "error": None})
+        try:
+            pagina = self.client.get("/", params={"q": "351355315430630"}).text
+            self.assertIn("<h2>Samsung Galaxy A16 4G</h2>", pagina)
+            self.assertIn("Versione Android verificata: Android 14", pagina)
+            self.assertNotIn("<h2>SM-A165F</h2>", pagina)
+        finally:
+            type(self).RISPOSTA_RICERCA = staticmethod(
+                lambda q: {"items": [], "error": None})
+
+    def test_tac_redmi_mostra_nome_e_scheda_europea(self):
+        pagina = self.client.get("/", params={"q": "867207081400866"}).text
+        self.assertIn("<h2>Redmi A7 Pro</h2>", pagina)
+        self.assertIn("Unisoc T7250", pagina)
+        self.assertIn("6000 mAh", pagina)
+        self.assertIn("Android 16", pagina)
 
     def test_un_imei_non_valido_resta_una_ricerca_normale(self):
         """Quindici cifre a caso non superano il controllo di Luhn: non
