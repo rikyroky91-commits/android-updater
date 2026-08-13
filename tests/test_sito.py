@@ -620,6 +620,25 @@ class TestRicerca(_Sito):
                 lambda q: {"items": [], "error": None})
 
 
+    def test_versione_di_fabbrica_resta_visibile_e_dichiarata(self):
+        """La UI deve mostrare Android anche senza promettere un OTA corrente."""
+        type(self).RISPOSTA_RICERCA = staticmethod(lambda q: {"items": [{
+            "source": "official_lookup", "source_label": "Catalogo AER",
+            "firmware_kind": "factory",
+            "brand": "Oppo / Realme / OnePlus", "device_model": "C63",
+            "model_code": "RMX3939", "android_version": 14,
+            "title": "", "severity": "", "color": "#00CC66",
+        }], "error": None})
+        try:
+            pagina = self.client.get("/", params={"q": "RMX3939"}).text
+            self.assertIn("<h2>realme C63</h2>", pagina)
+            self.assertIn("Versione Android verificata: Android 14 (di lancio/supporto)", pagina)
+            self.assertNotIn("nessuna fonte ne pubblica la versione", pagina)
+        finally:
+            type(self).RISPOSTA_RICERCA = staticmethod(
+                lambda q: {"items": [], "error": None})
+
+
 class TestConfronto(_Sito):
     """La pagina che mette due modelli fianco a fianco.
 
