@@ -147,6 +147,10 @@ def avvio() -> None:
         STATO_AVVIO["pulizia fonti"] = f"non riuscita: {errore}"
     if C.env_bool("AVVIA_WORKER", True):
         scan.start_background_worker()
+    # Il preriscaldamento tiene insieme in RAM cataloghi enormi mentre la
+    # scansione può caricarne altri: sul piano Render da 512 MB è un picco
+    # evitabile. È opt-in per chi dispone di memoria sufficiente.
+    if C.env_bool("PRERISCALDA_CATALOGHI", False):
         _scalda_i_cataloghi()
 
 
