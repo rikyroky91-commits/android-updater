@@ -882,10 +882,10 @@ def _modello_con_marca(marca: str, modello: str, codice: str = "") -> str:
 
     basso = modello.lower()
     # Un nome che dichiara già la sua marca non va prefissato di nuovo.
-    marchi_nel_nome = ("samsung", "galaxy", "redmi", "xiaomi", "poco",
+    marchi_nel_nome = ("samsung", "redmi", "xiaomi", "poco",
                        "realme", "oppo", "oneplus", "motorola", "moto",
-                       "google", "pixel", "honor", "huawei", "apple",
-                       "iphone", "vivo", "iqoo", "nothing", "nokia", "sony")
+                       "google", "honor", "huawei", "apple",
+                       "vivo", "iqoo", "nothing", "nokia", "sony")
     if basso.startswith(marchi_nel_nome):
         return modello
 
@@ -1434,10 +1434,18 @@ def _cerca_davvero(query: str) -> dict:
     # mano, tutti sopra) e la scheda ha davvero risolto qualcosa di diverso
     # dalla query scritta — un titolo identico alla query non è una
     # risoluzione, è un'eco.
-    if not versione_certa and not nome_corretto and scheda["trovata"]:
+    if not nome_corretto and scheda["trovata"]:
         titolo_scheda = (scheda["titolo"] or "").strip()
-        if titolo_scheda and titolo_scheda.lower() != query.strip().lower():
-            nome = titolo_scheda
+        nome_tecnico = (nome or "").strip().upper() in {
+            (query or "").strip().upper(), (codice or "").strip().upper()
+        }
+        # La scheda curata ha già risolto il nome quando la fonte diretta
+        # restituisce soltanto il codice. In quel caso il suo titolo è più
+        # preciso, anche se la fonte conosce una versione Android.
+        if (titolo_scheda and titolo_scheda.lower() != query.strip().lower()
+                and (not versione_certa or nome_tecnico)):
+            nome = _modello_con_marca(
+                scheda.get("marca") or marca, titolo_scheda, codice) or titolo_scheda
             # Il nome è cambiato: il codice di correzione e un'eventuale
             # correzione già salvata per QUEL nome vanno ricalcolati, stessa
             # ragione del blocco sopra.
