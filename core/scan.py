@@ -547,6 +547,10 @@ def search_model(model_query: str) -> dict:
         i for i in structured_items
         if i.get("is_relevant") and i.get("firmware_kind") == C.FW_CURRENT
     ]
+    structured_reported = [
+        i for i in structured_items
+        if i.get("is_relevant") and i.get("firmware_kind") == C.FW_REPORTED
+    ]
     rilevanti = [
         i for i in items
         if i.get("is_relevant") and i.get("firmware_kind") == C.FW_CURRENT
@@ -562,8 +566,9 @@ def search_model(model_query: str) -> dict:
             (i for i in rilevanti if _ha_firmware(i)),
             (structured_relevant[0] if structured_relevant
              else (rilevanti[0] if rilevanti
-                   else (riportati[0] if riportati
-                         else (identita[0] if identita else (items[0] if items else None))))),
+                   else (structured_reported[0] if structured_reported
+                         else (riportati[0] if riportati
+                               else (identita[0] if identita else (items[0] if items else None)))))),
         ),
     )
     if best:
