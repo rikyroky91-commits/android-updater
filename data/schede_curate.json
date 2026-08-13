@@ -1,0 +1,63 @@
+[
+  {
+    "nome": "realme Note 50",
+    "marca": "Oppo / Realme / OnePlus",
+    "codici": [
+      "RMX3834"
+    ],
+    "rilascio": "Gennaio 2024",
+    "chipset": "Unisoc Tiger T612 (12 nm)",
+    "cpu": "Octa-core fino a 1,8 GHz",
+    "gpu": "ARM Mali-G57",
+    "ram_gb": [
+      3,
+      4
+    ],
+    "storage_gb": [
+      64,
+      128
+    ],
+    "memoria": "64GB 3GB RAM, 64GB 4GB RAM, 128GB 4GB RAM",
+    "display": "6,74 pollici",
+    "display_tipo": "LCD, 90 Hz",
+    "batteria": "5000 mAh",
+    "ricarica": "10W, USB-C",
+    "camera_post": "13 MP, f/2.2",
+    "camera_front": "5 MP, f/2.22",
+    "os_lancio": "Android 13, realme UI T Edition",
+    "peso": "186 g",
+    "dimensioni": "167,2 x 76,7 x 7,99 mm",
+    "fonte": "specifiche ufficiali realme Italia"
+  },
+  {
+    "nome": "Samsung Galaxy A16 4G",
+    "marca": "Samsung",
+    "codici": [
+      "SM-A165F"
+    ],
+    "rilascio": "Ottobre 2024",
+    "chipset": "Mediatek Helio G99 (6 nm)",
+    "cpu": "Octa-core (2x2,2 GHz Cortex-A76 + 6x2,0 GHz Cortex-A55)",
+    "gpu": "Mali-G57 MC2",
+    "ram_gb": [
+      4,
+      6,
+      8
+    ],
+    "storage_gb": [
+      128,
+      256
+    ],
+    "memoria": "128GB 4GB RAM, 128GB 6GB RAM, 256GB 8GB RAM",
+    "display": "6,7 pollici",
+    "display_tipo": "Super AMOLED, 90 Hz",
+    "batteria": "5000 mAh",
+    "ricarica": "25W cablata, USB-C",
+    "camera_post": "50 MP + 5 MP ultrawide + 2 MP macro",
+    "camera_front": "13 MP",
+    "os_lancio": "Android 14, One UI 6.1",
+    "peso": "200 g",
+    "dimensioni": "164,4 x 77,9 x 7,9 mm",
+    "fonte": "scheda tecnica verificata"
+  }
+]
