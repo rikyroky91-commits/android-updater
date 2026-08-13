@@ -4240,7 +4240,12 @@ def lookup_model_structured(model_name: str, brand: str | None = None):
                     return items, None
                 raccolti.extend(items)
                 break
-            if ripiego is None:
+            # Se un firmware corrente non c'è, una scheda di fabbrica più
+            # ricca è comunque un'identità migliore del primo catalogo che
+            # ha detto soltanto «esiste». Il chiamante conserva il suo
+            # firmware_kind=FACTORY, quindi non la mostrerà come update.
+            if ripiego is None or (
+                    voce.firmware_kind == C.FW_FACTORY and _ha_versione(items[0])):
                 ripiego = items
             break
 
