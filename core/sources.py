@@ -4231,8 +4231,8 @@ def lookup_model_structured(model_name: str, brand: str | None = None):
             # «esiste» e non interrogare mai una fonte che avrebbe la
             # versione: è esattamente ciò che rendeva la ricerca inutile
             # per Oppo, pur essendo andata a buon fine.
-            if (voce.firmware_kind == C.FW_CURRENT
-                    or (voce.firmware_kind == C.FW_REPORTED and _ha_versione(items[0]))):
+            if (voce.firmware_kind in (C.FW_CURRENT, C.FW_REPORTED)
+                    and _ha_versione(items[0])):
                 if not ambigua:
                     return items, None
                 raccolti.extend(items)
