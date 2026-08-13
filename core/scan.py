@@ -764,7 +764,12 @@ def _lookup_structured_for(model_query: str) -> tuple[list[dict], str | None]:
                 fetch=None,
                 brand=raw_items[0].brand,
                 homepage="",
-                firmware_kind=raw_items[0].firmware_kind or C.FW_SUPPORT,
+                # I lookup registrati hanno già marcato ogni RawItem.
+                # Il default CURRENT preserva invece le integrazioni esterne
+                # e i test che restituiscono un RawItem di firmware senza
+                # conoscere ancora questo campo; i ripieghi di sola identità
+                # lo dichiarano esplicitamente più sotto come SUPPORT.
+                firmware_kind=raw_items[0].firmware_kind or C.FW_CURRENT,
             )
             normalizzati = [normalize(raw, source) for raw in raw_items]
             # SI SCEGLIE LA FORMA CHE HA IL FIRMWARE, NON LA PRIMA CHE
