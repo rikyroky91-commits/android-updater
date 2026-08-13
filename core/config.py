@@ -175,6 +175,16 @@ TRUST_STRUCTURED = "structured"
 TRUST_CURATED = "curated"
 TRUST_NOISY = "noisy"
 
+# Semantica del dato firmware. La fiducia dice quanto è attendibile una fonte;
+# questa etichetta dice invece *che cosa* la fonte sta dichiarando. Sono due
+# assi diversi: una scheda tecnica ufficiale può essere affidabile ma non
+# rappresentare l'ultimo firmware rilasciato.
+FW_CURRENT = "current"
+FW_FACTORY = "factory"
+FW_SUPPORT = "support"
+FW_BETA = "beta"
+FW_REPORTED = "reported"
+
 
 # --- Controlli di plausibilità (rete di sicurezza sui dati) -------------
 # Nessuna fonte esterna è affidabile per sempre: quando una si rompe, il
@@ -349,7 +359,10 @@ MAX_PLAUSIBLE_IOS = env_int("MAX_PLAUSIBLE_IOS", 30)
 #       Nello stesso giro: la marca scritta nella domanda vale anche sulle
 #       forme derivate (cercando «xiaomi 14» si otteneva un realme) e il
 #       confronto fra nomi e' per parole intere («14» non e' «14T»).
-DATA_LOGIC_VERSION = env_int("DATA_LOGIC_VERSION", 31)
+#  32 → la fiducia di una fonte e il tipo di dato diventano distinti. Le
+#       versioni di fabbrica, cataloghi di supporto e beta non possono più
+#       dichiarare l'ultimo firmware stabile; l'archivio va ricostruito.
+DATA_LOGIC_VERSION = env_int("DATA_LOGIC_VERSION", 32)
 
 
 # --- Tempo massimo di una ricerca interattiva ---------------------------
