@@ -286,6 +286,10 @@ def normalize(raw: sources.RawItem, source: sources.Source) -> dict:
         "source": source.key,
         "source_label": source.label,
         "source_trust": source.trust,
+        # La fonte può essere autorevole senza rappresentare il firmware
+        # corrente (per esempio AER o una scheda tecnica): conservarlo nel
+        # record permette a storage e UI di non trasformarlo in un update.
+        "firmware_kind": raw.firmware_kind or sources.firmware_kind_for(source),
         "published": raw.published,
         "first_seen": now_iso(),
         "is_relevant": relevance.is_relevant,
@@ -452,7 +456,10 @@ def _ha_firmware(voce: dict) -> bool:
     Trattarle come una risposta piena è il modo più efficace di far credere
     di avere un dato che non c'è.
     """
-    return bool(voce.get("os_version") or voce.get("build") or voce.get("patch_level"))
+    return bool(
+        voce.get("firmware_kind") == C.FW_CURRENT
+        and (voce.get("os_version") or voce.get("build") or voce.get("patch_level"))
+    )
 
 
 def search_model(model_query: str) -> dict:
@@ -536,14 +543,21 @@ def search_model(model_query: str) -> dict:
     # riportava una patch datata. È la stessa regola già adottata per la
     # scelta del risultato — si preferisce ciò CHE HA la versione — qui
     # applicata anche a quello che si annota.
-    structured_relevant = [i for i in structured_items if i.get("is_relevant")]
-    rilevanti = [i for i in items if i.get("is_relevant")]
+    structured_relevant = [
+        i for i in structured_items
+        if i.get("is_relevant") and i.get("firmware_kind") == C.FW_CURRENT
+    ]
+    rilevanti = [
+        i for i in items
+        if i.get("is_relevant") and i.get("firmware_kind") == C.FW_CURRENT
+    ]
+    identita = [i for i in items if i.get("is_relevant")]
     best = next(
         (i for i in structured_relevant if _ha_firmware(i)),
         next(
             (i for i in rilevanti if _ha_firmware(i)),
             (structured_relevant[0] if structured_relevant
-             else (rilevanti[0] if rilevanti else (items[0] if items else None))),
+             else (rilevanti[0] if rilevanti else (identita[0] if identita else (items[0] if items else None)))),
         ),
     )
     if best:
@@ -739,6 +753,7 @@ def _lookup_structured_for(model_query: str) -> tuple[list[dict], str | None]:
                 fetch=None,
                 brand=raw_items[0].brand,
                 homepage="",
+                firmware_kind=raw_items[0].firmware_kind or C.FW_SUPPORT,
             )
             normalizzati = [normalize(raw, source) for raw in raw_items]
             # SI SCEGLIE LA FORMA CHE HA IL FIRMWARE, NON LA PRIMA CHE
@@ -862,6 +877,7 @@ def _identifica_senza_firmware(model_query: str) -> list[dict]:
             fetch=None,
             brand=raw.brand,
             homepage="",
+            firmware_kind=C.FW_SUPPORT,
         )
         return [normalize(raw, source)]
     return []
