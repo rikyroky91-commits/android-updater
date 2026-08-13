@@ -497,18 +497,25 @@ def _punteggio_affidabilita(voci: list[tuple[str, str, str]], posizione: int) ->
     if base >= _PESO_FONTE[FONTE_CURATA]:
         return base
 
-    dettagli = parse_specs(marca, specs)
-    stessa_identita = _same_words_key(marca, dettagli["model"])
+    # Questa funzione gira per TUTTI i TAC all'avvio: non deve chiamare
+    # `parse_specs`, che può risolvere codici nei cataloghi esterni. Per il
+    # ranking basta il primo campo (il nome commerciale) e il pattern locale
+    # del codice, entrambi già contenuti nella riga TAC.
+    def nome_e_codice(marca_candidata: str, specs_candidati: str) -> tuple[frozenset, str | None]:
+        grezzo = " ".join(str(specs_candidati or "").split())
+        nome = grezzo.split(",", 1)[0].strip() or grezzo
+        codice, _anno = _split_code_and_year(grezzo)
+        return _same_words_key(marca_candidata, nome), codice
+
+    stessa_identita, codice = nome_e_codice(marca, specs)
     conferme = sum(
-        _same_words_key(altra_marca, parse_specs(altra_marca, altri_specs)["model"])
-        == stessa_identita
+        nome_e_codice(altra_marca, altri_specs)[0] == stessa_identita
         for _altra_fonte, altra_marca, altri_specs in voci
     )
     # Due cataloghi indipendenti che descrivono lo stesso modello sono un
     # riscontro più affidabile della sola posizione in una lista.
     base += max(0, conferme - 1) * 40
-    if dettagli.get("code"):
-        base += 10
+    if codice:
     if _RE_MERCATO_EU.search(specs or ""):
         base += 100
     return base
