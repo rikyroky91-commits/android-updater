@@ -1406,7 +1406,8 @@ def _cerca_davvero(query: str) -> dict:
     # («Note 60»), non solo col codice («RMX3933») — e senza questo la
     # correzione varrebbe solo per metà delle forme dello stesso telefono,
     # esattamente l'incoerenza che questo intero fix esiste per chiudere.
-    codice_per_correzione = (codice or\n                              next(iter(_codici_del_risultato(query, nome)), ""))
+    codice_per_correzione = (codice or
+                              next(iter(_codici_del_risultato(query, nome)), ""))
     nome_corretto = (storage.get_nome_modello(codice_per_correzione)
                      if codice_per_correzione else None)
     if nome_corretto:
