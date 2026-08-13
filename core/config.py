@@ -55,6 +55,12 @@ RETENTION_DAYS = env_int("RETENTION_DAYS", 400)
 # --- Scansione ---------------------------------------------------------
 SCAN_INTERVAL_MINUTES = env_int("SCAN_INTERVAL_MINUTES", 60)
 HTTP_TIMEOUT = env_int("HTTP_TIMEOUT", 15)
+# I cataloghi bulk si preparano in background solo dopo che il sito e' gia'
+# pronto a rispondere. Su Render la memoria e' limitata: avviarli insieme al
+# worker e' il picco che produceva gli OOM, avviarli uno alla volta evita che
+# la prima ricerca li debba invece scaricare tutti da zero.
+PRERISCALDA_CATALOGHI = env_bool("PRERISCALDA_CATALOGHI", False)
+PRERISCALDA_ATTESA_SECONDI = env_int("PRERISCALDA_ATTESA_SECONDI", 8)
 MAX_ITEMS_PER_SOURCE = env_int("MAX_ITEMS_PER_SOURCE", 100)
 # Il tracker Xiaomi è un catalogo strutturato (~1300 device unici), non un
 # feed di notizie recenti: qui il limite serve solo da tetto di sicurezza,

@@ -231,14 +231,18 @@ _META_TAC_UTENTE = "imei_tac_inseriti"
 # da uno si trova spesso nell'altro. Il primo non richiede nemmeno
 # registrazione.
 SITI_VERIFICA_TAC = [
-    ("HiCellTek", "https://hicelltek.com/en/tac-lookup/",
-     "gratuito, nessuna registrazione"),
     ("imei.info", "https://www.imei.info/it/?imei={imei}",
-     "catalogo ampio"),
+     "catalogo ampio; IMEI gia' precompilato"),
+    ("HiCellTek", "https://hicelltek.com/en/tac-lookup/",
+     "catalogo TAC; l'IMEI viene copiato prima di aprire il sito"),
+    ("IMEIpro", "https://www.imeipro.info/",
+     "controllo blacklist; l'IMEI viene copiato prima di aprire il sito"),
+    ("IMEI Check", "https://imeicheck.com/imei-check",
+     "identita', blacklist e SIM lock; l'IMEI viene copiato prima di aprire il sito"),
     ("nobbi.com", "http://www.nobbi.com/tacquery.php",
-     "storico, utile per i modelli vecchi"),
+     "storico, utile per i modelli vecchi; l'IMEI viene copiato prima di aprire il sito"),
     ("IMEI DB", "https://imeidb.xyz/",
-     "aggiornato di frequente"),
+     "aggiornato di frequente; l'IMEI viene copiato prima di aprire il sito"),
 ]
 
 
@@ -429,6 +433,7 @@ def _build_index() -> dict[str, list[tuple[str, str, str]]]:
     # L'ordine delle chiamate È l'ordine di precedenza.
     inseriti = tac_inseriti()
     curati = _indice_curato()
+
     principale = _indice_principale()
     imeidb = _indice_imeidb()
     storica = _indice_fallback()
@@ -726,11 +731,23 @@ def _testo_o_nome(valore) -> str:
     return str(valore or "").strip()
 
 
+def is_imei_like(imei: str) -> bool:
+    """True for a 15-digit value, even when the Luhn check digit is wrong.
+
+    A transcription error in the last digit must not turn a TAC lookup into a
+    model-name search: the first eight digits still identify the equipment
+    type. Callers keep the Luhn result visible as a warning and never use the
+    serial part for local identification.
+    """
+    digits = "".join(ch for ch in (imei or "") if ch.isdigit())
+    return len(digits) == 15
+
+
 def is_valid_imei(imei: str) -> bool:
     """Controllo Luhn standard sui 15 cifre di un IMEI (solo formato, non
     verifica se è realmente assegnato/attivo)."""
     digits = "".join(ch for ch in (imei or "") if ch.isdigit())
-    if len(digits) != 15:
+    if not is_imei_like(digits):
         return False
     total = 0
     for i, ch in enumerate(digits):
@@ -753,6 +770,22 @@ def tac_di(imei: str) -> str:
 def _voci_per_tac(tac: str) -> list[tuple[str, str, str]]:
     global _memory_index
     if _memory_index is None:
+        # Prima del catalogo bulk si controllano le correzioni locali. Sono
+        # dati piu' affidabili e, soprattutto, permettono alla ricerca IMEI
+        # appena dopo un deploy di rispondere senza scaricare e indicizzare
+        # centinaia di migliaia di TAC che non c'entrano con questa domanda.
+        # L'indice completo viene comunque caricato appena serve un TAC non
+        # presente qui: la copertura generale non si restringe.
+        locali: list[tuple[str, str, str]] = []
+        inserito = tac_inseriti().get(tac)
+        curato = _indice_curato().get(tac)
+        if inserito:
+            locali.append((FONTE_UTENTE, inserito[0], inserito[1]))
+        if curato:
+            locali.append((FONTE_CURATA, curato[0], curato[1]))
+        if locali:
+            globals()["_status"] = "risposta dal catalogo locale verificato"
+            return _ordina_per_affidabilita(locali)
         _memory_index = _build_index()
     return list(_memory_index.get(tac) or [])
 

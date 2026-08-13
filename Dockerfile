@@ -32,10 +32,10 @@ COPY --chown=app requirements-web.txt .
 RUN pip install --no-cache-dir -r requirements-web.txt
 
 COPY --chown=app core ./core
-COPY --chown=app web ./web
 COPY --chown=app data ./data
+COPY --chown=app scripts/preload_cataloghi.py ./scripts/preload_cataloghi.py
 
-# L'ARCHIVIO DI PARTENZA VIAGGIA CON L'IMMAGINE.
+# L'ARCHIVIO DI PARTENZA SI COSTRUISCE DURANTE LA BUILD.
 #
 # Il disco qui è effimero (vedi la nota su DB_PATH più sotto), quindi a
 # ogni risveglio l'applicazione ripartiva da zero dispositivi e restava
@@ -59,7 +59,15 @@ COPY --chown=app data ./data
 # docstring: "nessuna copia nell'immagine" non è un errore, è un ramo
 # previsto). Con l'asterisco il file si copia se c'è e non succede
 # niente se non c'è — mai un build che fallisce per questo.
-COPY --chown=app tracker.db* ./
+RUN PYTHONPATH=/home/app DB_PATH=/home/app/tracker.db \
+    python /home/app/scripts/preload_cataloghi.py \
+ && chown app:app /home/app/tracker.db
+
+# Il database qui contiene solo cataloghi pubblici costruiti durante la
+# build. Al primo avvio viene copiato in /tmp da `_semina_archivio()`;
+# cosi' il limite Render da 512 MB non deve assorbire download e parsing
+# concorrenti prima della prima ricerca.
+COPY --chown=app web ./web
 
 USER app
 ENV PYTHONUNBUFFERED=1 \

@@ -2467,6 +2467,7 @@ SAMSUNG_FUS_DEVICES: list[tuple[str, str]] = [
     ("SM-A346B", "Galaxy A34"),
     ("SM-A256B", "Galaxy A25"),
     ("SM-A156B", "Galaxy A15"),
+    ("SM-A057F", "Galaxy A05s"),
 ]
 
 # CSC (region code) da provare in ordine: ITV = Italia, poi Europa generica.

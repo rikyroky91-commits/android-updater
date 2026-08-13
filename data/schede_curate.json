@@ -61,6 +61,37 @@
     "fonte": "scheda tecnica verificata"
   },
   {
+    "nome": "Samsung Galaxy A05s",
+    "marca": "Samsung",
+    "codici": [
+      "SM-A057F",
+      "SM-A057G"
+    ],
+    "rilascio": "Settembre 2023",
+    "chipset": "Qualcomm Snapdragon 680 (6 nm)",
+    "cpu": "Octa-core (4x2,4 GHz Kryo 265 Gold + 4x1,9 GHz Kryo 265 Silver)",
+    "gpu": "Adreno 610",
+    "ram_gb": [
+      4,
+      6
+    ],
+    "storage_gb": [
+      64,
+      128
+    ],
+    "memoria": "64GB 4GB RAM, 128GB 4GB RAM, 128GB 6GB RAM",
+    "display": "6,7 pollici, 1080 x 2400 pixel",
+    "display_tipo": "PLS LCD, 90 Hz",
+    "batteria": "5000 mAh",
+    "ricarica": "25W cablata, USB-C",
+    "camera_post": "50 MP + 2 MP macro + 2 MP profondita'",
+    "camera_front": "13 MP",
+    "os_lancio": "Android 13, One UI 5.1",
+    "peso": "195 g",
+    "dimensioni": "168,0 x 77,8 x 8,8 mm",
+    "fonte": "specifiche Samsung Italia; firmware Samsung SM-A057F"
+  },
+  {
     "nome": "Redmi A7 Pro",
     "marca": "Xiaomi",
     "codici": [

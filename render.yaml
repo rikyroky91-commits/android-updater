@@ -27,6 +27,12 @@ services:
         value: 8000
       - key: DB_PATH
         value: /tmp/tracker.db
+      # I cataloghi sono gia' nel database-seme dell'immagine Docker. Non
+      # si espandono tutti in RAM dopo l'avvio, per restare sotto 512 MB.
+      - key: PRERISCALDA_CATALOGHI
+        value: "false"
+      - key: PRERISCALDA_ATTESA_SECONDI
+        value: "8"
       # I segreti NON stanno qui: si inseriscono dal pannello di Render.
       # `sync: false` significa esattamente questo — la variabile esiste,
       # il valore lo metti a mano e non finisce nel repository.

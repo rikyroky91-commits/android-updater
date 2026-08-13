@@ -1207,7 +1207,7 @@ class TestRicercaPerImei(_Sito):
         self.assertIn("6000 mAh", pagina)
         self.assertIn("Android 16", pagina)
 
-    def test_un_imei_non_valido_resta_una_ricerca_normale(self):
+    def test_un_imei_non_valido_resta_una_ricerca_tac_con_avviso(self):
         """Quindici cifre a caso non superano il controllo di Luhn: non
         vanno trattate come IMEI, o si direbbe «TAC sconosciuto» a chi ha
         semplicemente digitato male."""
@@ -1215,7 +1215,24 @@ class TestRicercaPerImei(_Sito):
 
         self.assertFalse(imeicheck.is_valid_imei("111111111111111"))
         pagina = self.client.get("/", params={"q": "111111111111111"}).text
-        self.assertNotIn("IMEI riconosciuto", pagina)
+        self.assertIn("IMEI a 15 cifre, modello sconosciuto", pagina)
+        self.assertIn("cifra di controllo", pagina)
+        self.assertIn("imei.info", pagina)
+
+    def test_imei_con_checksum_errato_mantiene_tac_link_e_avviso(self):
+        """L'ultimo numero puo' essere copiato male, il TAC no.
+
+        Il caso reale non deve ricadere nella ricerca modello: deve ancora
+        mostrare identita', avviso Luhn e le azioni per controllarlo fuori.
+        """
+        pagina = self.client.get("/", params={"q": "356909222457120"}).text
+        self.assertIn("Samsung Galaxy A05s", pagina)
+        self.assertIn("35690922", pagina)
+        self.assertIn("cifra di controllo", pagina)
+        for servizio in ("imei.info", "IMEIpro", "IMEI Check"):
+            with self.subTest(servizio=servizio):
+                self.assertIn(servizio, pagina)
+        self.assertIn("imei=356909222457120", pagina)
 
     def test_il_tac_sconosciuto_lo_dice_e_offre_la_correzione(self):
         """NON È UN GUASTO, È UN BUCO DI COPERTURA. Sono due cose che si
@@ -1320,6 +1337,11 @@ class TestInterpreteAI(_Sito):
         imei = "356938035643809"
         dati = self.client.post("/api/interpreta", data={"q": imei}).json()
         self.assertEqual(dati["proposte"], [imei])
+        self.assertIsNone(dati["errore"])
+
+    def test_un_imei_con_checksum_errato_non_passa_dal_modello(self):
+        dati = self.client.post("/api/interpreta", data={"q": "356909222457120"}).json()
+        self.assertEqual(dati["proposte"], ["356909222457120"])
         self.assertIsNone(dati["errore"])
 
     def test_nessuna_corrispondenza_ripiega_sul_testo_digitato(self):

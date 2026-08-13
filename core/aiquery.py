@@ -50,6 +50,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from urllib.parse import urlparse
 
 try:
     import requests
@@ -171,6 +172,23 @@ class Interpretazione:
         return bool(self.proposte)
 
 
+@dataclass(frozen=True)
+class Verifica:
+    """Esito della verifica assistita, mai un dato firmware dell'archivio.
+
+    Il testo rimane separato dalle fonti di aggiornamento: Gemini puo' aiutare
+    a trovare una pagina ufficiale, non diventare lui stesso una fonte che
+    dichiara una build o una versione Android.
+    """
+    sintesi: str = ""
+    fonti: tuple[tuple[str, str], ...] = ()
+    errore: str | None = None
+
+    @property
+    def riuscita(self) -> bool:
+        return bool(self.sintesi or self.fonti)
+
+
 # ======================================================================
 # I candidati: l'elenco fra cui il modello può scegliere
 # ======================================================================
@@ -290,6 +308,44 @@ _ISTRUZIONI = (
     '{"scelte": ["voce esatta", ...], "motivo": "una frase breve in italiano"}'
 )
 
+_ISTRUZIONI_VERIFICA = (
+    "Sei un assistente di verifica per un'app italiana che traccia firmware "
+    "degli smartphone. Devi cercare sul web solo quando serve, usando Google "
+    "Search, e aiutare un tecnico a capire quale pagina ufficiale consultare.\n\n"
+    "Regole tassative:\n"
+    "- Non inventare e non presentare come certo nessun firmware, build, patch "
+    "o versione Android che non sia supportata da una pagina del produttore.\n"
+    "- Privilegia siti ufficiali del produttore o pagine di supporto; se non "
+    "trovi una fonte ufficiale, dichiaralo chiaramente.\n"
+    "- Spiega in massimo tre frasi cosa e' verificabile e cosa va controllato "
+    "sul dispositivo.\n"
+    "- Rispondi esclusivamente con JSON: "
+    '{"sintesi":"...","fonti":[{"titolo":"...","url":"https://..."}]}'
+)
+
+
+def _dominio_ufficiale(url: str) -> bool:
+    """Accetta solo collegamenti HTTPS a domini plausibilmente ufficiali.
+
+    Gemini puo' restituire link utili ma una card di verifica non deve
+    promuovere un blog o un servizio IMEI come fosse il produttore. Questa
+    e' una barriera meccanica, non una preferenza affidata al prompt.
+    """
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except ValueError:
+        return False
+    if not host or not str(url).startswith("https://"):
+        return False
+    domini = (
+        "samsung.com", "apple.com", "google.com", "mi.com", "xiaomi.com",
+        "oppo.com", "realme.com", "oneplus.com", "motorola.com", "lenovo.com",
+        "vivo.com", "iqoo.com", "honor.com", "huawei.com", "nothing.tech",
+        "sony.com", "nokia.com",
+    )
+    return any(host == dominio or host.endswith("." + dominio)
+               for dominio in domini)
+
 
 class ErroreRiprovabile(RuntimeError):
     """Errore per cui ha senso provare il modello successivo."""
@@ -367,6 +423,84 @@ def _chiama_gemini(domanda: str, chiave: str, modello_scelto: str) -> str:
     pezzi = ((dati.get("candidates") or [{}])[0]
              .get("content", {}).get("parts") or [])
     return "\n".join(str(p.get("text") or "") for p in pezzi).strip()
+
+
+def _chiama_verifica_gemini(domanda: str, chiave: str, modello_scelto: str) -> str:
+    """Gemini con grounding: cerca, ma restituisce solo una pista verificabile.
+
+    Questa chiamata e' volutamente distinta da `_chiama_gemini`: l'interprete
+    sceglie tra candidati locali e non ha ragione di consumare una ricerca
+    web. La verifica, invece, si attiva solo dal risultato incompleto.
+    """
+    risposta = requests.post(
+        GEMINI_URL.format(modello=modello_scelto),
+        headers={"content-type": "application/json", "x-goog-api-key": chiave},
+        json={
+            "systemInstruction": {"parts": [{"text": _ISTRUZIONI_VERIFICA}]},
+            "contents": [{"role": "user", "parts": [{"text": domanda}]}],
+            "tools": [{"google_search": {}}],
+            "generationConfig": {"temperature": 0, "maxOutputTokens": 700},
+        },
+        timeout=_TIMEOUT,
+    )
+    dati = _controlla(risposta)
+    pezzi = ((dati.get("candidates") or [{}])[0]
+             .get("content", {}).get("parts") or [])
+    return "\n".join(str(p.get("text") or "") for p in pezzi).strip()
+
+
+def verifica(query: str, contesto: str = "") -> Verifica:
+    """Cerca una fonte ufficiale quando la ricerca normale non basta.
+
+    Il fallback e' esplicito: se Gemini non e' configurato, o il fornitore
+    non e' Gemini, non si simula una ricerca. Il bottone spiega che continua
+    a essere necessario verificare le informazioni sulla pagina collegata.
+    """
+    testo = " ".join(str(query or "").split())
+    scelto = fornitore()
+    if not testo:
+        return Verifica(errore="nessun modello da verificare")
+    if not disponibile() or scelto is None:
+        return Verifica(errore="nessuna chiave Gemini configurata")
+    nome, chiave, _richiesto = scelto
+    if nome != "Gemini":
+        return Verifica(errore="la verifica con fonti web richiede GEMINI_API_KEY")
+
+    domanda = (
+        f"Modello o codice: {testo}\n"
+        f"Contesto gia' noto dall'app: {contesto[:900] or 'nessuna versione certa'}\n\n"
+        "Trova una pagina ufficiale del produttore che aiuti a verificare "
+        "supporto software, firmware o identita' del modello."
+    )
+    ultimo = None
+    for modello_scelto in modelli_da_provare():
+        try:
+            risposta = _chiama_verifica_gemini(domanda, chiave, modello_scelto)
+            dati = _json_dal_testo(risposta)
+            if not isinstance(dati, dict):
+                return Verifica(errore="risposta di verifica non interpretabile")
+            fonti = []
+            for voce in (dati.get("fonti") or [])[:4]:
+                if not isinstance(voce, dict):
+                    continue
+                url = str(voce.get("url") or "").strip()
+                titolo = " ".join(str(voce.get("titolo") or "Fonte ufficiale").split())[:160]
+                if _dominio_ufficiale(url) and (titolo, url) not in fonti:
+                    fonti.append((titolo, url))
+            sintesi = " ".join(str(dati.get("sintesi") or "").split())[:700]
+            if not fonti:
+                return Verifica(
+                    sintesi=(sintesi or "Nessuna fonte ufficiale trovata: verifica "
+                             "direttamente sul sito del produttore."),
+                    errore="nessun collegamento ufficiale verificabile restituito",
+                )
+            return Verifica(sintesi=sintesi, fonti=tuple(fonti))
+        except ErroreRiprovabile as errore:
+            ultimo = errore
+            continue
+        except Exception as errore:
+            return Verifica(errore=_spiega(errore))
+    return Verifica(errore=_spiega(ultimo or RuntimeError("nessun modello Gemini disponibile")))
 
 
 def _controlla(risposta) -> dict:

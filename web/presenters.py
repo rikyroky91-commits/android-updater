@@ -270,11 +270,25 @@ def scheda_tecnica(nome: str, codice: str = "", brand: str = "",
     """
     from core import aer_catalog, images
 
-    aer = aer_catalog.lookup(codice) or aer_catalog.lookup(nome)
-    marca_aer = marca_probabile(codice, nome, aer=aer)
-
-    scheda = specs.cerca(codice or None, nome or None,
-                         (device or {}).get("build") or None, marca=marca_aer)
+    # Si guarda la scheda curata LOCale senza scaricare il catalogo bulk.
+    # Per un IMEI appena riconosciuto questo e' il percorso caldo: basta per
+    # Note 50/A16/A05s e non trasforma l'avvio in un picco di RAM. Se manca,
+    # si conserva il flusso completo AER -> marca verificata -> ripiego.
+    build = (device or {}).get("build") or None
+    scheda = (specs._curata_per_codice(codice) if codice else None)
+    if scheda is None and nome:
+        scheda = specs._curata_per_nome(nome)
+    # Le schede curate sono dati completi dentro l'immagine: per un TAC
+    # appena riconosciuto non si deve prima attendere il catalogo AER remoto
+    # soltanto per provare ad aggiungere una data di supporto. Il catalogo
+    # resta il ripiego per le schede non curate e viene gia' preriscaldato.
+    aer = None
+    if not scheda:
+        aer = aer_catalog.lookup(codice) or aer_catalog.lookup(nome)
+        marca_aer = marca_probabile(codice, nome, aer=aer)
+        scheda = specs.cerca(codice or None, nome or None, build, marca=marca_aer)
+    else:
+        marca_aer = scheda.marca
     chip = soc.per_modello(codice or (device or {}).get("build") or nome,
                            nome or (device or {}).get("model"), marca=marca_aer)
 

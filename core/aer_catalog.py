@@ -52,6 +52,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 
 from . import config as C
 
@@ -66,6 +67,13 @@ SOURCE_LABEL = "Android Enterprise Recommended (catalogo ufficiale)"
 # Il catalogo cambia quando esce un modello nuovo: qualche volta al mese.
 # Riscaricarlo a ogni scansione oraria sarebbe traffico sprecato.
 TTL_SECONDS = 12 * 3600
+
+# Il JSON Ã¨ piccolo ma serviva comunque una chiamata di rete al primo lookup
+# dopo ogni deploy. Tenerne una copia nel database-seme dell'immagine rende
+# immediati anche i modelli che non hanno una scheda curata; la rete resta
+# usata ogni dodici ore per aggiornarlo.
+_BLOB_CATALOGO = "aer_catalog_json"
+_META_SCARICATO = "aer_catalog_fetched_at"
 
 # Marche AER → brand del tracker. Le marche non elencate restano C.OTHER,
 # che è il comportamento giusto: il catalogo comprende anche produttori
@@ -84,6 +92,7 @@ _lock = threading.Lock()
 _dispositivi: list[dict] | None = None
 _per_nome: dict[str, dict] = {}
 _per_codice: dict[str, dict] = {}
+_salta_cache_archivio_una_volta = False
 # `None` = mai scaricato. NON `0.0`: il valore è un istante di
 # `time.monotonic()`, il cui zero è arbitrario (il boot della macchina, non
 # un'epoca). Su un container appena avviato `monotonic()` vale una manciata
@@ -101,12 +110,18 @@ def status() -> str:
 
 def reset_cache() -> None:
     global _dispositivi, _per_nome, _per_codice, _scaricato_a, _status
+    global _salta_cache_archivio_una_volta
     with _lock:
         _dispositivi = None
         _per_nome = {}
         _per_codice = {}
         _scaricato_a = None
         _status = "non ancora caricato"
+        # `reset_cache()` esprime una richiesta esplicita di riprovare la
+        # fonte. Non ha senso ripristinare immediatamente lo stesso blob
+        # dall'archivio; se la rete non risponde, si torna comunque alla
+        # memoria che c'era prima (vedi `carica`).
+        _salta_cache_archivio_una_volta = True
 
 
 # ----------------------------------------------------------------------
@@ -293,6 +308,7 @@ def _indicizza(voci: list[dict]) -> tuple[list[dict], dict, dict]:
 
 def carica(forza: bool = False) -> list[dict]:
     global _dispositivi, _per_nome, _per_codice, _scaricato_a, _status
+    global _salta_cache_archivio_una_volta
     with _lock:
         fresco = (
             _dispositivi is not None
@@ -301,8 +317,41 @@ def carica(forza: bool = False) -> list[dict]:
         )
         if fresco and not forza:
             return _dispositivi
+        voci = None
         try:
-            voci = _scarica()
+            from . import storage
+            cache = storage.get_blob(_BLOB_CATALOGO)
+            quando = storage.get_meta(_META_SCARICATO)
+            fresca = False
+            usa_cache_archivio = not forza and not _salta_cache_archivio_una_volta
+            _salta_cache_archivio_una_volta = False
+            if cache and quando and usa_cache_archivio:
+                try:
+                    eta = (datetime.now(timezone.utc)
+                           - datetime.fromisoformat(quando)).total_seconds()
+                    fresca = eta < TTL_SECONDS
+                except ValueError:
+                    fresca = False
+            # Una fixture o un catalogo gia' in memoria e' la migliore
+            # copia disponibile quando la rete cade: non sovrascriverla con
+            # il seed del database, che puo' appartenere a un'altra
+            # installazione (e nei test non deve entrare affatto).
+            if _dispositivi is not None and not forza:
+                voci = None
+            elif fresca:
+                letto = json.loads(cache.decode("utf-8"))
+                if isinstance(letto, list):
+                    voci = letto
+                    _status = "catalogo da archivio"
+            if voci is None:
+                scaricato = _scarica()
+                storage.set_blob(
+                    _BLOB_CATALOGO,
+                    json.dumps(scaricato, ensure_ascii=False).encode("utf-8"),
+                )
+                storage.set_meta(_META_SCARICATO,
+                                 datetime.now(timezone.utc).isoformat())
+                voci = scaricato
         except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
             _status = f"non raggiungibile: {exc}"
             # Meglio un catalogo vecchio che nessun catalogo: se c'era già
@@ -310,7 +359,9 @@ def carica(forza: bool = False) -> list[dict]:
             return _dispositivi or []
         _dispositivi, _per_nome, _per_codice = _indicizza(voci)
         _scaricato_a = time.monotonic()
-        _status = f"{len(_dispositivi)} dispositivi, {len(_per_codice)} codici modello"
+        _status = (f"{len(_dispositivi)} dispositivi, {len(_per_codice)} codici modello"
+                   if _status != "catalogo da archivio" else
+                   f"{len(_dispositivi)} dispositivi, {len(_per_codice)} codici modello (da archivio)")
         return _dispositivi
 
 
