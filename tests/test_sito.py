@@ -1125,6 +1125,17 @@ class TestRicercaPerImei(_Sito):
         self.assertIn("Confronto fra le fonti", pagina)
         self.assertIn("Controlla lo stesso IMEI su un'altra fonte", pagina)
 
+    def test_imei_riconosciuto_mostra_il_modello_anche_senza_firmware(self):
+        """L'identita' dal TAC non deve sparire se la ricerca firmware e' vuota.
+
+        Il caso segnalato e' il TAC 86120607: la pagina deve dire subito
+        realme Note 50, anche quando nessuna fonte firmware ha ancora dati
+        da rendere nel resto del risultato.
+        """
+        pagina = self.client.get("/", params={"q": "861206074094914"}).text
+        self.assertIn("IMEI riconosciuto: <strong>Note 50</strong>", pagina)
+        self.assertIn("Nessun firmware per «Note 50»", pagina)
+
     def test_un_imei_non_valido_resta_una_ricerca_normale(self):
         """Quindici cifre a caso non superano il controllo di Luhn: non
         vanno trattate come IMEI, o si direbbe «TAC sconosciuto» a chi ha

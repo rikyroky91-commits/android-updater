@@ -160,6 +160,21 @@ class TestConfronto(BaseImei):
         self.assertEqual(esito["voci"][0]["fonte"], imeicheck.FONTE_UTENTE)
         self.assertEqual(imeicheck.identify("867513060000000")[1], "Redmi 9A Verificato")
 
+    def test_tac_curato_note_50_precede_il_c60_delle_fonti_community(self):
+        """La correzione verificata deve vincere sul primo match pubblico.
+
+        Il TAC 86120607 e' stato segnalato come realme C60 da una fonte
+        community, ma il dispositivo europeo e' un realme Note 50. Una
+        riga curata e' quindi una fonte di affidabilita, non un semplice
+        suggerimento da mostrare dopo il risultato sbagliato.
+        """
+        imei = "861206074094914"
+        esito = imeicheck.confronto(imei)
+        self.assertEqual(esito["voci"][0]["fonte"], imeicheck.FONTE_CURATA)
+        self.assertEqual(esito["voci"][0]["marca"].lower(), "realme")
+        self.assertEqual(esito["voci"][0]["modello"], "Note 50")
+        self.assertEqual(imeicheck.identify(imei), ("realme", "Note 50"))
+
     def test_un_tac_sconosciuto_non_solleva(self):
         esito = imeicheck.confronto("999999990000000")
         self.assertEqual(esito["voci"], [])
