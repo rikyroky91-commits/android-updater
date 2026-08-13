@@ -6,8 +6,15 @@
 <p class="etichetta-imei">IMEI riconosciuto: <strong>{{ imei.descrizione }}</strong>
   · TAC <code>{{ imei.tac }}</code></p>
 {% else %}
-<p class="etichetta-imei etichetta-imei-incerta">IMEI valido, modello sconosciuto
+<p class="etichetta-imei etichetta-imei-incerta">IMEI a 15 cifre, modello sconosciuto
   · TAC <code>{{ imei.tac }}</code></p>
+{% endif %}
+
+{% if imei.luhn_valid is defined and not imei.luhn_valid %}
+<p class="avviso">La cifra di controllo dell'IMEI non risulta valida. Il modello
+  viene comunque cercato dal TAC <code>{{ imei.tac }}</code> (le prime 8 cifre):
+  verifica il numero riportato sul dispositivo prima di usarlo per blacklist,
+  garanzia o blocchi dell'operatore.</p>
 {% endif %}
 
 {# I 4 SITI DI VERIFICA STANNO QUI, SEMPRE VISIBILI — non dentro il
@@ -25,7 +32,10 @@
 <p class="proposte">
   {% for nome, url, nota in imei.siti %}
   <a class="proposta" href="{{ url }}" title="{{ nota }}" rel="noopener"
-     target="_blank">{{ nome }}</a>
+     target="_blank" data-copia-imei="{{ imei.imei }}">{{ nome }}</a>
   {% endfor %}
 </p>
+<p class="nota">Su <strong>imei.info</strong> il numero viene passato gia'
+  compilato. Sugli altri servizi il clic lo copia negli appunti prima di aprire
+  la pagina: basta incollarlo nel loro campo di verifica.</p>
 {% endif %}

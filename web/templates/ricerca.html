@@ -189,12 +189,34 @@
     scritto in un modello che l'app conosce.</p>
   {% endif %}
 
+  {% if ai_verifica_attiva and not imei %}
+  <p class="nota"><a href="/?q={{ query | urlencode }}&amp;verifica_ai=1">
+    Verifica con AI una fonte ufficiale per questo modello →</a></p>
+  {% endif %}
+
   {# L'INGRESSO AL CONFRONTO. Il primo modello è già scritto — quello che
      è stato appena cercato — e manca solo il secondo: un clic in meno
      rispetto a scrivere due nomi da zero sulla pagina di confronto. #}
   <p class="nota"><a href="/confronto?a={{ risultato.query | urlencode }}">Confronta
     con un altro modello →</a></p>
 </section>
+
+{% if verifica_ai %}
+<section class="esito {{ 'trovato' if verifica_ai.fonti else 'incerto' }}">
+  <h3>Verifica assistita con fonti ufficiali</h3>
+  {% if verifica_ai.sintesi %}<p>{{ verifica_ai.sintesi }}</p>{% endif %}
+  {% if verifica_ai.fonti %}
+  <p class="proposte">
+    {% for titolo, url in verifica_ai.fonti %}
+    <a class="proposta" href="{{ url }}" target="_blank" rel="noopener">{{ titolo }}</a>
+    {% endfor %}
+  </p>
+  {% endif %}
+  {% if verifica_ai.errore %}<p class="nota">{{ verifica_ai.errore }}</p>{% endif %}
+  <p class="nota">Questa verifica suggerisce solo pagine da controllare: non
+    sostituisce una fonte firmware e non modifica i dati dell'app.</p>
+</section>
+{% endif %}
 
 {# La scheda si mostra solo se c'è qualcosa da mostrare. Una scheda di
    soli trattini sotto un «nessun firmware trovato» non aggiunge niente e

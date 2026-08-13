@@ -150,7 +150,7 @@ def avvio() -> None:
     # Il preriscaldamento tiene insieme in RAM cataloghi enormi mentre la
     # scansione può caricarne altri: sul piano Render da 512 MB è un picco
     # evitabile. È opt-in per chi dispone di memoria sufficiente.
-    if C.env_bool("PRERISCALDA_CATALOGHI", False):
+    if C.PRERISCALDA_CATALOGHI:
         _scalda_i_cataloghi()
 
 
@@ -170,6 +170,12 @@ def _scalda_i_cataloghi() -> None:
     def scalda():
         # L'ordine è quello del costo: prima il più caro, che è anche
         # quello che la tabella dei dispositivi aspetta.
+        # Il worker ha appena avviato le sue fonti: lasciargli qualche
+        # secondo evita i picchi di RAM/rete che su Render portavano al
+        # riavvio. Il sito intanto e' gia' disponibile per schede curate e
+        # TAC locali, che non aspettano questo thread.
+        import time
+        time.sleep(max(0, C.PRERISCALDA_ATTESA_SECONDI))
         passi = (
             ("schede tecniche", specs.carica),
             ("codici modello", lambda: modelcodes.resolve("SM-S921B")),
@@ -256,8 +262,11 @@ def _contesto(request: Request, **extra) -> dict:
         "fonti_ok": sum(1 for s in stati if s.get("ok")),
         "fonti_totali": len(stati),
         "ai_attiva": aiquery.disponibile(),
+        "ai_verifica_attiva": bool(
+            aiquery.fornitore() and aiquery.fornitore()[0] == "Gemini"),
         "query": "",
         "attiva": "",
+        "verifica_ai": None,
     }
     base.update(extra)
     return base
@@ -281,10 +290,11 @@ def radice_head():
 
 @app.get("/", response_class=HTMLResponse)
 def pagina_ricerca(request: Request, q: str = Query(default=""),
-                   ai: str = Query(default=""),
-                   alt: list[str] = Query(default=[]),
-                   perche: str = Query(default=""),
-                   saved: int = Query(default=0)):
+                    ai: str = Query(default=""),
+                    alt: list[str] = Query(default=[]),
+                    perche: str = Query(default=""),
+                    verifica_ai: str = Query(default=""),
+                    saved: int = Query(default=0)):
     """La home, e la pagina di un modello cercato.
 
     SENZA DOMANDA È LA SOLA BARRA DI RICERCA. Prima qui c'era anche
@@ -311,7 +321,7 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
     # riconosciuto, ridotto al TAC (le prime otto cifre) e tradotto in un
     # modello; solo allora si cerca il firmware.
     imei = None
-    if imeicheck.is_valid_imei(domanda):
+    if imeicheck.is_imei_like(domanda):
         imei = _esito_imei_salvato(domanda) if saved else _esito_imei(domanda)
         if imei["modello_cercato"]:
             # Un IMEI ha già risolto un'identità precisa dal TAC. La ricerca
@@ -327,9 +337,17 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
     else:
         risultato = _esito_ricerca(domanda)
 
+    verifica = None
+    if verifica_ai == "1" and aiquery.fornitore() and aiquery.fornitore()[0] == "Gemini":
+        contesto = " · ".join(x for x in (
+            risultato.get("riga"), risultato.get("fonte"),
+            (risultato.get("scheda") or {}).get("fonte"),
+        ) if x)
+        verifica = aiquery.verifica(risultato.get("nome") or domanda, contesto)
+
     return _rendi(request, "ricerca.html", _contesto(
         request, attiva="cerca", query=q, stats=stats,
-        risultato=risultato, imei=imei,
+        risultato=risultato, imei=imei, verifica_ai=verifica,
         # L'INTERPRETAZIONE SI DICHIARA. Se l'AI ha tradotto «quel samsung
         # nero» in «Galaxy A56 5G», chi guarda deve vedere che cosa è
         # stato cercato al posto suo — altrimenti la pagina risponde a una
@@ -731,7 +749,7 @@ def api_interpreta(q: str = Form(...)):
     """
     domanda = q.strip()
 
-    if imeicheck.is_valid_imei(domanda):
+    if imeicheck.is_imei_like(domanda):
         return JSONResponse({
             "proposte": [domanda],
             "motivo": "un IMEI si cerca così com'è: qui non c'è niente da "
@@ -824,6 +842,7 @@ def _esito_imei(imei: str) -> dict:
     return {
         "imei": imei,
         "tac": raffronto.get("tac") or "",
+        "luhn_valid": imeicheck.is_valid_imei(imei),
         "riconosciuto": bool(trovato),
         "descrizione": descrizione,
         "marca": (marca if trovato else ""),
@@ -853,7 +872,8 @@ def _esito_imei_salvato(imei: str) -> dict:
     dettagli = imeicheck.parse_specs(marca, dettagli_grezzi) if dettagli_grezzi else {}
     modello = dettagli.get("model") or dettagli_grezzi
     return {
-        "imei": imei, "tac": tac, "riconosciuto": bool(modello),
+        "imei": imei, "tac": tac, "luhn_valid": imeicheck.is_valid_imei(imei),
+        "riconosciuto": bool(modello),
         "descrizione": imeicheck.describe(marca, dettagli_grezzi) if modello else "",
         "marca": marca, "modello": modello,
         "codice": dettagli.get("code") or "",
@@ -937,13 +957,22 @@ def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
     codice = imei.get("codice") or ancorato.get("codice", "")
     modello = imei.get("modello") or identita
     marca = imei.get("marca", "")
+    ancorato["scheda"] = P.scheda_tecnica(
+        modello, codice=codice or identita, brand=marca)
+    # Il catalogo tecnico curato conserva la grafia commerciale completa
+    # (es. «Galaxy A16 4G»). Il TAC puÃ² invece avere un nome abbreviato o
+    # tutto maiuscolo: per la UI si privilegia quindi il titolo della scheda
+    # che Ã¨ stata appena trovata per lo stesso codice, senza permettere alla
+    # ricerca firmware di rinominare l'identitÃ .
+    titolo_scheda = (ancorato["scheda"].get("titolo") or "").strip()
+    if ancorato["scheda"].get("trovata") and titolo_scheda:
+        modello = titolo_scheda
+        marca = ancorato["scheda"].get("marca") or marca
     ancorato["query"] = identita
     ancorato["nome"] = _modello_con_marca(marca, modello, codice) or modello
     ancorato["codice"] = codice
     ancorato["codice_per_correzione"] = codice
     ancorato["trovato"] = True
-    ancorato["scheda"] = P.scheda_tecnica(
-        modello, codice=codice or identita, brand=marca)
 
     # Se nessuna fonte OTA è interrogabile, la versione Android della scheda
     # è comunque un dato tecnico utile. Viene etichettata come versione di

@@ -332,6 +332,40 @@ class TestNienteRete(_Base):
         self.assertIn("SM-A075F", chiamate[0])
 
 
+class TestVerificaConFontiUfficiali(_Base):
+    def setUp(self):
+        super().setUp()
+        self._verifica_prima = aiquery._chiama_verifica_gemini
+
+    def tearDown(self):
+        aiquery._chiama_verifica_gemini = self._verifica_prima
+        super().tearDown()
+
+    def test_tiene_solo_fonti_del_produttore(self):
+        import json
+
+        aiquery._chiama_verifica_gemini = lambda *_args: json.dumps({
+            "sintesi": "Controlla la pagina Samsung.",
+            "fonti": [
+                {"titolo": "Supporto Samsung", "url": "https://www.samsung.com/it/support/"},
+                {"titolo": "Blog esterno", "url": "https://example.org/firmware"},
+            ],
+        })
+        esito = aiquery.verifica("Galaxy A05s")
+        self.assertEqual(esito.fonti, (("Supporto Samsung", "https://www.samsung.com/it/support/"),))
+
+    def test_non_si_finge_un_firmware_se_non_torna_una_fonte(self):
+        import json
+
+        aiquery._chiama_verifica_gemini = lambda *_args: json.dumps({
+            "sintesi": "Nessuna pagina ufficiale trovata.",
+            "fonti": [{"titolo": "Blog", "url": "https://example.org/"}],
+        })
+        esito = aiquery.verifica("modello ignoto")
+        self.assertFalse(esito.fonti)
+        self.assertIn("ufficiale", esito.errore)
+
+
 class TestSuggerimentiEstesi(unittest.TestCase):
     """Il livello gratuito: correzione dei refusi anche sui CODICI."""
 

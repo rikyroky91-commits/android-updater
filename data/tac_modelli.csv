@@ -30,5 +30,10 @@ tac,marca,modello,nota
 # TAC verificato: l'IMEI 351355315430630 corrisponde alla variante 4G europea.
 35135531,Samsung,"Galaxy A16 4G, Samsung SM-A165F",verificato per mercato europeo
 
+# TAC 35690922: riscontro Swappa TAC index e codice SM-A057F confermato da
+# Samsung. L'IMEI ricevuto terminava con una cifra Luhn errata, ma il TAC
+# resta il medesimo e identifica comunque il modello.
+35690922,Samsung,"Galaxy A05s, Samsung SM-A057F",verificato su indice TAC e documentazione Samsung
+
 # TAC segnalato: modello globale Redmi A7 Pro con codice 25128RN17Y.
 86720708,Redmi,"Redmi A7 Pro, Xiaomi 25128RN17Y",verificato su documentazione Xiaomi e catalogo europeo

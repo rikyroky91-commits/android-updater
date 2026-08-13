@@ -225,5 +225,22 @@ class TestIdentifyRestaCompatibile(BaseImei):
         self.assertIsNone(imeicheck.identify("999999990000000"))
 
 
+class TestLinkDiVerifica(unittest.TestCase):
+    def test_i_servizi_richiesti_sono_disponibili(self):
+        nomi = [nome for nome, _url, _nota in imeicheck.link_verifica("356909222457120")]
+        for atteso in ("imei.info", "IMEIpro", "IMEI Check"):
+            with self.subTest(servizio=atteso):
+                self.assertIn(atteso, nomi)
+
+    def test_imei_info_riceve_il_numero_nell_indirizzo(self):
+        links = dict((nome, url) for nome, url, _nota
+                     in imeicheck.link_verifica("356909222457120"))
+        self.assertIn("imei=356909222457120", links["imei.info"])
+
+    def test_quindici_cifre_con_luhn_errato_restano_un_imei(self):
+        self.assertTrue(imeicheck.is_imei_like("356909222457120"))
+        self.assertFalse(imeicheck.is_valid_imei("356909222457120"))
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main(verbosity=2)
