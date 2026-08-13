@@ -1380,14 +1380,11 @@ def _cerca_davvero(query: str) -> dict:
     # risposte diverse alla stessa domanda, ed è esattamente ciò che
     # rende un'applicazione poco credibile.
     #
-    # L'archivio un nome canonico ce l'ha già, scelto per affidabilità
-    # della fonte in `storage.get_devices()`, ed è lo stesso che compare
-    # nella tabella dei dispositivi: usarlo qui fa convergere tutte le
-    # forme E allinea la ricerca al resto del sito. Quando il telefono in
-    # archivio non c'è, resta il nome della fonte: inventarne uno sarebbe
-    # peggio.
-    if nome_archivio:
-        nome = nome_archivio
+    # L'archivio è utile per le forme che non hanno un codice. Quando il
+    # codice è noto, invece, il nome canonico del codice resta prioritario:
+    # una vecchia riga con l'alias C61 non può più rinominare RMX3939/C63.
+    if nome_archivio and not codice:
+        nome = _modello_con_marca(marca, nome_archivio, codice) or nome_archivio
 
     # LA CORREZIONE A MANO VINCE SU TUTTO, ARCHIVIO COMPRESO.
     #
@@ -1409,7 +1406,7 @@ def _cerca_davvero(query: str) -> dict:
     # («Note 60»), non solo col codice («RMX3933») — e senza questo la
     # correzione varrebbe solo per metà delle forme dello stesso telefono,
     # esattamente l'incoerenza che questo intero fix esiste per chiudere.
-    codice_per_correzione = next(iter(_codici_del_risultato(query, nome)), "")
+    codice_per_correzione = (codice or\n                              next(iter(_codici_del_risultato(query, nome)), ""))
     nome_corretto = (storage.get_nome_modello(codice_per_correzione)
                      if codice_per_correzione else None)
     if nome_corretto:
