@@ -439,6 +439,13 @@ def _build_index() -> dict[str, list[tuple[str, str, str]]]:
     aggiungi(FONTE_IMEIDB, imeidb)
     aggiungi(FONTE_OSMOCOM, storica)
 
+    # L'ordine di caricamento non è più una sentenza sul modello giusto.
+    # Le correzioni umane restano assolute; fra le fonti pubbliche, invece,
+    # si applica un punteggio riproducibile che premia riscontri indipendenti
+    # e indicazioni esplicite di disponibilità europea.
+    for tac, voci in index.items():
+        index[tac] = _ordina_per_affidabilita(voci)
+
     if not index:
         _status = "file interpretato ma nessuna riga valida trovata (formato cambiato?)"
     else:
@@ -455,6 +462,81 @@ def _build_index() -> dict[str, list[tuple[str, str, str]]]:
         if inseriti:
             _status += f" · {len(inseriti)} inseriti da te"
     return index
+
+
+# Le fonti pubbliche sono utili ma non autorevoli: il loro ordine di
+# download non deve decidere da solo quale telefono mostrare. I punteggi
+# grandi delle prime due voci rendono esplicita l'eccezione importante:
+# una correzione inserita dall'utente o verificata nel repository prevale
+# sempre sull'euristica automatica.
+_PESO_FONTE = {
+    FONTE_UTENTE: 10_000,
+    FONTE_CURATA: 9_000,
+    FONTE_PRINCIPALE: 30,
+    FONTE_IMEIDB: 20,
+    FONTE_OSMOCOM: 10,
+    FONTE_ESTERNA: 0,
+}
+_RE_MERCATO_EU = re.compile(
+    r"\\b(?:eea|europa|europe|european|italia|italy|italiano|italian)\\b",
+    re.IGNORECASE,
+)
+
+
+def _punteggio_affidabilita(voci: list[tuple[str, str, str]], posizione: int) -> int:
+    """Affidabilità di una risposta TAC senza consultare altra rete.
+
+    La preferenza europea si applica solo se la fonte la dichiara
+    esplicitamente: «Global» da solo non basta, perché non identifica un
+    mercato. Se non c'è un segnale verificabile si conserva il normale
+    ordine di fiducia delle fonti, invece di indovinare una regione.
+    """
+    fonte, marca, specs = voci[posizione]
+    base = _PESO_FONTE.get(fonte, 0)
+    # Le correzioni umane sono decisioni, non candidati da ripesare.
+    if base >= _PESO_FONTE[FONTE_CURATA]:
+        return base
+
+    # Questa funzione gira per TUTTI i TAC all'avvio: non deve chiamare
+    # `parse_specs`, che può risolvere codici nei cataloghi esterni. Per il
+    # ranking basta il primo campo (il nome commerciale) e il pattern locale
+    # del codice, entrambi già contenuti nella riga TAC.
+    def nome_e_codice(marca_candidata: str, specs_candidati: str) -> tuple[frozenset, str | None]:
+        grezzo = " ".join(str(specs_candidati or "").split())
+        nome = grezzo.split(",", 1)[0].strip() or grezzo
+        codice, _anno = _split_code_and_year(grezzo)
+        return _same_words_key(marca_candidata, nome), codice
+
+    stessa_identita, codice = nome_e_codice(marca, specs)
+    conferme = sum(
+        nome_e_codice(altra_marca, altri_specs)[0] == stessa_identita
+        for _altra_fonte, altra_marca, altri_specs in voci
+    )
+    # Due cataloghi indipendenti che descrivono lo stesso modello sono un
+    # riscontro più affidabile della sola posizione in una lista.
+    base += max(0, conferme - 1) * 40
+    if codice:
+    if _RE_MERCATO_EU.search(specs or ""):
+        base += 100
+    return base
+
+
+def _ordina_per_affidabilita(
+    voci: list[tuple[str, str, str]],
+) -> list[tuple[str, str, str]]:
+    """Ordina le risposte di un TAC dalla più affidabile alla meno tale.
+
+    Il secondo elemento della chiave conserva l'ordine originale come
+    spareggio: il filtro non rende instabili i casi in cui le prove sono
+    equivalenti.
+    """
+    return [
+        voce for _indice, voce in sorted(
+            enumerate(voci),
+            key=lambda coppia: (-_punteggio_affidabilita(voci, coppia[0]),
+                                coppia[0]),
+        )
+    ]
 
 
 def _indice_fallback() -> dict[str, tuple[str, str]]:
