@@ -827,6 +827,10 @@ def _esito_imei(imei: str) -> dict:
         "riconosciuto": bool(trovato),
         "descrizione": descrizione,
         "marca": (marca if trovato else ""),
+        # «model» è il nome da mostrare; «modello_cercato» è invece la
+        # chiave precisa (codice, quando presente) da passare alle fonti.
+        # Tenerli separati evita che il codice sostituisca il modello nella UI.
+        "modello": dettagli.get("model") if trovato else "",
         "codice": codice,
         "modello_cercato": modello_cercato,
         "voci": raffronto.get("voci") or [],
@@ -851,7 +855,8 @@ def _esito_imei_salvato(imei: str) -> dict:
     return {
         "imei": imei, "tac": tac, "riconosciuto": bool(modello),
         "descrizione": imeicheck.describe(marca, dettagli_grezzi) if modello else "",
-        "marca": marca, "codice": dettagli.get("code") or "",
+        "marca": marca, "modello": modello,
+        "codice": dettagli.get("code") or "",
         "modello_cercato": (dettagli.get("code") or modello or ""),
         "voci": ([{"fonte": imeicheck.FONTE_UTENTE, "marca": marca,
                    "modello": modello, "codice": dettagli.get("code"),
@@ -862,23 +867,96 @@ def _esito_imei_salvato(imei: str) -> dict:
     }
 
 
-def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
-    """Mantiene l'identità TAC sopra a ogni risultato firmware.
+def _modello_con_marca(marca: str, modello: str, codice: str = "") -> str:
+    """Nome commerciale leggibile, senza perdere la marca lungo la ricerca.
 
-    Fonti firmware e notizie possono usare un alias commerciale per lo
-    stesso codice, oppure perfino un nome errato. Il TAC verificato è il
-    dato che ha iniziato la ricerca: può arricchirsi, mai essere sostituito.
+    Le fonti firmware spesso restituiscono solo il codice o il nome corto;
+    il TAC invece tiene marca e modello separati. Questa è l'unica
+    composizione del nome usata dal risultato, così una ricerca per IMEI e
+    una per codice non possono più mostrare «A-16 4G» o «C63» nudi.
+    """
+    modello = " ".join(str(modello or "").split())
+    marca = " ".join(str(marca or "").split())
+    if not modello:
+        return ""
+
+    basso = modello.lower()
+    # Un nome che dichiara già la sua marca non va prefissato di nuovo.
+    marchi_nel_nome = ("samsung", "redmi", "xiaomi", "poco",
+                       "realme", "oppo", "oneplus", "motorola", "moto",
+                       "google", "honor", "huawei", "apple",
+                       "vivo", "iqoo", "nothing", "nokia", "sony")
+    if basso.startswith(marchi_nel_nome):
+        return modello
+
+    # Alcuni moduli usano il gruppo tecnico del tracker per realme/Oppo/
+    # OnePlus o Redmi/Xiaomi/POCO. Per la UI serve il marchio che l'utente
+    # riconosce; il codice modello dà questa distinzione senza euristiche.
+    gruppo = marca.lower()
+    codice = (codice or "").strip().upper()
+    if "realme" in gruppo and codice.startswith(("RMX", "RMP")):
+        marca = "realme"
+    elif "oppo" in gruppo and codice.startswith("CPH"):
+        marca = "OPPO"
+    elif "xiaomi" in gruppo and codice:
+        marca = "Xiaomi"
+    elif "/" in marca:
+        marca = ""
+
+    if not marca or marca.lower() in ("sconosciuto", "other", "altri brand"):
+        return modello
+    if basso.startswith(marca.lower() + " "):
+        return modello
+    return f"{marca} {modello}"
+
+
+def _android_da_scheda(scheda: dict) -> str:
+    """Versione Android di lancio come ultimo ripiego esplicito.
+
+    Non la promuove mai a OTA corrente: serve a evitare una scheda tecnica
+    corretta con una pagina che afferma di non sapere nemmeno Android.
+    """
+    for etichetta, valore in scheda.get("voci") or []:
+        if etichetta == "Sistema di lancio" and valore:
+            return " ".join(str(valore).split())
+    return ""
+
+
+def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
+    """Il TAC stabilisce l'identità; il firmware può solo arricchirla.
+
+    In precedenza qui veniva copiato ``modello_cercato`` nel titolo. Poiché
+    quel campo è volutamente il codice da inviare alle fonti (SM-A165F,
+    RMX3939…), la UI perdeva sistematicamente brand e nome commerciale.
     """
     identita = imei.get("modello_cercato") or ""
     if not identita:
         return risultato
+
     ancorato = dict(risultato)
+    codice = imei.get("codice") or ancorato.get("codice", "")
+    modello = imei.get("modello") or identita
+    marca = imei.get("marca", "")
     ancorato["query"] = identita
-    ancorato["nome"] = identita
-    ancorato["codice"] = imei.get("codice") or ancorato.get("codice", "")
-    ancorato["codice_per_correzione"] = ancorato["codice"]
+    ancorato["nome"] = _modello_con_marca(marca, modello, codice) or modello
+    ancorato["codice"] = codice
+    ancorato["codice_per_correzione"] = codice
+    ancorato["trovato"] = True
     ancorato["scheda"] = P.scheda_tecnica(
-        identita, codice=ancorato["codice"], brand=imei.get("marca", ""))
+        modello, codice=codice or identita, brand=marca)
+
+    # Se nessuna fonte OTA è interrogabile, la versione Android della scheda
+    # è comunque un dato tecnico utile. Viene etichettata come versione di
+    # lancio, non falsamente come l'ultimo firmware.
+    if not ancorato.get("riga"):
+        android = _android_da_scheda(ancorato["scheda"])
+        if android:
+            ancorato["riga"] = f"Versione Android verificata: {android} (di lancio)"
+            ancorato["fonte"] = (ancorato["scheda"].get("fonte")
+                                  or "scheda tecnica verificata")
+            ancorato["senza_firmware"] = False
+            ancorato["tipo_versione"] = C.FW_FACTORY
+
     # Per un'identità TAC non si propongono modelli con un nome simile:
     # sarebbero candidati per una domanda testuale, non alternative allo
     # stesso dispositivo fisico.
@@ -1211,44 +1289,79 @@ def _cerca_davvero(query: str) -> dict:
                      if i.get("source") in ("official_lookup", "curated_lookup")]
     notizie = [i for i in risultato.get("items", [])
                if i.get("source") not in ("official_lookup", "curated_lookup")]
-    # La fonte diretta può identificare il modello senza pubblicare una
-    # build. Si mantiene quell'identità per titolo e scheda tecnica, ma
-    # solo CURRENT può riempire la riga «ultimo firmware».
-    migliore = next(
-        (i for i in fonti_dirette if i.get("firmware_kind") == C.FW_CURRENT),
-        None,
-    )
-    identita = migliore or (fonti_dirette[0] if fonti_dirette else {})
+
+    def tipo(item: dict) -> str:
+        # Le vecchie righe in archivio e i test precedenti alla distinzione
+        # semantica non portano ancora il campo: una lookup ufficiale con
+        # versione resta comunque una fonte corrente, non un buco UI.
+        return (item.get("firmware_kind") or
+                (C.FW_CURRENT if item.get("source") == "official_lookup"
+                 else C.FW_REPORTED))
+
+    def ha_versione(item: dict) -> bool:
+        return bool(item and (item.get("os_version")
+                              or item.get("android_version")
+                              or item.get("build")
+                              or item.get("patch_level")))
+
+    # Primo risultato: una build/OTA realmente corrente. Secondo: una
+    # versione riportata da una fonte controllata. Solo dopo vengono i
+    # dati di lancio/supporto, che sono utili ma non vengono mai venduti
+    # come «ultimo firmware».
+    corrente = next((i for i in fonti_dirette
+                     if tipo(i) == C.FW_CURRENT and ha_versione(i)), None)
+    riportata = next((i for i in fonti_dirette
+                      if tipo(i) == C.FW_REPORTED and ha_versione(i)), None)
+    base_android = next((i for i in fonti_dirette
+                         if tipo(i) in (C.FW_FACTORY, C.FW_SUPPORT)
+                         and ha_versione(i)), None)
+    versione_certa = corrente or riportata or base_android
+    identita = versione_certa or (fonti_dirette[0] if fonti_dirette else {})
 
     codice = identita.get("model_code") or ""
     nome = identita.get("device_model") or query
+    marca = identita.get("brand", "")
+
+    # Un codice è più specifico di un alias restituito dalla fonte. Quando
+    # il catalogo ne conosce il nome commerciale verificato lo preferiamo:
+    # è ciò che impedisce a RMX3939 di ricadere su C61 e rende uguali la
+    # ricerca per codice, per modello e per IMEI.
+    if codice:
+        try:
+            canonico = modelcodes.nome_canonico(codice)
+        except Exception:
+            canonico = None
+        if canonico:
+            nome = canonico
+    nome = _modello_con_marca(marca, nome, codice) or nome
 
     pezzi = []
-    if migliore:
-        versione = migliore.get("os_version") or (
-            f"Android {migliore['android_version']}"
-            if migliore.get("android_version") else "")
+    tipo_versione = ""
+    if versione_certa:
+        versione = versione_certa.get("os_version") or (
+            f"Android {versione_certa['android_version']}"
+            if versione_certa.get("android_version") else "")
         if versione:
-            pezzi.append(versione)
-        if migliore.get("build"):
-            pezzi.append(f"build {migliore['build']}")
-        if migliore.get("patch_level"):
-            pezzi.append(f"patch {migliore['patch_level']}")
-        # LA DATA SI AGGIUNGE SOLO SE C'È GIÀ QUALCOSA DA DATARE.
-        # Attaccare «data di rilascio non pubblicata» a un risultato che
-        # non ha né versione né build riempie la riga di una frase che
-        # parla di un firmware inesistente — e, peggio, fa credere alla
-        # pagina di avere trovato qualcosa, perché la riga non è vuota.
-        if pezzi:
-            if migliore.get("published"):
-                pezzi.append(f"uscito il {fmt_date(migliore['published'])}")
+            if versione_certa is base_android:
+                pezzi.append(f"Versione Android verificata: {versione} (di lancio/supporto)")
+                tipo_versione = tipo(versione_certa)
+            elif versione_certa is riportata:
+                pezzi.append(f"Versione Android riportata: {versione}")
+                tipo_versione = C.FW_REPORTED
             else:
-                # Samsung la data non la pubblica, ma la scrive dentro la
-                # build: si legge il mese e si dice che viene da lì. Il
-                # giorno non c'è, e non si inventa.
-                mese = extract.mese_leggibile(migliore.get("build") or "")
-                pezzi.append(f"build di {mese}" if mese
-                             else "data di rilascio non pubblicata dalla fonte")
+                pezzi.append(f"Ultimo Android verificato: {versione}")
+                tipo_versione = C.FW_CURRENT
+        if versione_certa.get("build"):
+            pezzi.append(f"build {versione_certa['build']}")
+        if versione_certa.get("patch_level"):
+            pezzi.append(f"patch {versione_certa['patch_level']}")
+        if pezzi and versione_certa is not base_android:
+            if versione_certa.get("published"):
+                pezzi.append(f"uscito il {fmt_date(versione_certa['published'])}")
+            else:
+                mese = extract.mese_leggibile(versione_certa.get("build") or "")
+                if mese:
+                    pezzi.append(f"build di {mese}")
 
     storico, chiave, nome_archivio = _storico_del_modello(
         nome, identita.get("brand", ""))
@@ -1267,14 +1380,11 @@ def _cerca_davvero(query: str) -> dict:
     # risposte diverse alla stessa domanda, ed è esattamente ciò che
     # rende un'applicazione poco credibile.
     #
-    # L'archivio un nome canonico ce l'ha già, scelto per affidabilità
-    # della fonte in `storage.get_devices()`, ed è lo stesso che compare
-    # nella tabella dei dispositivi: usarlo qui fa convergere tutte le
-    # forme E allinea la ricerca al resto del sito. Quando il telefono in
-    # archivio non c'è, resta il nome della fonte: inventarne uno sarebbe
-    # peggio.
-    if nome_archivio:
-        nome = nome_archivio
+    # L'archivio è utile per le forme che non hanno un codice. Quando il
+    # codice è noto, invece, il nome canonico del codice resta prioritario:
+    # una vecchia riga con l'alias C61 non può più rinominare RMX3939/C63.
+    if nome_archivio and not codice:
+        nome = _modello_con_marca(marca, nome_archivio, codice) or nome_archivio
 
     # LA CORREZIONE A MANO VINCE SU TUTTO, ARCHIVIO COMPRESO.
     #
@@ -1296,7 +1406,8 @@ def _cerca_davvero(query: str) -> dict:
     # («Note 60»), non solo col codice («RMX3933») — e senza questo la
     # correzione varrebbe solo per metà delle forme dello stesso telefono,
     # esattamente l'incoerenza che questo intero fix esiste per chiudere.
-    codice_per_correzione = next(iter(_codici_del_risultato(query, nome)), "")
+    codice_per_correzione = (codice or
+                              next(iter(_codici_del_risultato(query, nome)), ""))
     nome_corretto = (storage.get_nome_modello(codice_per_correzione)
                      if codice_per_correzione else None)
     if nome_corretto:
@@ -1306,6 +1417,15 @@ def _cerca_davvero(query: str) -> dict:
     # può correggere il nome anche lei, non solo mostrarlo.
     scheda = P.scheda_tecnica(nome, codice=codice or query,
                               brand=identita.get("brand", ""))
+
+    # Per un codice esatto, la scheda curata/del catalogo è una fonte di
+    # identità più precisa del nome libero della fonte firmware. Questo
+    # chiude i casi di alias regionali: RMX3939 non può tornare C61 se la
+    # scheda per RMX3939 dichiara realme C63.
+    if codice and scheda.get("trovata") and scheda.get("titolo"):
+        nome = (_modello_con_marca(scheda.get("marca") or marca,
+                                   scheda["titolo"], codice)
+                or scheda["titolo"])
 
     # QUANDO NON C'È UN FIRMWARE MA C'È UN TELEFONO VERO.
     #
@@ -1323,10 +1443,18 @@ def _cerca_davvero(query: str) -> dict:
     # mano, tutti sopra) e la scheda ha davvero risolto qualcosa di diverso
     # dalla query scritta — un titolo identico alla query non è una
     # risoluzione, è un'eco.
-    if not migliore and not nome_corretto and scheda["trovata"]:
+    if not nome_corretto and scheda["trovata"]:
         titolo_scheda = (scheda["titolo"] or "").strip()
-        if titolo_scheda and titolo_scheda.lower() != query.strip().lower():
-            nome = titolo_scheda
+        nome_tecnico = (nome or "").strip().upper() in {
+            (query or "").strip().upper(), (codice or "").strip().upper()
+        }
+        # La scheda curata ha già risolto il nome quando la fonte diretta
+        # restituisce soltanto il codice. In quel caso il suo titolo è più
+        # preciso, anche se la fonte conosce una versione Android.
+        if (titolo_scheda and titolo_scheda.lower() != query.strip().lower()
+                and (not versione_certa or nome_tecnico)):
+            nome = _modello_con_marca(
+                scheda.get("marca") or marca, titolo_scheda, codice) or titolo_scheda
             # Il nome è cambiato: il codice di correzione e un'eventuale
             # correzione già salvata per QUEL nome vanno ricalcolati, stessa
             # ragione del blocco sopra.
@@ -1358,12 +1486,12 @@ def _cerca_davvero(query: str) -> dict:
         "codice_per_correzione": codice_per_correzione,
         "corretto_a_mano": bool(nome_corretto),
         "riga": " · ".join(pezzi),
-        "fonte": (migliore or identita).get("source_label", ""),
-        # ONESTÀ DEL RISULTATO. Alcune fonti confermano che un modello
-        # esiste ma NON pubblicano la versione firmware. Dichiarare «dato
-        # trovato» in quel caso è peggio che non trovare nulla: fa credere
-        # di avere una risposta che non c'è.
-        "senza_firmware": bool(identita) and not migliore,
+        "fonte": (versione_certa or identita).get("source_label", ""),
+        # Una versione di lancio/supporto è un dato Android utile, quindi
+        # non produce più una scheda apparentemente rotta. L'etichetta
+        # nella riga distingue esplicitamente quel caso da un OTA corrente.
+        "senza_firmware": bool(identita) and not bool(pezzi),
+        "tipo_versione": tipo_versione,
         "scheda": scheda,
         "notizie": [P.riga_aggiornamento(n) for n in notizie[:6]],
         "quante_notizie": len(notizie),

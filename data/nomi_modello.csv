@@ -24,3 +24,8 @@ codice,nome,nota
 #
 # `nota`: da dove viene la verifica, per poterla ricontrollare o smentire.
 CPH2781,OPPO A6 Pro,"Segnalato dall'utente: ""F31"" mostrato invece di ""A6 Pro"". Verificato (GSMArena CN/IN, oppo.com/en, DeviceAtlas, Gizmochina, GSMchoice, 2026-08-12): stesso hardware (Dimensity 6300, display 6.57"" 50MP+2MP, batteria 7000mAh) venduto come ""OPPO F31 5G"" in Cina e come ""OPPO A6 Pro 5G"" nei mercati Global/India/Medio Oriente — nessuno dei due e' ""sbagliato"". Scelto ""A6 Pro"" come nome di riferimento in un'app italiana perche' e' il nome del mercato Global/Europa; la variante cinese resta comunque visibile come ""gemello"" nel menu di correzione, per chi la riconosce con quel nome."
+
+# Codici con identità commerciale confermata dal produttore/regolatore.
+# L'override è applicato soltanto se il dataset upstream continua a conoscerlo.
+RMX3939,realme C63,"Guida rapida realme per RMX3939; evita l'alias C61 condiviso dal dataset community."
+25128RN17Y,Redmi A7 Pro,"Documentazione Xiaomi UE e certificazione TDRA collegano questo codice a Redmi A7 Pro."
