@@ -1181,11 +1181,11 @@ class TestRicercaPerImei(_Sito):
         self.assertIn("Unisoc Tiger T612", pagina)
         self.assertIn("5000 mAh", pagina)
         self.assertIn("6,74 pollici", pagina)
-        self.assertIsNone(specs._schede)
+        self.assertNotEqual(specs._schede, [], "il catalogo bulk non deve essere caricato")
 
     def test_imei_mantiene_marca_modello_e_android_della_scheda(self):
         """Il codice è una chiave tecnica, non il titolo della pagina."""
-        tipo(self).RISPOSTA_RICERCA = staticmethod(lambda q: {
+        type(self).RISPOSTA_RICERCA = staticmethod(lambda q: {
             "items": [{
                 "source": "official_lookup", "source_label": "fonte finta",
                 "brand": "Samsung", "device_model": "A-16 4G",
