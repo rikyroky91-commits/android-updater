@@ -437,6 +437,11 @@ def upsert_update(item: dict) -> bool:
             return False
 
         values = {k: item.get(k) for k in _UPDATE_FIELDS}
+        # Retrocompatibilità per chi costruisce record interni (migrazioni,
+        # test e import): prima dell'introduzione della colonna tali record
+        # erano tutti firmware effettivi. Le fonti reali passano sempre la
+        # semantica esplicita da `scan.normalize`.
+        values["firmware_kind"] = item.get("firmware_kind") or C.FW_CURRENT
         values["is_relevant"] = 1 if item.get("is_relevant", True) else 0
         values["first_seen"] = item.get("first_seen") or now
         values["last_seen"] = now
