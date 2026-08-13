@@ -457,7 +457,7 @@ def _ha_firmware(voce: dict) -> bool:
     di avere un dato che non c'è.
     """
     return bool(
-        voce.get("firmware_kind") == C.FW_CURRENT
+        voce.get("firmware_kind") in (C.FW_CURRENT, C.FW_REPORTED)
         and (voce.get("os_version") or voce.get("build") or voce.get("patch_level"))
     )
 
@@ -551,13 +551,19 @@ def search_model(model_query: str) -> dict:
         i for i in items
         if i.get("is_relevant") and i.get("firmware_kind") == C.FW_CURRENT
     ]
+    riportati = [
+        i for i in items
+        if i.get("is_relevant") and i.get("firmware_kind") == C.FW_REPORTED
+    ]
     identita = [i for i in items if i.get("is_relevant")]
     best = next(
         (i for i in structured_relevant if _ha_firmware(i)),
         next(
             (i for i in rilevanti if _ha_firmware(i)),
             (structured_relevant[0] if structured_relevant
-             else (rilevanti[0] if rilevanti else (identita[0] if identita else (items[0] if items else None)))),
+             else (rilevanti[0] if rilevanti
+                   else (riportati[0] if riportati
+                         else (identita[0] if identita else (items[0] if items else None))))),
         ),
     )
     if best:
