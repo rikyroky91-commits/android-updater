@@ -862,23 +862,96 @@ def _esito_imei_salvato(imei: str) -> dict:
     }
 
 
-def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
-    """Mantiene l'identità TAC sopra a ogni risultato firmware.
+def _modello_con_marca(marca: str, modello: str, codice: str = "") -> str:
+    """Nome commerciale leggibile, senza perdere la marca lungo la ricerca.
 
-    Fonti firmware e notizie possono usare un alias commerciale per lo
-    stesso codice, oppure perfino un nome errato. Il TAC verificato è il
-    dato che ha iniziato la ricerca: può arricchirsi, mai essere sostituito.
+    Le fonti firmware spesso restituiscono solo il codice o il nome corto;
+    il TAC invece tiene marca e modello separati. Questa è l'unica
+    composizione del nome usata dal risultato, così una ricerca per IMEI e
+    una per codice non possono più mostrare «A-16 4G» o «C63» nudi.
+    """
+    modello = " ".join(str(modello or "").split())
+    marca = " ".join(str(marca or "").split())
+    if not modello:
+        return ""
+
+    basso = modello.lower()
+    # Un nome che dichiara già la sua marca non va prefissato di nuovo.
+    marchi_nel_nome = ("samsung", "galaxy", "redmi", "xiaomi", "poco",
+                       "realme", "oppo", "oneplus", "motorola", "moto",
+                       "google", "pixel", "honor", "huawei", "apple",
+                       "iphone", "vivo", "iqoo", "nothing", "nokia", "sony")
+    if basso.startswith(marchi_nel_nome):
+        return modello
+
+    # Alcuni moduli usano il gruppo tecnico del tracker per realme/Oppo/
+    # OnePlus o Redmi/Xiaomi/POCO. Per la UI serve il marchio che l'utente
+    # riconosce; il codice modello dà questa distinzione senza euristiche.
+    gruppo = marca.lower()
+    codice = (codice or "").strip().upper()
+    if "realme" in gruppo and codice.startswith(("RMX", "RMP")):
+        marca = "realme"
+    elif "oppo" in gruppo and codice.startswith("CPH"):
+        marca = "OPPO"
+    elif "xiaomi" in gruppo and codice:
+        marca = "Xiaomi"
+    elif "/" in marca:
+        marca = ""
+
+    if not marca or marca.lower() in ("sconosciuto", "other", "altri brand"):
+        return modello
+    if basso.startswith(marca.lower() + " "):
+        return modello
+    return f"{marca} {modello}"
+
+
+def _android_da_scheda(scheda: dict) -> str:
+    """Versione Android di lancio come ultimo ripiego esplicito.
+
+    Non la promuove mai a OTA corrente: serve a evitare una scheda tecnica
+    corretta con una pagina che afferma di non sapere nemmeno Android.
+    """
+    for etichetta, valore in scheda.get("voci") or []:
+        if etichetta == "Sistema di lancio" and valore:
+            return " ".join(str(valore).split())
+    return ""
+
+
+def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
+    """Il TAC stabilisce l'identità; il firmware può solo arricchirla.
+
+    In precedenza qui veniva copiato ``modello_cercato`` nel titolo. Poiché
+    quel campo è volutamente il codice da inviare alle fonti (SM-A165F,
+    RMX3939…), la UI perdeva sistematicamente brand e nome commerciale.
     """
     identita = imei.get("modello_cercato") or ""
     if not identita:
         return risultato
+
     ancorato = dict(risultato)
+    codice = imei.get("codice") or ancorato.get("codice", "")
+    modello = imei.get("modello") or identita
+    marca = imei.get("marca", "")
     ancorato["query"] = identita
-    ancorato["nome"] = identita
-    ancorato["codice"] = imei.get("codice") or ancorato.get("codice", "")
-    ancorato["codice_per_correzione"] = ancorato["codice"]
+    ancorato["nome"] = _modello_con_marca(marca, modello, codice) or modello
+    ancorato["codice"] = codice
+    ancorato["codice_per_correzione"] = codice
+    ancorato["trovato"] = True
     ancorato["scheda"] = P.scheda_tecnica(
-        identita, codice=ancorato["codice"], brand=imei.get("marca", ""))
+        modello, codice=codice or identita, brand=marca)
+
+    # Se nessuna fonte OTA è interrogabile, la versione Android della scheda
+    # è comunque un dato tecnico utile. Viene etichettata come versione di
+    # lancio, non falsamente come l'ultimo firmware.
+    if not ancorato.get("riga"):
+        android = _android_da_scheda(ancorato["scheda"])
+        if android:
+            ancorato["riga"] = f"Versione Android verificata: {android} (di lancio)"
+            ancorato["fonte"] = (ancorato["scheda"].get("fonte")
+                                  or "scheda tecnica verificata")
+            ancorato["senza_firmware"] = False
+            ancorato["tipo_versione"] = C.FW_FACTORY
+
     # Per un'identità TAC non si propongono modelli con un nome simile:
     # sarebbero candidati per una domanda testuale, non alternative allo
     # stesso dispositivo fisico.
