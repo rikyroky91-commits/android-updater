@@ -3,7 +3,8 @@
    telefono li dice già `risultato.nome`/`risultato.riga` qui sotto: questa
    riga aggiunge solo il TAC, che altrove non compare. #}
 {% if imei.riconosciuto %}
-<p class="etichetta-imei">IMEI riconosciuto · TAC <code>{{ imei.tac }}</code></p>
+<p class="etichetta-imei">IMEI riconosciuto: <strong>{{ imei.descrizione }}</strong>
+  · TAC <code>{{ imei.tac }}</code></p>
 {% else %}
 <p class="etichetta-imei etichetta-imei-incerta">IMEI valido, modello sconosciuto
   · TAC <code>{{ imei.tac }}</code></p>
