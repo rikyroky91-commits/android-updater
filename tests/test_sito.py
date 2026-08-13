@@ -1153,6 +1153,16 @@ class TestRicercaPerImei(_Sito):
         self.assertIn("Galaxy A16 4G", pagina)
         self.assertIn("SM-A165F", pagina)
 
+    def test_il_note_50_usa_la_scheda_curata_senza_catalogo_bulk(self):
+        from core import specs
+
+        specs.reset_cache()
+        pagina = self.client.get("/", params={"q": "861206074094914"}).text
+        self.assertIn("Unisoc Tiger T612", pagina)
+        self.assertIn("5000 mAh", pagina)
+        self.assertIn("6,74 pollici", pagina)
+        self.assertIsNone(specs._schede)
+
     def test_un_imei_non_valido_resta_una_ricerca_normale(self):
         """Quindici cifre a caso non superano il controllo di Luhn: non
         vanno trattate come IMEI, o si direbbe «TAC sconosciuto» a chi ha
