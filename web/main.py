@@ -1418,6 +1418,15 @@ def _cerca_davvero(query: str) -> dict:
     scheda = P.scheda_tecnica(nome, codice=codice or query,
                               brand=identita.get("brand", ""))
 
+    # Per un codice esatto, la scheda curata/del catalogo è una fonte di
+    # identità più precisa del nome libero della fonte firmware. Questo
+    # chiude i casi di alias regionali: RMX3939 non può tornare C61 se la
+    # scheda per RMX3939 dichiara realme C63.
+    if codice and scheda.get("trovata") and scheda.get("titolo"):
+        nome = (_modello_con_marca(scheda.get("marca") or marca,
+                                   scheda["titolo"], codice)
+                or scheda["titolo"])
+
     # QUANDO NON C'È UN FIRMWARE MA C'È UN TELEFONO VERO.
     #
     # Segnalato dall'utente cercando «m1910f4g» (Xiaomi Mi Note 10): nessuna
