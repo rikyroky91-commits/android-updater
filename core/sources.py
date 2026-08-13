@@ -3649,9 +3649,10 @@ _NOTE_COPERTURA = {
         "OTA corrente per modello: i portali ufficiali rispondono 403/404 e "
         "l'API OTA pretende l'impronta del dispositivo. Coperti con build "
         "reale: i ~94 modelli dell'archivio firmware Oppo (fino al 2021-22) "
-        "e i modelli recenti che passano dal canale di rollout, in gran "
-        "parte OnePlus e Oppo di fascia alta, regione India. Fuori da questi, "
-        "resta la versione di fabbrica dichiarata come tale."
+        "e una copertura community verificabile ma parziale (ARB) per "
+        "OnePlus/OPPO. L'archivio ufficiale realme pubblico è legacy e non "
+        "copre Note 50; fuori da questi casi l'app mostra identificazione e "
+        "scheda tecnica, non una versione di fabbrica come firmware attuale."
     ),
     C.VIVO: (
         "vivo e iQOO pubblicano il piano di supporto ufficiale ma non la "
