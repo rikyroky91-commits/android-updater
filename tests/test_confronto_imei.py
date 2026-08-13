@@ -175,6 +175,24 @@ class TestConfronto(BaseImei):
         self.assertEqual(esito["voci"][0]["modello"], "Note 50")
         self.assertEqual(imeicheck.identify(imei), ("realme", "Note 50"))
 
+    def test_il_segnale_europeo_batte_la_posizione_della_fonte_pubblica(self):
+        """Fra dati pubblici discordanti, il mercato dichiarato conta.
+
+        Non e' una nuova eccezione per il Note 50: qualsiasi candidato con
+        disponibilita' EEA/Europa esplicita puo' superare una fonte che
+        arriva prima ma non offre lo stesso riscontro. Nessuna rete viene
+        interrogata per prendere questa decisione.
+        """
+        voci = [
+            (imeicheck.FONTE_PRINCIPALE, "realme",
+             "REALME C60, Realme RMX3939, 2024"),
+            (imeicheck.FONTE_IMEIDB, "realme",
+             "REALME NOTE 50, Realme RMX3834, EEA"),
+        ]
+        ordinate = imeicheck._ordina_per_affidabilita(voci)
+        self.assertEqual(ordinate[0][0], imeicheck.FONTE_IMEIDB)
+        self.assertIn("NOTE 50", ordinate[0][2])
+
     def test_un_tac_sconosciuto_non_solleva(self):
         esito = imeicheck.confronto("999999990000000")
         self.assertEqual(esito["voci"], [])
