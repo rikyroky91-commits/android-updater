@@ -27,6 +27,34 @@ Quello che si può fare davvero, ed è quello a cui punto qui, è:
    già presente in `storage.py` è la cosa più vicina all'affidabilità che
    esista, e va esteso.
 
+## Verifica 2026-08-13 e regola operativa
+
+Una fonte viene ora classificata su **due assi indipendenti**:
+
+- affidabilità: `structured`, `curated`, `noisy`;
+- tipo del dato: `current`, `reported`, `factory`, `support`, `beta`.
+
+Solo **current** può affermare «ultimo firmware disponibile». Un annuncio
+di rollout con prova concreta resta visibile come **reported**, ma è sempre
+secondario a un firmware interrogato direttamente. Le fonti **factory** e
+**support** possono identificare il telefono, offrire codice modello, scheda
+tecnica e finestra di sicurezza, ma non popolano più la cronologia firmware.
+
+### realme Note 50 / C60 (RMX3834)
+
+La pagina ufficiale europea `realme.com/eu/support/software-update` espone
+versione, data e dimensione dei pacchetti, ma il catalogo pubblico verificato
+il 2026-08-13 è un archivio legacy (modelli RMX18xx/RMX20xx): non pubblica un
+pacchetto OTA per Note 50. Gli Android Security Advisories ufficiali
+confermano invece che Note 50 e C60 condividono il codice RMX3834 e ne
+dichiarano la cadenza di patch; non sono un endpoint di firmware.
+
+Decisione: il progetto non usa i portali di download non ufficiali come fonte
+dell'«ultimo firmware», perché mancano provenienza e verifica di integrità.
+Per Note 50 l'app deve quindi mostrare correttamente **identità e scheda
+tecnica**, dichiarando che una build OTA corrente non è pubblicamente
+verificabile; non sostituirla con la versione di fabbrica del C60.
+
 ---
 
 ## Verdetti, fonte per fonte

@@ -1207,14 +1207,21 @@ def _storico_del_modello(nome: str, brand: str) -> tuple[list[dict], str, str]:
 
 def _cerca_davvero(query: str) -> dict:
     risultato = scan.search_model(query)
-    strutturati = [i for i in risultato.get("items", [])
-                   if i.get("source") in ("official_lookup", "curated_lookup")]
+    fonti_dirette = [i for i in risultato.get("items", [])
+                     if i.get("source") in ("official_lookup", "curated_lookup")]
     notizie = [i for i in risultato.get("items", [])
                if i.get("source") not in ("official_lookup", "curated_lookup")]
-    migliore = strutturati[0] if strutturati else None
+    # La fonte diretta può identificare il modello senza pubblicare una
+    # build. Si mantiene quell'identità per titolo e scheda tecnica, ma
+    # solo CURRENT può riempire la riga «ultimo firmware».
+    migliore = next(
+        (i for i in fonti_dirette if i.get("firmware_kind") == C.FW_CURRENT),
+        None,
+    )
+    identita = migliore or (fonti_dirette[0] if fonti_dirette else {})
 
-    codice = (migliore or {}).get("model_code") or ""
-    nome = (migliore or {}).get("device_model") or query
+    codice = identita.get("model_code") or ""
+    nome = identita.get("device_model") or query
 
     pezzi = []
     if migliore:
@@ -1244,7 +1251,7 @@ def _cerca_davvero(query: str) -> dict:
                              else "data di rilascio non pubblicata dalla fonte")
 
     storico, chiave, nome_archivio = _storico_del_modello(
-        nome, (migliore or {}).get("brand", ""))
+        nome, identita.get("brand", ""))
 
     # IL NOME LO DECIDE L'ARCHIVIO, quando quel telefono ci sta già.
     #
@@ -1298,7 +1305,7 @@ def _cerca_davvero(query: str) -> dict:
     # LA SCHEDA SI CALCOLA UNA VOLTA SOLA, PRIMA DEL NOME FINALE — perché
     # può correggere il nome anche lei, non solo mostrarlo.
     scheda = P.scheda_tecnica(nome, codice=codice or query,
-                              brand=(migliore or {}).get("brand", ""))
+                              brand=identita.get("brand", ""))
 
     # QUANDO NON C'È UN FIRMWARE MA C'È UN TELEFONO VERO.
     #
@@ -1338,25 +1345,25 @@ def _cerca_davvero(query: str) -> dict:
     # Si calcolano anche senza `migliore`, quando c'è comunque un codice da
     # correggere (il caso qui sopra): senza, chi cercava «m1910f4g» vedeva
     # finalmente il nome giusto ma nessun modo di correggerlo se sbagliato.
-    ha_un_risultato = bool(migliore) or bool(codice_per_correzione)
+    ha_un_risultato = bool(identita) or bool(codice_per_correzione)
     gemelli_veri = _nomi_gemelli(query, nome) if ha_un_risultato else []
     opzioni_correzione = (_opzioni_correzione(nome, gemelli_veri, codice_per_correzione)
                           if ha_un_risultato else [])
 
     return {
         "query": query,
-        "trovato": bool(migliore),
+        "trovato": bool(identita),
         "nome": nome,
         "codice": codice,
         "codice_per_correzione": codice_per_correzione,
         "corretto_a_mano": bool(nome_corretto),
         "riga": " · ".join(pezzi),
-        "fonte": (migliore or {}).get("source_label", ""),
+        "fonte": (migliore or identita).get("source_label", ""),
         # ONESTÀ DEL RISULTATO. Alcune fonti confermano che un modello
         # esiste ma NON pubblicano la versione firmware. Dichiarare «dato
         # trovato» in quel caso è peggio che non trovare nulla: fa credere
         # di avere una risposta che non c'è.
-        "senza_firmware": bool(migliore) and not pezzi,
+        "senza_firmware": bool(identita) and not migliore,
         "scheda": scheda,
         "notizie": [P.riga_aggiornamento(n) for n in notizie[:6]],
         "quante_notizie": len(notizie),
@@ -1369,8 +1376,8 @@ def _cerca_davvero(query: str) -> dict:
         # ha nessun modo di accorgersi che l'Ultra è a un clic. Nel
         # fallimento totale è un ripiego; qui è una correzione di rotta.
         #
-        "forse": _forse_cercavi(query, nome, (migliore or {}).get("brand", ""),
-                                bool(migliore)),
+        "forse": _forse_cercavi(query, nome, identita.get("brand", ""),
+                                bool(identita)),
         # GEMELLI VERI, NON UN «FORSE». Vedi il docstring di `_nomi_gemelli`:
         # stesso codice, più nomi commerciali reali. Si calcola solo se la
         # ricerca ha prodotto un nome — senza, non c'è niente con cui
