@@ -147,6 +147,10 @@ def avvio() -> None:
         STATO_AVVIO["pulizia fonti"] = f"non riuscita: {errore}"
     if C.env_bool("AVVIA_WORKER", True):
         scan.start_background_worker()
+    # Il preriscaldamento tiene insieme in RAM cataloghi enormi mentre la
+    # scansione può caricarne altri: sul piano Render da 512 MB è un picco
+    # evitabile. È opt-in per chi dispone di memoria sufficiente.
+    if C.env_bool("PRERISCALDA_CATALOGHI", False):
         _scalda_i_cataloghi()
 
 
@@ -279,7 +283,8 @@ def radice_head():
 def pagina_ricerca(request: Request, q: str = Query(default=""),
                    ai: str = Query(default=""),
                    alt: list[str] = Query(default=[]),
-                   perche: str = Query(default="")):
+                   perche: str = Query(default=""),
+                   saved: int = Query(default=0)):
     """La home, e la pagina di un modello cercato.
 
     SENZA DOMANDA È LA SOLA BARRA DI RICERCA. Prima qui c'era anche
@@ -307,9 +312,18 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
     # modello; solo allora si cerca il firmware.
     imei = None
     if imeicheck.is_valid_imei(domanda):
-        imei = _esito_imei(domanda)
-        risultato = (_esito_ricerca(imei["modello_cercato"])
-                     if imei["modello_cercato"] else _esito_vuoto(domanda))
+        imei = _esito_imei_salvato(domanda) if saved else _esito_imei(domanda)
+        if imei["modello_cercato"]:
+            # Un IMEI ha già risolto un'identità precisa dal TAC. La ricerca
+            # firmware è informazione aggiuntiva e non può rinominare il
+            # telefono con un alias regionale o con una voce errata di una
+            # fonte news. Dopo un salvataggio manuale non la avviamo proprio:
+            # la conferma deve tornare subito, senza aspettare la rete.
+            risultato = (_esito_solo_identita(imei["modello_cercato"])
+                         if saved else _esito_ricerca(imei["modello_cercato"]))
+            risultato = _ancora_esito_imei(risultato, imei)
+        else:
+            risultato = _esito_vuoto(domanda)
     else:
         risultato = _esito_ricerca(domanda)
 
@@ -639,7 +653,7 @@ def tac_salva(tac: str = Form(...), marca: str = Form(""),
     RICERCHE.svuota()
     # E VA MESSA AL SICURO SUBITO — vedi il docstring di `_backup_subito`.
     _backup_subito()
-    return RedirectResponse(f"/?q={quote(imei or tac)}", status_code=303)
+    return RedirectResponse(f"/?q={quote(imei or tac)}&saved=1", status_code=303)
 
 
 @app.post("/modello/correggi")
@@ -812,12 +826,77 @@ def _esito_imei(imei: str) -> dict:
         "tac": raffronto.get("tac") or "",
         "riconosciuto": bool(trovato),
         "descrizione": descrizione,
+        "marca": (marca if trovato else ""),
         "codice": codice,
         "modello_cercato": modello_cercato,
         "voci": raffronto.get("voci") or [],
         "discordi": bool(raffronto.get("discordi")),
         "stato_database": imeicheck.status(),
         "siti": list(imeicheck.link_verifica(imei)),
+    }
+
+
+def _esito_imei_salvato(imei: str) -> dict:
+    """Risposta immediata dopo un salvataggio manuale, senza ricreare l'indice TAC.
+
+    Il redirect successivo a «Salva» deve confermare il dato appena scritto,
+    non scaricare/indicizzare centinaia di migliaia di TAC prima di rendere
+    la pagina. Al prossimo caricamento normale torna il confronto completo
+    fra tutte le fonti.
+    """
+    tac = imeicheck.tac_di(imei)
+    marca, dettagli_grezzi = imeicheck.tac_inseriti().get(tac, ("", ""))
+    dettagli = imeicheck.parse_specs(marca, dettagli_grezzi) if dettagli_grezzi else {}
+    modello = dettagli.get("model") or dettagli_grezzi
+    return {
+        "imei": imei, "tac": tac, "riconosciuto": bool(modello),
+        "descrizione": imeicheck.describe(marca, dettagli_grezzi) if modello else "",
+        "marca": marca, "codice": dettagli.get("code") or "",
+        "modello_cercato": (dettagli.get("code") or modello or ""),
+        "voci": ([{"fonte": imeicheck.FONTE_UTENTE, "marca": marca,
+                   "modello": modello, "codice": dettagli.get("code"),
+                   "anno": dettagli.get("year"), "raw": dettagli.get("raw", "")}]
+                 if modello else []),
+        "discordi": False, "stato_database": "conferma appena salvata",
+        "siti": list(imeicheck.link_verifica(imei)),
+    }
+
+
+def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
+    """Mantiene l'identità TAC sopra a ogni risultato firmware.
+
+    Fonti firmware e notizie possono usare un alias commerciale per lo
+    stesso codice, oppure perfino un nome errato. Il TAC verificato è il
+    dato che ha iniziato la ricerca: può arricchirsi, mai essere sostituito.
+    """
+    identita = imei.get("modello_cercato") or ""
+    if not identita:
+        return risultato
+    ancorato = dict(risultato)
+    ancorato["query"] = identita
+    ancorato["nome"] = identita
+    ancorato["codice"] = imei.get("codice") or ancorato.get("codice", "")
+    ancorato["codice_per_correzione"] = ancorato["codice"]
+    ancorato["scheda"] = P.scheda_tecnica(
+        identita, codice=ancorato["codice"], brand=imei.get("marca", ""))
+    # Per un'identità TAC non si propongono modelli con un nome simile:
+    # sarebbero candidati per una domanda testuale, non alternative allo
+    # stesso dispositivo fisico.
+    ancorato["forse"] = []
+    ancorato["gemelli"] = []
+    ancorato["opzioni_correzione"] = []
+    return ancorato
+
+
+def _esito_solo_identita(query: str) -> dict:
+    """Risposta immediata dopo un salvataggio TAC, senza rete o cataloghi."""
+    return {
+        "query": query, "trovato": False, "nome": query, "codice": "",
+        "codice_per_correzione": "", "corretto_a_mano": False,
+        "riga": "", "fonte": "", "senza_firmware": False,
+        "scheda": {"trovata": False}, "notizie": [], "quante_notizie": 0,
+        "forse": [], "gemelli": [], "opzioni_correzione": [],
+        "storico": [], "chiave": "", "nota_fonte": None, "errore": None,
     }
 
 
