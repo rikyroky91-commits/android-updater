@@ -59,5 +59,66 @@
     "peso": "200 g",
     "dimensioni": "164,4 x 77,9 x 7,9 mm",
     "fonte": "scheda tecnica verificata"
+  },
+  {
+    "nome": "Redmi A7 Pro",
+    "marca": "Xiaomi",
+    "codici": [
+      "25128RN17Y",
+      "25128RN17A",
+      "25128RN17L"
+    ],
+    "rilascio": "Febbraio 2026",
+    "chipset": "Unisoc T7250",
+    "cpu": "Octa-core (2x1,8 GHz Cortex-A75 + 6x1,6 GHz Cortex-A55)",
+    "gpu": "Mali-G57",
+    "ram_gb": [
+      4
+    ],
+    "storage_gb": [
+      64,
+      128
+    ],
+    "memoria": "64GB 4GB RAM, 128GB 4GB RAM",
+    "display": "6,9 pollici, 1600 x 720 pixel",
+    "display_tipo": "LCD, 120 Hz",
+    "batteria": "6000 mAh",
+    "ricarica": "15W cablata, USB-C",
+    "camera_post": "13 MP",
+    "camera_front": "8 MP",
+    "os_lancio": "Android 16, HyperOS 3",
+    "peso": "208 g",
+    "dimensioni": "171,6 x 79,5 x 8,2 mm",
+    "fonte": "scheda tecnica del distributore; modello confermato da documentazione Xiaomi"
+  },
+  {
+    "nome": "realme C63",
+    "marca": "Oppo / Realme / OnePlus",
+    "codici": [
+      "RMX3939"
+    ],
+    "rilascio": "Maggio 2024",
+    "chipset": "Unisoc Tiger T612",
+    "cpu": "Octa-core fino a 1,8 GHz",
+    "gpu": "Mali-G57",
+    "ram_gb": [
+      6,
+      8
+    ],
+    "storage_gb": [
+      128,
+      256
+    ],
+    "memoria": "128GB 6GB RAM, 256GB 8GB RAM",
+    "display": "6,75 pollici, 720 x 1600 pixel",
+    "display_tipo": "IPS LCD, 90 Hz",
+    "batteria": "5000 mAh",
+    "ricarica": "45W cablata, USB-C",
+    "camera_post": "50 MP",
+    "camera_front": "8 MP",
+    "os_lancio": "Android 14, realme UI 5.0",
+    "peso": "189 g",
+    "dimensioni": "167,3 x 76,7 x 7,7 mm",
+    "fonte": "specifiche realme per RMX3939"
   }
 ]
