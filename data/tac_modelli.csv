@@ -26,3 +26,6 @@ tac,marca,modello,nota
 # Questa voce curata e' intenzionalmente prioritaria: evita che una fonte
 # community meno affidabile diventi il primo risultato.
 86120607,realme,Note 50,verificato per mercato europeo
+
+# TAC verificato: l'IMEI 351355315430630 corrisponde alla variante 4G europea.
+35135531,Samsung,"Galaxy A16 4G, Samsung SM-A165F",verificato per mercato europeo

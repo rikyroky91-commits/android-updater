@@ -56,6 +56,7 @@ import gzip
 import html
 import io
 import json
+import os
 import re
 import tarfile
 import threading
@@ -68,6 +69,9 @@ except ImportError:  # pragma: no cover
     requests = None
 
 from . import config as C
+
+CARTELLA_DATI = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+FILE_SCHEDE_CURATE = os.path.join(CARTELLA_DATI, "schede_curate.json")
 
 # L'archivio del branch principale. `codeload` è l'host che GitHub usa per
 # gli archivi: risponde senza autenticazione e non consuma il rate limit
@@ -91,6 +95,8 @@ _schede: list[dict] | None = None
 _per_codice: dict[str, dict] = {}
 _per_nome: dict[str, dict] = {}
 _status = "non ancora caricato"
+_curate_per_codice: dict[str, dict] | None = None
+_curate_per_nome: dict[str, dict] | None = None
 
 
 # ======================================================================
@@ -488,6 +494,45 @@ def _scarica() -> bytes | None:
     return contenuto
 
 
+def _carica_schede_curate() -> tuple[dict[str, dict], dict[str, dict]]:
+    """Le poche schede verificate in repository, senza rete né cataloghi bulk.
+
+    Sono il percorso critico per modelli che un catalogo generale non copre.
+    Vengono lette prima dell'archivio GSMArena: la pagina può rispondere con
+    dati completi senza decomprimere migliaia di schede e senza rischiare un
+    picco di memoria sul piano Render da 512 MB.
+    """
+    global _curate_per_codice, _curate_per_nome
+    if _curate_per_codice is not None:
+        return _curate_per_codice, _curate_per_nome or {}
+    try:
+        with open(FILE_SCHEDE_CURATE, encoding="utf-8") as f:
+            righe = json.load(f)
+    except (OSError, ValueError):
+        righe = []
+    if not isinstance(righe, list):
+        righe = []
+    _curate_per_codice, _curate_per_nome = indicizza(
+        [r for r in righe if isinstance(r, dict) and r.get("nome")]
+    )
+    return _curate_per_codice, _curate_per_nome
+
+
+def _curata_per_codice(codice: str) -> Scheda | None:
+    per_codice, _per_nome_curato = _carica_schede_curate()
+    riga = per_codice.get((codice or "").strip().upper().split("/")[0])
+    return _a_scheda(riga) if riga else None
+
+
+def _curata_per_nome(nome: str) -> Scheda | None:
+    _per_codice_curato, per_nome = _carica_schede_curate()
+    for forma in _forme_nome(nome):
+        riga = per_nome.get(forma)
+        if riga:
+            return _a_scheda(riga)
+    return None
+
+
 def carica_da(schede: list[dict], etichetta: str = "elenco fornito") -> list[dict]:
     """Indicizza schede già in mano, **senza toccare la rete**.
 
@@ -587,6 +632,9 @@ def per_codice(codice: str) -> Scheda | None:
     chiave = (codice or "").strip().upper().split("/")[0]
     if not chiave:
         return None
+    curata = _curata_per_codice(chiave)
+    if curata:
+        return curata
     carica()
     riga = _per_codice.get(chiave)
     return _a_scheda(riga) if riga else None
@@ -602,6 +650,9 @@ def per_nome(nome: str) -> Scheda | None:
     testo = (nome or "").strip()
     if not testo:
         return None
+    curata = _curata_per_nome(testo)
+    if curata:
+        return curata
     carica()
     forme = _forme_nome(testo)
     for forma in forme:
@@ -727,6 +778,15 @@ def cerca(*indizi: str | None, marca: str | None = None) -> Scheda | None:
         diretto = str(testo).strip().upper()
         if diretto not in visti:
             visti.append(diretto)
+
+    for codice in visti:
+        curata = _curata_per_codice(codice)
+        if curata:
+            return curata
+    for testo in testi:
+        curata = _curata_per_nome(str(testo))
+        if curata:
+            return curata
 
     carica()
     for codice in visti:
