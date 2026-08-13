@@ -884,7 +884,10 @@ class TestCronologiaRicerche(unittest.TestCase):
 
         originale = sources._lookup_order
         sources._lookup_order = lambda brand: [
-            sources.StructuredLookup(None, solo_esistenza, "basso", "catalogo di prova")
+            sources.StructuredLookup(
+                None, solo_esistenza, "basso", "catalogo di prova",
+                firmware_kind=C.FW_SUPPORT,
+            )
         ]
         try:
             scan.search_model("moto g14")
@@ -1564,11 +1567,12 @@ class TestRicercaOnDemandFontiUfficiali(unittest.TestCase):
         self.assertEqual(res["structured_count"], 1)
         self.assertEqual(res["items"][0]["build"], "S928BXXU5CYA1")  # risposta simulata
 
-    def test_dispositivo_finisce_nel_catalogo(self):
+    def test_modello_di_fabbrica_non_finisce_nel_catalogo_firmware(self):
         scan.search_model("Honor X8c")
-        devices = storage.get_devices(search="honor x8c")
-        self.assertEqual(len(devices), 1)
-        self.assertEqual(devices[0]["android_version"], 15)
+        # Il piano Honor è una fonte ufficiale di identità/supporto e
+        # versione iniziale, non un endpoint OTA: non deve creare la falsa
+        # impressione di un firmware corrente nel catalogo dispositivi.
+        self.assertEqual(storage.get_devices(search="honor x8c"), [])
 
     def test_brand_senza_fonte_dedicata_degrada_pulitamente(self):
         """La ricerca su una marca senza fonte DEDICATA non deve mai
