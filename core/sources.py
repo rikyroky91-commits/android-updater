@@ -3611,6 +3611,9 @@ def _gsmarena_lookup() -> StructuredLookup:
     return StructuredLookup(
         brand=None, funzione=_lookup_gsmarena, costo="medio",
         etichetta="scheda tecnica GSMArena",
+        # GSMArena è una scheda di fabbrica, non l'ultimo OTA. La ricerca
+        # la usa solo per identificazione e specifiche; non entra in
+        # storage.get_devices né nel feed firmware.
         firmware_kind=C.FW_FACTORY,
     )
 
