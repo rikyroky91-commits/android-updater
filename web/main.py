@@ -1358,7 +1358,7 @@ def _cerca_davvero(query: str) -> dict:
         "codice_per_correzione": codice_per_correzione,
         "corretto_a_mano": bool(nome_corretto),
         "riga": " · ".join(pezzi),
-        "fonte": (migliore or {}).get("source_label", ""),
+        "fonte": (migliore or identita).get("source_label", ""),
         # ONESTÀ DEL RISULTATO. Alcune fonti confermano che un modello
         # esiste ma NON pubblicano la versione firmware. Dichiarare «dato
         # trovato» in quel caso è peggio che non trovare nulla: fa credere
