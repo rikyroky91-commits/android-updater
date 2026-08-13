@@ -1436,7 +1436,7 @@ def _cerca_davvero(query: str) -> dict:
     # mano, tutti sopra) e la scheda ha davvero risolto qualcosa di diverso
     # dalla query scritta — un titolo identico alla query non è una
     # risoluzione, è un'eco.
-    if not migliore and not nome_corretto and scheda["trovata"]:
+    if not versione_certa and not nome_corretto and scheda["trovata"]:
         titolo_scheda = (scheda["titolo"] or "").strip()
         if titolo_scheda and titolo_scheda.lower() != query.strip().lower():
             nome = titolo_scheda
@@ -1471,12 +1471,12 @@ def _cerca_davvero(query: str) -> dict:
         "codice_per_correzione": codice_per_correzione,
         "corretto_a_mano": bool(nome_corretto),
         "riga": " · ".join(pezzi),
-        "fonte": (migliore or identita).get("source_label", ""),
-        # ONESTÀ DEL RISULTATO. Alcune fonti confermano che un modello
-        # esiste ma NON pubblicano la versione firmware. Dichiarare «dato
-        # trovato» in quel caso è peggio che non trovare nulla: fa credere
-        # di avere una risposta che non c'è.
-        "senza_firmware": bool(identita) and not migliore,
+        "fonte": (versione_certa or identita).get("source_label", ""),
+        # Una versione di lancio/supporto è un dato Android utile, quindi
+        # non produce più una scheda apparentemente rotta. L'etichetta
+        # nella riga distingue esplicitamente quel caso da un OTA corrente.
+        "senza_firmware": bool(identita) and not bool(pezzi),
+        "tipo_versione": tipo_versione,
         "scheda": scheda,
         "notizie": [P.riga_aggiornamento(n) for n in notizie[:6]],
         "quante_notizie": len(notizie),
