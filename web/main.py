@@ -308,7 +308,7 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
     # modello; solo allora si cerca il firmware.
     imei = None
     if imeicheck.is_valid_imei(domanda):
-        imei = _esito_imei(domanda)
+        imei = _esito_imei_salvato(domanda) if saved else _esito_imei(domanda)
         if imei["modello_cercato"]:
             # Un IMEI ha già risolto un'identità precisa dal TAC. La ricerca
             # firmware è informazione aggiuntiva e non può rinominare il
@@ -822,11 +822,38 @@ def _esito_imei(imei: str) -> dict:
         "tac": raffronto.get("tac") or "",
         "riconosciuto": bool(trovato),
         "descrizione": descrizione,
+        "marca": (marca if trovato else ""),
         "codice": codice,
         "modello_cercato": modello_cercato,
         "voci": raffronto.get("voci") or [],
         "discordi": bool(raffronto.get("discordi")),
         "stato_database": imeicheck.status(),
+        "siti": list(imeicheck.link_verifica(imei)),
+    }
+
+
+def _esito_imei_salvato(imei: str) -> dict:
+    """Risposta immediata dopo un salvataggio manuale, senza ricreare l'indice TAC.
+
+    Il redirect successivo a «Salva» deve confermare il dato appena scritto,
+    non scaricare/indicizzare centinaia di migliaia di TAC prima di rendere
+    la pagina. Al prossimo caricamento normale torna il confronto completo
+    fra tutte le fonti.
+    """
+    tac = imeicheck.tac_di(imei)
+    marca, dettagli_grezzi = imeicheck.tac_inseriti().get(tac, ("", ""))
+    dettagli = imeicheck.parse_specs(marca, dettagli_grezzi) if dettagli_grezzi else {}
+    modello = dettagli.get("model") or dettagli_grezzi
+    return {
+        "imei": imei, "tac": tac, "riconosciuto": bool(modello),
+        "descrizione": imeicheck.describe(marca, dettagli_grezzi) if modello else "",
+        "marca": marca, "codice": dettagli.get("code") or "",
+        "modello_cercato": (dettagli.get("code") or modello or ""),
+        "voci": ([{"fonte": imeicheck.FONTE_UTENTE, "marca": marca,
+                   "modello": modello, "codice": dettagli.get("code"),
+                   "anno": dettagli.get("year"), "raw": dettagli.get("raw", "")}]
+                 if modello else []),
+        "discordi": False, "stato_database": "conferma appena salvata",
         "siti": list(imeicheck.link_verifica(imei)),
     }
 
