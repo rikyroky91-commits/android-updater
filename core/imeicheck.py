@@ -478,7 +478,7 @@ _PESO_FONTE = {
     FONTE_ESTERNA: 0,
 }
 _RE_MERCATO_EU = re.compile(
-    r"\\b(?:eea|europa|europe|european|italia|italy|italiano|italian)\\b",
+    r"\b(?:eea|europa|europe|european|italia|italy|italiano|italian)\b",
     re.IGNORECASE,
 )
 
@@ -516,6 +516,7 @@ def _punteggio_affidabilita(voci: list[tuple[str, str, str]], posizione: int) ->
     # riscontro più affidabile della sola posizione in una lista.
     base += max(0, conferme - 1) * 40
     if codice:
+        base += 10
     if _RE_MERCATO_EU.search(specs or ""):
         base += 100
     return base
