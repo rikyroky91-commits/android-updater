@@ -1289,44 +1289,79 @@ def _cerca_davvero(query: str) -> dict:
                      if i.get("source") in ("official_lookup", "curated_lookup")]
     notizie = [i for i in risultato.get("items", [])
                if i.get("source") not in ("official_lookup", "curated_lookup")]
-    # La fonte diretta può identificare il modello senza pubblicare una
-    # build. Si mantiene quell'identità per titolo e scheda tecnica, ma
-    # solo CURRENT può riempire la riga «ultimo firmware».
-    migliore = next(
-        (i for i in fonti_dirette if i.get("firmware_kind") == C.FW_CURRENT),
-        None,
-    )
-    identita = migliore or (fonti_dirette[0] if fonti_dirette else {})
+
+    def tipo(item: dict) -> str:
+        # Le vecchie righe in archivio e i test precedenti alla distinzione
+        # semantica non portano ancora il campo: una lookup ufficiale con
+        # versione resta comunque una fonte corrente, non un buco UI.
+        return (item.get("firmware_kind") or
+                (C.FW_CURRENT if item.get("source") == "official_lookup"
+                 else C.FW_REPORTED))
+
+    def ha_versione(item: dict) -> bool:
+        return bool(item and (item.get("os_version")
+                              or item.get("android_version")
+                              or item.get("build")
+                              or item.get("patch_level")))
+
+    # Primo risultato: una build/OTA realmente corrente. Secondo: una
+    # versione riportata da una fonte controllata. Solo dopo vengono i
+    # dati di lancio/supporto, che sono utili ma non vengono mai venduti
+    # come «ultimo firmware».
+    corrente = next((i for i in fonti_dirette
+                     if tipo(i) == C.FW_CURRENT and ha_versione(i)), None)
+    riportata = next((i for i in fonti_dirette
+                      if tipo(i) == C.FW_REPORTED and ha_versione(i)), None)
+    base_android = next((i for i in fonti_dirette
+                         if tipo(i) in (C.FW_FACTORY, C.FW_SUPPORT)
+                         and ha_versione(i)), None)
+    versione_certa = corrente or riportata or base_android
+    identita = versione_certa or (fonti_dirette[0] if fonti_dirette else {})
 
     codice = identita.get("model_code") or ""
     nome = identita.get("device_model") or query
+    marca = identita.get("brand", "")
+
+    # Un codice è più specifico di un alias restituito dalla fonte. Quando
+    # il catalogo ne conosce il nome commerciale verificato lo preferiamo:
+    # è ciò che impedisce a RMX3939 di ricadere su C61 e rende uguali la
+    # ricerca per codice, per modello e per IMEI.
+    if codice:
+        try:
+            canonico = modelcodes.nome_canonico(codice)
+        except Exception:
+            canonico = None
+        if canonico:
+            nome = canonico
+    nome = _modello_con_marca(marca, nome, codice) or nome
 
     pezzi = []
-    if migliore:
-        versione = migliore.get("os_version") or (
-            f"Android {migliore['android_version']}"
-            if migliore.get("android_version") else "")
+    tipo_versione = ""
+    if versione_certa:
+        versione = versione_certa.get("os_version") or (
+            f"Android {versione_certa['android_version']}"
+            if versione_certa.get("android_version") else "")
         if versione:
-            pezzi.append(versione)
-        if migliore.get("build"):
-            pezzi.append(f"build {migliore['build']}")
-        if migliore.get("patch_level"):
-            pezzi.append(f"patch {migliore['patch_level']}")
-        # LA DATA SI AGGIUNGE SOLO SE C'È GIÀ QUALCOSA DA DATARE.
-        # Attaccare «data di rilascio non pubblicata» a un risultato che
-        # non ha né versione né build riempie la riga di una frase che
-        # parla di un firmware inesistente — e, peggio, fa credere alla
-        # pagina di avere trovato qualcosa, perché la riga non è vuota.
-        if pezzi:
-            if migliore.get("published"):
-                pezzi.append(f"uscito il {fmt_date(migliore['published'])}")
+            if versione_certa is base_android:
+                pezzi.append(f"Versione Android verificata: {versione} (di lancio/supporto)")
+                tipo_versione = tipo(versione_certa)
+            elif versione_certa is riportata:
+                pezzi.append(f"Versione Android riportata: {versione}")
+                tipo_versione = C.FW_REPORTED
             else:
-                # Samsung la data non la pubblica, ma la scrive dentro la
-                # build: si legge il mese e si dice che viene da lì. Il
-                # giorno non c'è, e non si inventa.
-                mese = extract.mese_leggibile(migliore.get("build") or "")
-                pezzi.append(f"build di {mese}" if mese
-                             else "data di rilascio non pubblicata dalla fonte")
+                pezzi.append(f"Ultimo Android verificato: {versione}")
+                tipo_versione = C.FW_CURRENT
+        if versione_certa.get("build"):
+            pezzi.append(f"build {versione_certa['build']}")
+        if versione_certa.get("patch_level"):
+            pezzi.append(f"patch {versione_certa['patch_level']}")
+        if pezzi and versione_certa is not base_android:
+            if versione_certa.get("published"):
+                pezzi.append(f"uscito il {fmt_date(versione_certa['published'])}")
+            else:
+                mese = extract.mese_leggibile(versione_certa.get("build") or "")
+                if mese:
+                    pezzi.append(f"build di {mese}")
 
     storico, chiave, nome_archivio = _storico_del_modello(
         nome, identita.get("brand", ""))
