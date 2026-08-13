@@ -827,6 +827,10 @@ def _esito_imei(imei: str) -> dict:
         "riconosciuto": bool(trovato),
         "descrizione": descrizione,
         "marca": (marca if trovato else ""),
+        # «model» è il nome da mostrare; «modello_cercato» è invece la
+        # chiave precisa (codice, quando presente) da passare alle fonti.
+        # Tenerli separati evita che il codice sostituisca il modello nella UI.
+        "modello": dettagli.get("model") if trovato else "",
         "codice": codice,
         "modello_cercato": modello_cercato,
         "voci": raffronto.get("voci") or [],
@@ -851,7 +855,8 @@ def _esito_imei_salvato(imei: str) -> dict:
     return {
         "imei": imei, "tac": tac, "riconosciuto": bool(modello),
         "descrizione": imeicheck.describe(marca, dettagli_grezzi) if modello else "",
-        "marca": marca, "codice": dettagli.get("code") or "",
+        "marca": marca, "modello": modello,
+        "codice": dettagli.get("code") or "",
         "modello_cercato": (dettagli.get("code") or modello or ""),
         "voci": ([{"fonte": imeicheck.FONTE_UTENTE, "marca": marca,
                    "modello": modello, "codice": dettagli.get("code"),
