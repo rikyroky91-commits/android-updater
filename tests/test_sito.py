@@ -378,7 +378,7 @@ class TestNotaCoperturaConChipTrovato(unittest.TestCase):
 
     def test_la_nota_non_contraddice_il_processore_appena_mostrato(self):
         pagina = self.client.get("/dispositivo", params={"k": self._chiave()}).text
-        self.assertIn("tabella verificata a mano", pagina)
+        self.assertIn("Verificato su GSMchoice + Geekbench", pagina)
         self.assertNotIn("Specifiche hardware non disponibili per questo modello.",
                          pagina)
 

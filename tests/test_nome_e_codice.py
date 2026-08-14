@@ -505,6 +505,26 @@ class TestVarianteNelRisultato(unittest.TestCase):
                               build="CPH2653_16.0.9.402(EX01)")
         self.assertEqual(scan.normalize(raw, self.fonte)["model_code"], "CPH2653")
 
+    def test_nome_regionale_della_fonte_non_viene_sovrascritto_dal_codice(self):
+        """Il catalogo dei codici può privilegiare un rebrand estero.
+
+        Se la fonte strutturata dichiara già il modello europeo corretto,
+        quel nome è più specifico della grafia generica del dataset.
+        """
+        originale = modelcodes.nome_canonico
+        modelcodes.nome_canonico = lambda codice: "OPPO F31"
+        try:
+            raw = sources.RawItem(
+                title="OPPO A6 Pro 5G update", brand=C.OPPO,
+                device="OPPO A6 Pro 5G", model_code="CPH2781",
+            )
+            self.assertEqual(
+                scan.normalize(raw, self.fonte)["device_model"],
+                "OPPO A6 Pro 5G",
+            )
+        finally:
+            modelcodes.nome_canonico = originale
+
     def test_il_codice_non_entra_nel_testo_analizzato(self):
         """`RawItem.text` è ciò che rileggono gli estrattori, e un codice
         modello ha la forma di un numero di build: infilarcelo dentro
@@ -596,6 +616,46 @@ class TestNomeEsattoBatteLaSottostringa(unittest.TestCase):
         ], None)
         trovati = sources._lookup_xiaomi("Redmi Note 13")
         self.assertEqual(trovati[0].device, "Redmi Note 13 Global")
+
+    def test_codice_xiaomi_con_alias_comune_sblocca_eea_per_prima(self):
+        """Il codice è esatto anche se il nome è condiviso da più varianti.
+
+        Il tracker è cronologico e poteva restituire Indonesia prima di EEA;
+        l'app deve scegliere prima la ROM europea e mantenere il codice
+        perché scheda tecnica e firmware siano della stessa variante.
+        """
+        originale = modelcodes.resolve
+        modelcodes.resolve = lambda codice: ["Xiaomi 13T"] if codice == "2306EPN60G" else []
+        try:
+            sources.fetch_xiaomi = lambda: ([
+                sources.RawItem(title="id", device="Xiaomi 13T Indonesia",
+                                build="OS3.0.2.0.WMFIDXM", published="2026-08-01"),
+                sources.RawItem(title="eu", device="Xiaomi 13T EEA",
+                                build="OS2.0.217.0.VMFEUXM", published="2026-05-01"),
+                sources.RawItem(title="global", device="Xiaomi 13T Global",
+                                build="OS2.0.200.0.VMFMIXM", published="2026-06-01"),
+            ], None)
+            trovati = sources._lookup_xiaomi("2306EPN60G")
+            self.assertEqual(trovati[0].device, "Xiaomi 13T EEA")
+            self.assertEqual(trovati[0].model_code, "2306EPN60G")
+        finally:
+            modelcodes.resolve = originale
+
+    def test_codice_xiaomi_numerico_non_diventa_t_o_ultra(self):
+        """La forma corta «14» deve accettare solo un suffisso regionale."""
+        originale = modelcodes.resolve
+        modelcodes.resolve = lambda codice: ["Xiaomi 14"] if codice == "23127PN0CG" else []
+        try:
+            sources.fetch_xiaomi = lambda: ([
+                sources.RawItem(title="t", device="Xiaomi 14T EEA", build="EUXM-T"),
+                sources.RawItem(title="ultra", device="Xiaomi 14 Ultra EEA", build="EUXM-U"),
+                sources.RawItem(title="eu", device="Xiaomi 14 EEA", build="EUXM-14"),
+            ], None)
+            trovati = sources._lookup_xiaomi("23127PN0CG")
+            self.assertEqual([item.device for item in trovati], ["Xiaomi 14 EEA"])
+            self.assertEqual(trovati[0].model_code, "23127PN0CG")
+        finally:
+            modelcodes.resolve = originale
 
 
 class TestCodiceSconosciutoNonDiventaUnDispositivo(unittest.TestCase):

@@ -466,7 +466,9 @@ class TestOrdineDelleFonti(unittest.TestCase):
         from core import config as C, sources
         for voce in sources._STRUCTURED_LOOKUPS_LIST:
             atteso = (C.TRUST_CURATED
-                      if "non ufficiale" in voce.etichetta else C.TRUST_STRUCTURED)
+                      if ("non ufficiale" in voce.etichetta
+                          or voce.etichetta.startswith("archivio tecnico"))
+                      else C.TRUST_STRUCTURED)
             with self.subTest(fonte=voce.etichetta):
                 self.assertEqual(voce.trust, atteso)
 

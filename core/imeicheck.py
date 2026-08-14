@@ -784,7 +784,19 @@ def _voci_per_tac(tac: str) -> list[tuple[str, str, str]]:
         if curato:
             locali.append((FONTE_CURATA, curato[0], curato[1]))
         if locali:
-            globals()["_status"] = "risposta dal catalogo locale verificato"
+            # Il percorso rapido evita il download/indice completo al primo
+            # IMEI dopo un deploy, ma Diagnostica deve continuare a dire se
+            # la risposta include un TAC inserito dall'utente. Altrimenti
+            # sembra che il salvataggio non sia mai avvenuto, pur essendo
+            # proprio il dato che ha fatto evitare il download pesante.
+            dettaglio = []
+            if curato:
+                dettaglio.append("verificato a mano")
+            if inserito:
+                dettaglio.append("1 inserito da te")
+            globals()["_status"] = (
+                "risposta dal catalogo locale " + " · ".join(dettaglio)
+            )
             return _ordina_per_affidabilita(locali)
         _memory_index = _build_index()
     return list(_memory_index.get(tac) or [])

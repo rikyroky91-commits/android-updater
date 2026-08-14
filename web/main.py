@@ -1355,7 +1355,10 @@ def _cerca_davvero(query: str) -> dict:
     # il catalogo ne conosce il nome commerciale verificato lo preferiamo:
     # è ciò che impedisce a RMX3939 di ricadere su C61 e rende uguali la
     # ricerca per codice, per modello e per IMEI.
-    if codice:
+    # `scan.normalize` conserva il nome fornito da una fonte strutturata
+    # quando è più preciso del dataset community dei codici (CPH2781 è A6
+    # Pro in Europa, F31 in India). Qui non si deve annullare quella scelta.
+    if codice and not identita.get("device_model"):
         try:
             canonico = modelcodes.nome_canonico(codice)
         except Exception:

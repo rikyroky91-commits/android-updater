@@ -164,6 +164,44 @@ class TestSceltaCandidato(unittest.TestCase):
         self.assertIsNone(versus.scegli_candidato("", RICERCHE["HONOR 400"], "Honor"))
 
 
+class TestRisolviConQueryAlternativa(unittest.TestCase):
+    """La query completa può non contenere un vecchio modello nella top 20.
+
+    Si registra il caso reale RMX3471 / realme 9 Pro 5G: la query senza 5G
+    trova il modello liscio, che il selettore accetta solo perché è l'unico
+    candidato con la medesima identità senza connettività.
+    """
+
+    def setUp(self):
+        self._scarica = versus._scarica
+        self.chiamate = []
+
+        def finta(url, parametri=None):
+            self.chiamate.append((url, (parametri or {}).get("q")))
+            if (parametri or {}).get("q") == "Realme 9 Pro 5G":
+                return _Risposta(dati=[{
+                    "name": "Realme 9 Pro Plus 5G",
+                    "name_url": "realme-9-pro-plus-5g",
+                    "categories": ["phone"],
+                }])
+            return _Risposta(dati=[{
+                "name": "Realme 9 Pro",
+                "name_url": "realme-9-pro",
+                "categories": ["phone"],
+            }])
+
+        versus._scarica = finta
+
+    def tearDown(self):
+        versus._scarica = self._scarica
+
+    def test_riprova_senza_5g_senza_accettare_un_plus(self):
+        scelto = versus.risolvi("Realme 9 Pro 5G", "Realme")
+        self.assertEqual(scelto["name_url"], "realme-9-pro")
+        self.assertEqual([q for _url, q in self.chiamate],
+                         ["Realme 9 Pro 5G", "Realme 9 Pro"])
+
+
 class TestLetturaPagina(unittest.TestCase):
     def setUp(self):
         self.proprieta, self.sezioni = versus.leggi_pagina(PAGINA)

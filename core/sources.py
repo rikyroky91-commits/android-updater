@@ -25,7 +25,7 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable
 
 try:
@@ -2161,6 +2161,46 @@ _REALME_FIRMWARE_RE = re.compile(
     r"(?P<data>\d{14})",
     re.IGNORECASE,
 )
+# Dal 2025 l'indice contiene anche i pacchetti service nel nuovo formato.
+# Sono gli stessi file RMX, ma non hanno più ``_15_C.14_`` nel nome:
+#
+#   RMX5011GDPR_11_16.0.3.500EX01_20260305010156.zip
+#   RMX5011 16.0.3.500(EX01) [GDPR].zip
+#
+# Il primo non va confuso con il vecchio campo Android ``_15_``: ``_11_`` è
+# parte del formato service. La versione Android certa è il primo numero
+# della build 14.0/15.0/16.0, convenzione confermata dalle pagine prodotto
+# realme (realme UI 6 = Android 15, realme UI 7 = Android 16). Limitare la
+# deduzione a questi numeri evita di trasformare un'altra sigla in Android.
+_REALME_FIRMWARE_MODERN_COMPACT_RE = re.compile(
+    r"\b(?P<codice>(?:RMX|CPH)\d{4}[A-Z]*?)(?:\d{5})?(?P<regione>GDPR|export)_\d{2}_"
+    r"(?P<versione>1[4-9](?:\.\d+){3})(?P<canale>[A-Z]{2}\d{2})"
+    r"(?:_(?P<data>\d{14}))?(?:\.zip)?",
+    re.IGNORECASE,
+)
+_REALME_FIRMWARE_MODERN_LABEL_RE = re.compile(
+    r"\b(?P<codice>(?:RMX|CPH)\d{4}[A-Z]*?)\s+"
+    r"(?P<versione>1[4-9](?:\.\d+){3})\((?P<canale>[A-Z]{2}\d{2})\)\s+"
+    r"\[(?P<regione>GDPR|export)\](?:\.zip)?",
+    re.IGNORECASE,
+)
+
+
+@dataclass(frozen=True)
+class _PacchettoRealme:
+    """Metadati del nome di un pacchetto realme, senza inventare un OTA.
+
+    ``data`` è presente soltanto nei nomi che la espongono. Non viene
+    sostituita dalla data di caricamento dell'archivio, che è un fatto
+    diverso e può far sembrare più recente un file ripubblicato.
+    """
+
+    codice: str
+    regione: str
+    build: str
+    android: int | None
+    data: str | None
+    filename: str
 # Mai un catalogo intero in memoria: fino a 32 codici richiesti di recente,
 # con al massimo due RawItem piccoli per codice (Europa e globale).
 _REALME_FIRMWARE_TTL = 60 * 60
@@ -2508,7 +2548,83 @@ def _realme_data_pacchetto(valore: str) -> str:
     return f"{valore[6:8]}/{valore[4:6]}/{valore[:4]}"
 
 
-def _lookup_realme_firmware_archive(model_name: str) -> list[RawItem]:
+def _android_da_build_realme(versione: str) -> int | None:
+    """Major Android dichiarato implicitamente dalle build realme recenti.
+
+    I nomi service moderni hanno una build come ``16.0.3.500(EX01)`` e un
+    campo intermedio ``_11_`` che *non* è Android. Per i rami 14--19 il
+    primo componente è invece quello della generazione Android/realme UI;
+    al di fuori di quel formato non si indovina nulla.
+    """
+    primo = (versione or "").split(".", 1)[0]
+    try:
+        android = int(primo)
+    except ValueError:
+        return None
+    return android if 14 <= android <= C.MAX_PLAUSIBLE_ANDROID else None
+
+
+def _pacchetti_realme_da_testo(testo: str) -> list[_PacchettoRealme]:
+    """Legge tutti i formati RMX usati dall'archivio tecnico.
+
+    La funzione è separata dalla rete per poterla testare con i nomi reali
+    di pacchetto: la regressione era nel parser, non nel download.
+    """
+    pacchetti: list[_PacchettoRealme] = []
+    visti: set[tuple[str, str, str]] = set()
+
+    def aggiungi(pacchetto: _PacchettoRealme) -> None:
+        chiave = (pacchetto.codice, pacchetto.regione, pacchetto.filename)
+        if chiave not in visti:
+            visti.add(chiave)
+            pacchetti.append(pacchetto)
+
+    for match in _REALME_FIRMWARE_RE.finditer(testo):
+        android = int(match.group("android"))
+        filename = match.group(0) + ".zip"
+        aggiungi(_PacchettoRealme(
+            codice=match.group("codice").upper(),
+            regione=match.group("regione").upper(),
+            build=f"{match.group('ramo').upper()}.{match.group('revisione')}",
+            android=android,
+            data=match.group("data"),
+            filename=filename,
+        ))
+
+    for parser in (_REALME_FIRMWARE_MODERN_COMPACT_RE,
+                   _REALME_FIRMWARE_MODERN_LABEL_RE):
+        for match in parser.finditer(testo):
+            versione = match.group("versione")
+            canale = match.group("canale").upper()
+            raw = match.group(0)
+            filename = raw if raw.lower().endswith(".zip") else raw + ".zip"
+            aggiungi(_PacchettoRealme(
+                codice=match.group("codice").upper(),
+                regione=match.group("regione").upper(),
+                build=f"{versione}({canale})",
+                android=_android_da_build_realme(versione),
+                data=match.groupdict().get("data"),
+                filename=filename,
+            ))
+    return pacchetti
+
+
+def _chiave_pacchetto_realme(pacchetto: _PacchettoRealme) -> tuple:
+    """Ordine stabile dentro un ramo regionale, senza comparare GDPR/Export.
+
+    Prima la major Android, poi (nei pacchetti moderni) i numeri della build
+    e solo dopo la data interna. Così una 16.0.3 senza data nel titolo non
+    viene scavalcata da una 16.0.2 più vecchia che esponeva un timestamp.
+    """
+    moderno = bool(re.match(r"^\d+\.", pacchetto.build))
+    numeri = tuple(int(x) for x in re.findall(r"\d+", pacchetto.build))
+    return (pacchetto.android or 0, moderno, numeri, pacchetto.data or "")
+
+
+def _lookup_realme_firmware_archive(model_name: str,
+                                    _verificato: tuple[str, str] | None = None,
+                                    _nome_fonte: str = "realme",
+                                    _verifica: str = "confermato da realme") -> list[RawItem]:
     """Build realme riportate da archivio tecnico, ordinate Europa → globale.
 
     La fonte non conosce lo stato OTA di uno specifico telefono e può
@@ -2517,7 +2633,7 @@ def _lookup_realme_firmware_archive(model_name: str) -> list[RawItem]:
     pacchetto* (non dalla descrizione editoriale, che per RMX3939 riporta
     Android 16 nonostante il pacchetto dica chiaramente `_15_`).
     """
-    trovato = _realme_codice_verificato(model_name)
+    trovato = _verificato or _realme_codice_verificato(model_name)
     if not trovato:
         return []
     codice, nome_composto = trovato
@@ -2530,7 +2646,9 @@ def _lookup_realme_firmware_archive(model_name: str) -> list[RawItem]:
     # Una build per ramo regionale: il numero C.16 Export non e' comparabile
     # con C.14 GDPR. La data interna al pacchetto, non la data di caricamento
     # dell'archivio, indica quale sia la copia più recente nel singolo ramo.
-    per_regione: dict[str, tuple[str, re.Match]] = {}
+    # GDPR e Export restano rami separati: la priorità europea è nell'ordine
+    # di presentazione, non un confronto arbitrario fra le loro revisioni.
+    per_regione: dict[str, _PacchettoRealme] = {}
     urls = [
         REALME_FIRMWARE_ARCHIVE_URL.format(codice=codice, pagina=pagina)
         for pagina in range(1, _REALME_FIRMWARE_SEARCH_PAGES + 1)
@@ -2552,46 +2670,46 @@ def _lookup_realme_firmware_archive(model_name: str) -> list[RawItem]:
         pagine = list(pool.map(scarica, urls))
     tutte_risposte_ok = all(ok for _testo, ok in pagine)
     for testo, _ok in pagine:
-        for match in _REALME_FIRMWARE_RE.finditer(testo):
-            if match.group("codice").upper() != codice:
+        for pacchetto in _pacchetti_realme_da_testo(testo):
+            if pacchetto.codice != codice:
                 continue
-            regione = match.group("regione").upper()
+            regione = pacchetto.regione
             precedente = per_regione.get(regione)
-            if precedente is None or match.group("data") > precedente[0]:
-                per_regione[regione] = (match.group("data"), match)
+            if (precedente is None
+                    or _chiave_pacchetto_realme(pacchetto) > _chiave_pacchetto_realme(precedente)):
+                per_regione[regione] = pacchetto
 
     # Il primo nome dell'elenco ufficiale è quello di mercato principale;
     # RMX3939 diventa quindi "realme C63", non il C61 ambiguo.
-    espansi = _realme_espandi(nome_composto)
+    # L'elenco ufficiale realme può avere più nomi regionali; il catalogo
+    # codici OPPO invece consegna già il nome singolo da mostrare.
+    espansi = _realme_espandi(nome_composto) if _nome_fonte == "realme" else []
     device = espansi[0] if espansi else nome_composto
     items: list[RawItem] = []
     for regione in ("GDPR", "EXPORT"):
         record = per_regione.get(regione)
         if not record:
             continue
-        data, match = record
-        android = int(match.group("android"))
-        ramo = match.group("ramo").upper()
-        revisione = match.group("revisione")
-        build = f"{ramo}.{revisione}"
         area = "Europa (GDPR)" if regione == "GDPR" else "Globale / Export"
-        filename = match.group(0) + ".zip"
+        versione = f"Android {record.android}" if record.android else None
+        dettaglio_data = (
+            f"Data interna del pacchetto: {_realme_data_pacchetto(record.data)}."
+            if record.data else
+            "Nome pacchetto senza data interna: non viene inventata una data di rilascio."
+        )
         items.append(RawItem(
-            title=f"{device} — {filename}",
+            title=f"{device} — {record.filename}",
             link=REALME_FIRMWARE_ARCHIVE_URL.format(codice=codice, pagina=1),
             brand=C.OPPO,
             device=device,
             model_code=codice,
-            version=f"Android {android}",
-            build=build,
-            android_version=android,
+            version=versione,
+            build=record.build,
+            android_version=record.android,
             size_info=(
-                f"Archivio tecnico realme · {area} · build riportata, non OTA ufficiale"
+                f"Archivio tecnico {_nome_fonte} · {area} · build riportata, non OTA ufficiale"
             ),
-            summary=(
-                f"Codice {codice} confermato da realme. Data interna del pacchetto: "
-                f"{_realme_data_pacchetto(data)}."
-            ),
+            summary=f"Codice {codice} {_verifica}. {dettaglio_data}",
             trust=C.TRUST_CURATED,
             firmware_kind=C.FW_REPORTED,
         ))
@@ -2608,6 +2726,85 @@ def _lookup_realme_firmware_archive(model_name: str) -> list[RawItem]:
                 _realme_firmware_cache.pop(next(iter(_realme_firmware_cache)))
             _realme_firmware_cache[codice] = (ora, list(items))
     return items
+
+
+_OPPO_ARCHIVIO_CODE_RE = re.compile(r"^CPH\d{4}[A-Z]*$", re.IGNORECASE)
+
+
+def _oppo_codice_archivio_verificato(query: str) -> tuple[str, str] | None:
+    """Codice CPH e nome commerciale per l'archivio tecnico OPPO.
+
+    A differenza di realme, OPPO non pubblica un elenco ufficiale codice →
+    nome per i modelli moderni. Il codice viene quindi accettato solo se il
+    catalogo modelli locale lo conosce; una ricerca per nome procede soltanto
+    quando identifica un solo CPH. Questo evita che «OPPO A5» interroghi a
+    caso una variante regionale o una generazione omonima.
+    """
+    testo = (query or "").strip()
+    diretto = re.sub(r"\s+", "", testo).upper()
+    if _OPPO_ARCHIVIO_CODE_RE.fullmatch(diretto):
+        candidati = [diretto]
+    else:
+        try:
+            candidati = [c.upper() for c in modelcodes.codes_for_name(testo)
+                          if _OPPO_ARCHIVIO_CODE_RE.fullmatch(c.upper())]
+        except Exception:
+            return None
+        candidati = list(dict.fromkeys(candidati))
+        if len(candidati) != 1:
+            return None
+
+    codice = candidati[0]
+    try:
+        nomi = modelcodes.resolve(codice)
+    except Exception:
+        return None
+    if not nomi:
+        return None
+    # La scheda AER ufficiale, quando c'è, è la migliore disambiguazione dei
+    # rebrand regionali (CPH2639: A3 Pro/A3/A80). Fuori da AER, le serie F e
+    # K sono in genere la denominazione India/Cina dello stesso CPH: per la
+    # priorità europea si preferisce una denominazione OPPO A/Reno/Find.
+    aer = aer_catalog.lookup(codice)
+    nome_aer = (aer or {}).get("device_model", "").split("/")[0].strip()
+    if nome_aer:
+        nome = nome_aer
+    else:
+        opzioni = [n for n in nomi if n.lower().startswith("oppo ")]
+        opzioni = opzioni or nomi
+        opzioni = sorted(opzioni, key=lambda n: bool(re.search(r"\b[FK]\d", n, re.I)))
+        nome = opzioni[0]
+        # «A6 Pro» e «A6 Pro 5G» non sono due grafie intercambiabili: il
+        # suffisso distingue proprio la variante radio. Se il catalogo
+        # associa quel CPH anche al nome 5G, non lo si elimina scegliendo
+        # meccanicamente la stringa più corta (CPH2781 è questo caso).
+        base = re.sub(r"\s+5G$", "", nome, flags=re.I).strip()
+        variante_5g = next((n for n in opzioni
+                            if n.lower().endswith(" 5g")
+                            and re.sub(r"\s+5G$", "", n, flags=re.I).strip().lower()
+                            == base.lower()), None)
+        if variante_5g:
+            nome = variante_5g
+    return codice, nome
+
+
+def _lookup_oppo_firmware_archive(model_name: str) -> list[RawItem]:
+    """Build CPH riportate dall'archivio tecnico, GDPR prima di Export.
+
+    Ha la stessa semantica prudente della fonte realme: il file è una build
+    osservabile, non la risposta dell'OTA del telefono, dunque non diventa
+    mai un firmware ``CURRENT``. È tuttavia più utile dei soli piani di
+    rollout per la serie OPPO A, che il tracker ARB non copre.
+    """
+    trovato = _oppo_codice_archivio_verificato(model_name)
+    if not trovato:
+        return []
+    return _lookup_realme_firmware_archive(
+        model_name,
+        _verificato=trovato,
+        _nome_fonte="OPPO",
+        _verifica="associato al modello dal catalogo dispositivi",
+    )
 
 
 def _realme_etichetta(item: RawItem, richiesto: str, codice: str | None) -> RawItem:
@@ -3392,7 +3589,11 @@ _MODEL_CODE_SHAPES = [
     re.compile(r"^(?:iPhone|iPad|iPod)\d+,\d+$", re.I),       # Apple
     # RMX3939, CPH2625, XT2347 — con eventuale suffisso di variante (XT2323-1)
     re.compile(r"^[A-Z]{2,5}[-_]?\d{4,5}[A-Z0-9]{0,4}(?:-\d{1,2})?$", re.I),
-    re.compile(r"^\d{4,5}[A-Z]{2,4}\d{2,3}[A-Z]{0,2}$", re.I),   # Xiaomi 2312DRA50C
+    # Xiaomi moderno: il tratto alfabetico e quello numerico non hanno più
+    # una lunghezza fissa. Sono reali sia `2306EPN60G` sia `23078PND5G`,
+    # `2304FPN6DG`, `2406APNFAG` e `2410FPCC5G`; il vecchio vincolo di due
+    # cifre dopo le lettere scartava tutti gli ultimi tre.
+    re.compile(r"^\d{4,5}[A-Z]{2,6}\d{0,3}[A-Z]{0,3}$", re.I),
     # Xiaomi vecchio stile: solo cifre più il suffisso di regione (22101316UG)
     re.compile(r"^\d{7,9}[A-Z]{1,3}$", re.I),
     # Xiaomi stile classico, con la M davanti: M1910F4G (Mi Note 10),
@@ -3590,6 +3791,79 @@ def _lookup_samsung(model_name: str) -> list[RawItem]:
     return items
 
 
+def _rango_mercato_xiaomi(item: RawItem) -> int:
+    """Ordine delle ROM Xiaomi per una ricerca dal mercato europeo.
+
+    Il tracker conserva la stessa release per tutte le regioni e la ordina
+    per data, non per mercato. Una build Indonesia più nuova non deve però
+    diventare il primo risultato per un codice globale/EEA: il suffisso
+    ``EUXM`` (o l'etichetta EEA) identifica la variante europea. Globale è
+    il secondo ripiego; le varianti nazionali restano disponibili dopo.
+    """
+    testo = " ".join((item.build or "", item.device or "", item.title or "")).upper()
+    if "EUXM" in testo or re.search(r"\bEEA\b", testo):
+        return 0
+    if "MIXM" in testo or re.search(r"\bGLOBAL\b", testo):
+        return 1
+    if "RUXM" in testo or "TWXM" in testo:
+        return 3
+    if "INXM" in testo or "IDXM" in testo:
+        return 4
+    if "CNXM" in testo or re.search(r"\bCHINA\b", testo):
+        return 5
+    return 2
+
+
+def _risultati_xiaomi_ordinati(items: list[RawItem], codice: str | None = None) -> list[RawItem]:
+    """Deduplica e mette Europa/Globale davanti alle altre regioni."""
+    visti: set[tuple[str, str, str]] = set()
+    distinti: list[RawItem] = []
+    for item in items:
+        chiave = (item.device or "", item.build or "", item.link or "")
+        if chiave in visti:
+            continue
+        visti.add(chiave)
+        distinti.append(replace(item, model_code=codice) if codice else item)
+    # Ordinamenti stabili in due passaggi: prima l'ultima data dentro ogni
+    # regione, poi la priorità geografica. Un ``reverse=True`` sul tuple
+    # invertirebbe anche Europa/Globale e ricreerebbe il difetto.
+    distinti.sort(key=lambda item: item.published or "", reverse=True)
+    distinti.sort(key=_rango_mercato_xiaomi)
+    return distinti[:3]
+
+
+_PAROLE_REGIONI_XIAOMI = frozenset((
+    "eea", "global", "china", "india", "indonesia", "japan", "russia",
+    "taiwan", "turkey", "europe", "european",
+))
+
+
+def _varianti_regionali_xiaomi(nomi: list[tuple[RawItem, str]], richiesto: str) -> list[RawItem]:
+    """Trova «Xiaomi 14 EEA» senza confonderlo con 14T o 14 Ultra.
+
+    La normalizzazione generale rimuove la marca, perciò «Xiaomi 14» si
+    riduce a ``14`` e il normale ripiego lo scarta (due caratteri sono in
+    genere troppo ambigui). Per un nome ricavato da un *codice esatto* si
+    può invece confrontare le parole originali: dopo il nome sono ammesse
+    esclusivamente etichette di regione, mai una variante di prodotto.
+    """
+    parole_richieste = re.findall(r"[a-z0-9]+", (richiesto or "").lower())
+    if not parole_richieste:
+        return []
+    trovati: list[RawItem] = []
+    for item, _nome_norm in nomi:
+        parole = re.findall(r"[a-z0-9]+", (item.device or item.title or "").lower())
+        larghezza = len(parole_richieste)
+        for inizio in range(len(parole) - larghezza + 1):
+            if parole[inizio:inizio + larghezza] != parole_richieste:
+                continue
+            resto = parole[inizio + larghezza:]
+            if resto and all(parola in _PAROLE_REGIONI_XIAOMI for parola in resto):
+                trovati.append(item)
+            break
+    return trovati
+
+
 def _lookup_xiaomi(model_name: str) -> list[RawItem]:
     """Cerca il modello nel catalogo Xiaomi completo (già scaricato e in
     cache): copre qualunque device del tracker, non solo i più recenti.
@@ -3604,15 +3878,32 @@ def _lookup_xiaomi(model_name: str) -> list[RawItem]:
     all_items, error = fetch_xiaomi()
     if error or not all_items:
         return []
-    needle = modelcodes._normalize_name(model_name)
-    if not needle:
+    codice = normalizza_codice_modello(model_name) if looks_like_model_code(model_name) else None
+    # Il codice è l'identità più precisa: un nome commerciale può comparire
+    # su più codici regionali, ma non è ambiguo *per il codice digitato*.
+    # `expand_query` evita correttamente quegli alias generici per non
+    # mescolare due RMX; qui invece li usiamo solo per interrogare il
+    # catalogo Xiaomi con quel preciso codice e li restituiamo marcati.
+    nomi_richiesti = modelcodes.resolve(codice) if codice else [model_name]
+    if not nomi_richiesti:
+        nomi_richiesti = [model_name]
+    aghi = [modelcodes._normalize_name(nome) for nome in nomi_richiesti]
+    aghi = [ago for ago in aghi if ago]
+    if not aghi:
         return []
     nomi = [(item, modelcodes._normalize_name(item.device or item.title))
             for item in all_items]
-    esatti = [item for item, nome in nomi if nome == needle]
+    esatti = [item for item, nome in nomi if nome in aghi]
     if esatti:
-        return esatti[:3]
-    return _piu_vicini(nomi, needle)
+        return _risultati_xiaomi_ordinati(esatti, codice)
+
+    vicini: list[RawItem] = []
+    for nome, ago in zip(nomi_richiesti, aghi):
+        if len(ago) < _TERMINE_MINIMO:
+            vicini.extend(_varianti_regionali_xiaomi(nomi, nome))
+            continue
+        vicini.extend(_piu_vicini(nomi, ago))
+    return _risultati_xiaomi_ordinati(vicini, codice)
 
 
 def _lookup_honor(model_name: str) -> list[RawItem]:
@@ -3869,6 +4160,12 @@ _STRUCTURED_LOOKUPS_LIST = [
     StructuredLookup(C.OPPO, _lookup_oppo_coloros16, "basso",
                      "piano ufficiale OPPO ColorOS 16", fetch_oppo_coloros16,
                      firmware_kind=C.FW_SUPPORT),
+    # La serie OPPO A moderna non è nel tracker ARB né nell'archivio
+    # ufficiale legacy. I pacchetti CPH osservabili colmano quel buco ma
+    # restano REPORTED, non un'asserzione sullo stato OTA del singolo telefono.
+    StructuredLookup(C.OPPO, _lookup_oppo_firmware_archive, "basso",
+                     "archivio tecnico OPPO (build per codice)",
+                     trust=C.TRUST_CURATED, firmware_kind=C.FW_REPORTED),
     # Per realme recenti non esiste un endpoint OTA pubblico. L'archivio
     # tecnico è una fonte REPORTED (non CURRENT), protetta dal controllo del
     # codice sul sito realme e ordinata GDPR/Europa prima del ramo Export.
@@ -3942,11 +4239,11 @@ _NOTE_COPERTURA = {
         "OPPO, OnePlus e realme non pubblicano da nessuna parte la versione "
         "OTA corrente per modello: i portali ufficiali rispondono 403/404 e "
         "l'API OTA pretende l'impronta del dispositivo. Coperti con build "
-        "reale: i ~94 modelli dell'archivio firmware Oppo (fino al 2021-22) "
-        "e una copertura community verificabile ma parziale (ARB) per "
-        "OnePlus/OPPO. L'archivio ufficiale realme pubblico è legacy e non "
-        "copre Note 50; fuori da questi casi l'app mostra identificazione e "
-        "scheda tecnica, non una versione di fabbrica come firmware attuale."
+        "riportata: pacchetti RMX e CPH moderni dell'archivio tecnico, "
+        "l'archivio OPPO legacy e una copertura verificabile ma parziale "
+        "(ARB) per OnePlus/OPPO. Fuori da questi casi l'app mostra "
+        "identificazione e scheda tecnica, non una versione di fabbrica "
+        "come firmware attuale."
     ),
     C.VIVO: (
         "vivo e iQOO pubblicano il piano di supporto ufficiale ma non la "
@@ -4694,6 +4991,12 @@ def _scalda_fonti(voci: list) -> None:
             # verrà richiamata dal giro di ricerca, che l'errore lo sa
             # gestire e lo sa anche riferire in Diagnostica.
             pass
+        finally:
+            # Il pool resta vivo per i riscaldamenti successivi: una
+            # connessione SQLite thread-local altrimenti rimarrebbe aperta
+            # inutilmente per tutta la vita del processo (e trattiene sia
+            # memoria sia il file del database dopo un cambio/deploy).
+            storage.close_thread_connection()
 
     for fetch in da_scaldare:
         try:

@@ -107,7 +107,7 @@ class TestLeFontiLocaliSopravvivonoAlDownload(unittest.TestCase):
     def test_lo_stato_dice_quanti_ne_hai_inseriti(self):
         imeicheck.aggiungi_tac("35135531", "Samsung", "X")
         imeicheck.identify("351355315430630")
-        self.assertIn("inseriti da te", imeicheck.status())
+        self.assertIn("inserito da te", imeicheck.status())
 
 
 if __name__ == "__main__":  # pragma: no cover

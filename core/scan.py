@@ -145,7 +145,12 @@ def normalize(raw: sources.RawItem, source: sources.Source) -> dict:
     # nello stesso articolo, e il risultato sarebbe una scheda che cambia
     # nome da sola. Il codice dichiarato viene invece da una fonte che ha
     # interrogato proprio quel telefono.
-    if raw.model_code:
+    # Una fonte strutturata può già dichiarare un nome regionale preciso
+    # (per esempio CPH2781 = OPPO A6 Pro in Europa). Il dataset dei codici
+    # contiene anche rebrand di altri mercati (F31): usarlo per sovrascrivere
+    # `raw.device` riporterebbe proprio il modello sbagliato. Il codice resta
+    # il ripiego per le fonti che non pubblicano alcun nome.
+    if raw.model_code and not raw.device:
         canonico = modelcodes.nome_canonico(raw.model_code)
         if canonico:
             model = canonico

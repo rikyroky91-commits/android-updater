@@ -303,7 +303,24 @@ def risolvi(nome: str, marca: str) -> dict | None:
         tentativi.append(completo.replace("+", " Plus"))
     if "/" in completo:
         tentativi.append(con_marca(completo.split("/")[0], marca))
+    # L'API di ricerca restituisce solo i primi venti risultati. Per i
+    # modelli non recenti «Realme 9 Pro 5G» può quindi non comparire affatto
+    # nella pagina, mentre «Realme 9 Pro» sì. Il selettore conserva comunque
+    # il requisito che, dopo aver tolto 4G/5G, resti un solo candidato: il
+    # ripiego amplia la query, non l'identità accettata.
+    nudo = senza_connettivita(completo)
+    if nudo and nudo != completo:
+        tentativi.append(nudo)
+    provati = set()
     for tentativo in tentativi:
+        # `chiave()` elimina già 4G/5G per confrontare i candidati: usarla
+        # qui per togliere i duplicati cancellerebbe proprio il secondo
+        # tentativo che questa funzione deve inviare. Si deduplica soltanto
+        # la stringa di query, mai la sua identità normalizzata.
+        chiave_tentativo = " ".join(tentativo.lower().split())
+        if not chiave_tentativo or chiave_tentativo in provati:
+            continue
+        provati.add(chiave_tentativo)
         risposta = _scarica(RICERCA_URL, {"q": tentativo})
         if risposta is None:
             continue
