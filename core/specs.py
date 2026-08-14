@@ -39,8 +39,8 @@ per questo non sapeva distinguere le varianti regionali.
 
 1. **Le marche coperte sono undici** (Samsung, Xiaomi, OPPO, OnePlus, vivo,
    Motorola, Google, Apple, Sony, Nokia). HONOR, realme, Huawei e Nothing
-   non ci sono: per loro restano le fonti precedenti. Non è un difetto da
-   correggere qui, è il perimetro della fonte, e `status()` lo dice.
+   non sono nel mirror: per loro si prova il ripiego per modello; per HONOR
+   anche la pagina prodotto italiana ufficiale, senza scaricare un catalogo.
 2. **Un chip per scheda, non per codice.** Dove GSMArena elenca due chip
    («Snapdragon negli USA, Exynos altrove») la scheda è una sola e i codici
    stanno tutti insieme: da qui non si può sapere quale codice monta quale.
@@ -60,6 +60,8 @@ import os
 import re
 import tarfile
 import threading
+import time
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -81,6 +83,7 @@ ARCHIVIO_URL = (
     "tar.gz/refs/heads/main"
 )
 FONTE_LABEL = "catalogo specifiche GSMArena (mirror JSON)"
+FONTE_HONOR_LABEL = "specifiche ufficiali HONOR Italia"
 
 # Le schede cambiano quando esce un modello nuovo: qualche volta al mese.
 _RINFRESCA_ORE = 24 * 14
@@ -97,6 +100,14 @@ _per_nome: dict[str, dict] = {}
 _status = "non ancora caricato"
 _curate_per_codice: dict[str, dict] | None = None
 _curate_per_nome: dict[str, dict] | None = None
+
+# Le pagine prodotto HONOR sono individuali: una piccola cache LRU evita che
+# una ricerca, la sua scheda e un eventuale refresh ricarichino tre volte lo
+# stesso HTML. Non è un catalogo in memoria e non cambia il profilo OOM.
+_HONOR_SPECS_TTL = 24 * 60 * 60
+_HONOR_SPECS_CACHE_LIMIT = 32
+_honor_specs_cache: dict[str, tuple[float, Scheda | None]] = {}
+_honor_specs_lock = threading.Lock()
 
 
 # ======================================================================
@@ -635,6 +646,8 @@ def reset_cache() -> None:
         _per_codice = {}
         _per_nome = {}
         _status = "non ancora caricato"
+    with _honor_specs_lock:
+        _honor_specs_cache.clear()
 
 
 def status() -> str:
@@ -700,8 +713,155 @@ def per_nome(nome: str, marca: str | None = None) -> Scheda | None:
 RIPIEGO_ESTERNO = True
 
 
+_HONOR_PRODUCT_URL = "https://www.honor.com/it/phones/{slug}/"
+_HONOR_TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
+_HONOR_OG_IMAGE_RE = re.compile(
+    r'<meta[^>]+(?:property|name)=["\']og:image["\'][^>]+content=["\']([^"\']+)',
+    re.IGNORECASE,
+)
+_HONOR_BATTERIA_RE = re.compile(r"\b(\d{4,5})\s*mAh\b", re.IGNORECASE)
+_HONOR_RICARICA_RE = re.compile(r"\b(\d{2,3})\s*W\b[^.]{0,48}(?:SuperCharge|ricaric)", re.IGNORECASE)
+_HONOR_PESO_RE = re.compile(r"\bpeso\s*(\d{2,3}(?:[,.]\d+)?)\s*g\b", re.IGNORECASE)
+_HONOR_SPESSORE_RE = re.compile(r"\bspessore\s*(\d(?:[,.]\d+)?)\s*mm\b", re.IGNORECASE)
+_HONOR_CAMERA_RE = re.compile(r"\b(\d{2,3})\s*MP\b", re.IGNORECASE)
+_HONOR_RISOLUZIONE_RE = re.compile(r"\b(\d{3,4})\s*[×x*]\s*(\d{3,4})\b")
+_HONOR_HZ_RE = re.compile(r"\b(\d{2,3})\s*Hz\b", re.IGNORECASE)
+
+
+def _chiave_honor(valore: str) -> str:
+    """Chiave URL/testo per un nome HONOR, senza accenti o punteggiatura."""
+    decomposed = unicodedata.normalize("NFKD", valore or "")
+    ascii_text = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    return "".join(re.findall(r"[a-z0-9]+", ascii_text.lower()))
+
+
+def _slug_honor(nome: str) -> str | None:
+    """``HONOR Magic7 Lite`` → ``honor-magic7-lite`` in modo sicuro."""
+    decomposed = unicodedata.normalize("NFKD", nome or "")
+    ascii_text = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    words = re.findall(r"[a-z0-9]+", ascii_text.lower())
+    if words and words[0] == "honor":
+        words = words[1:]
+    if not words or not any(any(ch.isdigit() for ch in word) for word in words):
+        return None
+    return "honor-" + "-".join(words)
+
+
+def _testo_honor_pagina(html_text: str) -> str:
+    """Testo breve della pagina prodotto, per i campi non strutturati."""
+    return pulisci(re.sub(r"<[^>]+>", " ", html_text or ""))
+
+
+def _scheda_honor_da_html(nome: str, pagina: str, url: str) -> Scheda | None:
+    """Legge i dati dichiarati nella pagina prodotto HONOR italiana.
+
+    La pagina non espone JSON-LD stabile: si estraggono soltanto misure e
+    valori accompagnati dalla loro unità. Un campo assente resta assente;
+    non si completa da brochure di altri paesi né da rebrand affini.
+    """
+    title_match = _HONOR_TITLE_RE.search(pagina or "")
+    titolo = pulisci(title_match.group(1)) if title_match else ""
+    chiave_nome = _chiave_honor(nome)
+    if not titolo or not chiave_nome or chiave_nome not in _chiave_honor(titolo):
+        return None
+
+    # La stessa risposta HTML contiene il catalogo completo del menu: senza
+    # questo ritaglio ``100 W`` di un alimentatore HONOR diventava la ricarica
+    # del telefono. Le immagini della pagina prodotto sono invece in una
+    # cartella che contiene ESATTAMENTE il suo slug; è il confine stabile fra
+    # contenuto del modello e navigazione generale.
+    slug = _slug_honor(nome)
+    marker = f"/products/smartphone/{slug}/" if slug else ""
+    start = pagina.lower().find(marker.lower()) if marker else -1
+    if start < 0:
+        return None
+    pagina_prodotto = pagina[start:]
+    testo = _testo_honor_pagina(pagina_prodotto)
+    batteria = _HONOR_BATTERIA_RE.search(testo)
+    ricarica = _HONOR_RICARICA_RE.search(testo)
+    peso = _HONOR_PESO_RE.search(testo)
+    spessore = _HONOR_SPESSORE_RE.search(testo)
+    camera = _HONOR_CAMERA_RE.search(testo)
+    risoluzione = _HONOR_RISOLUZIONE_RE.search(testo)
+    hz = _HONOR_HZ_RE.search(testo)
+    image = _HONOR_OG_IMAGE_RE.search(pagina or "")
+
+    display_parts = []
+    if risoluzione:
+        display_parts.append(f"{risoluzione.group(1)} × {risoluzione.group(2)} px")
+    if hz:
+        display_parts.append(f"{hz.group(1)} Hz")
+    sezioni = {"Specifiche ufficiali HONOR": {
+        key: value for key, value in {
+            "Batteria": f"{batteria.group(1)} mAh" if batteria else None,
+            "Ricarica": f"{ricarica.group(1)} W" if ricarica else None,
+            "Fotocamera principale": f"{camera.group(1)} MP" if camera else None,
+            "Peso": f"{peso.group(1)} g" if peso else None,
+            "Spessore": f"{spessore.group(1)} mm" if spessore else None,
+            "Display": " · ".join(display_parts) or None,
+            "Pagina prodotto": url,
+        }.items() if value
+    }}
+    if len(sezioni["Specifiche ufficiali HONOR"]) <= 1:
+        return None
+    return Scheda(
+        nome=nome,
+        marca=C.HUAWEI,
+        foto=html.unescape(image.group(1)) if image else None,
+        display=" · ".join(display_parts) or None,
+        batteria=f"{batteria.group(1)} mAh" if batteria else None,
+        ricarica=f"{ricarica.group(1)} W cablata" if ricarica else None,
+        camera_post=f"{camera.group(1)} MP" if camera else None,
+        peso=f"{peso.group(1)} g" if peso else None,
+        dimensioni=f"spessore {spessore.group(1)} mm" if spessore else None,
+        sezioni_json=_ripiega_sezioni(sezioni),
+        fonte=FONTE_HONOR_LABEL,
+    )
+
+
+def _ripiego_honor_ufficiale(*indizi: str | None, marca: str | None = None) -> Scheda | None:
+    """Scheda leggera dalla pagina prodotto italiana per qualsiasi HONOR.
+
+    È un fallback per modello, non un catalogo: entra dopo le fonti locali e
+    versus e conserva al massimo 32 piccole schede. Così i nuovi HONOR non
+    producono una card vuota solo perché il mirror GSMArena non li include.
+    """
+    marca_bassa = (marca or "").lower()
+    candidati = [str(indizio).strip() for indizio in indizi
+                 if indizio and "honor" in str(indizio).lower()]
+    if not candidati and "honor" not in marca_bassa:
+        return None
+    if not candidati:
+        return None
+    nome = next((c for c in candidati if _slug_honor(c)), None)
+    slug = _slug_honor(nome or "")
+    if not slug or requests is None:
+        return None
+
+    ora = time.monotonic()
+    with _honor_specs_lock:
+        cached = _honor_specs_cache.get(slug)
+        if cached and ora - cached[0] < _HONOR_SPECS_TTL:
+            return cached[1]
+
+    url = _HONOR_PRODUCT_URL.format(slug=slug)
+    try:
+        response = requests.get(url, headers={"User-Agent": C.USER_AGENT},
+                                timeout=C.SEARCH_HTTP_TIMEOUT)
+    except Exception:
+        return None
+    scheda = None
+    if getattr(response, "status_code", 0) == 200:
+        scheda = _scheda_honor_da_html(nome, getattr(response, "text", "") or "", url)
+    with _honor_specs_lock:
+        if len(_honor_specs_cache) >= _HONOR_SPECS_CACHE_LIMIT:
+            _honor_specs_cache.pop(next(iter(_honor_specs_cache)))
+        _honor_specs_cache[slug] = (ora, scheda)
+    return scheda
+
+
 def _ripiego_esterno(*indizi: str | None, marca: str | None = None) -> Scheda | None:
-    """La scheda di un modello HONOR/realme/Huawei/Nothing, da versus.com.
+    """La scheda di un modello fuori dal mirror, da versus o HONOR ufficiale.
 
     Il limite n. 1 dichiarato in testa a questo file — «le marche coperte
     sono dieci» — era vero e resta vero per QUESTA fonte, ma non doveva
@@ -711,7 +871,9 @@ def _ripiego_esterno(*indizi: str | None, marca: str | None = None) -> Scheda | 
     telefono senza sapere che telefono è. Vedi `core/versus.py`.
 
     Sta DOPO il catalogo e non prima: il mirror GSMArena è indicizzato per
-    codice modello e distingue le varianti regionali, versus no.
+    codice modello e distingue le varianti regionali, versus.com no. Se
+    versus non conosce un HONOR, si prova infine la sua pagina italiana
+    ufficiale — sempre per un solo modello, mai come catalogo bulk.
 
     ## Il bug reale trovato dall'utente: «RMX3933» senza scheda, «realme
     Note 60» con la scheda — stesso telefono
@@ -789,7 +951,7 @@ def _ripiego_esterno(*indizi: str | None, marca: str | None = None) -> Scheda | 
                 return _a_scheda(riga)
     except Exception:  # il ripiego non deve mai fermare una ricerca
         pass
-    return None
+    return _ripiego_honor_ufficiale(*testi, marca=marca)
 
 
 def cerca(*indizi: str | None, marca: str | None = None) -> Scheda | None:

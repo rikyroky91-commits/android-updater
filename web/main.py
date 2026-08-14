@@ -1342,10 +1342,18 @@ def _cerca_davvero(query: str) -> dict:
     corrente = next((i for i in fonti_dirette
                      if tipo(i) == C.FW_CURRENT and ha_versione(i)), None)
     riportata = next((i for i in fonti_dirette
-                      if tipo(i) == C.FW_REPORTED and ha_versione(i)), None)
+                       if tipo(i) == C.FW_REPORTED and ha_versione(i)), None)
     base_android = next((i for i in fonti_dirette
-                         if tipo(i) in (C.FW_FACTORY, C.FW_SUPPORT)
-                         and ha_versione(i)), None)
+                          if tipo(i) in (C.FW_FACTORY, C.FW_SUPPORT)
+                          and ha_versione(i)), None)
+    # Alcuni produttori — HONOR in particolare — pubblicano una cadenza di
+    # sicurezza per modello ma non il numero dell'OTA. Non è un firmware
+    # corrente, ma è comunque un esito concreto e verificabile: lasciarlo
+    # cadere produceva una scheda apparentemente vuota benché la fonte
+    # ufficiale avesse risposto. La riga resta esplicita sul limite, così il
+    # supporto non viene mai confuso con una build installata.
+    supporto_senza_versione = next((i for i in fonti_dirette
+                                    if tipo(i) == C.FW_SUPPORT and not ha_versione(i)), None)
     versione_certa = corrente or riportata or base_android
     identita = versione_certa or (fonti_dirette[0] if fonti_dirette else {})
 
@@ -1396,6 +1404,22 @@ def _cerca_davvero(query: str) -> dict:
                 mese = extract.mese_leggibile(versione_certa.get("build") or "")
                 if mese:
                     pezzi.append(f"build di {mese}")
+
+    if not pezzi and supporto_senza_versione:
+        # ``size_info`` viene arricchito più avanti con il SoC per la scheda
+        # tecnica. La riga di supporto deve invece descrivere SOLO la policy
+        # firmware, quindi preferisce l'etichetta della fonte costruita prima
+        # di quell'arricchimento.
+        dettaglio_supporto = (supporto_senza_versione.get("source_label")
+                              or supporto_senza_versione.get("size_info") or "").strip()
+        dettaglio_supporto = dettaglio_supporto.removesuffix(" (ricerca diretta)")
+        if dettaglio_supporto:
+            pezzi.append(f"Supporto ufficiale: {dettaglio_supporto}")
+        else:
+            pezzi.append(
+                "Supporto ufficiale confermato; il produttore non pubblica una build OTA per modello"
+            )
+        tipo_versione = C.FW_SUPPORT
 
     storico, chiave, nome_archivio = _storico_del_modello(
         nome, identita.get("brand", ""))

@@ -2616,11 +2616,15 @@ def _realme_espandi(composto: str) -> list[str]:
 
 
 def _realme_codice_verificato(query: str) -> tuple[str, str] | None:
-    """Restituisce `(codice, nome)` solo se realme lo dichiara ufficialmente.
+    """Restituisce ``(codice, nome)`` per un RMX identificato con certezza.
 
-    Il catalogo tecnico da solo non basta a collegare un file a un telefono:
-    nomi come C61 sono riusati. Il codice RMX risolve quell'ambiguità; prima
-    si controlla nella pagina di realme, poi si consulta l'archivio.
+    L'elenco AER realme resta la prova preferita, ma non è un catalogo
+    completo: modelli consumer recenti possono non comparirvi affatto.
+    Escluderli a priori trasformava un limite del piano AER in un limite
+    della ricerca firmware. Per un *codice RMX esatto* la variante è già
+    non ambigua; se AER tace si accetta quindi la corrispondenza del catalogo
+    dei codici modello. L'archivio resta comunque ``REPORTED``: una build
+    osservata non viene mai spacciata per la risposta OTA del telefono.
     """
     testo = (query or "").strip()
     if not testo:
@@ -2633,7 +2637,66 @@ def _realme_codice_verificato(query: str) -> tuple[str, str] | None:
     if variante and variante[1] in ufficiali:
         codice = variante[1]
         return codice, ufficiali[codice][0]
+
+    # Il codice esatto è l'identità, anche per i realme fuori dal programma
+    # Android Enterprise Recommended. Non usare `resolve_senza_ambiguita`:
+    # qui non partiamo da un nome condiviso, ma dal codice stampato sul
+    # dispositivo, e i suoi nomi regionali sono alternative lecite.
+    if re.fullmatch(r"RMX\d{4}[A-Z]*", codice):
+        nomi = modelcodes.resolve(codice)
+        if nomi:
+            return codice, _nome_realme_per_codice(codice, nomi)
+
+    # Stessa copertura per chi cerca il nome commerciale. Si prosegue solo se
+    # il catalogo porta a UN SOLO RMX: "realme C61" può essere un alias di
+    # più telefoni e non deve mai interrogare un firmware scelto a caso.
+    try:
+        candidati = [c.upper() for c in modelcodes.codes_for_name(testo)
+                      if re.fullmatch(r"RMX\d{4}[A-Z]*", c.upper())]
+    except Exception:
+        candidati = []
+    candidati = list(dict.fromkeys(candidati))
+    if len(candidati) == 1:
+        codice = candidati[0]
+        nomi = modelcodes.resolve(codice)
+        if nomi:
+            return codice, _nome_realme_per_codice(codice, nomi)
     return None
+
+
+def _nome_realme_per_codice(codice: str, nomi: list[str] | None = None) -> str:
+    """Nome da mostrare per un codice RMX, con priorità al mercato europeo.
+
+    L'archivio del firmware conosce il codice, non il paese. Il nome curato
+    per l'Europa resta prioritario; fuori da quei casi, una grafia latina è
+    più affidabile nell'interfaccia italiana di un'etichetta cinese generica.
+    Se il dataset non conosce nessun nome commerciale latino non si inventa
+    un rebrand: si mostra il codice RMX, che è l'identità certa.
+    """
+    nomi = nomi or modelcodes.resolve(codice)
+    codice = (codice or "").strip().upper()
+    try:
+        override = modelcodes._indice_override_nomi().get(codice)
+    except Exception:  # pragma: no cover - il file curato è solo una preferenza
+        override = None
+    if override and override in nomi:
+        return override
+
+    preferito = modelcodes.nome_canonico(codice)
+    contiene_cinese = lambda valore: any("一" <= ch <= "鿿" for ch in (valore or ""))
+    if preferito and not contiene_cinese(preferito):
+        return preferito
+
+    # ``realme RMX5061`` è una ripetizione del codice, non un nome da
+    # privilegiare rispetto a ``GT 7``. I nomi latini restanti vengono
+    # ordinati con gli stessi due criteri prudenti del catalogo: prima la
+    # forma non condivisa, poi quella più corta e stabile.
+    latini = [n for n in nomi
+              if not contiene_cinese(n) and not modelcodes._e_il_codice(n, codice)]
+    if latini:
+        return min(latini, key=lambda n: (
+            modelcodes.codes_for_name(n) != [codice], len(n), n.lower()))
+    return f"realme {codice}"
 
 
 def _realme_data_pacchetto(valore: str) -> str:
@@ -3645,9 +3708,10 @@ SOURCES: list[Source] = [
            "fine del supporto e cadenza delle patch. Verificata sul sito reale."),
     Source("news_vivo_iqoo", "vivo/iQOO — ricerca news", C.TRUST_NOISY,
            fetch_vivo_iqoo, C.VIVO, "https://news.google.com", is_web_search=True),
-    Source("motorola_lolinet", "Motorola — firmware (mirror lolinet.com)", C.TRUST_STRUCTURED,
+    Source("motorola_lolinet", "Motorola — firmware per codice", C.TRUST_STRUCTURED,
            fetch_motorola_lolinet, C.VIVO, "https://mirrors.lolinet.com/firmware/lenomola/",
-           "Copertura manuale dei modelli principali 2022-2025 (Razr/Edge/G)."),
+           "lolinet per i codename verificati; nelle ricerche dirette, fallback "
+           "dall'archivio tecnico per ogni codice XT del catalogo Motorola."),
     Source("news_motorola", "Motorola — ricerca news", C.TRUST_NOISY,
            fetch_motorola, C.VIVO, "https://news.google.com", is_web_search=True),
     Source("news_minor", "Altri brand — ricerca news", C.TRUST_NOISY,
@@ -4110,20 +4174,59 @@ def _lookup_xiaomi(model_name: str) -> list[RawItem]:
     return _risultati_xiaomi_ordinati(vicini, codice)
 
 
+def _nomi_da_codice_del_brand(model_name: str, brand: str) -> list[str]:
+    """Nomi regionali di un codice esatto, senza confondere codici diversi.
+
+    ``expand_query`` scarta gli alias ambigui per proteggere ricerche come
+    RMX3939/C61. Qui il contesto è diverso: una fonte riceve il *codice
+    esatto* e deve poterlo tradurre nel suo nome commerciale. Non farlo era
+    il motivo per cui BRP-NX1M non raggiungeva nemmeno il bollettino HONOR
+    che conosce già Magic7 Lite. Il codice resta associato al risultato dalla
+    ricerca chiamante, quindi non viene mai scambiato con un suo omonimo.
+    """
+    names: list[str] = []
+    for code in _code_candidates(model_name):
+        if brand_from_code(code) != brand:
+            continue
+        canonical = modelcodes.nome_canonico(code)
+        if canonical:
+            names.append(canonical)
+        names.extend(modelcodes.resolve(code))
+    seen: set[str] = set()
+    return [name for name in names
+            if (key := modelcodes._normalize_name(name)) and not (key in seen or seen.add(key))]
+
+
+def _aghi_lookup(model_name: str, brand: str) -> list[str]:
+    """Chiavi del testo e, quando è presente, del codice modello esatto."""
+    names = [model_name] + _nomi_da_codice_del_brand(model_name, brand)
+    seen: set[str] = set()
+    result = []
+    for name in names:
+        key = modelcodes._normalize_name(name)
+        if key and key not in seen:
+            seen.add(key)
+            result.append(key)
+    return result
+
+
 def _lookup_honor(model_name: str) -> list[RawItem]:
     """Stessa regola di `_lookup_xiaomi`: prima il nome esatto, poi chi lo
     contiene. «HONOR 200» non deve rispondere «HONOR 200 Pro»."""
     all_items, error = fetch_honor_aer()
     if error or not all_items:
         return []
-    needle = modelcodes._normalize_name(model_name)
-    if not needle:
+    needles = _aghi_lookup(model_name, C.HUAWEI)
+    if not needles:
         return []
     nomi = [(item, modelcodes._normalize_name(item.device or "")) for item in all_items]
-    esatti = [item for item, nome in nomi if nome == needle]
+    esatti = [item for item, nome in nomi if nome in needles]
     if esatti:
         return esatti[:3]
-    return _piu_vicini(nomi, needle)
+    vicini = []
+    for needle in needles:
+        vicini.extend(_piu_vicini(nomi, needle))
+    return vicini[:3]
 
 
 def _lookup_honor_security(model_name: str) -> list[RawItem]:
@@ -4131,14 +4234,17 @@ def _lookup_honor_security(model_name: str) -> list[RawItem]:
     all_items, error = fetch_honor_security_bulletin()
     if error or not all_items:
         return []
-    needle = modelcodes._normalize_name(model_name)
-    if not needle:
+    needles = _aghi_lookup(model_name, C.HUAWEI)
+    if not needles:
         return []
     nomi = [(item, modelcodes._normalize_name(item.device or "")) for item in all_items]
-    esatti = [item for item, name in nomi if name == needle]
+    esatti = [item for item, name in nomi if name in needles]
     if esatti:
         return esatti[:3]
-    return _piu_vicini(nomi, needle)
+    vicini = []
+    for needle in needles:
+        vicini.extend(_piu_vicini(nomi, needle))
+    return vicini[:3]
 
 
 # Sotto questa lunghezza il termine cercato non identifica un telefono.
@@ -4227,10 +4333,116 @@ def _piu_vicini(nomi: list[tuple], cercato: str) -> list[RawItem]:
     return [item for item, _ in scelta[:3]]
 
 
+_MOTOROLA_ARCHIVE_SEARCH_URL = (
+    "https://support.halabtech.com/index.php?a=downloads&b=search&keyword={code}&p_start=1"
+)
+_MOTOROLA_ARCHIVE_LINK_RE = re.compile(
+    r'<a\b[^>]*href=["\'](?P<link>https?://[^"\']*\b=file[^"\']*)["\'][^>]*>'
+    r'\s*(?P<filename>[^<]+?\.(?:xml\.)?zip)\s*</a>',
+    re.IGNORECASE,
+)
+_MOTOROLA_ARCHIVE_DATE_RE = re.compile(
+    r'class=["\']file-date["\'][^>]*>\s*Date:\s*(\d{2})-(\d{2})-(\d{4})',
+    re.IGNORECASE,
+)
+
+
+def _data_archivio_iso(day: str, month: str, year: str) -> str:
+    """Data dell'archivio tecnico, in formato accettato dal resto dell'app."""
+    return f"{year}-{month}-{day}"
+
+
+def _firmware_motorola_archivio(code: str) -> list[tuple[str, str, str | None]]:
+    """File di un codice XT da archivio tecnico, senza scaricare firmware.
+
+    Motorola non offre un endpoint pubblico per interrogare *tutti* i codici
+    XT; lolinet è ottimo ma organizzato per codename e quindi richiedeva una
+    tabella manuale. Questa interrogazione per codice mantiene lolinet come
+    fonte preferita, ma ne toglie il limite strutturale: qualsiasi XT presente
+    nel catalogo ufficiale Motorola può cercare una build osservabile.
+    """
+    try:
+        response = http_get(_MOTOROLA_ARCHIVE_SEARCH_URL.format(code=code),
+                            timeout=C.SEARCH_HTTP_TIMEOUT)
+    except Exception:
+        return []
+    if getattr(response, "status_code", 0) != 200:
+        return []
+    page = html.unescape(getattr(response, "text", "") or "")
+    found: list[tuple[str, str, str | None]] = []
+    expected = code.upper()
+    for match in _MOTOROLA_ARCHIVE_LINK_RE.finditer(page):
+        filename = clean_text(match.group("filename"))
+        # Il codice deve essere quello del file, non un riferimento in un
+        # commento della pagina o il codice di un modello vicino.
+        if not filename.upper().startswith(expected + "_"):
+            continue
+        after = page[match.end():match.end() + 1800]
+        date = _MOTOROLA_ARCHIVE_DATE_RE.search(after)
+        published = (_data_archivio_iso(*date.groups()) if date else None)
+        found.append((filename, html.unescape(match.group("link")), published))
+    return found
+
+
+def _codici_motorola_per_ricerca(model_name: str) -> list[tuple[str, str]]:
+    """Codici XT e nome ufficiale, dal catalogo Motorola anziché da liste.
+
+    Per non appesantire le ricerche vivo/iQOO, il catalogo viene consultato
+    soltanto quando la query contiene esplicitamente Motorola/moto oppure è
+    già un codice XT.
+    """
+    raw_code = normalizza_codice_modello(model_name)
+    if re.fullmatch(r"XT\d{4}(?:-\d{1,2})?", raw_code, re.I):
+        display = (motorola_catalog.name_for_code(raw_code, rete=False)
+                   or modelcodes.nome_canonico(raw_code))
+        return [(raw_code.upper(), display or f"Motorola {raw_code.upper()}")]
+    if not re.search(r"\b(?:motorola|moto)\b", model_name or "", re.I):
+        return []
+    return [(code, motorola_catalog.name_for_code(code, rete=False) or f"Motorola {code}")
+            for code in motorola_catalog.codes_for_name(model_name)[:3]]
+
+
+def _chiave_firmware_motorola_archivio(record: tuple[str, str, str | None]) -> tuple:
+    filename, _link, published = record
+    _code, _android, build = _lolinet_metadata(filename)
+    # Le revisioni Motorola sono numeriche (`...-153-3`): il confronto per
+    # numeri evita che una 99 venga presentata come più recente della 153.
+    numbers = tuple(int(n) for n in re.findall(r"\d+", build or ""))
+    return numbers, published or ""
+
+
+def _lookup_motorola_archivio(model_name: str) -> list[RawItem]:
+    """Fallback generico per tutti i Motorola identificati dal codice XT.
+
+    È volutamente un dato ``REPORTED``: l'archivio mostra un pacchetto, non
+    può sapere quale OTA abbia già ricevuto il singolo telefono dell'utente.
+    """
+    items: list[RawItem] = []
+    for code, display in _codici_motorola_per_ricerca(model_name):
+        files = _firmware_motorola_archivio(code)
+        if not files:
+            continue
+        filename, link, published = max(files, key=_chiave_firmware_motorola_archivio)
+        _file_code, android_version, build = _lolinet_metadata(filename, code)
+        device = display if display.lower().startswith("motorola ") else f"Motorola {display}"
+        items.append(RawItem(
+            title=f"{device} — build {build or filename}",
+            link=link,
+            published=iso(published),
+            brand=C.VIVO,
+            device=device,
+            model_code=code,
+            build=build,
+            android_version=android_version,
+            size_info="Archivio tecnico Motorola · build riportata, non OTA ufficiale",
+            trust=C.TRUST_CURATED,
+            firmware_kind=C.FW_REPORTED,
+        ))
+    return items
+
+
 def _lookup_motorola(model_name: str) -> list[RawItem]:
-    """Cerca fra i modelli Motorola coperti dal mirror. Qui la copertura
-    resta quella della tabella manuale (il mirror è organizzato per nome in
-    codice interno, non per nome commerciale)."""
+    """Prima lolinet, poi un fallback per codice XT senza lista manuale."""
     query_code = normalizza_codice_modello(model_name)
     target = MOTOROLA_LOLINET_CODES.get(query_code)
     if target:
@@ -4240,22 +4452,21 @@ def _lookup_motorola(model_name: str) -> list[RawItem]:
         try:
             found = _lolinet_latest(codename, year)
         except Exception:
-            return []
-        if not found:
-            return []
-        filename, file_url, date_str = found
-        model_code, android_version, build = _lolinet_metadata(filename, query_code)
-        return [RawItem(
-            title=f"Motorola {commercial} - build {build or filename}",
-            link=file_url,
-            published=iso(date_str.replace(" ", "T", 1)),
-            brand=C.VIVO,
-            device=f"Motorola {commercial}",
-            model_code=model_code,
-            build=build,
-            android_version=android_version,
-            size_info="Firmware ufficiale (mirror lolinet.com)",
-        )]
+            found = None
+        if found:
+            filename, file_url, date_str = found
+            model_code, android_version, build = _lolinet_metadata(filename, query_code)
+            return [RawItem(
+                title=f"Motorola {commercial} - build {build or filename}",
+                link=file_url,
+                published=iso(date_str.replace(" ", "T", 1)),
+                brand=C.VIVO,
+                device=f"Motorola {commercial}",
+                model_code=model_code,
+                build=build,
+                android_version=android_version,
+                size_info="Firmware ufficiale (mirror lolinet.com)",
+            )]
 
     needle = modelcodes._normalize_name(model_name)
     if not needle:
@@ -4266,22 +4477,21 @@ def _lookup_motorola(model_name: str) -> list[RawItem]:
         try:
             found = _lolinet_latest(codename, year)
         except Exception:
-            return []
-        if not found:
-            return []
-        filename, file_url, date_str = found
-        name_match = _LOLINET_NAME_RE.search(filename)
-        return [RawItem(
-            title=f"Motorola {commercial} — build {name_match.group(3) if name_match else filename}",
-            link=file_url,
-            published=iso(date_str.replace(" ", "T", 1)),
-            brand=C.VIVO,
-            device=f"Motorola {commercial}",
-            build=name_match.group(3) if name_match else None,
-            android_version=int(name_match.group(2)) if name_match else None,
-            size_info="Firmware ufficiale (mirror lolinet.com)",
-        )]
-    return []
+            found = None
+        if found:
+            filename, file_url, date_str = found
+            name_match = _LOLINET_NAME_RE.search(filename)
+            return [RawItem(
+                title=f"Motorola {commercial} — build {name_match.group(3) if name_match else filename}",
+                link=file_url,
+                published=iso(date_str.replace(" ", "T", 1)),
+                brand=C.VIVO,
+                device=f"Motorola {commercial}",
+                build=name_match.group(3) if name_match else None,
+                android_version=int(name_match.group(2)) if name_match else None,
+                size_info="Firmware ufficiale (mirror lolinet.com)",
+            )]
+    return _lookup_motorola_archivio(model_name)
 
 
 def _lookup_apple(model_name: str) -> list[RawItem]:
@@ -4369,7 +4579,7 @@ class StructuredLookup:
 _STRUCTURED_LOOKUPS_LIST = [
     StructuredLookup(C.SAMSUNG, _lookup_samsung, "alto", "controllo versione Samsung"),
     StructuredLookup(C.APPLE, _lookup_apple, "alto", "firmware Apple per dispositivo"),
-    StructuredLookup(C.VIVO, _lookup_motorola, "alto", "mirror firmware Motorola"),
+    StructuredLookup(C.VIVO, _lookup_motorola, "alto", "firmware Motorola per codice"),
     StructuredLookup(C.PIXEL, _lookup_pixel, "basso", "immagini OTA ufficiali Pixel",
                      fetch_pixel_ota, firmware_kind=C.FW_BETA),
     StructuredLookup(C.VIVO, _lookup_vivo, "basso", "piano ufficiale vivo",
@@ -4495,7 +4705,8 @@ _NOTE_COPERTURA = {
     ),
     C.VIVO: (
         "vivo e iQOO pubblicano il piano di supporto ufficiale ma non la "
-        "build per modello. Per Motorola la build reale c'è (mirror lolinet)."
+        "build per modello. Per Motorola si prova prima lolinet e, per ogni "
+        "codice XT ufficiale, una build riportata dall'archivio tecnico."
     ),
     C.OTHER: (
         "Marca senza fonte dedicata: si può solo riportare quanto scrivono "
@@ -4614,10 +4825,19 @@ def _sottomarca_nominata(testo: str) -> str | None:
     parole = set(re.sub(r"[^a-z0-9 ]+", " ", (testo or "").lower()).split())
     if not parole:
         return None
+    # Alcuni nomi commerciali e di assistenza usano un'abbreviazione della
+    # stessa sotto-marca (``moto`` / ``Motorola``). Il filtro che segue non
+    # deve considerarle produttori in conflitto: altrimenti una ricerca per
+    # ``moto g05`` butta via la risposta ufficialmente identificata come
+    # ``Motorola moto g05`` prima ancora di arrivare alla UI.
+    #
+    # Questa tabella riguarda identità di marca, non modelli: resta quindi
+    # valida per ogni Motorola presente e futuro, senza eccezioni per codice.
+    aliases = {"moto": "motorola"}
     for sottomarche in extract._SOTTOMARCHE_DEL_GRUPPO.values():
         for sottomarca in sottomarche:
             if sottomarca in parole:
-                return sottomarca
+                return aliases.get(sottomarca, sottomarca)
     return None
 
 

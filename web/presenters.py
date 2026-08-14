@@ -370,14 +370,15 @@ def scheda_tecnica(nome: str, codice: str = "", brand: str = "",
                 "disponibile per questo modello: il processore sopra viene "
                 "dalla tabella verificata a mano del progetto. Le schede "
                 "arrivano dal catalogo GSMArena e, per HONOR, realme, Huawei "
-                "e Nothing, da versus.com: un modello assente da entrambi è "
-                "di solito un tablet o una variante venduta in un solo mercato."
+                "e Nothing, da versus.com; per HONOR si prova anche la pagina "
+                "ufficiale italiana. Un modello assente da tutte è di solito "
+                "un tablet o una variante venduta in un solo mercato."
                 if chip else
                 "Specifiche hardware non disponibili per questo modello. Le "
                 "schede arrivano dal catalogo GSMArena (Samsung, Xiaomi, OPPO, "
-                "OnePlus, vivo, Motorola, Google, Apple, Sony, Nokia) e da "
-                "versus.com per HONOR, realme, Huawei e Nothing: questo "
-                "modello non è in nessuno dei due."
+                "OnePlus, vivo, Motorola, Google, Apple, Sony, Nokia), da "
+                "versus.com per HONOR, realme, Huawei e Nothing e dalla pagina "
+                "HONOR Italia quando disponibile: questo modello non è in nessuna fonte."
             )
         ),
     }

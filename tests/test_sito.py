@@ -640,6 +640,29 @@ class TestRicerca(_Sito):
             type(self).RISPOSTA_RICERCA = staticmethod(
                 lambda q: {"items": [], "error": None})
 
+    def test_supporto_ufficiale_senza_build_non_lascia_una_scheda_vuota(self):
+        """La policy di sicurezza è utile, ma non deve sembrare un OTA.
+
+        Vale per qualunque fonte ``support`` senza major/build: HONOR usa
+        proprio questa forma perché il suo bollettino pubblico dichiara la
+        cadenza ma non il numero dell'aggiornamento installabile.
+        """
+        type(self).RISPOSTA_RICERCA = staticmethod(lambda q: {"items": [{
+            "source": "official_lookup",
+            "source_label": "Bollettino HONOR — cadenza trimestrale; il produttore non pubblica una build OTA per modello",
+            "firmware_kind": "support", "brand": "Huawei / Honor",
+            "device_model": "HONOR Magic7 Lite", "model_code": "BRP-NX1M",
+            "size_info": "cadenza trimestrale; il produttore non pubblica una build OTA per modello",
+            "title": "", "severity": "", "color": "#00CC66",
+        }], "error": None})
+        try:
+            pagina = self.client.get("/", params={"q": "BRP-NX1M"}).text
+            self.assertIn("Supporto ufficiale: Bollettino HONOR — cadenza trimestrale", pagina)
+            self.assertNotIn("nessuna fonte ne pubblica la versione", pagina)
+        finally:
+            type(self).RISPOSTA_RICERCA = staticmethod(
+                lambda q: {"items": [], "error": None})
+
 
 class TestConfronto(_Sito):
     """La pagina che mette due modelli fianco a fianco.

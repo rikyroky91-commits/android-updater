@@ -17,6 +17,7 @@ risposta esatta si conosce.
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -279,6 +280,46 @@ class TestRipiegoEsternoConMarca(unittest.TestCase):
 
         self.assertIsNotNone(scheda)
         self.assertIn("realme GT 5G", chiamate)
+
+
+class TestSpecificheHonorUfficiali(unittest.TestCase):
+    """Fallback leggero sulle pagine italiane di prodotto HONOR."""
+
+    _HTML = """
+    <html><head><title>HONOR Magic7 Lite - HONOR Italia</title>
+    <meta property="og:image" content="https://img.example/magic7-lite.jpg"></head>
+    <body>https://www-file.honor.com/content/dam/honor/it/products/smartphone/honor-magic7-lite/assets/hero.jpg
+    HONOR Magic7 Lite Batteria al silicio-carbonio da 6600mAh.
+    Il caricatore HONOR 66W SuperCharge aumenta rapidamente la potenza.
+    peso 189 g e uno spessore di 7,98 mm. Risoluzione 2700 * 1224.
+    Display 120Hz. Fotocamera principale 108MP.</body></html>
+    """
+
+    class _Response:
+        status_code = 200
+
+        def __init__(self, text):
+            self.text = text
+
+    def tearDown(self):
+        specs.reset_cache()
+
+    def test_legge_solo_valori_dichiarati_dalla_pagina_ufficiale(self):
+        with patch.object(specs.requests, "get", return_value=self._Response(self._HTML)):
+            scheda = specs._ripiego_honor_ufficiale(
+                "BRP-NX1M", "HONOR Magic7 Lite", marca="HONOR")
+
+        self.assertIsNotNone(scheda)
+        self.assertEqual(scheda.nome, "HONOR Magic7 Lite")
+        self.assertEqual(scheda.batteria, "6600 mAh")
+        self.assertEqual(scheda.ricarica, "66 W cablata")
+        self.assertEqual(scheda.camera_post, "108 MP")
+        self.assertEqual(scheda.peso, "189 g")
+        self.assertEqual(scheda.fonte, specs.FONTE_HONOR_LABEL)
+
+    def test_non_si_attiva_per_un_altro_brand(self):
+        self.assertIsNone(specs._ripiego_honor_ufficiale(
+            "realme Note 70T", marca="realme"))
 
 
 class TestChipsetLeggibile(unittest.TestCase):

@@ -32,6 +32,7 @@ _ROW_RE = re.compile(
 )
 _TAG_RE = re.compile(r"<[^>]+>")
 _CODE_RE = re.compile(r"^XT\d{4}(?:-\d{1,2})?$", re.IGNORECASE)
+_NAME_WORD_RE = re.compile(r"[a-z0-9]+", re.IGNORECASE)
 
 _lock = threading.Lock()
 _codes: dict[str, str] | None = None
@@ -63,8 +64,15 @@ def _download() -> bytes:
     return content
 
 
-def carica(forza: bool = False) -> dict[str, str]:
-    """Mappa aggiornata, con cache compressa nel DB incluso nell'immagine."""
+def carica(forza: bool = False, rete: bool = True) -> dict[str, str]:
+    """Mappa aggiornata, con cache compressa nel DB incluso nell'immagine.
+
+    ``rete=False`` serve alle ricerche interattive: il database-seme creato
+    durante la build è già sufficiente a risolvere i codici, mentre attendere
+    il refresh del sito Motorola può consumare tutto il budget della pagina.
+    Il preload e i refresh espliciti mantengono invece il comportamento di
+    rete predefinito.
+    """
     global _codes, _loaded_at, _status
     with _lock:
         if (_codes is not None and _loaded_at is not None and not forza
@@ -81,8 +89,17 @@ def carica(forza: bool = False) -> dict[str, str]:
             except (TypeError, ValueError):
                 pass
 
-        content = cached if fresh else None
-        source = "archivio" if fresh else "rete"
+        content = cached if fresh or not rete else None
+        source = "archivio" if content is not None else "rete"
+        if content is None and not rete:
+            # La richiesta interattiva non deve trasformarsi in un download
+            # inatteso quando il database-seme non e' ancora disponibile.
+            # Torna vuoto: il chiamante prosegue con le altre fonti nel suo
+            # budget, mentre il preload/refresh esplicito puo' popolare la
+            # cache in seguito.
+            _status = "archivio non disponibile"
+            return _codes or {}
+
         if content is None:
             try:
                 content = _download()
@@ -116,8 +133,34 @@ def carica_da(rows: dict[str, str], etichetta: str = "elenco fornito") -> dict[s
         return _codes
 
 
-def name_for_code(code: str) -> str | None:
-    return carica().get(str(code or "").strip().upper())
+def name_for_code(code: str, rete: bool = True) -> str | None:
+    return carica(rete=rete).get(str(code or "").strip().upper())
+
+
+def _name_key(value: str) -> str:
+    """Chiave prudente per il nome commerciale nella tabella Motorola.
+
+    Il catalogo ufficiale alterna ``motorola moto g05`` e ``moto g05``;
+    marca e spazi non devono decidere se la ricerca per nome riesce. Non si
+    eliminano invece parole di gamma (``power``, ``5g``...) perche' quelle
+    identificano modelli diversi.
+    """
+    words = [w.lower() for w in _NAME_WORD_RE.findall(value or "")]
+    return " ".join(w for w in words if w not in {"motorola", "moto"})
+
+
+def codes_for_name(name: str) -> list[str]:
+    """Codici XT ufficiali per un nome commerciale esatto.
+
+    E' l'inverso di :func:`name_for_code`: permette alla ricerca di partire
+    da ``moto g05`` e interrogare un archivio firmware *per codice*, senza
+    mantenere nel codice una lista manuale di modelli Motorola.
+    """
+    target = _name_key(name)
+    if not target:
+        return []
+    return [code for code, display in carica(rete=False).items()
+            if _name_key(display) == target]
 
 
 def status() -> str:
