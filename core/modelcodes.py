@@ -362,6 +362,18 @@ def resolve(code: str) -> list[str]:
         _memory_cache = _build_index()
     codice = (code or "").strip().upper()
     nomi = _memory_cache.get(codice, [])
+    # Il catalogo di certificazioni Motorola e' la fonte primaria per i
+    # codici XT europei che i due dataset generici non elencano. E' una
+    # risposta di identita' soltanto: firmware e versione continuano a
+    # provenire dalla fonte dedicata Motorola.
+    if not nomi and re.fullmatch(r"XT\d{4}(?:-\d{1,2})?", codice):
+        try:
+            from . import motorola_catalog
+            nome = motorola_catalog.name_for_code(codice)
+            if nome:
+                nomi = [nome]
+        except Exception:
+            pass
     if len(nomi) < 2:
         return nomi
 

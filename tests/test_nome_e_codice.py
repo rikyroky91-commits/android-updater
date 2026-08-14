@@ -617,6 +617,43 @@ class TestNomeEsattoBatteLaSottostringa(unittest.TestCase):
         trovati = sources._lookup_xiaomi("Redmi Note 13")
         self.assertEqual(trovati[0].device, "Redmi Note 13 Global")
 
+    def test_varianti_con_alias_usano_l_eea_della_stessa_build(self):
+        """L'alias POCO dopo la barra non deve far sparire la ROM EEA.
+
+        Il catalogo può avere le prime tre righe di un prodotto in mercati
+        extraeuropei e il nome EEA in una quarta riga. Il token ``WOU``
+        collega le quattro build, senza accostare un altro Redmi 15.
+        """
+        sources.fetch_xiaomi = lambda: ([
+            sources.RawItem(title="india", device="Redmi 15 5G / POCO M7 Plus 5G India",
+                            build="OS3.0.303.0.WOUINXM"),
+            sources.RawItem(title="taiwan", device="Redmi 15 5G / POCO M7 Plus 5G Taiwan",
+                            build="OS3.0.301.0.WOUTWXM"),
+            sources.RawItem(title="japan", device="Redmi 15 5G / POCO M7 Plus 5G Japan",
+                            build="OS3.0.301.0.WOUJPXM"),
+            sources.RawItem(title="eea", device="Redmi 15 5G / M7 Plus / M8s 5G EEA",
+                            build="OS3.0.301.0.WOUEUXM"),
+            sources.RawItem(title="altro", device="Redmi 15C 5G EEA",
+                            build="OS3.0.303.0.WPOEUXM"),
+        ], None)
+        trovati = sources._lookup_xiaomi("Redmi 15 5G")
+        self.assertEqual(trovati[0].device, "Redmi 15 5G / M7 Plus / M8s 5G EEA")
+
+    def test_major_release_con_token_nuovo_conserva_l_eea(self):
+        """Una major HyperOS può cambiare token senza cambiare telefono."""
+        sources.fetch_xiaomi = lambda: ([
+            sources.RawItem(title="turkey", device="Xiaomi 17 Ultra Turkey",
+                            build="OS3.0.305.0.WPATRXM"),
+            sources.RawItem(title="russia", device="Xiaomi 17 Ultra Russia",
+                            build="OS3.0.305.0.WPARUXM"),
+            sources.RawItem(title="china", device="Xiaomi 17 Ultra China",
+                            build="OS3.0.309.0.WPACNXM"),
+            sources.RawItem(title="eea", device="Xiaomi 17 Ultra EEA",
+                            build="OS3.0.332.0.XPAEUXM"),
+        ], None)
+        trovati = sources._lookup_xiaomi("Xiaomi 17 Ultra")
+        self.assertEqual(trovati[0].device, "Xiaomi 17 Ultra EEA")
+
     def test_codice_xiaomi_con_alias_comune_sblocca_eea_per_prima(self):
         """Il codice è esatto anche se il nome è condiviso da più varianti.
 

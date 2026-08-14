@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core import classify, config as C, extract, sources, storage  # noqa: E402
 from core import appledevices, images, imeicheck, modelcodes, scan, suggest  # noqa: E402
-from core import aer_catalog, oppo_official  # noqa: E402
+from core import aer_catalog, motorola_catalog, oppo_official  # noqa: E402
 
 _FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
 
@@ -1217,6 +1217,53 @@ class TestMotorolaLolinet(unittest.TestCase):
         self.assertEqual(m.group(2), "15")
         self.assertEqual(m.group(3), "V1TVS35H.41-24-6-7")
 
+    def test_fastboot_conserva_android_e_build(self):
+        code, android, build = sources._lolinet_metadata(
+            "fastboot_cancun_g_oem_user_14_UTLBS34.102-91-1_release-keys.zip",
+            "XT2341-2",
+        )
+        self.assertEqual((code, android, build), ("XT2341-2", 14, "UTLBS34.102-91-1"))
+
+    def test_reteu_precede_un_file_di_un_altro_mercato(self):
+        class Response:
+            status_code = 200
+            text = (
+                '<tr><td><a href="XT2323-1_LYNKCO_RETAPAC_15_V9.zip">x</a></td>'
+                '<td>2026-02-01 00:00</td></tr>'
+                '<tr><td><a href="XT2323-1_LYNKCO_RETEU_15_V8.zip">x</a></td>'
+                '<td>2026-01-01 00:00</td></tr>'
+            )
+
+        original = sources.http_get
+        sources.http_get = lambda *_args, **_kwargs: Response()
+        try:
+            found = sources._lolinet_latest("lynkco", 2023)
+        finally:
+            sources.http_get = original
+        self.assertIsNotNone(found)
+        self.assertIn("_RETEU_", found[0])
+
+    def test_codice_xt_mappato_restituisce_il_nome_europeo(self):
+        original = sources._lolinet_latest
+        sources._lolinet_latest = lambda *_args: (
+            "XT2409-1_VIENNA_RETEU_15_V2UIS35.43-12-4-1_subsidy-DEFAULT.zip",
+            "https://mirror.test/XT2409-1.zip", "2026-01-01 00:00",
+        )
+        try:
+            items = sources._lookup_motorola("XT2409-1")
+        finally:
+            sources._lolinet_latest = original
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].device, "Motorola Edge 50 Neo")
+        self.assertEqual(items[0].model_code, "XT2409-1")
+        self.assertEqual(items[0].android_version, 15)
+
+    def test_mappa_codici_copre_un_campione_esteso_di_modelli(self):
+        # Ogni voce deriva dal nome di un pacchetto, non da una somiglianza.
+        self.assertGreaterEqual(len(sources.MOTOROLA_LOLINET_CODES), 25)
+        self.assertEqual(sources.MOTOROLA_LOLINET_CODES["XT2503-4"][2], "Edge 60 Fusion")
+        self.assertEqual(sources.MOTOROLA_LOLINET_CODES["XT2601-2"][2], "Edge 70")
+
     def test_pagina_vuota_non_solleva_eccezioni(self):
         self.assertEqual(sources._LOLINET_FILE_RE.findall("<html>vuota</html>"), [])
 
@@ -1226,6 +1273,17 @@ class TestMotorolaLolinet(unittest.TestCase):
             self.assertIsInstance(year, int)
             self.assertTrue(codename.islower())
             self.assertTrue(model)
+
+
+class TestCatalogoCodiciMotorola(unittest.TestCase):
+    def test_parser_tabella_ufficiale(self):
+        page = (
+            '<tr><td><span>XT2507-1</span></td>'
+            '<td><span>motorola edge 60 pro</span></td></tr>'
+        )
+        self.assertEqual(motorola_catalog.parse(page), {
+            "XT2507-1": "motorola edge 60 pro",
+        })
 
 
 class TestPixelOtaPerPosizione(unittest.TestCase):

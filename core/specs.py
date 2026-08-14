@@ -387,6 +387,22 @@ def _a_scheda(riga: dict) -> Scheda:
     )
 
 
+def _marca_compatibile(scheda: Scheda, richiesta: str | None) -> bool:
+    """Evita che una coincidenza di nome attraversi una famiglia di marchi.
+
+    Il catalogo contiene sia ``Redmi Pad Pro`` sia ``OnePlus Pad Pro``. La
+    ricerca per nome può usare gli alias *dentro* Xiaomi/Redmi/POCO, ma non
+    può trasformare il primo nel secondo. Le schede curate talvolta salvano
+    il nome breve della marca (``Xiaomi``), mentre il catalogo usa il gruppo
+    del tracker: `_MARCHE` normalizza entrambi prima del confronto.
+    """
+    if not richiesta:
+        return True
+    trovata = (scheda.marca or "").strip()
+    canonica = _MARCHE.get(trovata.lower(), trovata)
+    return canonica == richiesta
+
+
 # ======================================================================
 # Archivio → elenco di schede
 # ======================================================================
@@ -646,19 +662,21 @@ def per_codice(codice: str) -> Scheda | None:
 _SUFFISSI_CONNETTIVITA = ("4G", "5G", "LTE", "5G UW")
 
 
-def per_nome(nome: str) -> Scheda | None:
+def per_nome(nome: str, marca: str | None = None) -> Scheda | None:
     testo = (nome or "").strip()
     if not testo:
         return None
     curata = _curata_per_nome(testo)
-    if curata:
+    if curata and _marca_compatibile(curata, marca):
         return curata
     carica()
     forme = _forme_nome(testo)
     for forma in forme:
         riga = _per_nome.get(forma)
         if riga:
-            return _a_scheda(riga)
+            trovata = _a_scheda(riga)
+            if _marca_compatibile(trovata, marca):
+                return trovata
 
     # RIPIEGO, e solo se non è ambiguo. Si accetta una scheda il cui nome
     # è quello cercato più un suffisso di connettività — ma **una sola**:
@@ -668,7 +686,8 @@ def per_nome(nome: str) -> Scheda | None:
         candidate = []
         for suffisso in _SUFFISSI_CONNETTIVITA:
             riga = _per_nome.get(f"{forma} {suffisso}")
-            if riga is not None and riga not in candidate:
+            if (riga is not None and riga not in candidate
+                    and _marca_compatibile(_a_scheda(riga), marca)):
                 candidate.append(riga)
         if len(candidate) == 1:
             return _a_scheda(candidate[0])
@@ -805,7 +824,7 @@ def cerca(*indizi: str | None, marca: str | None = None) -> Scheda | None:
 
     for codice in visti:
         curata = _curata_per_codice(codice)
-        if curata:
+        if curata and _marca_compatibile(curata, marca):
             return curata
     for testo in testi:
         curata = _curata_per_nome(str(testo))
@@ -816,10 +835,12 @@ def cerca(*indizi: str | None, marca: str | None = None) -> Scheda | None:
     for codice in visti:
         riga = _per_codice.get(codice.split("/")[0])
         if riga:
-            return _a_scheda(riga)
+            trovata = _a_scheda(riga)
+            if _marca_compatibile(trovata, marca):
+                return trovata
 
     for testo in testi:
-        trovata = per_nome(str(testo))
+        trovata = per_nome(str(testo), marca=marca)
         if trovata:
             return trovata
 

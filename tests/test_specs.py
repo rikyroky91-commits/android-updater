@@ -150,6 +150,22 @@ class TestRicercaScheda(unittest.TestCase):
         self.assertIsNone(specs.cerca(""))
         self.assertIsNone(specs.cerca(None))
 
+    def test_marca_impedisce_omonimo_di_un_altro_produttore(self):
+        """«Redmi Pad Pro» non può mostrare per errore «OnePlus Pad Pro»."""
+        riga = {
+            "nome": "OnePlus Pad Pro", "marca": C.OPPO,
+            "chipset": "Snapdragon", "codici": [],
+        }
+        precedente_indice = specs._per_nome
+        precedente_ripiego = specs.RIPIEGO_ESTERNO
+        try:
+            _codici, specs._per_nome = specs.indicizza([riga])
+            specs.RIPIEGO_ESTERNO = False
+            self.assertIsNone(specs.cerca("Redmi Pad Pro", marca=C.XIAOMI))
+        finally:
+            specs._per_nome = precedente_indice
+            specs.RIPIEGO_ESTERNO = precedente_ripiego
+
 
 class TestRipiegoEsternoConMarca(unittest.TestCase):
     """Il bug reale: «RMX3933» (un codice) e «Note 60s» (il nome canonico
