@@ -3368,6 +3368,7 @@ class TestSceltaRisultatoMigliore(unittest.TestCase):
 
     def tearDown(self):
         sources.http_get, modelcodes._download = self._orig
+        sources.attendi_riscaldamenti()
         modelcodes.reset_cache()
         storage.reset_state()
         if os.path.exists(self._db):

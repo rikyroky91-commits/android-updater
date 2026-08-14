@@ -295,10 +295,18 @@ class TestTabellaTacVerificata(unittest.TestCase):
                  "35135531,,,\n")                # né marca né modello
         self.assertEqual(imeicheck.carica_tac_curati(testo), {})
 
-    def test_il_file_del_repo_non_contiene_esempi_attivi(self):
-        """L'esempio nel file è commentato: se diventasse una riga vera,
-        l'app affermerebbe un modello che nessuno ha verificato."""
-        self.assertEqual(imeicheck._indice_curato(), {})
+    def test_il_file_del_repo_contiene_solo_tac_verificati_rilevanti(self):
+        """Le righe reali sostituiscono l'esempio commentato.
+
+        Ogni TAC qui è stato aggiunto dopo un caso reale riportato in
+        produzione: protegge la priorità europea di Note 50, Galaxy A16,
+        Galaxy A05s e Redmi A7 Pro, non è più una tabella dimostrativa.
+        """
+        indice = imeicheck._indice_curato()
+        self.assertEqual(indice["86120607"], ("realme", "Note 50"))
+        self.assertIn("35135531", indice)
+        self.assertIn("35690922", indice)
+        self.assertIn("86720708", indice)
 
     def test_la_tabella_verificata_vince_sui_database_scaricati(self):
         """Se una riga è stata controllata di persona e contraddice il
@@ -321,8 +329,12 @@ class TestTabellaTacVerificata(unittest.TestCase):
         try:
             self.assertEqual(imeicheck.identify("351355315430630"),
                              ("Samsung", "Galaxy A54 5G"))
-            # E il dato scaricato non sparisce: resta come confronto.
-            fonti = [v["fonte"] for v in imeicheck.confronto("351355315430630")["voci"]]
+            # Il percorso rapido evita di scaricare centinaia di migliaia
+            # di TAC solo per un valore già verificato. Quando l'indice
+            # completo viene richiesto, il dato pubblico resta comunque
+            # disponibile accanto alla correzione manuale.
+            indice = imeicheck._build_index()
+            fonti = [fonte for fonte, _marca, _specs in indice["35135531"]]
             self.assertIn(imeicheck.FONTE_CURATA, fonti)
             self.assertIn(imeicheck.FONTE_PRINCIPALE, fonti)
             self.assertLess(fonti.index(imeicheck.FONTE_CURATA),

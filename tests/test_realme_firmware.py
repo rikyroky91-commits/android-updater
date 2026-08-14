@@ -29,6 +29,9 @@ class TestArchivioTecnicoRealme(unittest.TestCase):
     def setUp(self):
         self._http_get = sources.http_get
         self._official_codes = sources.realme_official_codes
+        self._modelcodes_resolve = sources.modelcodes.resolve
+        self._modelcodes_codes_for_name = sources.modelcodes.codes_for_name
+        self._aer_lookup = sources.aer_catalog.lookup
         self.calls = []
         sources.reset_realme_firmware_cache()
         sources.realme_official_codes = lambda: {
@@ -44,6 +47,9 @@ class TestArchivioTecnicoRealme(unittest.TestCase):
     def tearDown(self):
         sources.http_get = self._http_get
         sources.realme_official_codes = self._official_codes
+        sources.modelcodes.resolve = self._modelcodes_resolve
+        sources.modelcodes.codes_for_name = self._modelcodes_codes_for_name
+        sources.aer_catalog.lookup = self._aer_lookup
         sources.reset_realme_firmware_cache()
 
     def test_preferisce_gdpr_e_legge_android_dal_pacchetto(self):
@@ -89,6 +95,81 @@ class TestArchivioTecnicoRealme(unittest.TestCase):
         self.assertEqual(sources._lookup_realme_firmware_archive("RMX3939"), [])
         self.assertEqual(sources._lookup_realme_firmware_archive("realme C63"), [])
         self.assertEqual(len(self.calls), sources._REALME_FIRMWARE_SEARCH_PAGES)
+
+    def test_formati_moderni_leggono_build_android_e_regione_europea(self):
+        """Il formato 2025+ non contiene più il vecchio ``_15_C.14``.
+
+        Questa è una regressione del problema trovato nel collaudo reale:
+        l'archivio aveva i file, ma il parser non restituiva nulla.
+        """
+        sources.realme_official_codes = lambda: {
+            "RMX5011": ("realme GT 7 Pro", "trimestrale")
+        }
+        self.CATALOGO = """
+            RMX5011export_11_15.0.0.1120EX01_2025111010101010.zip
+            RMX5011GDPR_11_16.0.2.400EX01_2026021010101010.zip
+            RMX5011 16.0.3.500(EX01) [GDPR].zip
+            RMX5011 16.0.3.500(EX01) [Export].zip
+        """
+
+        items = sources._lookup_realme_firmware_archive("RMX5011")
+
+        self.assertEqual(len(items), 2)
+        self.assertEqual(items[0].device, "realme GT 7 Pro")
+        self.assertEqual(items[0].android_version, 16)
+        self.assertEqual(items[0].build, "16.0.3.500(EX01)")
+        self.assertIn("Europa (GDPR)", items[0].size_info)
+        self.assertIn("senza data interna", items[0].summary)
+        self.assertEqual(items[1].android_version, 16)
+        self.assertIn("Globale / Export", items[1].size_info)
+
+    def test_archivio_oppo_cph_usa_lo_stesso_formato_moderno(self):
+        """La serie A OPPO usa CPH e lo stesso nome package moderno.
+
+        CPH2683 (OPPO A3) non è nell'archivio firmware OPPO legacy: senza
+        questo percorso la scheda resta senza una build pur avendo il
+        pacchetto GDPR nell'archivio tecnico.
+        """
+        sources.modelcodes.resolve = lambda codice: (
+            ["OPPO A3"] if codice.upper() == "CPH2683" else []
+        )
+        # Il caso verifica il ripiego del catalogo locale; AER ha dati live
+        # e può legittimamente indicare una variante regionale più precisa.
+        sources.aer_catalog.lookup = lambda codice: None
+        self.CATALOGO = """
+            CPH2683export_11_15.0.0.1301EX01_2025102315070000.zip
+            CPH2683GDPR_11_15.0.0.1200EX01_2025082220180000.zip
+        """
+
+        items = sources._lookup_oppo_firmware_archive("CPH2683")
+
+        self.assertEqual(len(items), 2)
+        self.assertEqual(items[0].device, "OPPO A3")
+        self.assertEqual(items[0].android_version, 15)
+        self.assertEqual(items[0].build, "15.0.0.1200(EX01)")
+        self.assertIn("Archivio tecnico OPPO", items[0].size_info)
+        self.assertIn("Europa (GDPR)", items[0].size_info)
+
+    def test_oppo_cph_conserva_il_nome_europeo_aer_sul_rebrand(self):
+        """Un CPH può avere nomi diversi fuori Europa.
+
+        CPH2781 è A6 Pro 5G nel catalogo europeo e F31 in India: la
+        scheda AER ufficiale deve prevalere, altrimenti una ricerca per
+        codice restituisce un telefono di un altro mercato.
+        """
+        sources.modelcodes.resolve = lambda codice: (
+            ["OPPO F31", "OPPO A6 Pro 5G"] if codice.upper() == "CPH2781" else []
+        )
+        sources.aer_catalog.lookup = lambda codice: (
+            {"device_model": "OPPO A6 Pro 5G"} if codice.upper() == "CPH2781" else None
+        )
+        self.CATALOGO = "CPH2781GDPR_11_16.0.5.1000EX01_2026030101010101.zip"
+
+        items = sources._lookup_oppo_firmware_archive("CPH2781")
+
+        self.assertEqual(items[0].device, "OPPO A6 Pro 5G")
+        self.assertEqual(items[0].android_version, 16)
+        self.assertIn("Europa (GDPR)", items[0].size_info)
 
     def test_matrice_dieci_modelli_aggiuntivi_non_regredisce(self):
         """Ogni ampliamento della fonte deve provare almeno dieci modelli

@@ -106,16 +106,24 @@ ufficiali OPPO restano disponibili soltanto nell'archivio legacy.
 Per non lasciare vuota la ricerca quando realme non pubblica l'OTA, la ricerca
 diretta interroga le prime quattro pagine dell'indice tecnico
 `support.halabtech.com` **solo dopo** avere confermato il codice RMX nella
-pagina ufficiale realme. Legge codice, regione, Android e build dal nome del
-pacchetto e mostra al massimo un ramo **GDPR
-europeo** e uno **Export**; i due rami non vengono confrontati fra loro perché
-le loro revisioni non sono direttamente ordinabili.
+pagina ufficiale realme. Riconosce sia i nomi storici
+`RMX3939GDPR_15_C.14_...` sia quelli moderni
+`RMX5011 16.0.3.500(EX01) [GDPR]` / `RMX5011GDPR_11_16.0.3.500EX01_...`.
+Nel secondo formato `_11_` non viene scambiato per Android: la major viene
+letta dalla build 14.0/15.0/16.0. Mostra al massimo un ramo **GDPR europeo**
+e uno **Export**; i due rami non vengono confrontati fra loro perché le loro
+revisioni non sono direttamente ordinabili.
 
 Il risultato è deliberatamente marcato **reported / curato**, non «ultimo
 firmware»: l'archivio non è un endpoint OTA del produttore e la data esposta è
 quella interna al pacchetto. Esempio verificato: RMX3939 → C63/Narzo 63/C61
 secondo realme; nell'indice sono presenti `RMX3939GDPR_15_C.14_20260320…` e
 `RMX3939export_15_C.16_20260116…`, entrambi Android 15 dal nome pacchetto.
+
+Lo stesso archivio contiene pacchetti **CPH** OPPO moderni (per esempio
+`CPH2683GDPR_11_15.0.0.1200EX01_...`). Per OPPO il codice viene accettato
+solo quando è presente nel catalogo modelli; anche qui GDPR ha priorità su
+Export e il dato resta *reported*, mai «OTA corrente» dichiarato.
 
 Da qui è nata l'unica eccezione dichiaratamente non ufficiale del progetto,
 descritta sotto.

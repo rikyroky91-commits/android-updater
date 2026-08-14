@@ -384,6 +384,22 @@ def reset_state() -> None:
         _local.conn = None
 
 
+def close_thread_connection() -> None:
+    """Chiude solo la connessione SQLite del thread chiamante.
+
+    I worker che preriscaldano i cataloghi restano vivi nel pool. Se uno di
+    loro ha consultato la cache SQLite, tenere la connessione thread-local
+    aperta non porta alcun vantaggio (il worker è inattivo) ma trattiene un
+    file handle e memoria; su Windows impedisce anche la rimozione di un DB
+    temporaneo. Il thread principale continua a usare la propria connessione
+    tramite `connect()` come prima.
+    """
+    conn = getattr(_local, "conn", None)
+    if conn is not None:
+        conn.close()
+        _local.conn = None
+
+
 @contextmanager
 def transaction():
     conn = connect()

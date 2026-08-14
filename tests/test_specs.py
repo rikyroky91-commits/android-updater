@@ -232,6 +232,38 @@ class TestRipiegoEsternoConMarca(unittest.TestCase):
         self.assertIsNotNone(scheda)
         self.assertIn("Realme Note 60s", self.chiamate_scheda_grezza)
 
+    def test_il_codice_aggiunge_un_alias_reale_al_ripiego(self):
+        """RMX2202 è «realme GT 5G»: cercare solo «GT» non basta alla fonte.
+
+        L'alias viene dal codice tecnico già riconosciuto, non da una
+        somiglianza fra modelli, quindi non può trasformare GT in GT Neo.
+        """
+        from core import modelcodes, versus
+        originale_risolvi = modelcodes.resolve
+        originale_scheda = versus.scheda_grezza
+        chiamate = []
+
+        modelcodes.resolve = lambda codice: (
+            ["realme GT 5G"] if codice.upper() == "RMX2202" else []
+        )
+
+        def solo_alias(nome, marca_tracker=""):
+            chiamate.append(nome)
+            if nome.lower() == "realme gt 5g":
+                return {"nome": nome, "chipset": "Snapdragon 888",
+                        "marca": marca_tracker}
+            return None
+
+        versus.scheda_grezza = solo_alias
+        try:
+            scheda = specs._ripiego_esterno("RMX2202", "realme GT", marca="realme")
+        finally:
+            modelcodes.resolve = originale_risolvi
+            versus.scheda_grezza = originale_scheda
+
+        self.assertIsNotNone(scheda)
+        self.assertIn("realme GT 5G", chiamate)
+
 
 class TestChipsetLeggibile(unittest.TestCase):
     """La traduzione da stringa GSMArena a chip mostrabile."""

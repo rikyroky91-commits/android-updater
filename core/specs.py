@@ -730,6 +730,8 @@ def _ripiego_esterno(*indizi: str | None, marca: str | None = None) -> Scheda | 
     if not testi:
         return None
 
+    marca_nota = versus.marca_scoperta(marca) if marca else None
+
     for testo in testi:
         trovata = versus.marca_scoperta(testo)
         if not trovata:
@@ -738,7 +740,6 @@ def _ripiego_esterno(*indizi: str | None, marca: str | None = None) -> Scheda | 
         if riga:
             return _a_scheda(riga)
 
-    marca_nota = versus.marca_scoperta(marca) if marca else None
     if not marca_nota:
         return None
     for testo in testi:
@@ -746,6 +747,29 @@ def _ripiego_esterno(*indizi: str | None, marca: str | None = None) -> Scheda | 
         riga = versus.scheda_grezza(completo, _MARCHE.get(marca_nota.lower(), C.OTHER))
         if riga:
             return _a_scheda(riga)
+
+    # Un codice modello è più preciso del nome, ma versus indicizza solo
+    # nomi. Solo DOPO avere provato gli indizi ricevuti, si aggiungono i nomi
+    # associati a QUEL codice nel dataset: RMX2202 -> «realme GT 5G» è la
+    # stessa identità, non una ricerca per somiglianza. Metterli in fondo
+    # preserva la precedenza del nome scelto dalla fonte chiamante quando
+    # questo è già risolvibile.
+    try:
+        from . import modelcodes
+        alias_completi = []
+        for codice in testi:
+            for alias in modelcodes.resolve(codice):
+                if versus.marca_scoperta(alias) != marca_nota:
+                    continue
+                completo = versus.con_marca(alias, marca_nota)
+                if completo not in testi and completo not in alias_completi:
+                    alias_completi.append(completo)
+        for completo in alias_completi:
+            riga = versus.scheda_grezza(completo, _MARCHE.get(marca_nota.lower(), C.OTHER))
+            if riga:
+                return _a_scheda(riga)
+    except Exception:  # il ripiego non deve mai fermare una ricerca
+        pass
     return None
 
 

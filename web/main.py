@@ -843,6 +843,7 @@ def _esito_imei(imei: str) -> dict:
         "imei": imei,
         "tac": raffronto.get("tac") or "",
         "luhn_valid": imeicheck.is_valid_imei(imei),
+        "imei_corretto": imeicheck.imei_con_cifra_di_controllo(imei),
         "riconosciuto": bool(trovato),
         "descrizione": descrizione,
         "marca": (marca if trovato else ""),
@@ -873,6 +874,7 @@ def _esito_imei_salvato(imei: str) -> dict:
     modello = dettagli.get("model") or dettagli_grezzi
     return {
         "imei": imei, "tac": tac, "luhn_valid": imeicheck.is_valid_imei(imei),
+        "imei_corretto": imeicheck.imei_con_cifra_di_controllo(imei),
         "riconosciuto": bool(modello),
         "descrizione": imeicheck.describe(marca, dettagli_grezzi) if modello else "",
         "marca": marca, "modello": modello,
@@ -1355,7 +1357,10 @@ def _cerca_davvero(query: str) -> dict:
     # il catalogo ne conosce il nome commerciale verificato lo preferiamo:
     # è ciò che impedisce a RMX3939 di ricadere su C61 e rende uguali la
     # ricerca per codice, per modello e per IMEI.
-    if codice:
+    # `scan.normalize` conserva il nome fornito da una fonte strutturata
+    # quando è più preciso del dataset community dei codici (CPH2781 è A6
+    # Pro in Europa, F31 in India). Qui non si deve annullare quella scelta.
+    if codice and not identita.get("device_model"):
         try:
             canonico = modelcodes.nome_canonico(codice)
         except Exception:

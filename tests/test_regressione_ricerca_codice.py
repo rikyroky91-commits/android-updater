@@ -84,6 +84,16 @@ class TestCodiceXiaomiStileClassico(unittest.TestCase):
             with self.subTest(codice=codice):
                 self.assertTrue(sources.looks_like_model_code(codice))
 
+    def test_i_codici_xiaomi_moderni_a_formato_variabile_sono_validi(self):
+        """Le nuove famiglie non hanno sempre due cifre dopo le lettere."""
+        for codice in (
+            "2306EPN60G", "23078PND5G", "2304FPN6DG", "23127PN0CG",
+            "2406APNFAG", "2407FPN8EG", "24129PN74G", "25069PTEBG",
+            "2506BPN68G", "25010PN30G", "25113PN0EG", "2410FPCC5G",
+        ):
+            with self.subTest(codice=codice):
+                self.assertTrue(sources.looks_like_model_code(codice))
+
     def test_non_cattura_parole_qualunque_che_iniziano_per_m(self):
         # «M123» non è in questa lista: ha GIÀ la forma di un Samsung
         # senza prefisso («M»+tre cifre, vedi `_RE_SAMSUNG_SENZA_PREFISSO`)
