@@ -193,12 +193,27 @@ class TestStatoBackup(unittest.TestCase):
 
     def test_configurato_ma_in_errore(self):
         backup.configurato = lambda: True
-        backup.stato = lambda: {"ultimo_esito": "GitHub ha risposto 401: token non valido",
-                                "ultimo_salvataggio": None, "ultimo_ripristino": None}
+        backup.stato = lambda: {
+            "ultimo_esito": "GitHub ha risposto 401: token non valido",
+            "ultimo_salvataggio": None, "ultimo_ripristino": None,
+            "ultima_operazione": "salvataggio", "ultima_operazione_ok": False,
+        }
         stato = P.stato_backup()
         self.assertEqual(stato["etichetta"], "Errore")
         self.assertEqual(stato["classe"], "tag-outline")
         self.assertIn("401", stato["dettaglio"])
+
+    def test_ripristino_fallito_non_scambia_la_configurazione_per_un_errore(self):
+        backup.configurato = lambda: True
+        backup.stato = lambda: {
+            "ultimo_esito": "connessione fallita durante il ripristino",
+            "ultimo_salvataggio": None, "ultimo_ripristino": None,
+            "ultima_operazione": "ripristino", "ultima_operazione_ok": False,
+        }
+        stato = P.stato_backup()
+        self.assertEqual(stato["etichetta"], "Configurato, verifica consigliata")
+        self.assertEqual(stato["classe"], "tag-neutral")
+        self.assertIn("ripristino", stato["dettaglio"])
 
 
 if __name__ == "__main__":

@@ -51,6 +51,13 @@ class BaseBackup(unittest.TestCase):
     def setUp(self):
         self._db_originale = C.DB_PATH
         self._env_originale = os.environ.get("TRACKER_DB")
+        self._stato_originale = backup.stato()
+        backup._stato.clear()
+        backup._stato.update({
+            "ultimo_esito": "non configurato", "ultimo_salvataggio": None,
+            "ultimo_ripristino": None, "ultima_operazione": None,
+            "ultima_operazione_ok": None, "byte": 0,
+        })
         self._db = tempfile.mktemp(suffix=".db")
         C.DB_PATH = self._db
         os.environ["TRACKER_DB"] = self._db
@@ -60,6 +67,8 @@ class BaseBackup(unittest.TestCase):
 
     def tearDown(self):
         backup.requests = self._requests_originale
+        backup._stato.clear()
+        backup._stato.update(self._stato_originale)
         for chiave in ("BACKUP_GIST_ID", "BACKUP_GITHUB_TOKEN", "BACKUP_URL"):
             os.environ.pop(chiave, None)
         storage.reset_state()
@@ -185,6 +194,9 @@ class TestSalvataggio(BaseBackup):
         ok, messaggio = backup.salva()
         self.assertFalse(ok)
         self.assertIn("connessione fallita", messaggio)
+        stato = backup.stato()
+        self.assertEqual(stato["ultima_operazione"], "salvataggio")
+        self.assertFalse(stato["ultima_operazione_ok"])
 
 
 class TestRipristino(BaseBackup):
@@ -258,6 +270,24 @@ class TestRipristino(BaseBackup):
         self.assertIn("danneggiato", messaggio)
         with open(self._db, "rb") as f:
             self.assertEqual(f.read(), locale, "il database locale è stato perso")
+
+    def test_fallimento_ripristino_e_distinto_dal_salvataggio(self):
+        """Il controllo automatico all'avvio non deve rendere rosso un
+        archivio configurato quando il problema è solo la lettura iniziale."""
+        os.environ["BACKUP_URL"] = "https://archivio.test/db"
+
+        class FinteRichieste:
+            @staticmethod
+            def get(*args, **kwargs):
+                raise ConnectionError("rete assente")
+
+        backup.requests = FinteRichieste
+        ok, messaggio = backup.ripristina()
+        self.assertFalse(ok)
+        self.assertIn("connessione fallita", messaggio)
+        stato = backup.stato()
+        self.assertEqual(stato["ultima_operazione"], "ripristino")
+        self.assertFalse(stato["ultima_operazione_ok"])
 
     def test_archivio_vuoto_gestito(self):
         os.environ["BACKUP_GIST_ID"] = "abc123"

@@ -459,6 +459,7 @@ def azzera_cache_fonti() -> None:
     # precedente, e la scansione dichiarava quella fonte «OK».
     reset_arb_cache()
     reset_telegram_cache()
+    reset_realme_firmware_cache()
 
 
 def reset_xiaomi_cache() -> None:
@@ -1458,6 +1459,102 @@ OPPO_SUPPORT_POLICY = (
     "almeno un passaggio di versione Android"
 )
 
+# L'endpoint ``support.oppo.com/software-update`` continua a essere la
+# fonte per le build legacy, ma il suo catalogo termina intorno al 2021/22.
+# Per modelli moderni OPPO pubblica il piano di rollout ColorOS: non è una
+# build installata, quindi questa fonte resta SUPPORT e non può mai essere
+# presentata come "ultimo firmware". È però il modo ufficiale per dire se
+# Android 16 è previsto per quel modello.
+OPPO_COLOROS16_URL = "https://www.oppo.com/en/coloros16/"
+_OPPO_COLOROS16_TTL_SECONDI = 12 * 60 * 60
+_OPPO_COLOROS16_SEZIONE_RE = re.compile(
+    r"ColorOS\s+16\s+Official\s+Version\s+Roll[\s-]*Out\s+Schedule"
+    r"(?P<corpo>.*?)(?=ColorOS\s+15\b|$)",
+    re.IGNORECASE | re.DOTALL,
+)
+_oppo_coloros16_cache = _CacheDiFonte(_OPPO_COLOROS16_TTL_SECONDI)
+
+
+def reset_oppo_coloros16_cache() -> None:
+    """Azzera la cache del piano ColorOS 16 (usata dai test)."""
+    _oppo_coloros16_cache.azzera()
+
+
+def fetch_oppo_coloros16(forza: bool = False) -> tuple[list[RawItem], str | None]:
+    """Modelli nel piano ufficiale OPPO ColorOS 16 / Android 16.
+
+    OPPO avverte che date, regione e operatore possono cambiare. Per questo
+    le voci sono ``FW_SUPPORT`` e dichiarano il limite, pur mantenendo il
+    dato Android utile alla diagnosi.
+    """
+    return _oppo_coloros16_cache.ottieni(_fetch_oppo_coloros16_scarica, forza)
+
+
+def _fetch_oppo_coloros16_scarica() -> tuple[list[RawItem], str | None]:
+    try:
+        risposta = http_get(OPPO_COLOROS16_URL, timeout=C.HTTP_TIMEOUT + 10)
+    except Exception as exc:
+        return [], f"connessione fallita: {exc}"
+    if risposta.status_code != 200:
+        return [], f"HTTP {risposta.status_code}"
+
+    testo = html.unescape(re.sub(r"<[^>]+>", "\n", risposta.text or ""))
+    sezione = _OPPO_COLOROS16_SEZIONE_RE.search(testo)
+    if not sezione:
+        return [], "pagina raggiungibile ma calendario ColorOS 16 non riconosciuto (formato cambiato?)"
+
+    visti: set[str] = set()
+    items: list[RawItem] = []
+    for riga in sezione.group("corpo").splitlines():
+        nome = " ".join(riga.split())
+        # Nella sezione del calendario le righe dispositivo iniziano tutte
+        # con OPPO. Il controllo stretto evita falsi modelli dalle note
+        # legali nel caso in cui OPPO cambi il markup.
+        if not re.fullmatch(r"OPPO\s+[A-Za-z0-9][A-Za-z0-9 +.-]{1,64}", nome):
+            continue
+        chiave = modelcodes._normalize_name(nome)
+        if not chiave or chiave in visti:
+            continue
+        visti.add(chiave)
+        items.append(RawItem(
+            title=f"{nome} — ColorOS 16 / Android 16 (piano ufficiale)",
+            link=OPPO_COLOROS16_URL,
+            brand=C.OPPO,
+            device=nome,
+            version="ColorOS 16",
+            android_version=16,
+            summary=(
+                "Calendario ufficiale OPPO: date, regione e operatore possono "
+                "variare; non prova la build installata."
+            ),
+            size_info="Piano ufficiale OPPO ColorOS 16",
+            firmware_kind=C.FW_SUPPORT,
+        ))
+    if not items:
+        return [], "pagina raggiungibile ma nessun modello ColorOS 16 riconosciuto (formato cambiato?)"
+    return items, None
+
+
+def _lookup_oppo_coloros16(model_name: str) -> list[RawItem]:
+    """Trova il piano Android 16 anche partendo da un codice CPH."""
+    tutti, errore = fetch_oppo_coloros16()
+    if errore or not tutti:
+        return []
+
+    candidati = [model_name]
+    for codice in _code_candidates(model_name):
+        canonico = modelcodes.nome_canonico(codice)
+        if canonico:
+            candidati.append(canonico)
+    for candidato in candidati:
+        bersaglio = modelcodes._normalize_name(candidato)
+        if not bersaglio:
+            continue
+        esatti = [i for i in tutti if modelcodes._normalize_name(i.device or "") == bersaglio]
+        if esatti:
+            return esatti[:1]
+    return []
+
 
 def _oppo_nome_da_slug(slug: str) -> str:
     """'a6x-5g' → 'OPPO A6x 5G'."""
@@ -1867,24 +1964,39 @@ def _arb_item(rilascio, con_regione: bool = True) -> RawItem:
         # spacciata per data di rilascio.
         riepilogo = f"Build vista dal tracker il {rilascio.last_checked}."
 
+    # Dal 14 in poi OPPO associa in modo esplicito il numero principale di
+    # ColorOS a quello di Android (ColorOS 14 -> Android 14, 15 -> 15,
+    # 16 -> 16). Non si indovinano le versioni precedenti né si ricava un
+    # Android dalla sola build: il tracker espone già la versione ColorOS.
+    android_da_coloros = _android_da_coloros(rilascio.skin_version)
+
     return RawItem(
         title=titolo,
         link=rilascio.link,
         published=None,
         brand=C.OPPO,
         device=rilascio.device_name,
+        # Il README dichiara il codice esatto per regione (CPH2525EEA,
+        # CPH2653, ...). Perderlo qui impediva la ricerca da IMEI/TAC.
+        model_code=rilascio.model_code,
         version=rilascio.skin_version,
         build=rilascio.build,
-        # La versione di Android NON viene dedotta dal numero di build.
-        # Si potrebbe: OxygenOS 16 gira su Android 16, quasi sempre. Ma
-        # «quasi sempre» su un dato che decide un retest completo è
-        # esattamente il tipo di scorciatoia che questo progetto paga poi
-        # a caro prezzo. Meglio un campo vuoto di un campo plausibile.
-        android_version=None,
+        android_version=android_da_coloros,
         summary=riepilogo,
         size_info=" · ".join(p for p in descrizione if p),
         trust=C.TRUST_CURATED,
     )
+
+
+def _android_da_coloros(versione: str | None) -> int | None:
+    """Versione Android documentata per ColorOS 14, 15 e 16.
+
+    La conversione resta volontariamente limitata alle tre associazioni
+    pubblicate da OPPO. Un formato sconosciuto restituisce ``None`` invece
+    di una versione Android soltanto plausibile.
+    """
+    match = re.match(r"^(14|15|16)(?:\.\d+){0,3}$", (versione or "").strip())
+    return int(match.group(1)) if match else None
 
 
 def fetch_oplus_arb() -> tuple[list[RawItem], str | None]:
@@ -2030,6 +2142,32 @@ def fetch_coloros_news():
 
 REALME_AER_URL = "https://www.realme.com/global/legal/AndroidSecurityAdvisories"
 
+# realme non espone un catalogo OTA pubblico per i modelli recenti. Questo
+# archivio tecnico non viene quindi mai trattato come fonte ufficiale o come
+# risposta "ultimo OTA": serve a riportare una build osservabile, soltanto
+# dopo che il codice RMX e' stato verificato nella pagina ufficiale realme.
+#
+# La ricerca per codice è preferita al tag: per RMX3939 il tag è incompleto e
+# ometteva la C.16 Export, mentre le prime quattro pagine di ricerca contengono
+# sia la C.14 GDPR sia la C.16. Le quattro piccole pagine sono richieste in
+# parallelo, quindi non si scarica mai un catalogo globale né si supera il
+# budget interattivo.
+REALME_FIRMWARE_ARCHIVE_URL = (
+    "https://support.halabtech.com/index.php?a=downloads&b=search&keyword={codice}&p_start={pagina}"
+)
+_REALME_FIRMWARE_RE = re.compile(
+    r"\b(?P<codice>RMX\d{4}[A-Z]*)(?P<regione>GDPR|export)_"
+    r"(?P<android>\d{2})_(?P<ramo>[A-Z])\.(?P<revisione>\d+)_"
+    r"(?P<data>\d{14})",
+    re.IGNORECASE,
+)
+# Mai un catalogo intero in memoria: fino a 32 codici richiesti di recente,
+# con al massimo due RawItem piccoli per codice (Europa e globale).
+_REALME_FIRMWARE_TTL = 60 * 60
+_REALME_FIRMWARE_SEARCH_PAGES = 4
+_realme_firmware_cache: dict[str, tuple[float, list[RawItem]]] = {}
+_realme_firmware_cache_lock = threading.Lock()
+
 # ATTENZIONE AL FORMATO SU CUI SI LAVORA (errore già commesso):
 # `_realme_page` sostituisce i tag HTML con un a capo, quindi il testo che
 # arriva qui ha i campi separati da NEWLINE, non da pipe. La prima versione
@@ -2079,6 +2217,16 @@ _realme_pagina_cache = _CacheDiFonte(_AER_TTL_SECONDI)
 def reset_realme_aer_cache() -> None:
     """Azzera la cache della pagina realme AER (usata dai test)."""
     _realme_pagina_cache.azzera()
+
+
+def reset_realme_firmware_cache() -> None:
+    """Azzera le piccole risposte per codice dell'archivio tecnico realme.
+
+    È separata dalla cache AER: la prima contiene l'elenco ufficiale dei
+    codici, la seconda soltanto gli ultimi due nomi di pacchetto osservati.
+    """
+    with _realme_firmware_cache_lock:
+        _realme_firmware_cache.clear()
 
 
 def _realme_page() -> tuple[str | None, str | None]:
@@ -2330,6 +2478,136 @@ def _realme_espandi(composto: str) -> list[str]:
             pezzo = f"{prefisso} {pezzo}"
         espansi.append(pezzo)
     return espansi
+
+
+def _realme_codice_verificato(query: str) -> tuple[str, str] | None:
+    """Restituisce `(codice, nome)` solo se realme lo dichiara ufficialmente.
+
+    Il catalogo tecnico da solo non basta a collegare un file a un telefono:
+    nomi come C61 sono riusati. Il codice RMX risolve quell'ambiguità; prima
+    si controlla nella pagina di realme, poi si consulta l'archivio.
+    """
+    testo = (query or "").strip()
+    if not testo:
+        return None
+    ufficiali = realme_official_codes()
+    codice = re.sub(r"\s+", "", testo).upper()
+    if codice in ufficiali:
+        return codice, ufficiali[codice][0]
+    variante = realme_name_variants().get(modelcodes._normalize_name(testo))
+    if variante and variante[1] in ufficiali:
+        codice = variante[1]
+        return codice, ufficiali[codice][0]
+    return None
+
+
+def _realme_data_pacchetto(valore: str) -> str:
+    """Data interna `AAAAMMGGhhmmss`, formattata senza fingere un rilascio."""
+    if len(valore) != 14:
+        return valore
+    return f"{valore[6:8]}/{valore[4:6]}/{valore[:4]}"
+
+
+def _lookup_realme_firmware_archive(model_name: str) -> list[RawItem]:
+    """Build realme riportate da archivio tecnico, ordinate Europa → globale.
+
+    La fonte non conosce lo stato OTA di uno specifico telefono e può
+    ospitare copie non ufficiali: è dunque `CURATED` + `REPORTED`, mai
+    `CURRENT`. Il codice, la regione e Android vengono letti dal *nome del
+    pacchetto* (non dalla descrizione editoriale, che per RMX3939 riporta
+    Android 16 nonostante il pacchetto dica chiaramente `_15_`).
+    """
+    trovato = _realme_codice_verificato(model_name)
+    if not trovato:
+        return []
+    codice, nome_composto = trovato
+    ora = time.monotonic()
+    with _realme_firmware_cache_lock:
+        in_cache = _realme_firmware_cache.get(codice)
+        if in_cache and ora - in_cache[0] < _REALME_FIRMWARE_TTL:
+            return list(in_cache[1])
+
+    # Una build per ramo regionale: il numero C.16 Export non e' comparabile
+    # con C.14 GDPR. La data interna al pacchetto, non la data di caricamento
+    # dell'archivio, indica quale sia la copia più recente nel singolo ramo.
+    per_regione: dict[str, tuple[str, re.Match]] = {}
+    urls = [
+        REALME_FIRMWARE_ARCHIVE_URL.format(codice=codice, pagina=pagina)
+        for pagina in range(1, _REALME_FIRMWARE_SEARCH_PAGES + 1)
+    ]
+
+    def scarica(url: str) -> tuple[str, bool]:
+        try:
+            risposta = http_get(url, timeout=C.SEARCH_HTTP_TIMEOUT)
+        except Exception:
+            return "", False
+        if getattr(risposta, "status_code", 0) != 200:
+            return "", False
+        return getattr(risposta, "text", "") or "", True
+
+    # Quattro pagine da ~160 KB in quattro worker sono un picco sotto 1 MB;
+    # il contenuto è interpretato subito e non entra nella cache. In serie,
+    # invece, quattro timeout da 5 s basterebbero a svuotare il budget di 12 s.
+    with ThreadPoolExecutor(max_workers=_REALME_FIRMWARE_SEARCH_PAGES) as pool:
+        pagine = list(pool.map(scarica, urls))
+    tutte_risposte_ok = all(ok for _testo, ok in pagine)
+    for testo, _ok in pagine:
+        for match in _REALME_FIRMWARE_RE.finditer(testo):
+            if match.group("codice").upper() != codice:
+                continue
+            regione = match.group("regione").upper()
+            precedente = per_regione.get(regione)
+            if precedente is None or match.group("data") > precedente[0]:
+                per_regione[regione] = (match.group("data"), match)
+
+    # Il primo nome dell'elenco ufficiale è quello di mercato principale;
+    # RMX3939 diventa quindi "realme C63", non il C61 ambiguo.
+    espansi = _realme_espandi(nome_composto)
+    device = espansi[0] if espansi else nome_composto
+    items: list[RawItem] = []
+    for regione in ("GDPR", "EXPORT"):
+        record = per_regione.get(regione)
+        if not record:
+            continue
+        data, match = record
+        android = int(match.group("android"))
+        ramo = match.group("ramo").upper()
+        revisione = match.group("revisione")
+        build = f"{ramo}.{revisione}"
+        area = "Europa (GDPR)" if regione == "GDPR" else "Globale / Export"
+        filename = match.group(0) + ".zip"
+        items.append(RawItem(
+            title=f"{device} — {filename}",
+            link=REALME_FIRMWARE_ARCHIVE_URL.format(codice=codice, pagina=1),
+            brand=C.OPPO,
+            device=device,
+            model_code=codice,
+            version=f"Android {android}",
+            build=build,
+            android_version=android,
+            size_info=(
+                f"Archivio tecnico realme · {area} · build riportata, non OTA ufficiale"
+            ),
+            summary=(
+                f"Codice {codice} confermato da realme. Data interna del pacchetto: "
+                f"{_realme_data_pacchetto(data)}."
+            ),
+            trust=C.TRUST_CURATED,
+            firmware_kind=C.FW_REPORTED,
+        ))
+
+    # Anche «nessuna build trovata» è un esito utile se tutte le pagine hanno
+    # risposto: per le forme equivalenti dello stesso RMX evita di ripetere
+    # quattro GET senza alcuna possibilità di ottenere un dato diverso. Un
+    # guasto di rete, invece, NON entra in cache e sarà ritentato.
+    if items or tutte_risposte_ok:
+        with _realme_firmware_cache_lock:
+            # Il limite impedisce che una raffica di codici diversi trasformi
+            # una cache di comodità in memoria trattenuta sul piano da 512 MB.
+            if len(_realme_firmware_cache) >= 32:
+                _realme_firmware_cache.pop(next(iter(_realme_firmware_cache)))
+            _realme_firmware_cache[codice] = (ora, list(items))
+    return items
 
 
 def _realme_etichetta(item: RawItem, richiesto: str, codice: str | None) -> RawItem:
@@ -3585,6 +3863,18 @@ _STRUCTURED_LOOKUPS_LIST = [
     StructuredLookup(C.OPPO, _lookup_oplus_arb, "basso",
                      "tracker ARB OnePlus/OPPO (non ufficiale)",
                      fetch_oplus_arb, trust=C.TRUST_CURATED),
+    # Il piano ufficiale risponde alla domanda "Android 16 è previsto?",
+    # ma viene dopo le build correnti: non deve nascondere un firmware reale
+    # dell'archivio OPPO o del tracker ARB.
+    StructuredLookup(C.OPPO, _lookup_oppo_coloros16, "basso",
+                     "piano ufficiale OPPO ColorOS 16", fetch_oppo_coloros16,
+                     firmware_kind=C.FW_SUPPORT),
+    # Per realme recenti non esiste un endpoint OTA pubblico. L'archivio
+    # tecnico è una fonte REPORTED (non CURRENT), protetta dal controllo del
+    # codice sul sito realme e ordinata GDPR/Europa prima del ramo Export.
+    StructuredLookup(C.OPPO, _lookup_realme_firmware_archive, "basso",
+                     "archivio tecnico realme (build per codice)",
+                     trust=C.TRUST_CURATED, firmware_kind=C.FW_REPORTED),
     # `oplus_telegram` tolta di qui l'11/08/2026 insieme al resto della
     # fonte — vedi il commento sopra `RETIRED_SOURCES` per il motivo e come
     # riportarla.

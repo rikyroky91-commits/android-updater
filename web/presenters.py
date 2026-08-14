@@ -141,28 +141,38 @@ def stato_backup() -> dict:
     l'informazione che serve per rispondere «la correzione che ho appena
     salvato sopravviverà al prossimo riavvio?».
 
-    `core/backup.py::_stato["ultimo_esito"]` parte da `"non configurato"`
-    a ogni avvio del processo, e resta così finché `salva()`/`ripristina()`
-    non girano almeno una volta — quindi un backup CONFIGURATO ma non
-    ancora tentato in questa sessione (appena riavviato, nessuna
-    correzione o scansione ancora passata di lì) mostrerebbe alla lettera
-    "non configurato", che è fuorviante: non è che manchi la
-    configurazione, è solo che non è ancora successo niente da riportare.
-    Qui si distingue esplicitamente questo caso.
+    L'ultimo esito porta anche il tipo di operazione che lo ha generato.
+    Un ripristino automatico fallito all'avvio non prova che Gist o URL
+    siano configurati male: se il successivo ``Salva adesso`` riesce, il
+    backup è utilizzabile. Solo il fallimento di un salvataggio viene quindi
+    mostrato qui come errore di configurazione.
     """
     from core import backup
 
     configurato = backup.configurato()
     stato = backup.stato()
-    mai_tentato = configurato and stato.get("ultimo_esito") == "non configurato"
+    operazione = stato.get("ultima_operazione")
+    esito_ok = stato.get("ultima_operazione_ok")
+    mai_tentato = (configurato and not operazione
+                   and stato.get("ultimo_esito") == "non configurato")
 
     if not configurato:
         classe, etichetta = "tag-outline", "Non configurato"
+    elif operazione == "salvataggio" and esito_ok is False:
+        classe, etichetta = "tag-outline", "Errore"
     elif stato.get("ultimo_salvataggio"):
         classe, etichetta = "tag-accent", "Attivo"
+    elif operazione == "ripristino" and esito_ok is True:
+        classe, etichetta = "tag-accent", "Attivo"
+    elif operazione == "ripristino" and esito_ok is False:
+        classe, etichetta = "tag-neutral", "Configurato, verifica consigliata"
+    elif operazione == "ripristino":
+        classe, etichetta = "tag-neutral", "Configurato, pronto a salvare"
     elif mai_tentato:
         classe, etichetta = "tag-neutral", "Configurato, in attesa del primo salvataggio"
     else:
+        # Stato di versioni precedenti, senza il tipo dell'operazione: il
+        # motivo dell'errore non è deducibile con affidabilità.
         classe, etichetta = "tag-outline", "Errore"
 
     return {

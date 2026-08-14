@@ -207,12 +207,18 @@ class TestFonteInSources(unittest.TestCase):
         items, _ = self.sources.fetch_oplus_arb()
         self.assertIn("non ufficiale", items[0].size_info.lower())
 
-    def test_nessuna_versione_android_dedotta(self):
-        """OxygenOS 16 gira su Android 16 quasi sempre. «Quasi» non basta
-        per un campo che decide un retest completo."""
+    def test_android_recente_da_coloros_documentato(self):
+        """ColorOS 14/15/16 corrispondono esplicitamente ad Android 14/15/16;
+        i formati vecchi restano volutamente vuoti."""
         items, _ = self.sources.fetch_oplus_arb()
-        for item in items:
-            self.assertIsNone(item.android_version)
+        op13 = next(i for i in items if i.device == "OnePlus 13")
+        self.assertEqual(op13.android_version, 16)
+        self.assertIsNone(self.sources._android_da_coloros("11"))
+
+    def test_il_codice_di_variante_arriva_al_risultato(self):
+        items, _ = self.sources.fetch_oplus_arb()
+        reno = next(i for i in items if i.device == "OPPO Reno10 Pro")
+        self.assertEqual(reno.model_code, "CPH2525SG")
 
     def test_nessuna_data_di_rilascio_inventata(self):
         """Il tracker dà la data in cui HA VISTO la build, non quella in
