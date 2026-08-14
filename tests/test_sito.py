@@ -1231,10 +1231,22 @@ class TestRicercaPerImei(_Sito):
         self.assertIn("Samsung Galaxy A05s", pagina)
         self.assertIn("35690922", pagina)
         self.assertIn("cifra di controllo", pagina)
+        self.assertIn("La cifra di controllo calcolata con Luhn", pagina)
+        self.assertIn("356909222457121", pagina)
+        self.assertIn("/?q=356909222457121", pagina)
         for servizio in ("imei.info", "IMEIpro", "IMEI Check"):
             with self.subTest(servizio=servizio):
                 self.assertIn(servizio, pagina)
         self.assertIn("imei=356909222457120", pagina)
+
+    def test_la_correzione_luhn_agisce_solo_sulla_cifra_finale(self):
+        from core import imeicheck
+
+        corretto = imeicheck.imei_con_cifra_di_controllo("356909222457120")
+        self.assertEqual(corretto, "356909222457121")
+        self.assertEqual(corretto[:14], "356909222457120"[:14])
+        self.assertTrue(imeicheck.is_valid_imei(corretto))
+        self.assertIsNone(imeicheck.imei_con_cifra_di_controllo("35690922"))
 
     def test_il_tac_sconosciuto_lo_dice_e_offre_la_correzione(self):
         """NON È UN GUASTO, È UN BUCO DI COPERTURA. Sono due cose che si

@@ -843,6 +843,7 @@ def _esito_imei(imei: str) -> dict:
         "imei": imei,
         "tac": raffronto.get("tac") or "",
         "luhn_valid": imeicheck.is_valid_imei(imei),
+        "imei_corretto": imeicheck.imei_con_cifra_di_controllo(imei),
         "riconosciuto": bool(trovato),
         "descrizione": descrizione,
         "marca": (marca if trovato else ""),
@@ -873,6 +874,7 @@ def _esito_imei_salvato(imei: str) -> dict:
     modello = dettagli.get("model") or dettagli_grezzi
     return {
         "imei": imei, "tac": tac, "luhn_valid": imeicheck.is_valid_imei(imei),
+        "imei_corretto": imeicheck.imei_con_cifra_di_controllo(imei),
         "riconosciuto": bool(modello),
         "descrizione": imeicheck.describe(marca, dettagli_grezzi) if modello else "",
         "marca": marca, "modello": modello,

@@ -760,6 +760,28 @@ def is_valid_imei(imei: str) -> bool:
     return total % 10 == 0
 
 
+def imei_con_cifra_di_controllo(imei: str) -> str | None:
+    """Restituisce lo stesso IMEI con la quindicesima cifra Luhn corretta.
+
+    Non interroga alcun database: corregge esclusivamente la cifra di
+    controllo dal prefisso di 14 cifre. Per questo è un suggerimento di
+    trascrizione utile a cercare e copiare il numero, non una conferma che
+    l'IMEI sia assegnato, non bloccato o appartenente al telefono mostrato.
+    """
+    digits = "".join(ch for ch in (imei or "") if ch.isdigit())
+    if len(digits) != 15:
+        return None
+    totale = 0
+    for indice, char in enumerate(digits[:14]):
+        valore = int(char)
+        if indice % 2 == 1:
+            valore *= 2
+            if valore > 9:
+                valore -= 9
+        totale += valore
+    return digits[:14] + str((-totale) % 10)
+
+
 def tac_di(imei: str) -> str:
     """Le 8 cifre che identificano il modello. Le altre sette identificano
     il singolo esemplare e non servono mai a questo modulo."""

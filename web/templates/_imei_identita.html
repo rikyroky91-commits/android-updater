@@ -11,10 +11,12 @@
 {% endif %}
 
 {% if imei.luhn_valid is defined and not imei.luhn_valid %}
-<p class="avviso">La cifra di controllo dell'IMEI non risulta valida. Il modello
-  viene comunque cercato dal TAC <code>{{ imei.tac }}</code> (le prime 8 cifre):
-  verifica il numero riportato sul dispositivo prima di usarlo per blacklist,
-  garanzia o blocchi dell'operatore.</p>
+<p class="avviso">La cifra di controllo calcolata con Luhn è
+  <code>{{ imei.imei_corretto }}</code>. Corregge solo l'ultima cifra:
+  <a class="proposta" href="/?q={{ imei.imei_corretto }}">cerca questo IMEI</a>
+  prima di usarlo, verifica comunque il numero sul dispositivo. Il modello
+  viene cercato dal TAC <code>{{ imei.tac }}</code> (le prime 8 cifre): questa
+  correzione non conferma blacklist, garanzia o blocchi dell'operatore.</p>
 {% endif %}
 
 {# I 4 SITI DI VERIFICA STANNO QUI, SEMPRE VISIBILI — non dentro il
