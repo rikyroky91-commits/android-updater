@@ -840,10 +840,15 @@ class TestCronologiaRicerche(unittest.TestCase):
         # cosa contiene il dataset in quel momento.
         self._original_modelcodes_cache = modelcodes._memory_cache
         modelcodes._memory_cache = {}
+        # Questa classe collauda la cronologia costruita dalla ricerca live,
+        # non il catalogo Motorola incluso. Lo si svuota esplicitamente per
+        # mantenere il test isolato dalla nuova via diretta per codice XT.
+        motorola_catalog.carica_da({})
 
     def tearDown(self):
         sources.rss_items = self._original_rss_items
         modelcodes._memory_cache = self._original_modelcodes_cache
+        motorola_catalog.reset_cache()
         storage.reset_state()
         if os.path.exists(self._db):
             os.remove(self._db)

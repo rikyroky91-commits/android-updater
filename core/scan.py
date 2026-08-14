@@ -526,15 +526,26 @@ def search_model(model_query: str) -> dict:
         storage.upsert_update(item)
     items.extend(structured_items)
 
-    # 2) Ricerca live su notizie: sempre eseguita comunque, per intercettare
-    #    un rollout più recente di quanto sappia la fonte ufficiale, e per i
-    #    brand che non hanno una fonte ufficiale interrogabile a comando.
-    raw_items, error = sources.search_model_live(model_query)
-    if not (error and not raw_items):
-        news_items = [normalize(raw, _LIVE_SOURCE) for raw in raw_items]
-        for item in news_items:
-            storage.upsert_update(item)
-        items.extend(news_items)
+    # 2) Ricerca live sulle notizie SOLO quando la fonte per modello non ha
+    #    gia' prodotto una build. Prima veniva sempre fatta: su un Moto G05
+    #    la build era pronta in un secondo, poi la pagina restava bloccata
+    #    ad aspettare feed generici che non potevano migliorare quel dato.
+    #    Le notizie restano utili per i brand senza endpoint interrogabile o
+    #    quando la fonte ufficiale conferma soltanto l'identita'.
+    #
+    #    Non rinunciamo alla scoperta di rollout nuovi: il worker periodico
+    #    continua a scandire le fonti. Qui si evita solo di far pagare ad
+    #    ogni persona una ricerca rumorosa dopo che la risposta affidabile
+    #    e' gia' disponibile.
+    structured_has_firmware = any(_ha_firmware(item) for item in structured_items)
+    raw_items, error = ([], None)
+    if not structured_has_firmware:
+        raw_items, error = sources.search_model_live(model_query)
+        if not (error and not raw_items):
+            news_items = [normalize(raw, _LIVE_SOURCE) for raw in raw_items]
+            for item in news_items:
+                storage.upsert_update(item)
+            items.extend(news_items)
 
     items.sort(key=lambda i: i.get("published") or i.get("first_seen") or "", reverse=True)
 
@@ -723,7 +734,19 @@ def _lookup_structured_for(model_query: str) -> tuple[list[dict], str | None]:
     # resta in caricamento sembra bloccata (stessa ragione della nota in
     # `sources.search_model_live`).
     scadenza = time.monotonic() + C.SEARCH_BUDGET_SECONDS
-    for name in forme_equivalenti(model_query):
+    # Si interroga prima esattamente cio' che ha scritto la persona. Le
+    # forme equivalenti possono richiedere il catalogo generale dei codici:
+    # costruirle prima della prima richiesta faceva scaricare e indicizzare
+    # quel catalogo anche per ``Moto G05``, mentre la fonte Motorola sa gia'
+    # cercarlo per nome. Espandiamo quindi soltanto se la via diretta non
+    # trova una build; il comportamento di copertura resta identico, ma la
+    # risposta normale non paga il costo del ripiego.
+    forme = [model_query]
+    indice = 0
+    estese = False
+    while indice < len(forme):
+        name = forme[indice]
+        indice += 1
         if time.monotonic() >= scadenza:
             break
         raw_items, lookup_note = sources.lookup_model_structured(name)
@@ -790,6 +813,11 @@ def _lookup_structured_for(model_query: str) -> tuple[list[dict], str | None]:
                 return normalizzati, None
             if ripiego is None:
                 ripiego = normalizzati
+
+        if not estese:
+            estese = True
+            forme.extend(forma for forma in forme_equivalenti(model_query)
+                         if forma not in forme)
 
     if ripiego:
         return ripiego, note

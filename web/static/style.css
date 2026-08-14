@@ -280,6 +280,12 @@ a { color: inherit; }
 .esito.trovato { border-left-color: var(--accent); }
 .esito h2 { margin: 0 0 .3rem; font-size: 1.2rem; }
 .riga-esito { margin: 0; font-size: 1rem; }
+.verifica-fonti {
+  background: var(--paper); border: 1px solid var(--filo); border-radius: 8px;
+  padding: .8rem 1rem; margin: 1rem 0 1.5rem;
+}
+.verifica-fonti h3 { margin: 0; font-size: .95rem; }
+.verifica-ai-indisponibile { margin: .7rem 0 1.2rem; }
 
 /* L'IMEI dentro il risultato, non sopra come un secondo risultato: una
    riga d'etichetta, non un titolo con lo stesso peso di `.esito h2`. */

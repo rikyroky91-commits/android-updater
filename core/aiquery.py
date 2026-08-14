@@ -691,19 +691,10 @@ def _spiega(errore: Exception) -> str:
     """
     testo = str(errore)
     if "429" in testo:
-        return (
-            "il fornitore ha risposto «quota esaurita» per tutti i modelli "
-            "provati. Su Gemini succede per tre motivi diversi: la quota "
-            "gratuita del giorno è finita (si azzera a mezzanotte, ora del "
-            "Pacifico); oppure il progetto collegato alla chiave non ha una "
-            "corsia gratuita — in quel caso una chiave nuova creata in un "
-            "PROGETTO nuovo la risolve, mentre un'altra chiave nello stesso "
-            "progetto no, perché la quota è del progetto; oppure i nomi dei "
-            "modelli sono cambiati ancora."
-        )
+        return "Servizio AI temporaneamente non disponibile. Riprova più tardi."
     if "401" in testo or "403" in testo:
-        return "la chiave non è valida o non ha accesso al modello."
-    return f"chiamata fallita: {testo}"
+        return "Servizio AI temporaneamente non disponibile."
+    return "Verifica AI non riuscita. Riprova più tardi."
 
 
 def status() -> str:

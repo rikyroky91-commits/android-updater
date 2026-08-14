@@ -1353,7 +1353,12 @@ def _cerca_davvero(query: str) -> dict:
     # ufficiale avesse risposto. La riga resta esplicita sul limite, così il
     # supporto non viene mai confuso con una build installata.
     supporto_senza_versione = next((i for i in fonti_dirette
-                                    if tipo(i) == C.FW_SUPPORT and not ha_versione(i)), None)
+                                    if tipo(i) == C.FW_SUPPORT and not ha_versione(i)
+                                    # Il riconoscimento da catalogo identifica il
+                                    # telefono, non e' un servizio firmware. Non
+                                    # deve mai comparire come «Supporto ufficiale».
+                                    and "riconoscimento del codice" not in
+                                    (i.get("source_label") or "").lower()), None)
     versione_certa = corrente or riportata or base_android
     identita = versione_certa or (fonti_dirette[0] if fonti_dirette else {})
 
@@ -1545,6 +1550,10 @@ def _cerca_davvero(query: str) -> dict:
         "corretto_a_mano": bool(nome_corretto),
         "riga": " · ".join(pezzi),
         "fonte": (versione_certa or identita).get("source_label", ""),
+        # La fonte non e' una decorazione: chi vuole controllare la build
+        # mostrata deve poterla aprire. Questo percorso e' deterministico
+        # e non dipende dalla quota di un servizio AI esterno.
+        "fonte_url": (versione_certa or identita).get("link", ""),
         # Una versione di lancio/supporto è un dato Android utile, quindi
         # non produce più una scheda apparentemente rotta. L'etichetta
         # nella riga distingue esplicitamente quel caso da un OTA corrente.

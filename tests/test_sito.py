@@ -640,6 +640,24 @@ class TestRicerca(_Sito):
             type(self).RISPOSTA_RICERCA = staticmethod(
                 lambda q: {"items": [], "error": None})
 
+    def test_la_fonte_del_firmware_e_apribile_senza_ai(self):
+        type(self).RISPOSTA_RICERCA = staticmethod(lambda q: {"items": [{
+            "source": "official_lookup", "source_label": "Endpoint FOTA ufficiale",
+            "brand": "Samsung", "device_model": "Galaxy A07",
+            "model_code": "SM-A075F", "build": "A075FXXS1AYG1",
+            "os_version": "Android 16", "android_version": "16",
+            "link": "https://example.test/fota/a075f", "title": "",
+            "severity": "", "color": "#00CC66",
+        }], "error": None})
+        try:
+            pagina = self.client.get("/", params={"q": "SM-A075F"}).text
+            self.assertIn("Apri la fonte del firmware", pagina)
+            self.assertIn("https://example.test/fota/a075f", pagina)
+            self.assertNotIn("Verifica con AI una fonte", pagina)
+        finally:
+            type(self).RISPOSTA_RICERCA = staticmethod(
+                lambda q: {"items": [], "error": None})
+
     def test_supporto_ufficiale_senza_build_non_lascia_una_scheda_vuota(self):
         """La policy di sicurezza è utile, ma non deve sembrare un OTA.
 
@@ -659,6 +677,22 @@ class TestRicerca(_Sito):
             pagina = self.client.get("/", params={"q": "BRP-NX1M"}).text
             self.assertIn("Supporto ufficiale: Bollettino HONOR — cadenza trimestrale", pagina)
             self.assertNotIn("nessuna fonte ne pubblica la versione", pagina)
+        finally:
+            type(self).RISPOSTA_RICERCA = staticmethod(
+                lambda q: {"items": [], "error": None})
+
+    def test_riconoscimento_del_codice_non_si_spaccia_per_supporto(self):
+        type(self).RISPOSTA_RICERCA = staticmethod(lambda q: {"items": [{
+            "source": "official_lookup",
+            "source_label": "Riconoscimento del codice modello (ricerca diretta)",
+            "firmware_kind": "support", "brand": "Motorola",
+            "device_model": "Moto G05", "model_code": "XT2523-3",
+            "title": "", "severity": "", "color": "#00CC66",
+        }], "error": None})
+        try:
+            pagina = self.client.get("/", params={"q": "MOTO G05"}).text
+            self.assertIn("nessuna fonte ne pubblica la versione", pagina)
+            self.assertNotIn("Supporto ufficiale: Riconoscimento del codice", pagina)
         finally:
             type(self).RISPOSTA_RICERCA = staticmethod(
                 lambda q: {"items": [], "error": None})

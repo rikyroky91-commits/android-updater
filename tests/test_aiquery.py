@@ -158,11 +158,11 @@ class TestRisposteMalformate(_Base):
         aiquery._chiama = esplodi
         esito = aiquery.interpreta("a07", candidati=["SM-A075F"])
         self.assertFalse(esito.riuscita)
-        # NON lo stato nudo: «HTTP 429 — quota exceeded» è vero e
-        # inservibile. Il messaggio deve dire quale dei tre motivi
-        # possibili riguarda chi legge, perché hanno rimedi diversi.
-        self.assertIn("quota", esito.errore)
-        self.assertIn("PROGETTO nuovo", esito.errore)
+        # NON lo stato nudo: il dettaglio sulla quota e sul progetto non
+        # serve nella pagina di ricerca e trasforma un aiuto in un errore
+        # tecnico. Chi cerca un telefono deve poter proseguire.
+        self.assertIn("temporaneamente non disponibile", esito.errore)
+        self.assertNotIn("quota", esito.errore.lower())
 
     def test_nessun_candidato_e_un_errore_diverso(self):
         """«Non gli è stato dato niente su cui lavorare» e «non ha

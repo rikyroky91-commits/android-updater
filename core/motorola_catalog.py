@@ -8,6 +8,7 @@ Android o un firmware.
 """
 from __future__ import annotations
 
+import csv
 import html
 import re
 import threading
@@ -15,6 +16,7 @@ import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
+from pathlib import Path
 
 from . import config as C
 from . import storage
@@ -24,6 +26,7 @@ URL = "https://en-us.support.motorola.com/app/answers/detail/a_id/178271/p/11066
 TTL_SECONDS = 24 * 3600
 _BLOB = "motorola_model_catalog_html"
 _META = "motorola_model_catalog_fetched_at"
+_SEED = Path(__file__).resolve().parents[1] / "data" / "motorola_modelli.csv"
 
 _ROW_RE = re.compile(
     r"<tr[^>]*>\s*<td[^>]*>.*?\b(XT\d{4}(?:-\d{1,2})?)\b.*?</td>"
@@ -38,6 +41,7 @@ _lock = threading.Lock()
 _codes: dict[str, str] | None = None
 _loaded_at: float | None = None
 _status = "non ancora caricato"
+_from_seed = False
 
 
 def _clean(value: str) -> str:
@@ -53,6 +57,27 @@ def parse(page: str) -> dict[str, str]:
         if _CODE_RE.fullmatch(code) and name:
             rows.setdefault(code, name)
     return rows
+
+
+def _catalogo_incluso() -> dict[str, str]:
+    """Snapshot piccolo della tabella Motorola, disponibile senza rete.
+
+    La build prova comunque a scaricare la tabella aggiornata e la salva nel
+    database. Il file incluso copre pero' il caso importante in cui la rete
+    del *build* di Render non risponde: la prima ricerca Motorola non deve
+    degradare al solo nome del telefono ne' aspettare un worker di fondo.
+    """
+    try:
+        with _SEED.open(encoding="utf-8", newline="") as handle:
+            return {
+                str(row.get("codice") or "").strip().upper():
+                str(row.get("nome") or "").strip()
+                for row in csv.DictReader(handle)
+                if _CODE_RE.fullmatch(str(row.get("codice") or "").strip())
+                and str(row.get("nome") or "").strip()
+            }
+    except OSError:
+        return {}
 
 
 def _download() -> bytes:
@@ -73,10 +98,14 @@ def carica(forza: bool = False, rete: bool = True) -> dict[str, str]:
     Il preload e i refresh espliciti mantengono invece il comportamento di
     rete predefinito.
     """
-    global _codes, _loaded_at, _status
+    global _codes, _loaded_at, _status, _from_seed
     with _lock:
         if (_codes is not None and _loaded_at is not None and not forza
-                and time.monotonic() - _loaded_at < TTL_SECONDS):
+                and time.monotonic() - _loaded_at < TTL_SECONDS
+                # Una risposta dal file incluso e' subito utilizzabile,
+                # ma non deve impedire al preload dal completare il refresh
+                # ufficiale quando la rete e' disponibile.
+                and (not rete or not _from_seed)):
             return _codes
 
         cached = storage.get_blob(_BLOB)
@@ -97,6 +126,13 @@ def carica(forza: bool = False, rete: bool = True) -> dict[str, str]:
             # Torna vuoto: il chiamante prosegue con le altre fonti nel suo
             # budget, mentre il preload/refresh esplicito puo' popolare la
             # cache in seguito.
+            included = _catalogo_incluso()
+            if included:
+                _codes = included
+                _loaded_at = time.monotonic()
+                _from_seed = True
+                _status = f"{len(included)} codici XT (copia inclusa)"
+                return _codes
             _status = "archivio non disponibile"
             return _codes or {}
 
@@ -109,6 +145,13 @@ def carica(forza: bool = False, rete: bool = True) -> dict[str, str]:
                 content = cached
                 source = "archivio precedente"
                 if content is None:
+                    included = _catalogo_incluso()
+                    if included:
+                        _codes = included
+                        _loaded_at = time.monotonic()
+                        _from_seed = True
+                        _status = f"{len(included)} codici XT (copia inclusa; rete non raggiungibile)"
+                        return _codes
                     _status = f"non raggiungibile: {exc}"
                     return _codes or {}
 
@@ -118,17 +161,19 @@ def carica(forza: bool = False, rete: bool = True) -> dict[str, str]:
             return _codes or {}
         _codes = parsed
         _loaded_at = time.monotonic()
+        _from_seed = False
         _status = f"{len(parsed)} codici XT ({source})"
         return _codes
 
 
 def carica_da(rows: dict[str, str], etichetta: str = "elenco fornito") -> dict[str, str]:
     """Iniezione senza rete per i test."""
-    global _codes, _loaded_at, _status
+    global _codes, _loaded_at, _status, _from_seed
     with _lock:
         _codes = {str(code).upper(): str(name) for code, name in rows.items()
                   if _CODE_RE.fullmatch(str(code)) and str(name).strip()}
         _loaded_at = time.monotonic()
+        _from_seed = False
         _status = f"{len(_codes)} codici XT ({etichetta})"
         return _codes
 
@@ -168,8 +213,9 @@ def status() -> str:
 
 
 def reset_cache() -> None:
-    global _codes, _loaded_at, _status
+    global _codes, _loaded_at, _status, _from_seed
     with _lock:
         _codes = None
         _loaded_at = None
+        _from_seed = False
         _status = "non ancora caricato"

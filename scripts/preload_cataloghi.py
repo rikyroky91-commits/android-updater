@@ -7,7 +7,8 @@ Render, cosi' la prima visita non deve costruire cataloghi da zero.
 """
 from __future__ import annotations
 
-from core import aer_catalog, imeicheck, modelcodes, motorola_catalog, sources, specs, storage
+from core import (aer_catalog, imeicheck, modelcodes, motorola_catalog, soc,
+                  sources, specs, storage)
 
 
 def main() -> None:
@@ -16,6 +17,11 @@ def main() -> None:
         ("TAC", imeicheck._build_index),
         ("codici modello", lambda: modelcodes.resolve("SM-A057F")),
         ("schede tecniche", specs.carica),
+        # L'indice SoC viene usato da ogni risultato per completare la
+        # scheda. Senza questo passo la prima ricerca dopo un deploy poteva
+        # scaricare il dataset multi-marca durante la richiesta, con attese
+        # lunghe e un picco di RAM sul piano Render da 512 MB.
+        ("processori", soc._indice_dataset),
         ("catalogo Android Enterprise", aer_catalog.carica),
         ("codici Motorola", motorola_catalog.carica),
         ("bollettino sicurezza Honor", sources.fetch_honor_security_bulletin),

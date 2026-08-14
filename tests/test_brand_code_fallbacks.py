@@ -44,6 +44,11 @@ class TestBrandCodeFallbacks(unittest.TestCase):
         motorola_catalog.carica_da({"XT2523-3": "motorola moto g05"})
         self.assertEqual(motorola_catalog.codes_for_name("moto g05"), ["XT2523-3"])
 
+    def test_catalogo_motorola_incluso_risponde_a_freddo(self):
+        """Un deploy senza download non puo' trasformare G05 in sola identita'."""
+        motorola_catalog.reset_cache()
+        self.assertIn("XT2523-3", motorola_catalog.codes_for_name("moto g05"))
+
     def test_motorola_archivio_copre_codice_fuori_lista_manuale(self):
         motorola_catalog.carica_da({"XT2523-3": "moto g05"})
         with patch.object(sources, "http_get", return_value=_Response(_MOTOROLA_PAGE)):
