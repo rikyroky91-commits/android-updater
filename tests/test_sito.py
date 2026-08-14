@@ -1504,6 +1504,44 @@ class TestParcoDiTest(_Sito):
         self.assertEqual(risposta.headers["location"], "/?q=Galaxy+S24&parco=1")
         self.assertIn(chiave, storage.watched_keys())
 
+    def test_si_puo_registrare_subito_la_data_del_test(self):
+        """Una data scelta nel parco salva anche la baseline del firmware.
+
+        Senza baseline la data sarebbe solo una nota: il parco non saprebbe
+        dire se nel frattempo e' cambiata build, patch o versione Android.
+        """
+        from core import storage
+
+        chiave = next(d["device_key"] for d in storage.get_devices()
+                      if "S24" in d["model"])
+        storage.add_to_watchlist(chiave, "Samsung", "Galaxy S24")
+        risposta = self.client.post(
+            "/parco/segna-test",
+            data={"chiave": chiave, "data_test": "2026-08-12"},
+            follow_redirects=False,
+        )
+        self.assertEqual(risposta.status_code, 303)
+        self.assertEqual(risposta.headers["location"], "/parco?test_salvato=1")
+        baseline = storage.get_test_baseline(chiave)
+        self.assertEqual(baseline["tested_at"], "2026-08-12T12:00:00+00:00")
+        pagina = self.client.get("/parco?test_salvato=1").text
+        self.assertIn('type="date"', pagina)
+        self.assertIn("Test registrato", pagina)
+
+    def test_data_test_non_valida_non_sovrascrive_la_baseline(self):
+        from core import storage
+
+        chiave = next(d["device_key"] for d in storage.get_devices()
+                      if "S24" in d["model"])
+        storage.add_to_watchlist(chiave, "Samsung", "Galaxy S24")
+        risposta = self.client.post(
+            "/parco/segna-test",
+            data={"chiave": chiave, "data_test": "12/08/2026"},
+            follow_redirects=False,
+        )
+        self.assertEqual(risposta.headers["location"], "/parco?errore_test=data")
+        self.assertIsNone(storage.get_test_baseline(chiave))
+
 
 class TestControlliDiSalute(_Sito):
     """IL DIFETTO CHE HA FATTO RIAVVIARE IL SERVIZIO IN CICLO.

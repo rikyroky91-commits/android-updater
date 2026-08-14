@@ -325,6 +325,22 @@ a { color: inherit; }
 .azione-parco { margin-top: .9rem; }
 .azione-parco form { margin: 0; }
 
+/* La data e' un'azione frequente del parco: campo e salvataggio restano
+   sulla stessa riga, gia' compilati con oggi, invece di aprire una pagina
+   separata per ogni telefono. */
+.data-test-form { display: flex; align-items: center; gap: .45rem; min-width: 230px; }
+.data-test-form input[type="date"] {
+  min-width: 132px; font: inherit; font-size: .85rem; color: var(--ink);
+  background: var(--carta); border: 1px solid var(--regola); padding: .32rem .4rem;
+}
+.data-test-form button.secondario { padding: .3rem .55rem; font-size: .78rem; white-space: nowrap; }
+@media (max-width: 620px) { .data-test-form { flex-wrap: wrap; } }
+.conferma-azione, .errore-azione {
+  margin: 0 0 1rem; padding: .65rem .8rem; font-size: .88rem;
+  background: var(--carta); border-left: 3px solid var(--cerca);
+}
+.errore-azione { border-left-color: var(--accent); }
+
 /* --- Correzione a mano del nome commerciale -----------------------------
    Chiusa di default (`<details>`): è una via d'uscita per il caso in cui
    la scelta automatica ha preso il nome «sbagliato» secondo chi ha il

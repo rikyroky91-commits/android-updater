@@ -37,6 +37,7 @@ from __future__ import annotations
 import os
 import shutil
 from contextlib import asynccontextmanager
+from datetime import date
 from pathlib import Path
 from urllib.parse import quote
 
@@ -433,7 +434,8 @@ def pagina_aggiornamenti(request: Request, giorni: int = Query(default=30)):
 
 
 @app.get("/parco", response_class=HTMLResponse)
-def pagina_parco(request: Request):
+def pagina_parco(request: Request, test_salvato: int = Query(default=0),
+                 errore_test: str = Query(default="")):
     parco = storage.get_watchlist()
     baseline = storage.get_test_baselines()
     devices = {d["device_key"]: d for d in storage.get_devices()}
@@ -454,10 +456,24 @@ def pagina_parco(request: Request):
             "brand": voce.get("brand") or device.get("brand", ""),
             "provato_il": (fmt_date(riferimento["tested_at"])
                            if riferimento and riferimento.get("tested_at") else None),
+            # Il controllo nativo ``date`` vuole YYYY-MM-DD; la baseline
+            # conserva invece un istante ISO completo. Tenerli distinti
+            # rende modificabile la data senza esporre un orario inutile.
+            "data_test": ((riferimento.get("tested_at") or "")[:10]
+                           if riferimento and riferimento.get("tested_at")
+                           else date.today().isoformat()),
+            "puo_segnare_test": bool(device),
             "confronto": confronto,
         })
+    messaggi_errore = {
+        "data": "Inserisci una data valida per il test.",
+        "dispositivo": "Questo modello non ha ancora dati firmware da salvare come riferimento.",
+        "parco": "Il modello non risulta piu nel parco di test.",
+    }
     return _rendi(request, "parco.html", _contesto(
         request, attiva="parco", righe=righe,
+        test_salvato=bool(test_salvato),
+        errore_test=messaggi_errore.get(errore_test, ""),
     ))
 
 
@@ -624,6 +640,43 @@ def parco_aggiungi(chiave: str = Form(...), brand: str = Form(""),
 def parco_togli(chiave: str = Form(...)):
     storage.remove_from_watchlist(chiave)
     return RedirectResponse(f"/dispositivo?k={quote(chiave)}", status_code=303)
+
+
+def _istante_test(data_test: str) -> str | None:
+    """Converte la sola data scelta nel parco in un istante ISO stabile.
+
+    A mezzogiorno UTC, non a mezzanotte: una data di test non deve slittare
+    al giorno precedente/successivo quando viene letta in un fuso diverso.
+    """
+    try:
+        scelta = date.fromisoformat((data_test or "").strip())
+    except ValueError:
+        return None
+    return f"{scelta.isoformat()}T12:00:00+00:00"
+
+
+@app.post("/parco/segna-test")
+def parco_segna_test(chiave: str = Form(...), data_test: str = Form("")):
+    """Registra quando il telefono e' stato provato e la baseline attuale.
+
+    La data da sola non basta al parco: il suo scopo e' capire *cosa* e'
+    cambiato dal test. PerciÃ² il click salva insieme la versione/build/patch
+    che il tracker conosce in quel momento, senza chiedere una seconda form.
+    """
+    if chiave not in storage.watched_keys():
+        return RedirectResponse("/parco?errore_test=parco", status_code=303)
+    dispositivo = next((d for d in storage.get_devices()
+                        if d.get("device_key") == chiave), None)
+    if not dispositivo:
+        return RedirectResponse("/parco?errore_test=dispositivo", status_code=303)
+    istante = _istante_test(data_test)
+    if not istante:
+        return RedirectResponse("/parco?errore_test=data", status_code=303)
+    storage.set_test_baseline(dispositivo, tested_at=istante)
+    # La data del test e' un dato inserito a mano: va nel backup subito,
+    # come le correzioni TAC, per non dipendere dalla prossima scansione.
+    _backup_subito()
+    return RedirectResponse("/parco?test_salvato=1", status_code=303)
 
 
 def _backup_subito() -> None:
