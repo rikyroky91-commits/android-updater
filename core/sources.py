@@ -37,6 +37,7 @@ from . import aer_catalog
 from . import config as C
 from . import extract
 from . import modelcodes
+from . import motorola_catalog
 from . import oplus_arb
 from . import oppo_official
 from . import storage
@@ -131,6 +132,7 @@ _FIRMWARE_KIND_BY_SOURCE = {
     "aer_catalog": C.FW_SUPPORT,
     "realme_aer": C.FW_FACTORY,
     "honor_aer": C.FW_FACTORY,
+    "honor_security": C.FW_SUPPORT,
     "vivo_aer": C.FW_FACTORY,
 }
 
@@ -671,6 +673,7 @@ def _fetch_pixel_ota_scarica() -> tuple[list[RawItem], str | None]:
                     # vista per modello. Resta leggibile in `size_info`, che
                     # non passa dagli estrattori.
                     build=build,
+                    firmware_kind=C.FW_BETA,
                     size_info=(
                         "Immagine OTA canale Beta"
                         + (f" · anteprima Android {android_version}" if android_version else "")
@@ -858,10 +861,102 @@ _HONOR_ROW_RE = re.compile(
 _AER_TTL_SECONDI = 60 * 60
 _honor_aer_cache = _CacheDiFonte(_AER_TTL_SECONDI)
 
+# Il bollettino italiano è la fonte europea più ampia che HONOR pubblichi
+# direttamente: non espone il numero di build, ma elenca i modelli ancora
+# supportati e la loro cadenza di sicurezza. È complementare ad AER, che
+# copre soltanto una parte dei modelli business e riporta l'Android iniziale.
+HONOR_SECURITY_BULLETIN_URL = "https://www.honor.com/it/support/bulletin/"
+_HONOR_SECURITY_SECTION_RE = re.compile(
+    r'<p\b[^>]*class=["\']des-tit["\'][^>]*>(?P<title>.*?)</p>'
+    r'(?P<models>.*?)(?=<p\b[^>]*class=["\']des-tit["\']|</div>)',
+    re.IGNORECASE | re.DOTALL,
+)
+_HONOR_SECURITY_MODEL_LINE_RE = re.compile(
+    r'<p\b[^>]*class=["\']des["\'][^>]*>(?P<line>.*?)</p>',
+    re.IGNORECASE | re.DOTALL,
+)
+_honor_security_cache = _CacheDiFonte(_AER_TTL_SECONDI)
+
+
+def _testo_html_breve(value: str) -> str:
+    return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", value or "")).split())
+
+
+def _parse_honor_security_bulletin(html_text: str) -> list[tuple[str, str]]:
+    """Estrae ``(modello, cadenza)`` dal bollettino HONOR europeo.
+
+    Il parser opera sulle sezioni (mensile/bimestrale/trimestrale), non su
+    ogni token del documento: i bollettini mensili contengono gli stessi
+    nomi e non devono diventare falsi dispositivi o duplicati.
+    """
+    result: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for section in _HONOR_SECURITY_SECTION_RE.finditer(html_text or ""):
+        title = _testo_html_breve(section.group("title")).lower()
+        if "mensili" in title:
+            cadence = "mensili"
+        elif "bimestrali" in title:
+            cadence = "bimestrali"
+        elif "trimestrali" in title:
+            cadence = "trimestrali"
+        else:
+            continue
+        for line_match in _HONOR_SECURITY_MODEL_LINE_RE.finditer(section.group("models")):
+            line = _testo_html_breve(line_match.group("line"))
+            if ":" not in line:
+                continue
+            _series, names = line.split(":", 1)
+            for raw_name in names.split(","):
+                name = " ".join(raw_name.split())
+                if not name or "honor" not in name.lower():
+                    continue
+                key = modelcodes._normalize_name(name)
+                if key and key not in seen:
+                    seen.add(key)
+                    result.append((name, cadence))
+    return result
+
 
 def reset_honor_aer_cache() -> None:
     """Azzera la cache della pagina Honor AER (usata dai test)."""
     _honor_aer_cache.azzera()
+
+
+def reset_honor_security_cache() -> None:
+    """Azzera la cache del bollettino sicurezza HONOR (usata dai test)."""
+    _honor_security_cache.azzera()
+
+
+def fetch_honor_security_bulletin(forza: bool = False) -> tuple[list[RawItem], str | None]:
+    return _honor_security_cache.ottieni(_fetch_honor_security_bulletin_scarica, forza)
+
+
+def _fetch_honor_security_bulletin_scarica() -> tuple[list[RawItem], str | None]:
+    try:
+        response = http_get(HONOR_SECURITY_BULLETIN_URL)
+    except Exception as exc:
+        return [], f"connessione fallita: {exc}"
+    if response.status_code != 200:
+        return [], f"HTTP {response.status_code}"
+    response.encoding = "utf-8"
+    parsed = _parse_honor_security_bulletin(response.text)
+    if not parsed:
+        return [], "pagina raggiungibile ma nessuna riga dispositivo riconosciuta (formato cambiato?)"
+    return [
+        RawItem(
+            title=f"{device} — aggiornamenti di sicurezza {cadence}",
+            link=HONOR_SECURITY_BULLETIN_URL,
+            brand=C.HUAWEI,
+            device=device,
+            size_info=(
+                "Bollettino sicurezza ufficiale HONOR Italia — "
+                f"cadenza {cadence}; il produttore non pubblica una build OTA per modello"
+            ),
+            trust=C.TRUST_STRUCTURED,
+            firmware_kind=C.FW_SUPPORT,
+        )
+        for device, cadence in parsed
+    ], None
 
 
 def fetch_honor_aer(forza: bool = False) -> tuple[list[RawItem], str | None]:
@@ -3269,33 +3364,76 @@ MOTOROLA_LOLINET_DEVICES: list[tuple[int, str, str]] = [
     (2022, "corfur", "G71"),
     (2023, "bronco", "ThinkPhone"),
     (2023, "cancun", "G14"),
-    (2023, "cancunf", "G54"),
-    (2023, "devonf", "G73"),
+    (2023, "cancunf", "G54 5G"),
+    (2023, "devonf", "G73 5G"),
     (2023, "devonn", "G Power (2023)"),
-    (2023, "fogos", "G34"),
+    (2023, "fogos", "G34 5G"),
     (2023, "genevn", "G Stylus 5G (2023)"),
     (2023, "gnevan", "G Stylus (2023)"),
     (2023, "lynkco", "Razr 40"),
     (2023, "lyriq", "Edge 40"),
     (2023, "manaus", "Edge 40 Neo"),
-    (2023, "penang", "G53"),
+    (2023, "penang", "G53 5G"),
     (2023, "penangf", "G13"),
     (2023, "pnangn", "G 5G (2023)"),
     (2023, "rtwo", "Edge 40 Pro"),
     (2023, "sabahl", "E13"),
     (2023, "zeekr", "Razr 40 Ultra"),
-    (2024, "ctwo", "X50 Ultra"),
-    (2024, "vienna", "S50"),
-    (2024, "malmo", "S50 Neo"),
+    # I nomi cinesi X50/S50 sono rebrand: in Europa questi codename sono
+    # Edge 50 Ultra, Edge 50 Neo e moto g85. Mostrare il rebrand avrebbe
+    # portato a scheda tecnica e firmware del mercato sbagliato.
+    (2024, "ctwo", "Edge 50 Ultra"),
+    (2024, "vienna", "Edge 50 Neo"),
+    (2024, "malmo", "G85 5G"),
     (2024, "fogorow", "G24"),
     (2024, "aito", "Razr 50"),
     (2024, "arcfox", "Razr 50 Ultra"),
     (2024, "taipei", "G55"),
     (2024, "paros", "G75"),
-    (2024, "scout", "Edge 60"),
-    (2024, "cybert", "Edge 60 Pro"),
+    (2025, "scout", "Edge 60 Fusion"),
+    (2025, "cybert", "Edge 60 Pro"),
     (2025, "leap", "Razr 60 Ultra"),
+    # Nuovi codename con pacchetto RETEU verificato nel mirror e nome
+    # verificato nella tabella ufficiale Motorola dei codici XT.
+    (2025, "aito25", "Razr 60"),
+    (2025, "bogota", "G56 5G"),
+    (2025, "nice", "G86 5G"),
+    (2025, "roadstr", "Edge 70"),
 ]
+
+# Codici letti dai pacchetti del mirror, non dedotti dal nome. Questa piccola
+# mappa rende immediata la ricerca per codice anche offline, mentre
+# `motorola_catalog` amplia l'identificazione a tutti i codici XT pubblicati
+# da Motorola. Ogni tupla e' (anno, codename, nome europeo).
+MOTOROLA_LOLINET_CODES: dict[str, tuple[int, str, str]] = {
+    "XT2309-2": (2023, "bronco", "ThinkPhone"),
+    "XT2341-2": (2023, "cancun", "G14"),
+    "XT2343-2": (2023, "cancunf", "G54 5G"),
+    "XT2237-2": (2023, "devonf", "G73 5G"),
+    "XT2363-3": (2023, "fogos", "G34 5G"),
+    "XT2323-1": (2023, "lynkco", "Razr 40"),
+    "XT2307-1": (2023, "manaus", "Edge 40 Neo"),
+    "XT2331-2": (2023, "penangf", "G13"),
+    "XT2335-2": (2023, "penang", "G53 5G"),
+    "XT2301-4": (2023, "rtwo", "Edge 40 Pro"),
+    "XT2345-3": (2023, "sabahl", "E13"),
+    "XT2321-1": (2023, "zeekr", "Razr 40 Ultra"),
+    "XT2401-1": (2024, "ctwo", "Edge 50 Ultra"),
+    "XT2409-1": (2024, "vienna", "Edge 50 Neo"),
+    "XT2423-3": (2024, "fogorow", "G24"),
+    "XT2427-2": (2024, "malmo", "G85 5G"),
+    "XT2453-1": (2024, "aito", "Razr 50"),
+    "XT2451-3": (2024, "arcfox", "Razr 50 Ultra"),
+    "XT2435-2": (2024, "taipei", "G55 5G"),
+    "XT2437-3": (2024, "paros", "G75 5G"),
+    "XT2503-4": (2025, "scout", "Edge 60 Fusion"),
+    "XT2507-1": (2025, "cybert", "Edge 60 Pro"),
+    "XT2551-6": (2025, "leap", "Razr 60 Ultra"),
+    "XT2553-1": (2025, "aito25", "Razr 60"),
+    "XT2529-2": (2025, "bogota", "G56 5G"),
+    "XT2527-2": (2025, "nice", "G86 5G"),
+    "XT2601-2": (2025, "roadstr", "Edge 70"),
+}
 
 # Non tutti i modelli pubblicano un pacchetto per ogni regione: si prova
 # questa lista in ordine finché una cartella risponde con dei file.
@@ -3312,12 +3450,28 @@ _LOLINET_FILE_RE = re.compile(
 _LOLINET_NAME_RE = re.compile(
     r"(XT[\w-]+)_[A-Z0-9]+_[A-Z0-9]+_(\d{1,2})_([^_/]+)_subsidy", re.I
 )
+_LOLINET_FASTBOOT_RE = re.compile(
+    r"_(\d{1,2})_(?:SHIPPING_[^_]+_g-user-)?([A-Z][A-Z0-9.-]*\d[A-Z0-9.-]*)",
+    re.I,
+)
+
+
+def _lolinet_metadata(filename: str, fallback_code: str | None = None):
+    """Codice, Android e build sia dai pacchetti OTA sia dai fastboot."""
+    match = _LOLINET_NAME_RE.search(filename or "")
+    if match:
+        return match.group(1).upper(), int(match.group(2)), match.group(3)
+    match = _LOLINET_FASTBOOT_RE.search(filename or "")
+    if match:
+        return fallback_code, int(match.group(1)), match.group(2)
+    return fallback_code, None, None
 
 
 def _lolinet_latest(codename: str, year: int):
     """Ultimo file firmware per un codename, provando le region una a una.
     Ritorna (nome_file, url_completo, data_iso) oppure None se non trovato."""
     base = f"https://mirrors.lolinet.com/firmware/lenomola/{year}/{codename}/official"
+    ripiego = None
     for region in _LOLINET_REGIONS:
         folder_url = f"{base}/{region}/"
         try:
@@ -3329,10 +3483,21 @@ def _lolinet_latest(codename: str, year: int):
         matches = _LOLINET_FILE_RE.findall(response.text)
         if not matches:
             continue
-        filename, date_str = max(matches, key=lambda m: m[1])
+        # L'indice h5ai puo' contenere pacchetti di piu' mercati anche
+        # dentro una cartella regionale. Prima si prendeva la data piu'
+        # recente e un RETAPAC poteva prevalere su un RETEU. Qui si accetta
+        # solo il tag della regione richiesta; se non esiste nessun tag, il
+        # pacchetto resta disponibile esclusivamente come ripiego finale.
+        regionali = [m for m in matches if f"_{region}_" in m[0].upper()]
+        scelti = regionali or matches
+        filename, date_str = max(scelti, key=lambda m: m[1])
         filename = filename.rsplit("/", 1)[-1]
-        return filename, folder_url + filename, date_str
-    return None
+        trovato = (filename, folder_url + filename, date_str)
+        if regionali:
+            return trovato
+        if ripiego is None:
+            ripiego = trovato
+    return ripiego
 
 
 def fetch_motorola_lolinet():
@@ -3359,9 +3524,7 @@ def fetch_motorola_lolinet():
             if not found:
                 continue
             filename, file_url, date_str = found
-            name_match = _LOLINET_NAME_RE.search(filename)
-            android_version = int(name_match.group(2)) if name_match else None
-            build = name_match.group(3) if name_match else None
+            model_code, android_version, build = _lolinet_metadata(filename)
             items.append(
                 RawItem(
                     title=f"Motorola {model} — build {build or filename}",
@@ -3369,6 +3532,7 @@ def fetch_motorola_lolinet():
                     published=iso(date_str.replace(" ", "T", 1)),
                     brand=C.VIVO,
                     device=f"Motorola {model}",
+                    model_code=model_code,
                     build=build,
                     android_version=android_version,
                     size_info="Firmware ufficiale (mirror lolinet.com)",
@@ -3460,6 +3624,9 @@ SOURCES: list[Source] = [
     Source("honor_aer", "Honor — piano ufficiale Android Enterprise Recommended", C.TRUST_STRUCTURED,
            fetch_honor_aer, C.HUAWEI, HONOR_AER_URL,
            "Versione Android di partenza e impegno di aggiornamento futuro per modello."),
+    Source("honor_security", "Honor — bollettino sicurezza ufficiale Italia", C.TRUST_STRUCTURED,
+           fetch_honor_security_bulletin, C.HUAWEI, HONOR_SECURITY_BULLETIN_URL,
+           "Modelli supportati e cadenza aggiornamenti: non pubblica il numero di build OTA."),
     Source("aer_catalog", "Multi-brand — Android Enterprise Recommended (catalogo)",
            C.TRUST_STRUCTURED, fetch_aer_catalog, None,
            "https://androidenterprisepartners.withgoogle.com/devices/",
@@ -3832,6 +3999,24 @@ def _risultati_xiaomi_ordinati(items: list[RawItem], codice: str | None = None) 
     return distinti[:3]
 
 
+# Nelle build Xiaomi le tre lettere subito prima del mercato sono il
+# identificatore della stessa variante hardware: ``WNO`` in
+# ``WNOEUXM``/``WNOMIXM``, per esempio, è sempre il Redmi Note 13 Pro+ 5G.
+# Il nome nel tracker può invece contenere uno o più alias dopo ``/`` e non
+# è quindi confrontabile letteralmente fra regioni. Usiamo la chiave soltanto
+# *dopo* avere trovato il modello per nome: non trasforma mai una sigla di
+# build in un riconoscimento autonomo.
+_XIAOMI_BUILD_PRODUCT_RE = re.compile(
+    r"\.([A-Z0-9]{3})(?:CN|EU|MI|IN|ID|RU|TW|TR|JP)XM(?:\b|$)", re.I
+)
+
+
+def _chiave_prodotto_xiaomi(item: RawItem) -> str | None:
+    testo = " ".join((item.build or "", item.version or "")).upper()
+    trovato = _XIAOMI_BUILD_PRODUCT_RE.search(testo)
+    return trovato.group(1).upper() if trovato else None
+
+
 _PAROLE_REGIONI_XIAOMI = frozenset((
     "eea", "global", "china", "india", "indonesia", "japan", "russia",
     "taiwan", "turkey", "europe", "european",
@@ -3899,10 +4084,29 @@ def _lookup_xiaomi(model_name: str) -> list[RawItem]:
 
     vicini: list[RawItem] = []
     for nome, ago in zip(nomi_richiesti, aghi):
+        # Le righe che differiscono dal nome richiesto soltanto per il
+        # mercato sono già un gruppo certo, anche se il nome è lungo. Non
+        # limitarle alle sole query corte: una major release può cambiare il
+        # token della build (es. WPA -> XPA) e non sarebbe quindi recuperata
+        # dal raggruppamento per build qui sotto.
+        vicini.extend(_varianti_regionali_xiaomi(nomi, nome))
         if len(ago) < _TERMINE_MINIMO:
-            vicini.extend(_varianti_regionali_xiaomi(nomi, nome))
             continue
         vicini.extend(_piu_vicini(nomi, ago))
+
+    # `_piu_vicini` limita deliberatamente il ripiego a tre nomi. Per una
+    # famiglia già riconosciuta questo non basta: le tre righe iniziali del
+    # tracker possono essere Taiwan/India/Russia e l'EEA, pur esistente,
+    # resterebbe esclusa prima dell'ordinamento per mercato. La chiave della
+    # build riunisce qui soltanto le release della *stessa* variante hardware
+    # trovata sopra, incluse quelle che nel nome hanno l'alias dopo ``/``.
+    chiavi = {chiave for chiave in (_chiave_prodotto_xiaomi(item) for item in vicini)
+              if chiave}
+    if chiavi:
+        vicini.extend(
+            item for item in all_items
+            if _chiave_prodotto_xiaomi(item) in chiavi
+        )
     return _risultati_xiaomi_ordinati(vicini, codice)
 
 
@@ -3917,6 +4121,21 @@ def _lookup_honor(model_name: str) -> list[RawItem]:
         return []
     nomi = [(item, modelcodes._normalize_name(item.device or "")) for item in all_items]
     esatti = [item for item, nome in nomi if nome == needle]
+    if esatti:
+        return esatti[:3]
+    return _piu_vicini(nomi, needle)
+
+
+def _lookup_honor_security(model_name: str) -> list[RawItem]:
+    """Supporto HONOR ufficiale per i modelli non presenti nel solo AER."""
+    all_items, error = fetch_honor_security_bulletin()
+    if error or not all_items:
+        return []
+    needle = modelcodes._normalize_name(model_name)
+    if not needle:
+        return []
+    nomi = [(item, modelcodes._normalize_name(item.device or "")) for item in all_items]
+    esatti = [item for item, name in nomi if name == needle]
     if esatti:
         return esatti[:3]
     return _piu_vicini(nomi, needle)
@@ -4012,6 +4231,32 @@ def _lookup_motorola(model_name: str) -> list[RawItem]:
     """Cerca fra i modelli Motorola coperti dal mirror. Qui la copertura
     resta quella della tabella manuale (il mirror è organizzato per nome in
     codice interno, non per nome commerciale)."""
+    query_code = normalizza_codice_modello(model_name)
+    target = MOTOROLA_LOLINET_CODES.get(query_code)
+    if target:
+        # Il codice e' stato letto da un pacchetto reale: questa via non
+        # mescola mai firmware di varianti XT sorelle.
+        year, codename, commercial = target
+        try:
+            found = _lolinet_latest(codename, year)
+        except Exception:
+            return []
+        if not found:
+            return []
+        filename, file_url, date_str = found
+        model_code, android_version, build = _lolinet_metadata(filename, query_code)
+        return [RawItem(
+            title=f"Motorola {commercial} - build {build or filename}",
+            link=file_url,
+            published=iso(date_str.replace(" ", "T", 1)),
+            brand=C.VIVO,
+            device=f"Motorola {commercial}",
+            model_code=model_code,
+            build=build,
+            android_version=android_version,
+            size_info="Firmware ufficiale (mirror lolinet.com)",
+        )]
+
     needle = modelcodes._normalize_name(model_name)
     if not needle:
         return []
@@ -4132,6 +4377,9 @@ _STRUCTURED_LOOKUPS_LIST = [
     StructuredLookup(C.XIAOMI, _lookup_xiaomi, "basso", "catalogo Xiaomi", fetch_xiaomi),
     StructuredLookup(C.HUAWEI, _lookup_honor, "basso", "piano ufficiale Honor",
                      fetch_honor_aer, firmware_kind=C.FW_FACTORY),
+    StructuredLookup(C.HUAWEI, _lookup_honor_security, "basso",
+                     "bollettino sicurezza ufficiale Honor Italia",
+                     fetch_honor_security_bulletin, firmware_kind=C.FW_SUPPORT),
     # Prima delle due fonti Oppo che danno la versione di fabbrica: questa
     # dà quella davvero rilasciata.
     #
@@ -4908,6 +5156,7 @@ def _lookup_order(brand: str | None) -> list:
 _CACHE_PER_FETCH = {
     id(fetch_xiaomi): _xiaomi_cache,
     id(fetch_honor_aer): _honor_aer_cache,
+    id(fetch_honor_security_bulletin): _honor_security_cache,
     id(fetch_vivo_aer): _vivo_aer_cache,
     id(fetch_oppo_aer): _oppo_aer_cache,
     id(fetch_pixel_ota): _pixel_ota_cache,

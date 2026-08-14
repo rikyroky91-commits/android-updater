@@ -7,7 +7,7 @@ Render, cosi' la prima visita non deve costruire cataloghi da zero.
 """
 from __future__ import annotations
 
-from core import aer_catalog, imeicheck, modelcodes, specs, storage
+from core import aer_catalog, imeicheck, modelcodes, motorola_catalog, sources, specs, storage
 
 
 def main() -> None:
@@ -17,6 +17,8 @@ def main() -> None:
         ("codici modello", lambda: modelcodes.resolve("SM-A057F")),
         ("schede tecniche", specs.carica),
         ("catalogo Android Enterprise", aer_catalog.carica),
+        ("codici Motorola", motorola_catalog.carica),
+        ("bollettino sicurezza Honor", sources.fetch_honor_security_bulletin),
     )
     pronti = []
     for nome, carica in passi:
