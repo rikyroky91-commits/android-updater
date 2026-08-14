@@ -47,12 +47,25 @@ from . import storage
 _GIST_FILENAME = "tracker-db.sqlite.gz"
 _lock = threading.Lock()
 _stato = {"ultimo_esito": "non configurato", "ultimo_salvataggio": None,
-          "ultimo_ripristino": None, "byte": 0}
+          "ultimo_ripristino": None, "ultima_operazione": None,
+          "ultima_operazione_ok": None, "byte": 0}
 
 
 def stato() -> dict:
     """Diagnostica leggibile, per la scheda Diagnostica."""
     return dict(_stato)
+
+
+def _esito(operazione: str, ok: bool | None, messaggio: str) -> None:
+    """Memorizza l'esito insieme al tipo di operazione che lo ha prodotto.
+
+    Il ripristino viene tentato automaticamente all'avvio e puo' fallire per
+    un motivo temporaneo senza impedire al backup di salvare. La Diagnostica
+    deve quindi poterlo distinguere dal fallimento di un salvataggio.
+    """
+    _stato["ultimo_esito"] = messaggio
+    _stato["ultima_operazione"] = operazione
+    _stato["ultima_operazione_ok"] = ok
 
 
 def configurato() -> bool:
@@ -161,19 +174,27 @@ def salva() -> tuple[bool, str]:
     limite di dimensione e la banda non è gratuita.
     """
     if not configurato():
-        return False, "nessun archivio configurato"
+        messaggio = "nessun archivio configurato"
+        _esito("salvataggio", False, messaggio)
+        return False, messaggio
     if requests is None:  # pragma: no cover
-        return False, "libreria 'requests' non disponibile"
+        messaggio = "libreria 'requests' non disponibile"
+        _esito("salvataggio", False, messaggio)
+        return False, messaggio
 
     percorso = C.DB_PATH
     if not os.path.exists(percorso):
-        return False, "database non ancora creato"
+        messaggio = "database non ancora creato"
+        _esito("salvataggio", False, messaggio)
+        return False, messaggio
 
     with _lock:
         try:
             grezzo = _istantanea_coerente(percorso)
         except Exception as exc:
-            return False, f"lettura del database non riuscita: {exc}"
+            messaggio = f"lettura del database non riuscita: {exc}"
+            _esito("salvataggio", False, messaggio)
+            return False, messaggio
 
         # UN ARCHIVIO VUOTO NON SI CARICA MAI SOPRA UNO PIENO.
         #
@@ -190,7 +211,7 @@ def salva() -> tuple[bool, str]:
         if _archivio_senza_contenuto():
             messaggio = ("archivio locale vuoto: salvataggio saltato per non "
                          "sovrascrivere lo storico esterno")
-            _stato["ultimo_esito"] = messaggio
+            _esito("salvataggio", False, messaggio)
             return False, messaggio
 
         # E SI CONTROLLA ANCHE PRIMA DI CARICARE.
@@ -205,7 +226,7 @@ def salva() -> tuple[bool, str]:
         if guasto:
             messaggio = (f"istantanea non valida ({guasto}): salvataggio annullato "
                          "per non sovrascrivere l'ultima copia buona")
-            _stato["ultimo_esito"] = messaggio
+            _esito("salvataggio", False, messaggio)
             return False, messaggio
 
         compresso = gzip.compress(grezzo, compresslevel=6)
@@ -216,7 +237,7 @@ def salva() -> tuple[bool, str]:
         else:
             ok, messaggio = _salva_su_url(compresso)
 
-        _stato["ultimo_esito"] = messaggio
+        _esito("salvataggio", ok, messaggio)
         if ok:
             _stato["ultimo_salvataggio"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         return ok, messaggio
@@ -268,13 +289,19 @@ def ripristina(solo_se_mancante: bool = True) -> tuple[bool, str]:
     in ogni altra situazione si preferisce non toccare nulla.
     """
     if not configurato():
-        return False, "nessun archivio configurato"
+        messaggio = "nessun archivio configurato"
+        _esito("ripristino", False, messaggio)
+        return False, messaggio
     if requests is None:  # pragma: no cover
-        return False, "libreria 'requests' non disponibile"
+        messaggio = "libreria 'requests' non disponibile"
+        _esito("ripristino", False, messaggio)
+        return False, messaggio
 
     percorso = C.DB_PATH
     if solo_se_mancante and os.path.exists(percorso) and os.path.getsize(percorso) > 4096:
-        return False, "database locale già presente: ripristino non necessario"
+        messaggio = "database locale già presente: ripristino non necessario"
+        _esito("ripristino", None, messaggio)
+        return False, messaggio
 
     with _lock:
         if C.env("BACKUP_GIST_ID"):
@@ -283,14 +310,14 @@ def ripristina(solo_se_mancante: bool = True) -> tuple[bool, str]:
             dati, messaggio = _leggi_da_url()
 
         if dati is None:
-            _stato["ultimo_esito"] = messaggio
+            _esito("ripristino", False, messaggio)
             return False, messaggio
 
         try:
             grezzo = gzip.decompress(dati)
         except Exception as exc:
             messaggio = f"archivio scaricato ma non decomprimibile: {exc}"
-            _stato["ultimo_esito"] = messaggio
+            _esito("ripristino", False, messaggio)
             return False, messaggio
 
         # Scrittura atomica: un'interruzione a metà lascerebbe un database
@@ -323,7 +350,7 @@ def ripristina(solo_se_mancante: bool = True) -> tuple[bool, str]:
                     "NON è stato installato. L'archivio locale resta quello che era; "
                     "il prossimo salvataggio sovrascriverà la copia guasta con una buona."
                 )
-                _stato["ultimo_esito"] = messaggio
+                _esito("ripristino", False, messaggio)
                 return False, messaggio
 
             # PRIMA di sostituire il file: chiudere le connessioni aperte e
@@ -347,13 +374,15 @@ def ripristina(solo_se_mancante: bool = True) -> tuple[bool, str]:
 
             os.replace(temporaneo, percorso)
         except OSError as exc:
-            return False, f"scrittura del database non riuscita: {exc}"
+            messaggio = f"scrittura del database non riuscita: {exc}"
+            _esito("ripristino", False, messaggio)
+            return False, messaggio
         finally:
             if os.path.exists(temporaneo):
                 os.remove(temporaneo)
 
         messaggio = f"ripristinato ({len(grezzo) // 1024} KB)"
-        _stato["ultimo_esito"] = messaggio
+        _esito("ripristino", True, messaggio)
         _stato["ultimo_ripristino"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         return True, messaggio
 

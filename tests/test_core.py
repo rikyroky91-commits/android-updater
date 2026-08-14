@@ -2026,8 +2026,16 @@ class TestRealmeUfficiale(unittest.TestCase):
         # azzerarla, altrimenti legge la pagina lasciata lì dal test
         # precedente invece della propria — vedi la nota in
         # `test_honor_legge_una_pagina_html`.
-        sources.reset_realme_aer_cache()
-        self.addCleanup(sources.reset_realme_aer_cache)
+        # Le fonti vengono scaldate in thread di servizio. Se un test
+        # precedente lascia una cache (o un worker) attivo, qui non stiamo
+        # più testando questa pagina Realme ma il risultato casuale di prima.
+        sources.azzera_cache_fonti()
+        self.addCleanup(sources.azzera_cache_fonti)
+        # Questa classe verifica il parser e la risoluzione, non il
+        # riscaldamento. Un worker mantiene la propria connessione SQLite e
+        # su Windows può trattenere il database temporaneo del test.
+        self._orig_scalda_fonti = sources._scalda_fonti
+        sources._scalda_fonti = lambda voci: None
         self._db = tempfile.mktemp(suffix=".db")
         os.environ["TRACKER_DB"] = self._db
         C.DB_PATH = self._db
@@ -2046,6 +2054,8 @@ class TestRealmeUfficiale(unittest.TestCase):
     def tearDown(self):
         sources.http_get = self._orig_http_get
         sources.rss_items = self._orig_rss
+        sources._scalda_fonti = self._orig_scalda_fonti
+        sources.attendi_riscaldamenti()
         storage.reset_state()
         if os.path.exists(self._db):
             os.remove(self._db)
@@ -2882,8 +2892,14 @@ class TestMatriceRicerca(unittest.TestCase):
         storage.init_db()
         modelcodes.reset_cache()
         appledevices.reset_cache()
+        sources.azzera_cache_fonti()
         self._orig = (sources.http_get, sources.rss_items,
                       modelcodes._download, appledevices._download)
+        # Stessa ragione della classe Realme sopra: qui servono risultati
+        # riproducibili delle fonti finte, non download concorrenti che
+        # possano trattenere il database di fixture su Windows.
+        self._orig_scalda_fonti = sources._scalda_fonti
+        sources._scalda_fonti = lambda voci: None
         # L'archivio firmware Oppo parla con urllib, non con
         # `sources.http_get`: senza questo stub la matrice andrebbe in rete
         # davvero, e un test che dipende dalla rete fallisce a caso.
@@ -2947,10 +2963,12 @@ class TestMatriceRicerca(unittest.TestCase):
     def tearDown(self):
         (sources.http_get, sources.rss_items,
          modelcodes._download, appledevices._download) = self._orig
+        sources._scalda_fonti = self._orig_scalda_fonti
         oppo_official._post = self._orig_oppo_post
         oppo_official.reset_cache()
         modelcodes.reset_cache()
         appledevices.reset_cache()
+        sources.azzera_cache_fonti()
         storage.reset_state()
         if os.path.exists(self._db):
             os.remove(self._db)

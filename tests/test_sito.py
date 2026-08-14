@@ -229,7 +229,9 @@ class TestDiagnosticaConfigurazioneBackup(_Sito):
         backup.configurato = lambda: True
         backup.stato = lambda: {
             "ultimo_esito": 'GitHub ha risposto 401: { "message": "Bad credentials" }',
-            "ultimo_salvataggio": None, "ultimo_ripristino": None}
+            "ultimo_salvataggio": None, "ultimo_ripristino": None,
+            "ultima_operazione": "salvataggio", "ultima_operazione_ok": False,
+        }
 
     def test_il_modulo_di_configurazione_compare_solo_se_non_configurato(self):
         self._non_configurato()

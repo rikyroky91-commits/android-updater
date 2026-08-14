@@ -12,6 +12,11 @@ python worker.py                        # ciclo continuo, senza sito
 python -m unittest discover -s tests    # 824 test
 ```
 
+Regola di collaudo delle fonti: ogni modifica deve mantenere i casi di
+regressione e aggiungere **almeno 10 modelli diversi** non presenti nella
+matrice precedente. Non basta far tornare verde lo stesso telefono che ha
+generato il difetto.
+
 Il sito ha due pagine d'ingresso: `/` è **solo la barra di ricerca**, e
 diventa la scheda di un modello quando le si dà qualcosa da cercare;
 `/dispositivi` è l'archivio.
@@ -92,7 +97,10 @@ far credere di avere una risposta.
 | MIUI/HyperOS Updates Tracker | strutturata | ~1300 device, versione, peso, data |
 | Motorola — mirror lolinet.com | strutturata | build ufficiali |
 | **Oppo — archivio firmware ufficiale** | strutturata | versione **rilasciata**, data e changelog per ~94 modelli fino al 2021-22 |
+| **OPPO ColorOS 16 — piano ufficiale** | strutturata | 42 modelli con Android 16 previsto; non è una conferma della build installata |
+| OnePlus / OPPO — tracker ARB | curata | build osservata per regione, codice variante e Android 14/15/16; non ufficiale |
 | Honor / realme / **vivo** — pagine AER | strutturata | versione di fabbrica, finestra di supporto |
+| realme — archivio tecnico per codice RMX | curata | build osservata per regione (GDPR europea prima dell'Export), chiaramente non OTA ufficiale |
 | **Android Enterprise Recommended (JSON)** | strutturata | 706 device di 40+ marche: 1404 **codici modello**, fine del supporto, cadenza patch. Unica fonte per OnePlus |
 | Catalogo specifiche GSMArena (mirror JSON) | strutturata | scheda hardware di 4766 modelli, indicizzata per **codice** — dieci marche |
 | **versus.com** | strutturata | scheda hardware di HONOR, realme, Huawei e Nothing, le quattro marche che il mirror GSMArena non copre |

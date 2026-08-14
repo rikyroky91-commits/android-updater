@@ -74,6 +74,8 @@ verificabile; non sostituirla con la versione di fabbrica del C60.
 | Fonte | Cosa dà | Limite verificato |
 |---|---|---|
 | **Oppo — archivio firmware** `{host}/oppo-server/softwareUpgrade/info` | versione rilasciata reale, data, patch level | **solo 94 modelli fino al 2021-2022**. Vedi `INTEGRAZIONE-OPPO.md` |
+| **OPPO — piano ColorOS 16** `oppo.com/en/coloros16/` | elenco ufficiale di 42 modelli con **Android 16 previsto** | calendario indicativo per regione/carrier; nessuna build o prova dell'installazione |
+| **Tracker ARB OnePlus/OPPO** | build corrente osservata per regione, codice CPH/variante e Android 14/15/16 | fonte community, non ufficiale; copre 7 OPPO nel campione live, non la serie A |
 | **AER — API JSON** | catalogo, codici modello, fine supporto sicurezza | **nessuna versione attuale** (vedi trappola sotto) |
 | **GSMArena** | versione di fabbrica + codici modello | derivata, non ufficiale |
 
@@ -93,8 +95,27 @@ verificabile; non sostituirla con la versione di fabbrica del C60.
 | API OTA Oppo/OnePlus/realme (Allawn/ColorOS) | richiedono l'impronta del dispositivo e la finzione dell'app ufficiale → **fuori dalle regole del progetto**, come già deciso per OxygenUpdater |
 
 **Conclusione onesta su Oppo/OnePlus/realme moderni:** non esiste una fonte
-**ufficiale** pubblica e machine-readable della versione OTA corrente. Non è
-un limite del progetto, è una scelta di quei produttori.
+**ufficiale** pubblica e machine-readable della versione OTA corrente. OPPO
+pubblica però un piano ufficiale di rollout per ColorOS 16: il progetto lo
+mostra come *Android 16 previsto*, mai come firmware già installato. Per le
+build reali recenti resta il tracker ARB, dichiaratamente community; le build
+ufficiali OPPO restano disponibili soltanto nell'archivio legacy.
+
+### realme per codice RMX: build riportate, non OTA dichiarati
+
+Per non lasciare vuota la ricerca quando realme non pubblica l'OTA, la ricerca
+diretta interroga le prime quattro pagine dell'indice tecnico
+`support.halabtech.com` **solo dopo** avere confermato il codice RMX nella
+pagina ufficiale realme. Legge codice, regione, Android e build dal nome del
+pacchetto e mostra al massimo un ramo **GDPR
+europeo** e uno **Export**; i due rami non vengono confrontati fra loro perché
+le loro revisioni non sono direttamente ordinabili.
+
+Il risultato è deliberatamente marcato **reported / curato**, non «ultimo
+firmware»: l'archivio non è un endpoint OTA del produttore e la data esposta è
+quella interna al pacchetto. Esempio verificato: RMX3939 → C63/Narzo 63/C61
+secondo realme; nell'indice sono presenti `RMX3939GDPR_15_C.14_20260320…` e
+`RMX3939export_15_C.16_20260116…`, entrambi Android 15 dal nome pacchetto.
 
 Da qui è nata l'unica eccezione dichiaratamente non ufficiale del progetto,
 descritta sotto.
@@ -403,10 +424,23 @@ una parte di OPPO (Reno10 Pro, Find N3/N5, Find X3/X5, Find X8 Ultra).
    presente solo nello stato corrente.
 2. La data in tabella e' quando il **tracker ha visto** la build, non quando il
    produttore l'ha distribuita. Va detta com'e', non spacciata per data di uscita.
+3. Il codice della colonna (`CPH2525EEA`) viene conservato fino al risultato.
+   È essenziale per una ricerca da TAC/IMEI: la build contiene spesso solo il
+   codice base, mentre la colonna distingue la variante di mercato.
 
-**Non si deduce la versione di Android dal numero di build.** OxygenOS 16 gira su
-Android 16 quasi sempre; "quasi" non basta per un campo che decide un retest
-completo.
+**Android non viene dedotto dal numero di build.** Per ColorOS 14, 15 e 16 il
+tracker espone però una versione ColorOS distinta e OPPO documenta
+esplicitamente le associazioni con Android 14, 15 e 16: il progetto converte
+solo questi tre casi. Le versioni precedenti o non riconosciute rimangono vuote.
+
+### Piano ufficiale OPPO ColorOS 16
+
+`https://www.oppo.com/en/coloros16/` pubblica il calendario ufficiale di
+rollout per 42 modelli (Find N/X, Reno, K/F e Pad). È una fonte distinta dalle
+build: per ciascun modello incluso aggiunge **ColorOS 16 / Android 16 previsto**
+e avvisa che regione, operatore e data possono variare. Non sovrascrive mai una
+build dell'archivio OPPO o del tracker ARB e non usa endpoint interni del
+programma di aggiornamento.
 
 **Da sorvegliare:** il README letto riportava `Last updated: 2026-05-17`. Se
 quella data smette di avanzare, il progetto e' fermo e la fonte va spenta.
