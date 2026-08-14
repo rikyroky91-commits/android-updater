@@ -532,6 +532,14 @@ class TestRigheCostruiteSoloSeSiVedono(_Sito):
 
 
 class TestRicerca(_Sito):
+    def test_un_nome_nudo_vivo_conserva_il_brand(self):
+        from web import main as M
+
+        self.assertEqual(
+            M._modello_con_marca("Vivo / iQOO / Motorola", "V60", "Z2356"),
+            "vivo V60",
+        )
+
     def test_un_modello_trovato_mostra_la_scheda(self):
         type(self).RISPOSTA_RICERCA = staticmethod(lambda q: {"items": [{
             "source": "official_lookup", "source_label": "Endpoint FOTA ufficiale",
@@ -640,6 +648,22 @@ class TestRicerca(_Sito):
             type(self).RISPOSTA_RICERCA = staticmethod(
                 lambda q: {"items": [], "error": None})
 
+    def test_ios_non_viene_chiamato_android(self):
+        type(self).RISPOSTA_RICERCA = staticmethod(lambda q: {"items": [{
+            "source": "official_lookup", "source_label": "Apple IPSW",
+            "brand": "Apple", "device_model": "iPhone 16e",
+            "model_code": "iPhone17,5", "build": "23G71",
+            "os_version": "iOS 26.6", "title": "", "severity": "",
+            "color": "#00CC66",
+        }], "error": None})
+        try:
+            pagina = self.client.get("/", params={"q": "iPhone 16e"}).text
+            self.assertIn("Ultima versione verificata: iOS 26.6", pagina)
+            self.assertNotIn("Ultimo Android verificato: iOS", pagina)
+        finally:
+            type(self).RISPOSTA_RICERCA = staticmethod(
+                lambda q: {"items": [], "error": None})
+
     def test_la_fonte_del_firmware_e_apribile_senza_ai(self):
         type(self).RISPOSTA_RICERCA = staticmethod(lambda q: {"items": [{
             "source": "official_lookup", "source_label": "Endpoint FOTA ufficiale",
@@ -654,6 +678,22 @@ class TestRicerca(_Sito):
             self.assertIn("Apri la fonte del firmware", pagina)
             self.assertIn("https://example.test/fota/a075f", pagina)
             self.assertNotIn("Verifica con AI una fonte", pagina)
+        finally:
+            type(self).RISPOSTA_RICERCA = staticmethod(
+                lambda q: {"items": [], "error": None})
+
+    def test_il_risultato_puo_entrare_direttamente_nel_parco(self):
+        type(self).RISPOSTA_RICERCA = staticmethod(lambda q: {"items": [{
+            "source": "official_lookup", "source_label": "Endpoint FOTA ufficiale",
+            "brand": "Samsung", "device_model": "Galaxy A07",
+            "model_code": "SM-A075F", "build": "A075FXXS1AYG1",
+            "os_version": "Android 16", "android_version": "16",
+            "title": "", "severity": "", "color": "#00CC66",
+        }], "error": None})
+        try:
+            pagina = self.client.get("/", params={"q": "SM-A075F"}).text
+            self.assertIn("Aggiungi al parco di test", pagina)
+            self.assertIn('name="ritorno"', pagina)
         finally:
             type(self).RISPOSTA_RICERCA = staticmethod(
                 lambda q: {"items": [], "error": None})
@@ -1448,6 +1488,21 @@ class TestParcoDiTest(_Sito):
         self.client.post("/parco/togli", data={"chiave": chiave},
                          follow_redirects=False)
         self.assertNotIn(chiave, storage.watched_keys())
+
+    def test_aggiunta_dalla_ricerca_torna_al_risultato(self):
+        from core import storage
+
+        chiave = next(d["device_key"] for d in storage.get_devices()
+                      if "S24" in d["model"])
+        risposta = self.client.post(
+            "/parco/aggiungi",
+            data={"chiave": chiave, "brand": "Samsung", "modello": "Galaxy S24",
+                  "ritorno": "/?q=Galaxy+S24"},
+            follow_redirects=False,
+        )
+        self.assertEqual(risposta.status_code, 303)
+        self.assertEqual(risposta.headers["location"], "/?q=Galaxy+S24&parco=1")
+        self.assertIn(chiave, storage.watched_keys())
 
 
 class TestControlliDiSalute(_Sito):

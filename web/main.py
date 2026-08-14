@@ -294,6 +294,7 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
                     alt: list[str] = Query(default=[]),
                     perche: str = Query(default=""),
                     verifica_ai: str = Query(default=""),
+                    parco: int = Query(default=0),
                     saved: int = Query(default=0)):
     """La home, e la pagina di un modello cercato.
 
@@ -348,6 +349,7 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
     return _rendi(request, "ricerca.html", _contesto(
         request, attiva="cerca", query=q, stats=stats,
         risultato=risultato, imei=imei, verifica_ai=verifica,
+        aggiunto_al_parco=bool(parco),
         # L'INTERPRETAZIONE SI DICHIARA. Se l'AI ha tradotto «quel samsung
         # nero» in «Galaxy A56 5G», chi guarda deve vedere che cosa è
         # stato cercato al posto suo — altrimenti la pagina risponde a una
@@ -604,8 +606,17 @@ def pagina_dispositivo(request: Request, k: str = Query(default="")):
 # ======================================================================
 @app.post("/parco/aggiungi")
 def parco_aggiungi(chiave: str = Form(...), brand: str = Form(""),
-                   modello: str = Form("")):
+                   modello: str = Form(""), ritorno: str = Form("")):
     storage.add_to_watchlist(chiave, brand, modello)
+    # Il risultato appena visto e' nella cache corta: se non la si svuota,
+    # tornando dalla form il pulsante resterebbe «Aggiungi» anche se il
+    # telefono e' gia' entrato nel parco.
+    RICERCHE.svuota()
+    # Il parametro viene dal nostro template, ma non deve mai diventare un
+    # redirect verso un dominio esterno se qualcuno costruisce una POST a
+    # mano. Accettiamo solo la ricerca locale con la query gia' compilata.
+    if ritorno.startswith("/?") and not ritorno.startswith("//"):
+        return RedirectResponse(f"{ritorno}&parco=1", status_code=303)
     return RedirectResponse(f"/dispositivo?k={quote(chiave)}", status_code=303)
 
 
@@ -922,6 +933,10 @@ def _modello_con_marca(marca: str, modello: str, codice: str = "") -> str:
         marca = "OPPO"
     elif "xiaomi" in gruppo and codice:
         marca = "Xiaomi"
+    elif "vivo" in gruppo:
+        # Motorola e iQOO arrivano gia' con il marchio nel nome; per un
+        # nome nudo del gruppo (V60, X200...) la forma commerciale e vivo.
+        marca = "vivo"
     elif "/" in marca:
         marca = ""
 
@@ -1390,13 +1405,22 @@ def _cerca_davvero(query: str) -> dict:
             if versione_certa.get("android_version") else "")
         if versione:
             if versione_certa is base_android:
-                pezzi.append(f"Versione Android verificata: {versione} (di lancio/supporto)")
+                etichetta = ("Versione Android verificata"
+                             if versione.lower().startswith("android")
+                             else "Versione di sistema verificata")
+                pezzi.append(f"{etichetta}: {versione} (di lancio/supporto)")
                 tipo_versione = tipo(versione_certa)
             elif versione_certa is riportata:
-                pezzi.append(f"Versione Android riportata: {versione}")
+                etichetta = ("Versione Android riportata"
+                             if versione.lower().startswith("android")
+                             else "Versione di sistema riportata")
+                pezzi.append(f"{etichetta}: {versione}")
                 tipo_versione = C.FW_REPORTED
             else:
-                pezzi.append(f"Ultimo Android verificato: {versione}")
+                etichetta = ("Ultimo Android verificato"
+                             if versione.lower().startswith("android")
+                             else "Ultima versione verificata")
+                pezzi.append(f"{etichetta}: {versione}")
                 tipo_versione = C.FW_CURRENT
         if versione_certa.get("build"):
             pezzi.append(f"build {versione_certa['build']}")
@@ -1540,6 +1564,7 @@ def _cerca_davvero(query: str) -> dict:
     gemelli_veri = _nomi_gemelli(query, nome) if ha_un_risultato else []
     opzioni_correzione = (_opzioni_correzione(nome, gemelli_veri, codice_per_correzione)
                           if ha_un_risultato else [])
+    chiave_parco = chiave or extract.device_key(marca, nome)
 
     return {
         "query": query,
@@ -1581,6 +1606,9 @@ def _cerca_davvero(query: str) -> dict:
         "opzioni_correzione": opzioni_correzione,
         "storico": storico,
         "chiave": chiave,
+        "chiave_parco": chiave_parco,
+        "brand": marca,
+        "in_parco": bool(chiave_parco and chiave_parco in storage.watched_keys()),
         "nota_fonte": risultato.get("structured_note"),
         "errore": risultato.get("error"),
     }

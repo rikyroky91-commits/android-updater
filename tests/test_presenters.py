@@ -65,24 +65,32 @@ class TestMarcaAerPassataAlleFontiEsterne(unittest.TestCase):
         soc.per_modello = self._per_modello_vero
         aer_catalog.reset_cache()
 
-    def test_la_marca_aer_arriva_a_specs_cerca(self):
+    def test_la_marca_della_fonte_arriva_a_specs_cerca(self):
         P.scheda_tecnica("Note Test 60s", codice="RMXTEST1",
                          brand="Oppo / Realme / OnePlus")
-        self.assertEqual(self.chiamate_cerca, ["realme"])
+        self.assertEqual(self.chiamate_cerca, ["Oppo / Realme / OnePlus"])
 
-    def test_la_marca_aer_arriva_a_soc_per_modello(self):
+    def test_la_marca_della_fonte_arriva_a_soc_per_modello(self):
         P.scheda_tecnica("Note Test 60s", codice="RMXTEST1",
                          brand="Oppo / Realme / OnePlus")
-        self.assertEqual(self.chiamate_soc, ["realme"])
+        self.assertEqual(self.chiamate_soc, ["Oppo / Realme / OnePlus"])
 
     def test_senza_voce_aer_la_marca_e_none_non_indovinata(self):
         """Un codice che il catalogo AER non conosce non deve inventare
-        una marca: `specs.cerca`/`soc.per_modello` restano liberi di
-        provare con il testo grezzo, come facevano prima di questo fix."""
+        una marca: quella dichiarata dalla fonte resta un vincolo di
+        sicurezza e non puo' essere scartata."""
         P.scheda_tecnica("Telefono Che Non Esiste 9000", codice="ZZ0000",
                          brand="Samsung")
-        self.assertEqual(self.chiamate_cerca, [None])
-        self.assertEqual(self.chiamate_soc, [None])
+        self.assertEqual(self.chiamate_cerca, ["Samsung"])
+        self.assertEqual(self.chiamate_soc, ["Samsung"])
+
+    def test_il_vincolo_di_marca_blocca_omonimi_di_altri_produttori(self):
+        """X200 Pro vivo non puo' risolvere il Samsung SM-X200."""
+        aer_catalog.carica_da(
+            [_voce_aer("Galaxy Tab A8", "SM-X200", "Samsung")],
+            "omonimo di test")
+        P.scheda_tecnica("X200 Pro", codice="", brand="Vivo / iQOO / Motorola")
+        self.assertEqual(self.chiamate_cerca, ["Vivo / iQOO / Motorola"])
 
     def test_il_codice_e_il_nome_trovano_entrambi_la_stessa_voce_aer(self):
         """Cercare per codice o per nome è la stessa domanda: deve

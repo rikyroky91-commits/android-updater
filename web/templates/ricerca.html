@@ -77,6 +77,23 @@
     <h2>Nessun firmware per «{{ risultato.query }}»</h2>
   {% endif %}
 
+  {% if risultato.chiave_parco %}
+  <div class="azione-parco">
+    {% if risultato.in_parco %}
+    <p class="nota">✓ Già nel <a href="/parco">parco di test</a>.</p>
+    {% else %}
+    <form method="post" action="/parco/aggiungi">
+      <input type="hidden" name="chiave" value="{{ risultato.chiave_parco }}">
+      <input type="hidden" name="brand" value="{{ risultato.brand }}">
+      <input type="hidden" name="modello" value="{{ risultato.nome }}">
+      <input type="hidden" name="ritorno" value="/?q={{ risultato.query | urlencode }}">
+      <button type="submit" class="secondario">Aggiungi al parco di test</button>
+    </form>
+    {% endif %}
+    {% if aggiunto_al_parco %}<p class="nota">Aggiunto al parco di test.</p>{% endif %}
+  </div>
+  {% endif %}
+
   {# QUESTO CODICE HA PIÙ DI UN NOME COMMERCIALE VERO, NON UN «FORSE».
      `RMX3933` è insieme «C61», «Note 60», «Note 60s» e «NARZO N61»: la
      stessa piattaforma venduta con nomi diversi in mercati diversi. Il

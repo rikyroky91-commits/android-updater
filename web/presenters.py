@@ -295,7 +295,13 @@ def scheda_tecnica(nome: str, codice: str = "", brand: str = "",
     aer = None
     if not scheda:
         aer = aer_catalog.lookup(codice) or aer_catalog.lookup(nome)
-        marca_aer = marca_probabile(codice, nome, aer=aer)
+        # La marca della fonte che ha appena risolto il modello e' piu'
+        # precisa di un riscontro AER ottenuto cercando solo un nome corto.
+        # Senza questa precedenza ``vivo X200 Pro`` prendeva il codice
+        # Samsung SM-X200 (Tab A8): stessa sigla, telefono completamente
+        # diverso. Il fallback AER resta utile quando la ricerca non sa la
+        # marca, ma non puo' scavalcare un vincolo gia' verificato.
+        marca_aer = brand or marca_probabile(codice, nome, aer=aer)
         scheda = specs.cerca(codice or None, nome or None, build, marca=marca_aer)
     else:
         marca_aer = scheda.marca

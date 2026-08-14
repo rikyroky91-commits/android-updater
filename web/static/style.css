@@ -322,6 +322,8 @@ a { color: inherit; }
 }
 .proposta:hover { border-color: var(--accent); color: var(--accent); }
 .proposta.attiva { border-color: var(--ink); font-weight: 700; }
+.azione-parco { margin-top: .9rem; }
+.azione-parco form { margin: 0; }
 
 /* --- Correzione a mano del nome commerciale -----------------------------
    Chiusa di default (`<details>`): è una via d'uscita per il caso in cui

@@ -617,6 +617,30 @@ class TestNomeEsattoBatteLaSottostringa(unittest.TestCase):
         trovati = sources._lookup_xiaomi("Redmi Note 13")
         self.assertEqual(trovati[0].device, "Redmi Note 13 Global")
 
+    def test_non_sostituisce_il_modello_base_con_la_variante(self):
+        """Se c'e' solo il Pro/Lite, non e' una risposta al modello base."""
+        sources.fetch_xiaomi = lambda: ([
+            sources.RawItem(title="a", device="Redmi Note 13 Pro+ 5G Taiwan"),
+        ], None)
+        self.assertEqual(sources._lookup_xiaomi("Redmi Note 13"), [])
+
+    def test_nome_corto_non_prende_il_codice_di_un_altro_brand(self):
+        """``vivo V60`` non puÃ² fermarsi sul Nubia Z2356, che si chiama
+        anch'esso V60 nel catalogo. Deve continuare fino al codice vivo."""
+        originali = (scan._codici_riconoscibili, modelcodes.resolve,
+                      modelcodes.nome_canonico, modelcodes.marca_dichiarata)
+        scan._codici_riconoscibili = lambda _q: ["Z2356", "V2512"]
+        modelcodes.resolve = lambda c: ["V60"] if c in {"Z2356", "V2512"} else []
+        modelcodes.nome_canonico = lambda _c: "V60"
+        modelcodes.marca_dichiarata = lambda c: {"Z2356": "Nubia", "V2512": "vivo"}.get(c)
+        try:
+            trovati = scan._identifica_senza_firmware("vivo V60")
+            self.assertEqual(trovati[0]["brand"], C.VIVO)
+            self.assertEqual(trovati[0]["model_code"], "V2512")
+        finally:
+            (scan._codici_riconoscibili, modelcodes.resolve,
+             modelcodes.nome_canonico, modelcodes.marca_dichiarata) = originali
+
     def test_varianti_con_alias_usano_l_eea_della_stessa_build(self):
         """L'alias POCO dopo la barra non deve far sparire la ROM EEA.
 

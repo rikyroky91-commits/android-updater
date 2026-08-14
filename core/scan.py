@@ -713,11 +713,40 @@ def _marca_della_forma(forma: str) -> str | None:
     comportamento che serve: una marca ignota non deve far scartare
     niente.
     """
+    # Un codice puÃ² avere nel catalogo una marca esplicita che l'app non
+    # raggruppa (per esempio Nubia). Non Ã¨ una marca ignota: Ã¨ certamente
+    # *un'altra* marca rispetto a ``vivo``. Ridurla ad ``Altri brand`` qui
+    # impedisce che il solo nome corto ``V60`` faccia entrare Z2356 (Nubia)
+    # nella ricerca del vivo V60. Per i codici senza marca dichiarata resta
+    # invece il normale ripiego sulle regole di formato.
+    marca = _marca_dichiarata_del_codice(forma)
+    if marca:
+        return marca
     marca = sources.brand_from_code(forma) or extract.detect_brand(forma)
     if marca:
         return marca
     prima = (forma or "").strip().split(" ")[0]
     return sources.gruppo_di_marca(prima) if prima else None
+
+
+def _marca_dichiarata_del_codice(codice: str) -> str | None:
+    """Gruppo dell'app per la marca dichiarata dal dataset dei codici.
+
+    Se il dataset conosce la marca ma questa non Ã¨ una delle famiglie
+    principali dell'app, ``C.OTHER`` Ã¨ comunque un'informazione utile per
+    filtrare le collisioni fra nomi commerciali. Restituiamo invece ``None``
+    solo quando il dataset non dichiara proprio nessuna marca: in quel caso
+    le euristiche sul formato del codice devono poter ancora intervenire.
+    """
+    try:
+        dichiarata = modelcodes.marca_dichiarata(codice)
+    except Exception:  # pragma: no cover - il catalogo non deve bloccare la ricerca
+        dichiarata = None
+    if not dichiarata:
+        return None
+    return (sources.gruppo_di_marca(dichiarata)
+            or extract.detect_brand(dichiarata)
+            or C.OTHER)
 
 
 def _lookup_structured_for(model_query: str) -> tuple[list[dict], str | None]:
@@ -890,9 +919,15 @@ def _identifica_senza_firmware(model_query: str) -> list[dict]:
         nomi = modelcodes.resolve(codice)
         if not nomi:
             continue
+        # Prima la marca dichiarata dal catalogo: `brand_from_code` tace
+        # correttamente per marche che l'app mette sotto Â«Altri brandÂ», ma
+        # qui il silenzio non puÃ² autorizzare un Nubia/ZTE a rispondere a una
+        # domanda esplicitamente vivo. Se non c'Ã¨ una dichiarazione, restano
+        # le stesse euristiche usate finora.
+        marca_codice = (_marca_dichiarata_del_codice(codice)
+                         or sources.brand_from_code(codice)
+                         or _marca_della_forma(nomi[0]))
         if marca_chiesta:
-            marca_codice = (sources.brand_from_code(codice)
-                            or _marca_della_forma(nomi[0]))
             if marca_codice and marca_codice != marca_chiesta:
                 continue
         # IL NOME LO SCEGLIE `nome_canonico`, NON L'ORDINE DELLA LISTA.
@@ -914,8 +949,14 @@ def _identifica_senza_firmware(model_query: str) -> list[dict]:
         raw = sources.RawItem(
             title=f"{nome} ({pulito})",
             link="",
-            brand=sources.brand_from_code(pulito) or sources.brand_from_known_device(nome),
+            # Se il dataset ha una marca esplicita, questa vince su un nome
+            # commerciale generico (``V60`` esiste per piÃ¹ produttori).
+            brand=marca_codice or sources.brand_from_known_device(nome),
             device=nome,
+            # Il codice e' gia' quello che ha identificato il modello:
+            # conservarlo evita che la UI perda la sotto-marca del gruppo
+            # vivo/iQOO/Motorola e rende coerenti scheda e parco di test.
+            model_code=pulito,
             size_info=" · ".join(descrizione),
             trust=C.TRUST_STRUCTURED,
         )

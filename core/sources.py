@@ -4321,16 +4321,15 @@ def _piu_vicini(nomi: list[tuple], cercato: str) -> list[RawItem]:
             continue
         trovati.append((item, nome, seguente in _PAROLE_VARIANTE))
 
-    # SI PREFERISCE SEMPRE CHI NON CAMBIA FASCIA. Solo se nessun candidato
-    # resta lo stesso telefono si torna a quelli che lo fanno — meglio un
-    # nome vicino ma di un'altra gamma che nessuna risposta, e il nome
-    # restituito lo dichiara comunque per quello che è («Pro», «Ultra»...
-    # restano scritti nel risultato, non vengono nascosti).
+    # SI ACCETTA SOLO CHI NON CAMBIA FASCIA. ``vivo V60`` e ``vivo V60
+    # Lite`` sono due telefoni diversi: quando nel catalogo esiste solo il
+    # secondo non e' un suggerimento, e non deve mai diventare una risposta
+    # firmware/scheda. Meglio dichiarare che manca la fonte che sostituire
+    # silenziosamente il modello chiesto con Pro, Lite, Ultra o simili.
     stesso_telefono = [(item, nome) for item, nome, altra_fascia in trovati
                        if not altra_fascia]
-    scelta = stesso_telefono or [(item, nome) for item, nome, _ in trovati]
-    scelta.sort(key=lambda coppia: len(coppia[1].split()))
-    return [item for item, _ in scelta[:3]]
+    stesso_telefono.sort(key=lambda coppia: len(coppia[1].split()))
+    return [item for item, _ in stesso_telefono[:3]]
 
 
 _MOTOROLA_ARCHIVE_SEARCH_URL = (
