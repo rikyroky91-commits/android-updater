@@ -14,6 +14,7 @@ requests>=2.31
 feedparser>=6.0
 pyyaml>=6.0
 openpyxl>=3.1
+cryptography>=42.0   # cifratura del salvataggio esterno (core/cifratura.py)
 
 fastapi>=0.110
 uvicorn[standard]>=0.27

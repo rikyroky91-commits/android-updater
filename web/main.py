@@ -46,7 +46,7 @@ from fastapi.responses import (HTMLResponse, JSONResponse, RedirectResponse,
                                Response)
 from fastapi.staticfiles import StaticFiles
 
-from core import aer_catalog, aiquery, allegati, appledevices, config as C
+from core import aer_catalog, aiquery, allegati, appledevices, cifratura, config as C
 from core import extract, imeicheck, mail, modelcodes, retest, scan, soc, sources, specs
 from core import storage, suggest, versus
 from core.util import fmt_date
@@ -591,6 +591,7 @@ def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
             # codice di prima, e leggerla porta a conclusioni sbagliate.
             ("Versione in produzione", C.versione_distribuita()),
             ("Invio email (richieste account)", mail.stato()),
+            ("Cifratura del salvataggio", cifratura.stato()),
             ("Allegati del parco", allegati.stato()),
             ("Salvataggio continuo",
              STATO_AVVIO.get("salvataggio continuo", "avvio non ancora completato")),

@@ -33,9 +33,9 @@ from datetime import timedelta
 from urllib.parse import quote
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
-from core import auth, config as C, mail, storage
+from core import auth, backup, config as C, mail, storage
 from core.util import to_dt, utcnow
 
 from . import auth_web
@@ -541,6 +541,99 @@ def genera_reset(request: Request, utente_id: int, csrf: str = Form("")):
         f"/admin/utenti?link={quote(link)}&per={quote(bersaglio['username'])}",
         status_code=303)
 
+
+
+# ======================================================================
+# Scaricare i propri dati — SOLO amministratore
+# ======================================================================
+# PERCHE' SOLO L'AMMINISTRATORE. Il primo file contiene l'archivio
+# INTERO: email e hash delle password di tutti gli account, oltre ai
+# dati del parco. Non e' materiale da mettere dietro un semplice login,
+# e non e' un'esportazione «dei propri dati» — e' l'esportazione di
+# quelli di tutti.
+#
+# PERCHE' ESISTE. Fino a oggi l'unica copia duratura del progetto stava
+# in un Gist su GitHub: un servizio solo, un token solo. Poter tenere una
+# copia sul proprio computer e' la differenza fra un guasto e una
+# perdita, e non dipende da nessun fornitore.
+def _solo_admin(request: Request):
+    """`(utente, risposta_di_rifiuto)`. Nessuna pagina, nessun indizio:
+    chi non e' amministratore viene rimandato come se la rotta non
+    riguardasse lui."""
+    utente = auth_web.utente_da_richiesta(request)
+    if not utente:
+        return None, RedirectResponse("/login?next=/admin/utenti", status_code=303)
+    if not auth_web.richiede_admin(utente):
+        return None, RedirectResponse("/parco", status_code=303)
+    return utente, None
+
+
+@router.get("/admin/backup")
+def scarica_backup(request: Request):
+    """L'archivio intero, compresso, da tenere dove vuoi.
+
+    IN CHIARO, NON CIFRATO, ed e' voluto: la cifratura
+    (`core/cifratura.py`) protegge il Gist, che e' un posto pubblico
+    raggiungibile da chi ne conosce l'indirizzo. Questo file invece esce
+    da una connessione HTTPS verso un amministratore che si e' appena
+    autenticato, e deve poterlo APRIRE — consegnarglielo illeggibile
+    senza la passphrase renderebbe inutile il motivo per cui lo scarica.
+    """
+    _, rifiuto = _solo_admin(request)
+    if rifiuto:
+        return rifiuto
+    dati, errore = backup.istantanea_compressa()
+    if dati is None:
+        return RedirectResponse(f"/admin/utenti?errore={quote(errore)}", status_code=303)
+    nome = f"tracker-{utcnow().strftime('%Y%m%d-%H%M')}.db.gz"
+    return Response(
+        content=dati, media_type="application/gzip",
+        headers={"Content-Disposition": f'attachment; filename="{nome}"'},
+    )
+
+
+@router.get("/admin/parco.csv")
+def scarica_parco(request: Request):
+    """Il parco di test in CSV: modelli, date, note.
+
+    E' il file che serve piu' spesso — si apre in un foglio di calcolo,
+    si manda a qualcuno, si tiene come registro — mentre l'archivio
+    intero interessa solo come copia di sicurezza. Gli allegati NON ci
+    sono: sono file binari, e un CSV non e' il posto per metterli.
+    """
+    _, rifiuto = _solo_admin(request)
+    if rifiuto:
+        return rifiuto
+
+    import csv
+    import io
+
+    baseline = storage.get_test_baselines()
+    allegati = storage.get_allegati_per_device()
+    buffer = io.StringIO()
+    scrittore = csv.writer(buffer)
+    scrittore.writerow(["marca", "modello", "codice_dispositivo", "ultimo_test",
+                        "versione_al_test", "build_al_test", "nota", "allegati"])
+    for voce in storage.get_watchlist():
+        chiave = voce["device_key"]
+        riferimento = baseline.get(chiave) or {}
+        scrittore.writerow([
+            voce.get("brand", ""), voce.get("model", ""), chiave,
+            (riferimento.get("tested_at") or "")[:10],
+            riferimento.get("os_version") or "",
+            riferimento.get("build") or "",
+            " ".join((voce.get("note") or "").split()),
+            len(allegati.get(chiave, [])),
+        ])
+    nome = f"parco-di-test-{utcnow().strftime('%Y%m%d')}.csv"
+    return Response(
+        # BOM in testa: senza, Excel apre un CSV UTF-8 come Latin-1 e le
+        # note con accenti diventano illeggibili. E' il formato in cui
+        # questo file verra' aperto nella stragrande maggioranza dei casi.
+        content="\ufeff" + buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{nome}"'},
+    )
 
 # ======================================================================
 # Cambio password (richiede login)

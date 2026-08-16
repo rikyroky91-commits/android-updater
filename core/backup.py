@@ -41,7 +41,7 @@ try:
 except ImportError:  # pragma: no cover
     requests = None
 
-from . import config as C
+from . import cifratura, config as C
 from . import storage
 
 _GIST_FILENAME = "tracker-db.sqlite.gz"
@@ -166,6 +166,28 @@ def _istantanea_illeggibile(dati: bytes, percorso: str) -> str | None:
             pass
 
 
+def istantanea_compressa() -> tuple[bytes | None, str]:
+    """`(gzip del database, errore)` — per lo scaricamento da parte
+    dell'amministratore (`web/account.py::scarica_backup`).
+
+    Riusa `_istantanea_coerente`, la stessa che prepara il salvataggio
+    esterno: quella funzione esiste perche' copiare un file SQLite mentre
+    qualcuno ci scrive dentro produce un archivio corrotto in modo
+    silenzioso. Rifarla qui a modo proprio sarebbe il solito secondo
+    percorso che risponde diversamente dal primo.
+
+    NON cifra: vedi il docstring della rotta per il perche'.
+    """
+    percorso = C.DB_PATH
+    if not os.path.exists(percorso):
+        return None, "database non ancora creato"
+    try:
+        grezzo = _istantanea_coerente(percorso)
+    except Exception as exc:
+        return None, f"lettura del database non riuscita: {exc}"
+    return gzip.compress(grezzo, compresslevel=6), ""
+
+
 def salva() -> tuple[bool, str]:
     """Carica il database sull'archivio esterno.
 
@@ -230,6 +252,21 @@ def salva() -> tuple[bool, str]:
             return False, messaggio
 
         compresso = gzip.compress(grezzo, compresslevel=6)
+
+        # SI CIFRA DOPO AVER COMPRESSO, mai prima: il testo cifrato non ha
+        # ridondanza da comprimere, quindi l'ordine inverso gonfierebbe il
+        # file invece di ridurlo.
+        #
+        # Se la chiave e' impostata ma qualcosa non va, il salvataggio si
+        # FERMA: caricare in chiaro un archivio che qualcuno ha chiesto di
+        # cifrare sarebbe il tipo di degrado silenzioso che nessuno nota
+        # finche' non conta (vedi core/cifratura.py).
+        if cifratura.attiva():
+            compresso, errore_cifratura = cifratura.cifra(compresso)
+            if compresso is None:
+                _esito("salvataggio", False, errore_cifratura)
+                return False, errore_cifratura
+
         _stato["byte"] = len(compresso)
 
         if C.env("BACKUP_GIST_ID"):
@@ -312,6 +349,14 @@ def ripristina(solo_se_mancante: bool = True) -> tuple[bool, str]:
         if dati is None:
             _esito("ripristino", False, messaggio)
             return False, messaggio
+
+        # Un archivio in chiaro torna da qui immutato: i salvataggi fatti
+        # prima che la cifratura esistesse devono continuare a
+        # ripristinarsi, ed e' l'intestazione a distinguerli.
+        dati, errore_cifratura = cifratura.decifra(dati)
+        if dati is None:
+            _esito("ripristino", False, errore_cifratura)
+            return False, errore_cifratura
 
         try:
             grezzo = gzip.decompress(dati)

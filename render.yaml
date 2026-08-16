@@ -80,6 +80,19 @@ services:
       # «password per le app» generata su myaccount.google.com — non la
       # password normale dell'account. Se non impostate, la richiesta
       # resta comunque visibile su /admin/richieste dopo il login.
+      # Cifra il salvataggio esterno prima di caricarlo (core/cifratura.py).
+      #
+      # PERCHE' SERVE: un Gist «secret» non e' privato, e' NON ELENCATO —
+      # chi ne conosce l'indirizzo lo apre senza autenticarsi. Da quando
+      # il database contiene email e hash delle password degli account,
+      # la segretezza di un URL non basta piu'.
+      #
+      # Una passphrase lunga a caso, es. `openssl rand -base64 32`.
+      # ATTENZIONE: perderla significa perdere i backup cifrati con essa,
+      # non c'e' recupero. I salvataggi fatti PRIMA restano leggibili:
+      # l'intestazione distingue i due formati.
+      - key: BACKUP_ENCRYPTION_KEY
+        sync: false
       - key: SMTP_USERNAME
         sync: false
       - key: SMTP_PASSWORD

@@ -132,12 +132,12 @@ LOGIN_MAX_TENTATIVI = env_int("LOGIN_MAX_TENTATIVI", 5)
 LOGIN_BLOCCO_MINUTI = env_int("LOGIN_BLOCCO_MINUTI", 15)
 SESSIONE_DURATA_ORE = env_int("SESSIONE_DURATA_ORE", 12)
 RICHIESTA_ACCESSO_SCADENZA_GIORNI = env_int("RICHIESTA_ACCESSO_SCADENZA_GIORNI", 7)
-# Allegati delle righe del parco (vedi core/allegati.py). Il tetto non è
-# una scelta di gusto: l'archivio è un Gist, non uno spazio disco, e ogni
-# allegato ci resta finché non lo si toglie a mano.
 # Un link di reset è una credenziale che viaggia in una casella di posta:
 # dura poche ore, non una settimana come l'approvazione di un account.
 RESET_PASSWORD_SCADENZA_ORE = env_int("RESET_PASSWORD_SCADENZA_ORE", 2)
+# Allegati delle righe del parco (vedi core/allegati.py). Il tetto non è
+# una scelta di gusto: l'archivio è un Gist, non uno spazio disco, e ogni
+# allegato ci resta finché non lo si toglie a mano.
 ALLEGATI_MAX_MB = env_int("ALLEGATI_MAX_MB", 5)
 ALLEGATI_MAX_PER_MODELLO = env_int("ALLEGATI_MAX_PER_MODELLO", 10)
 
@@ -160,6 +160,18 @@ def versione_distribuita() -> str:
         return "sconosciuta (fuori da Render: RENDER_GIT_COMMIT non impostata)"
     ramo = env("RENDER_GIT_BRANCH")
     return f"{commit[:7]}{f' (ramo {ramo})' if ramo else ''}"
+
+
+def chiave_cifratura_backup() -> str:
+    """Passphrase con cui si cifra il salvataggio esterno.
+
+    Vive SOLO nelle variabili d'ambiente, mai nel repository: e' l'unica
+    cosa che separa gli hash delle password degli account da chiunque
+    conosca l'indirizzo del Gist, che e' «secret» ma non privato.
+
+    Perderla significa perdere i backup cifrati con essa — non c'e' un
+    recupero, ed e' il punto di questa funzione."""
+    return env("BACKUP_ENCRYPTION_KEY")
 
 
 def session_secret() -> str:
