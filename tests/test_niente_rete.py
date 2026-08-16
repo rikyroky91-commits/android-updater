@@ -235,6 +235,25 @@ class TestGuastoDiReteNonPropagaEccezioni(unittest.TestCase):
         finally:
             aer_catalog.reset_cache()
 
+    def test_huaweicentral_resta_fuori_dallelenco_predefinito(self):
+        """huaweicentral.com risponde 403 a QUALUNQUE richiesta: non e' un
+        filtro sullo User-Agent ma una sfida anti-bot di Cloudflare
+        (`Cf-Mitigated: challenge`), identica su home e feed. Verificato il
+        16/08/2026 con UA del progetto, UA browser e senza UA.
+
+        Restava rossa in Diagnostica a ogni scansione senza che ci fosse
+        niente da aggiustare da questa parte, e costava un giro di rete
+        ogni volta. Se qualcuno la rimette nell'elenco predefinito senza
+        aver prima verificato che il sito sia tornato raggiungibile,
+        questo test glielo ricorda."""
+        from core import sources
+
+        attive = [s.key for s in sources.all_sources()]
+        self.assertNotIn("huaweicentral", attive)
+        self.assertIn("huaweicentral", [s.key for s in sources.RETIRED_SOURCES])
+        # La copertura Huawei/Honor non deve essere sparita insieme a lei.
+        self.assertIn("news_huawei_honor", attive)
+
     def test_fonti_senza_rete_restituiscono_un_errore_non_lo_sollevano(self):
         """LE CACHE VANNO AZZERATE PRIMA DI TOGLIERE LA RETE.
 

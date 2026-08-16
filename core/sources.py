@@ -3292,6 +3292,9 @@ def fetch_samsung_fus() -> tuple[list[RawItem], str | None]:
 
 
 def fetch_huawei():
+    """FONTE RITIRATA il 2026-08-16 — vedi `RETIRED_SOURCES`. Il codice
+    resta qui perché il giorno che il sito torna raggiungibile si
+    riattiva senza riscrivere niente."""
     return rss_items(
         [
             "https://www.huaweicentral.com/category/updates/feed/",
@@ -3300,6 +3303,30 @@ def fetch_huawei():
         C.HUAWEI,
         "EMUI / HarmonyOS / MagicOS",
     )
+
+
+def fetch_huawei_honor_news():
+    """La copertura Huawei/Honor dopo che HuaweiCentral è finito dietro una
+    sfida anti-bot di Cloudflare (vedi `RETIRED_SOURCES`).
+
+    NON è un modo per rientrare da quella porta: passa dall'indice di
+    Google News, che quel sito lascia esplicitamente entrare, e pesca da
+    TUTTE le testate invece che da una sola — HuaweiCentral compreso,
+    quando Google lo indicizza. Il risultato è anche più robusto di
+    prima: non dipende più dalla raggiungibilità di un singolo sito.
+
+    Query brevi e separate per il motivo spiegato in
+    `_merge_news_queries`: il parser di Google News RSS restituisce
+    silenziosamente zero risultati quando la query annida troppi
+    operatori.
+    """
+    queries = [
+        "EMUI update rollout",
+        "HarmonyOS update rollout",
+        "Honor MagicOS update",
+        "Huawei security patch update",
+    ]
+    return _merge_news_queries(queries, C.HUAWEI, "OTA news")
 
 
 def fetch_piunikaweb():
@@ -3682,8 +3709,19 @@ SOURCES: list[Source] = [
            "Copertura manuale dei modelli principali 2021-2024 (S/A/Z series)."),
     Source("sammobile", "Samsung — SamMobile Firmware News", C.TRUST_CURATED,
            fetch_samsung, C.SAMSUNG, "https://www.sammobile.com"),
-    Source("huaweicentral", "Huawei/Honor — HuaweiCentral Updates", C.TRUST_CURATED,
-           fetch_huawei, C.HUAWEI, "https://www.huaweicentral.com"),
+    # FONTE RITIRATA DALL'ELENCO PREDEFINITO il 2026-08-16 (vedi
+    # `RETIRED_SOURCES`): huaweicentral.com risponde 403 a QUALUNQUE
+    # richiesta — non è un filtro sullo User-Agent, è una sfida anti-bot
+    # di Cloudflare (`Cf-Mitigated: challenge`, corpo «Just a moment...»),
+    # identica sulla home e su entrambi i feed. Restava rossa in
+    # Diagnostica a ogni scansione senza che ci fosse niente da
+    # aggiustare da questa parte. Al suo posto, `news_huawei_honor` qui
+    # sotto. Per riattivarla: ENABLED_SOURCES="huaweicentral".
+    Source("news_huawei_honor", "Huawei/Honor — ricerca news", C.TRUST_NOISY,
+           fetch_huawei_honor_news, C.HUAWEI, "https://news.google.com",
+           "Sostituisce il feed HuaweiCentral, irraggiungibile da agosto 2026. "
+           "Copre EMUI, HarmonyOS e MagicOS da tutte le testate indicizzate.",
+           is_web_search=True),
     Source("honor_aer", "Honor — piano ufficiale Android Enterprise Recommended", C.TRUST_STRUCTURED,
            fetch_honor_aer, C.HUAWEI, HONOR_AER_URL,
            "Versione Android di partenza e impegno di aggiornamento futuro per modello."),
@@ -3765,6 +3803,13 @@ RETIRED_SOURCES = [
            "to change') vengono scartati. Ritirata l'11/08/2026: non stava "
            "dando risultati (0 voci in scansione) e costava comunque un giro "
            "di rete a ogni scansione e a ogni ricerca live Oppo/OnePlus."),
+    Source("huaweicentral", "Huawei/Honor — HuaweiCentral Updates", C.TRUST_CURATED,
+           fetch_huawei, C.HUAWEI, "https://www.huaweicentral.com",
+           "Ritirata il 16/08/2026: il sito risponde 403 a qualunque richiesta "
+           "con una sfida anti-bot di Cloudflare, home e feed compresi — non è "
+           "un filtro sullo User-Agent e non si risolve da questa parte. "
+           "Sostituita da `news_huawei_honor`. Da riattivare se il sito torna "
+           "raggiungibile: il codice di `fetch_huawei` è rimasto intatto."),
 ]
 
 
