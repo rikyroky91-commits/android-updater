@@ -57,20 +57,16 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
-      # NOTA: `ADMIN_PASSWORD_RESET` NON è dichiarata qui di proposito.
-      #
-      # È la via d'uscita se perdi la password da amministratore (vedi
-      # `web/account.py::_forse_reimposta_admin` e
-      # `guida-account-amministratore.md`): si aggiunge A MANO sul
-      # pannello Render nel momento del bisogno, e si toglie subito dopo.
-      #
-      # Dichiararla qui come `sync: false` l'ha già rotta una volta: su un
-      # servizio gestito da Blueprint una variabile nuova senza valore
-      # mette il deploy in attesa che qualcuno gliene dia uno, e il
-      # deploy del 16/08/2026 è rimasto fermo per questo. Una variabile
-      # che serve una volta ogni mai non deve poter bloccare tutti i
-      # rilasci: il codice la legge con `C.env_bool`, che non ha bisogno
-      # che sia dichiarata da nessuna parte.
+      # LA VIA D'USCITA SE PERDI LA PASSWORD DA AMMINISTRATORE. Tutti gli
+      # altri account si recuperano da /password-dimenticata o con un
+      # link generato da te; per te no, perché sei tu che li generi.
+      # Mettila a `true` insieme alla nuova ADMIN_PASSWORD: al riavvio
+      # successivo la password torna quella, e la Diagnostica lo dice.
+      # POI TOGLILA: lasciata accesa, ogni riavvio riporterebbe la
+      # password a quella della variabile, cancellando ogni cambio fatto
+      # da /account/password.
+      - key: ADMIN_PASSWORD_RESET
+        sync: false
       # Firma i cookie di sessione. Senza, l'app ne genera una casuale a
       # ogni avvio: funziona, ma disconnette tutti a ogni riavvio del
       # piano gratuito. Va generata una volta (es. `openssl rand -hex 32`)
