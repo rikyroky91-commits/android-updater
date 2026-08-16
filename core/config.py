@@ -142,6 +142,26 @@ ALLEGATI_MAX_MB = env_int("ALLEGATI_MAX_MB", 5)
 ALLEGATI_MAX_PER_MODELLO = env_int("ALLEGATI_MAX_PER_MODELLO", 10)
 
 
+def versione_distribuita() -> str:
+    """Quale commit sta girando davvero, per la Diagnostica.
+
+    ESISTE PER UNA DOMANDA CHE È COSTATA TEMPO DUE VOLTE: «ho fatto il
+    push, il sito è aggiornato?». Senza una risposta visibile la si
+    deduceva per indizi — cercare a mano una funzione nuova, vedere se
+    una pagina risponde 404 — e una volta la deduzione è stata sbagliata,
+    con una correzione fatta a un problema che non esisteva.
+
+    Render mette `RENDER_GIT_COMMIT` nell'ambiente di ogni servizio, da
+    solo: non è una variabile da configurare. Fuori da Render (in locale,
+    nei test) non c'è, e allora si dice che non c'è invece di inventare
+    un valore."""
+    commit = env("RENDER_GIT_COMMIT")
+    if not commit:
+        return "sconosciuta (fuori da Render: RENDER_GIT_COMMIT non impostata)"
+    ramo = env("RENDER_GIT_BRANCH")
+    return f"{commit[:7]}{f' (ramo {ramo})' if ramo else ''}"
+
+
 def session_secret() -> str:
     """Chiave per firmare i cookie di sessione. Vedi core/auth.py per cosa
     succede quando non è impostata: mai una stringa vuota o fissa nel

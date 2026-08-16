@@ -579,6 +579,10 @@ def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
             # PASSWORD sono state lette bene su Render?».
             ("Amministratore parco di test",
              STATO_AVVIO.get("amministratore parco di test", "avvio non ancora completato")),
+            # PRIMA DI TUTTO IL RESTO: se il commit non è quello che ti
+            # aspetti, ogni altra riga di questa pagina descrive il
+            # codice di prima, e leggerla porta a conclusioni sbagliate.
+            ("Versione in produzione", C.versione_distribuita()),
             ("Invio email (richieste account)", mail.stato()),
             ("Allegati del parco", allegati.stato()),
             ("Salvataggio continuo",

@@ -903,5 +903,38 @@ class TestDiagnosticaInvioEmail(_SitoConAccount):
         self.assertNotIn("arrivano anche via email", pagina)
 
 
+class TestVersioneInProduzione(_SitoConAccount):
+    """«Ho fatto il push, il sito e' aggiornato?» era deducibile solo per
+    indizi, e una volta la deduzione e' stata sbagliata. Render mette
+    RENDER_GIT_COMMIT da solo nell'ambiente: qui si verifica che finisca
+    dove si va a guardare."""
+
+    def test_fuori_da_render_lo_dice_invece_di_inventare(self):
+        from core import config as C
+
+        for chiave in ("RENDER_GIT_COMMIT", "RENDER_GIT_BRANCH"):
+            os.environ.pop(chiave, None)
+        self.assertIn("sconosciuta", C.versione_distribuita())
+
+    def test_su_render_mostra_commit_e_ramo(self):
+        from core import config as C
+
+        os.environ["RENDER_GIT_COMMIT"] = "abcdef1234567890"
+        os.environ["RENDER_GIT_BRANCH"] = "main"
+        try:
+            testo = C.versione_distribuita()
+            self.assertIn("abcdef1", testo)
+            self.assertIn("main", testo)
+            # Accorciato: un commit intero in una tabella non si legge.
+            self.assertNotIn("abcdef1234567890", testo)
+
+            pagina = self.client.get("/diagnostica").text
+            self.assertIn("Versione in produzione", pagina)
+            self.assertIn("abcdef1", pagina)
+        finally:
+            for chiave in ("RENDER_GIT_COMMIT", "RENDER_GIT_BRANCH"):
+                os.environ.pop(chiave, None)
+
+
 if __name__ == "__main__":
     unittest.main()
