@@ -822,3 +822,69 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
 .tabella-confronto tr.diversi td {
   font-weight: 700; color: color-mix(in srgb, var(--differenza) 82%, var(--ink));
 }
+
+/* --- Note e allegati del parco di test ---------------------------------
+   LE DUE COLONNE CHE HANNO SOSTITUITO «Cosa fare». Quella diceva sempre
+   una frase calcolata dal confronto («Nessun retest necessario»), uguale
+   per tutti i telefoni nello stesso stato: occupava la larghezza di una
+   colonna per non dire niente che chi guarda non vedesse già dal pallino
+   accanto. Al suo posto c'è quello che il sito non può sapere da solo —
+   cosa hai visto provandolo, e i file che lo mostrano.
+
+   I moduli stanno dentro `<details>` chiusi: la tabella deve restare
+   leggibile a colpo d'occhio, e sei righe con una casella di testo
+   sempre aperta sono un questionario, non un elenco. */
+.tabella-parco .col-stato { white-space: nowrap; }
+.tabella-parco .col-nota { min-width: 14rem; }
+.tabella-parco .col-allegati { min-width: 9rem; }
+
+.nota-testo {
+  font-size: .88rem; line-height: 1.45; white-space: pre-wrap;
+  overflow-wrap: anywhere; margin-bottom: .35rem;
+}
+
+/* Il tasto che sostituisce un indirizzo intero (vedi
+   `presenters.nota_con_link`): un indirizzo lungo dentro una tabella la
+   sfonda in larghezza e non si legge comunque. L'indirizzo vero resta
+   nel `title`, quindi si vede passandoci sopra. */
+.tasto-link {
+  display: inline-block; font-size: .78rem; font-weight: 600;
+  padding: .05rem .45rem; margin: 0 .1rem;
+  border: 1px solid var(--filo); border-radius: 999px;
+  text-decoration: none; color: var(--ai); background: var(--carta);
+  vertical-align: baseline;
+}
+.tasto-link:hover { color: var(--ai-scuro); border-color: var(--ai); }
+
+.nota-modifica summary, .allegato-aggiungi summary {
+  cursor: pointer; color: var(--ai); font-weight: 600; font-size: .82rem;
+}
+.nota-modifica summary:hover, .allegato-aggiungi summary:hover { color: var(--ai-scuro); }
+.nota-modifica textarea {
+  font: inherit; font-size: .85rem; width: 100%; margin: .4rem 0;
+  padding: .4rem .5rem; border: 1px solid var(--filo);
+  background: var(--carta); color: inherit; border-radius: 4px;
+  /* Verticale soltanto: un textarea allargabile in orizzontale dentro
+     una tabella la fa scorrere lateralmente, che il progetto vieta. */
+  resize: vertical;
+}
+.allegato-aggiungi input[type="file"] {
+  font: inherit; font-size: .78rem; margin: .4rem 0; max-width: 100%;
+}
+
+.allegato {
+  display: flex; align-items: center; gap: .35rem;
+  font-size: .82rem; margin-bottom: .2rem;
+}
+/* Il nome del file si accorcia con i puntini invece di allargare la
+   colonna: `min-width: 0` serve perché dentro un flex il testo non si
+   restringe sotto la propria larghezza naturale senza. */
+.allegato > a {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.allegato-togli { display: inline; }
+.allegato-togli .link-bottone { text-decoration: none; font-size: .9rem; }
+
+@media (max-width: 700px) {
+  .tabella-parco .col-nota, .tabella-parco .col-allegati { min-width: 0; }
+}

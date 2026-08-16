@@ -206,6 +206,29 @@ CREATE TABLE IF NOT EXISTS utenti (
     bloccato_fino_a   TEXT
 );
 
+-- Allegati delle righe del parco di test: QUI CI SONO SOLO I METADATI.
+-- Il contenuto del file vive fuori da questo database (vedi
+-- core/allegati.py), e non per pignoleria: il salvataggio esterno
+-- ricarica ogni volta l'INTERO file del database, quindi una foto messa
+-- qui dentro verrebbe rispedita per intero a ogni salvataggio, per
+-- sempre. Con i metadati separati dal contenuto, il database resta
+-- piccolo e un allegato si carica una volta sola.
+CREATE TABLE IF NOT EXISTS allegati_parco (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_key  TEXT NOT NULL,
+    nome        TEXT NOT NULL,
+    tipo        TEXT NOT NULL,
+    byte        INTEGER NOT NULL,
+    -- Il nome con cui il contenuto è conservato nell'archivio esterno.
+    -- È l'impronta del contenuto, non il nome scelto da chi carica: due
+    -- file identici occupano un posto solo, e un nome con caratteri
+    -- strani non può rompere l'archivio.
+    impronta    TEXT NOT NULL,
+    caricato_il TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_allegati_device ON allegati_parco(device_key);
+
 -- La richiesta di approvazione inviata via email. Il link porta un token
 -- generato con secrets.token_urlsafe: qui si conserva solo il suo hash
 -- SHA-256, mai il valore in chiaro, con lo stesso principio delle
@@ -763,11 +786,28 @@ def get_device_history(device_key: str, limit: int = 50) -> list[dict]:
 def add_to_watchlist(device_key: str, brand: str, model: str, note: str = "") -> None:
     with transaction() as conn:
         conn.execute(
+            # Riaggiungere un modello già nel parco NON cancella la nota
+            # che ci hai scritto sopra. Finché `note` era un campo che
+            # nessuna pagina mostrava, sovrascriverlo con la stringa
+            # vuota di `/parco/aggiungi` non si notava; da quando la nota
+            # è una colonna che si compila a mano, sarebbe una perdita di
+            # dati silenziosa al primo click sbagliato.
             """INSERT INTO watchlist (device_key, brand, model, note, added_at)
                VALUES (?, ?, ?, ?, ?)
-               ON CONFLICT(device_key) DO UPDATE SET note = excluded.note""",
+               ON CONFLICT(device_key) DO UPDATE SET
+                 note = CASE WHEN excluded.note <> '' THEN excluded.note
+                             ELSE watchlist.note END""",
             (device_key, brand, model, note, now_iso()),
         )
+
+
+def imposta_nota_parco(device_key: str, testo: str) -> None:
+    """La nota libera della riga del parco. Solo per i modelli che nel
+    parco ci sono già: scriverla su un device_key qualunque creerebbe
+    righe fantasma senza marca né modello."""
+    with transaction() as conn:
+        conn.execute("UPDATE watchlist SET note = ? WHERE device_key = ?",
+                     (testo, device_key))
 
 
 def remove_from_watchlist(device_key: str) -> None:
@@ -887,6 +927,60 @@ def get_richiesta_accesso(richiesta_id: int) -> dict | None:
 def segna_richiesta_usata(richiesta_id: int) -> None:
     with transaction() as conn:
         conn.execute("UPDATE richieste_accesso SET usata = 1 WHERE id = ?", (richiesta_id,))
+
+
+# ----------------------------------------------------------------------
+# Allegati del parco di test (solo metadati — vedi core/allegati.py)
+# ----------------------------------------------------------------------
+def aggiungi_allegato(device_key: str, nome: str, tipo: str, byte: int,
+                      impronta: str) -> int:
+    with transaction() as conn:
+        cur = conn.execute(
+            """INSERT INTO allegati_parco (device_key, nome, tipo, byte, impronta, caricato_il)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (device_key, nome, tipo, byte, impronta, now_iso()),
+        )
+        return cur.lastrowid
+
+
+def get_allegato(allegato_id: int) -> dict | None:
+    conn = connect()
+    riga = conn.execute(
+        "SELECT * FROM allegati_parco WHERE id = ?", (allegato_id,)).fetchone()
+    return dict(riga) if riga else None
+
+
+def get_allegati_per_device() -> dict[str, list[dict]]:
+    """Tutti gli allegati raggruppati per modello, in una query sola: la
+    pagina del parco disegna molte righe e una query per riga sarebbe il
+    solito moltiplicatore nascosto."""
+    conn = connect()
+    raggruppati: dict[str, list[dict]] = {}
+    for riga in conn.execute(
+            "SELECT * FROM allegati_parco ORDER BY caricato_il").fetchall():
+        raggruppati.setdefault(riga["device_key"], []).append(dict(riga))
+    return raggruppati
+
+
+def elimina_allegato(allegato_id: int) -> dict | None:
+    """Torna la riga eliminata, così chi chiama sa quale impronta può
+    togliere dall'archivio esterno."""
+    allegato = get_allegato(allegato_id)
+    if not allegato:
+        return None
+    with transaction() as conn:
+        conn.execute("DELETE FROM allegati_parco WHERE id = ?", (allegato_id,))
+    return allegato
+
+
+def impronta_ancora_usata(impronta: str) -> bool:
+    """Due righe possono puntare allo stesso contenuto (lo stesso file
+    allegato a due modelli): il contenuto si cancella dall'archivio
+    esterno solo quando NESSUNA riga lo nomina più."""
+    conn = connect()
+    return conn.execute(
+        "SELECT 1 FROM allegati_parco WHERE impronta = ? LIMIT 1", (impronta,)
+    ).fetchone() is not None
 
 
 # ----------------------------------------------------------------------
@@ -1393,9 +1487,16 @@ def migra_chiavi_dispositivo() -> dict:
 
         # --- Parco di test: chiave primaria, quindi si riscrive ----------
         iscritti = rows_to_dicts(conn.execute("SELECT * FROM watchlist").fetchall())
+        # La corrispondenza vecchia-chiave → nuova-chiave si raccoglie
+        # QUI, prima che il ciclo sotto riscriva `device_key` dentro le
+        # voci: dopo, l'originale non sarebbe più leggibile da nessuna
+        # parte e gli allegati non saprebbero più chi seguire.
+        rinomina: dict[str, str] = {}
         migliori: dict[str, dict] = {}
         for voce in iscritti:
             nuova = device_key(voce["brand"], voce["model"]) or voce["device_key"]
+            if nuova != voce["device_key"]:
+                rinomina[voce["device_key"]] = nuova
             voce["device_key"] = nuova
             precedente = migliori.get(nuova)
             if precedente is None:
@@ -1417,6 +1518,16 @@ def migra_chiavi_dispositivo() -> dict:
                      voce["note"], voce["added_at"]),
                 )
             esito["parco_di_test"] = len(iscritti) - len(migliori)
+
+        # --- Allegati: seguono la riga del parco a cui appartengono ------
+        # Sono indicizzati per chiave dispositivo come il parco, quindi
+        # senza questo passaggio resterebbero agganciati a una chiave che
+        # non esiste più: gli allegati sparirebbero dalla riga pur essendo
+        # ancora nell'archivio esterno, esattamente il guasto che il
+        # docstring qui sopra descrive per il parco di test.
+        for vecchia, nuova in rinomina.items():
+            conn.execute("UPDATE allegati_parco SET device_key = ? WHERE device_key = ?",
+                         (nuova, vecchia))
 
         # --- Baseline di test: vince la fotografia più recente -----------
         baseline = rows_to_dicts(conn.execute("SELECT * FROM test_baseline").fetchall())

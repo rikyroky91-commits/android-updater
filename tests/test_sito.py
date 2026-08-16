@@ -1182,6 +1182,17 @@ class TestCorrezioneAvviaSubitoIlBackup(_Sito):
     locale e sparire al riavvio successivo. Qui si collauda che
     `_backup_subito` (in `web/main.py`) faccia partire un salvataggio
     subito dopo ogni correzione, senza aspettare quel giro.
+
+    DAL 16/08/2026 IL MECCANISMO È CAMBIATO, l'esigenza no. Prima ogni
+    correzione lanciava un thread che salvava all'istante, uno per click;
+    ora alza una bandierina che un thread raccoglie entro
+    `backup.RITARDO_SALVATAGGIO`, così una raffica di modifiche (le note
+    e gli allegati del parco ne producono molte più di una correzione di
+    nome) diventa un invio solo invece di dieci da 7,6 MB. Il test tiene
+    quindi la stessa domanda — «la correzione arriva alla copia duratura
+    senza aspettare la prossima scansione?» — e la verifica sulla catena
+    vera, con il ritardo azzerato: non basta controllare che la
+    bandierina si alzi, deve arrivare fino a `salva()`.
     """
 
     def setUp(self):
@@ -1204,6 +1215,8 @@ class TestCorrezioneAvviaSubitoIlBackup(_Sito):
         }], "error": None})
 
         self._salva_vera = backup.salva
+        self._configurato_vero = backup.configurato
+        self._ritardo_vero = backup.RITARDO_SALVATAGGIO
         self.chiamato = threading.Event()
 
         def salva_finta():
@@ -1211,13 +1224,24 @@ class TestCorrezioneAvviaSubitoIlBackup(_Sito):
             return True, "ok (finto)"
 
         backup.salva = salva_finta
+        # Il thread parte solo se un archivio è configurato, e qui non
+        # lo è (nessun Gist nei test): lo si dichiara configurato senza
+        # toccare la rete, perché `salva` è già finto.
+        backup.configurato = lambda: True
+        # Senza ritardo la finestra di raggruppamento non c'è: il test
+        # misura la catena, non la pazienza di chi lo esegue.
+        backup.RITARDO_SALVATAGGIO = 0
+        backup.avvia_salvataggio_continuo()
 
     def tearDown(self):
         from core import backup, modelcodes, storage
 
         from web.main import RICERCHE
 
+        backup.ferma_salvataggio_continuo(attesa=5)
         backup.salva = self._salva_vera
+        backup.configurato = self._configurato_vero
+        backup.RITARDO_SALVATAGGIO = self._ritardo_vero
         type(self).RISPOSTA_RICERCA = staticmethod(
             lambda q: {"items": [], "error": None})
         modelcodes._memory_cache.pop("ZZ8001", None)

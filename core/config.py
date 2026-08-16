@@ -132,6 +132,11 @@ LOGIN_MAX_TENTATIVI = env_int("LOGIN_MAX_TENTATIVI", 5)
 LOGIN_BLOCCO_MINUTI = env_int("LOGIN_BLOCCO_MINUTI", 15)
 SESSIONE_DURATA_ORE = env_int("SESSIONE_DURATA_ORE", 12)
 RICHIESTA_ACCESSO_SCADENZA_GIORNI = env_int("RICHIESTA_ACCESSO_SCADENZA_GIORNI", 7)
+# Allegati delle righe del parco (vedi core/allegati.py). Il tetto non è
+# una scelta di gusto: l'archivio è un Gist, non uno spazio disco, e ogni
+# allegato ci resta finché non lo si toglie a mano.
+ALLEGATI_MAX_MB = env_int("ALLEGATI_MAX_MB", 5)
+ALLEGATI_MAX_PER_MODELLO = env_int("ALLEGATI_MAX_PER_MODELLO", 10)
 
 
 def session_secret() -> str:

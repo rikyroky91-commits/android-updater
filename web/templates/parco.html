@@ -21,10 +21,19 @@
 
 {% if righe %}
 {% if test_salvato %}<p class="conferma-azione">✓ Test registrato: salvata la data e la versione corrente.</p>{% endif %}
+{% if nota_salvata %}<p class="conferma-azione">✓ Nota salvata.</p>{% endif %}
+{% if allegato_salvato %}<p class="conferma-azione">✓ Allegato caricato.</p>{% endif %}
+{% if allegato_tolto %}<p class="conferma-azione">✓ Allegato rimosso.</p>{% endif %}
 {% if errore_test %}<p class="errore-azione">{{ errore_test }}</p>{% endif %}
-<table class="tabella">
+{% if errore_allegato %}<p class="errore-azione">{{ errore_allegato }}</p>{% endif %}
+{% if not allegati_attivi %}
+<p class="nota">Il caricamento di allegati è disattivato: manca l'archivio esterno
+  (<code>BACKUP_GIST_ID</code> / <code>BACKUP_GITHUB_TOKEN</code>). Senza, un file
+  caricato sparirebbe al primo riavvio.</p>
+{% endif %}
+<table class="tabella tabella-parco">
   <thead><tr><th>Brand</th><th>Modello</th><th>Data del test</th>
-             <th>Rispetto all'ultima prova</th><th>Cosa fare</th></tr></thead>
+             <th class="col-stato">Stato</th><th>Note</th><th>Allegati</th></tr></thead>
   <tbody>
     {% for r in righe %}
     <tr>
@@ -43,8 +52,53 @@
         <span class="tenue">Dati firmware non disponibili</span>
         {% endif %}
       </td>
-      <td>{% if r.confronto %}{{ r.confronto.etichetta }}{% else %}—{% endif %}</td>
-      <td class="tenue">{% if r.confronto %}{{ r.confronto.azione }}{% endif %}</td>
+      {# Il pallino resta: dice se il firmware è cambiato dall'ultima
+         prova, ed è l'unica cosa in questa tabella che il sito sa da sé.
+         Il consiglio scritto accanto («Nessun retest necessario») no: era
+         una frase generica al posto di quello che sai tu, e adesso quel
+         posto ce l'ha la nota. #}
+      <td class="col-stato">
+        {% if r.confronto %}<span title="{{ r.confronto.azione }}">{{ r.confronto.etichetta }}</span>
+        {% else %}<span class="tenue">—</span>{% endif %}
+      </td>
+      <td class="col-nota">
+        {% if r.nota %}<div class="nota-testo">{{ r.nota_html }}</div>{% endif %}
+        <details class="nota-modifica">
+          <summary>{{ "Modifica" if r.nota else "Aggiungi nota" }}</summary>
+          <form method="post" action="/parco/nota">
+            <input type="hidden" name="chiave" value="{{ r.chiave }}">
+            <label class="sr-only" for="nota-{{ loop.index }}">Nota per {{ r.modello }}</label>
+            <textarea id="nota-{{ loop.index }}" name="nota" rows="3"
+                      placeholder="Cosa hai visto provandolo. Un indirizzo incollato qui diventa un tasto Link.">{{ r.nota }}</textarea>
+            <button type="submit" class="secondario">Salva nota</button>
+          </form>
+        </details>
+      </td>
+      <td class="col-allegati">
+        {% for a in r.allegati %}
+        <div class="allegato">
+          <a href="/parco/allegato/{{ a.id }}" target="_blank" rel="noopener"
+             title="{{ a.nome }} · {{ (a.byte / 1024) | round | int }} KB">{{ a.nome }}</a>
+          <form method="post" action="/parco/allegato/{{ a.id }}/elimina" class="allegato-togli">
+            <button type="submit" class="link-bottone" title="Togli {{ a.nome }}">✕</button>
+          </form>
+        </div>
+        {% endfor %}
+        {% if allegati_attivi and r.puo_allegare %}
+        <details class="allegato-aggiungi">
+          <summary>Allega</summary>
+          <form method="post" action="/parco/allegato" enctype="multipart/form-data">
+            <input type="hidden" name="chiave" value="{{ r.chiave }}">
+            <label class="sr-only" for="file-{{ loop.index }}">File per {{ r.modello }}</label>
+            <input id="file-{{ loop.index }}" type="file" name="file" required
+                   accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain">
+            <button type="submit" class="secondario">Carica</button>
+          </form>
+        </details>
+        {% elif allegati_attivi %}
+        <span class="tenue">limite raggiunto</span>
+        {% endif %}
+      </td>
     </tr>
     {% endfor %}
   </tbody>

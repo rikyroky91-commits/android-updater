@@ -460,6 +460,84 @@ def salva_se_serve(intervallo_minuti: int | None = None) -> None:
 
 
 # ----------------------------------------------------------------------
+# Salvataggio subito dopo una modifica fatta da una persona
+# ----------------------------------------------------------------------
+# PERCHÉ NON «A OGNI CLICK», che era la richiesta letterale. Ogni
+# salvataggio ricarica l'INTERO database: oggi 5,7 MB compressi, che in
+# base64 diventano circa 7,6 MB per invio (vedi `_salva_su_gist`). Un
+# invio per click significherebbe spedirli di nuovo per ogni nota
+# scritta, ogni allegato, ogni «Segna test» — su un piano gratuito da
+# 512 MB, con la scansione che gira in sottofondo, è proprio il peso che
+# la richiesta voleva evitare.
+#
+# Quello che serviva davvero è che una modifica non possa restare fuori
+# dal salvataggio per mezz'ora. Qui una modifica ALZA UNA BANDIERINA, e
+# un thread la raccoglie entro `RITARDO_SALVATAGGIO` secondi: dieci
+# modifiche di fila diventano un invio solo invece di dieci, e la più
+# vecchia ha comunque aspettato meno di un minuto.
+#
+# La scansione NON alza la bandierina: scrive in continuazione e
+# terrebbe il salvataggio sempre acceso. Per lei resta
+# `salva_se_serve()` con il suo intervallo di mezz'ora, che è il ritmo
+# giusto per dati che si riscaricano da soli.
+RITARDO_SALVATAGGIO = 60
+
+_da_salvare = threading.Event()
+_fermare = threading.Event()
+_thread_salvataggio: threading.Thread | None = None
+
+
+def segna_modificato() -> None:
+    """Da chiamare dopo una modifica fatta da una persona (una nota, un
+    allegato, un test segnato, un account approvato). Non salva: dice che
+    c'è qualcosa da salvare, e torna subito — chi ha cliccato non deve
+    aspettare un invio di rete per vedere la propria pagina."""
+    _da_salvare.set()
+
+
+def _ciclo_salvataggio() -> None:
+    while not _fermare.is_set():
+        # Aspetta una modifica; se non arriva niente, si sveglia comunque
+        # ogni tanto per accorgersi di `_fermare` senza restare appesa.
+        if not _da_salvare.wait(timeout=5):
+            continue
+        # Una modifica c'è. Si concede la finestra di raggruppamento
+        # PRIMA di salvare: è quella che unisce una raffica di click in un
+        # invio solo. Se nel frattempo arriva l'ordine di fermarsi, si
+        # salva subito invece di aspettare la fine della finestra.
+        _fermare.wait(timeout=RITARDO_SALVATAGGIO)
+        _da_salvare.clear()
+        try:
+            salva()
+        except Exception:  # pragma: no cover - un guasto di rete non ferma il thread
+            pass
+
+
+def avvia_salvataggio_continuo() -> str:
+    """Accende il thread. Il testo torna in STATO_AVVIO, come gli altri
+    passi dell'avvio."""
+    global _thread_salvataggio
+    if not configurato():
+        return "non attivo: nessun archivio configurato"
+    if _thread_salvataggio and _thread_salvataggio.is_alive():
+        return "già attivo"
+    _fermare.clear()
+    _thread_salvataggio = threading.Thread(
+        target=_ciclo_salvataggio, name="salvataggio-continuo", daemon=True)
+    _thread_salvataggio.start()
+    return f"attivo (salva entro {RITARDO_SALVATAGGIO}s da una modifica)"
+
+
+def ferma_salvataggio_continuo(attesa: float = 30.0) -> None:
+    """All'arresto del servizio: sveglia il thread, che salva subito se
+    ha una modifica in sospeso invece di portarsela via. Render manda un
+    SIGTERM prima di spegnere, quindi questa finestra esiste davvero."""
+    _fermare.set()
+    if _thread_salvataggio and _thread_salvataggio.is_alive():
+        _thread_salvataggio.join(timeout=attesa)
+
+
+# ----------------------------------------------------------------------
 # Preparazione assistita
 # ----------------------------------------------------------------------
 def verifica_token(token: str) -> tuple[bool, str]:

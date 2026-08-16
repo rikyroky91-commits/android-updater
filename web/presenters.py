@@ -19,6 +19,10 @@ Nulla in questo file tocca la rete o il database: prende quello che
 """
 from __future__ import annotations
 
+import re
+
+from markupsafe import Markup, escape
+
 from core import config as C
 from core import soc, specs
 from core.classify import qa_impact
@@ -388,3 +392,54 @@ def scheda_tecnica(nome: str, codice: str = "", brand: str = "",
             )
         ),
     }
+
+
+# ======================================================================
+# La nota libera di una riga del parco
+# ======================================================================
+# Un indirizzo intero dentro una tabella la sfonda in larghezza e non si
+# legge comunque: quello che serve sapere, guardando la riga, è che una
+# nota HA un collegamento, non quale. L'indirizzo resta nel `title`, che
+# il browser mostra al passaggio del mouse, e ovviamente nel `href`.
+_URL_NELLA_NOTA = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
+
+
+def nota_con_link(testo: str | None) -> Markup:
+    """La nota come HTML: il testo scritto a mano, con gli indirizzi
+    trasformati in un tasto «Link».
+
+    QUESTA FUNZIONE COSTRUISCE HTML A MANO, quindi è l'unico punto del
+    progetto dove l'autoescape di Jinja non lavora per noi: ogni pezzo di
+    testo che arriva da fuori passa per `escape()` prima di essere
+    concatenato. Una nota che contiene `<script>` deve leggersi come
+    `<script>`, non eseguirsi — e la nota la scrive una persona collegata,
+    ma «collegata» non vuol dire «di cui fidarsi ciecamente», e comunque
+    un domani il parco potrebbe avere più utenti.
+
+    Solo `http://` e `https://` diventano tasti: uno schema come
+    `javascript:` in un `href` sarebbe codice che parte al click.
+    """
+    if not testo or not testo.strip():
+        return Markup("")
+    pezzi: list[str] = []
+    ultimo = 0
+    for trovato in _URL_NELLA_NOTA.finditer(testo):
+        pezzi.append(str(escape(testo[ultimo:trovato.start()])))
+        indirizzo = trovato.group(0)
+        # Un punto o una parentesi finale quasi sempre appartengono alla
+        # frase, non all'indirizzo: «vedi https://esempio.invalid/a.» non
+        # deve produrre un link che finisce con il punto.
+        coda = ""
+        while indirizzo and indirizzo[-1] in ".,;:)]}":
+            coda = indirizzo[-1] + coda
+            indirizzo = indirizzo[:-1]
+        if indirizzo:
+            pezzi.append(
+                f'<a class="tasto-link" href="{escape(indirizzo)}" '
+                f'title="{escape(indirizzo)}" target="_blank" '
+                f'rel="noopener noreferrer">Link</a>'
+            )
+        pezzi.append(str(escape(coda)))
+        ultimo = trovato.end()
+    pezzi.append(str(escape(testo[ultimo:])))
+    return Markup("".join(pezzi))

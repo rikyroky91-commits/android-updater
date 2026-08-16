@@ -40,12 +40,12 @@ from contextlib import asynccontextmanager
 from datetime import date
 from urllib.parse import quote
 
-from fastapi import FastAPI, Form, Query, Request
+from fastapi import FastAPI, File, Form, Query, Request, UploadFile
 from fastapi.responses import (HTMLResponse, JSONResponse, RedirectResponse,
                                Response)
 from fastapi.staticfiles import StaticFiles
 
-from core import aer_catalog, aiquery, appledevices, config as C
+from core import aer_catalog, aiquery, allegati, appledevices, config as C
 from core import extract, imeicheck, modelcodes, retest, scan, soc, sources, specs
 from core import storage, suggest, versus
 from core.util import fmt_date
@@ -68,6 +68,13 @@ IN_PAGINA = 200
 async def ciclo_di_vita(app: FastAPI):
     avvio()
     yield
+    # ALL'ARRESTO, NON SOLO ALL'AVVIO. Render manda un SIGTERM prima di
+    # spegnere il servizio: è la finestra in cui una nota scritta pochi
+    # secondi prima può ancora raggiungere l'archivio esterno invece di
+    # sparire con il disco effimero.
+    from core import backup
+
+    backup.ferma_salvataggio_continuo()
 
 
 app = FastAPI(title=C.APP_TITLE, docs_url=None, redoc_url=None,
@@ -132,6 +139,7 @@ def avvio() -> None:
 
     storage.init_db()
     STATO_AVVIO["amministratore parco di test"] = account.assicura_admin()
+    STATO_AVVIO["salvataggio continuo"] = backup.avvia_salvataggio_continuo()
     rimossi = storage.rebuild_if_logic_changed()
     if rimossi:
         STATO_AVVIO["ricostruzione"] = (
@@ -440,13 +448,20 @@ def _ordina_righe_parco(righe: list[dict], ordina: str) -> list[dict]:
 @app.get("/parco", response_class=HTMLResponse)
 def pagina_parco(request: Request, test_salvato: int = Query(default=0),
                  errore_test: str = Query(default=""), q: str = Query(default=""),
-                 ordina: str = Query(default="")):
+                 ordina: str = Query(default=""), nota_salvata: int = Query(default=0),
+                 allegato_salvato: int = Query(default=0),
+                 allegato_tolto: int = Query(default=0),
+                 errore_allegato: str = Query(default="")):
     utente, redirect = _accesso_parco_richiesto(request)
     if redirect:
         return redirect
     parco = storage.get_watchlist()
     baseline = storage.get_test_baselines()
     devices = {d["device_key"]: d for d in storage.get_devices()}
+    # Una query sola per TUTTI gli allegati, non una per riga: il parco
+    # disegna molte righe e una query dentro il ciclo è il solito
+    # moltiplicatore che non si vede finché le righe sono tre.
+    allegati_per_device = storage.get_allegati_per_device()
 
     righe = []
     for voce in parco:
@@ -474,6 +489,13 @@ def pagina_parco(request: Request, test_salvato: int = Query(default=0),
             "data_test": (tested_at_iso[:10] if tested_at_iso else date.today().isoformat()),
             "puo_segnare_test": bool(device),
             "confronto": confronto,
+            # La nota vive nella colonna `note` di `watchlist`, che
+            # esisteva da sempre ma non era mostrata da nessuna pagina.
+            "nota": voce.get("note") or "",
+            "nota_html": P.nota_con_link(voce.get("note")),
+            "allegati": allegati_per_device.get(chiave, []),
+            "puo_allegare": (len(allegati_per_device.get(chiave, []))
+                             < C.ALLEGATI_MAX_PER_MODELLO),
         })
 
     totale_parco = len(righe)
@@ -495,6 +517,8 @@ def pagina_parco(request: Request, test_salvato: int = Query(default=0),
         "data": "Inserisci una data valida per il test.",
         "dispositivo": "Questo modello non ha ancora dati firmware da salvare come riferimento.",
         "parco": "Il modello non risulta piu nel parco di test.",
+        "troppi_allegati": (f"Questo modello ha già {C.ALLEGATI_MAX_PER_MODELLO} allegati: "
+                            "togline uno prima di aggiungerne un altro."),
     }
     return _rendi(request, "parco.html", _contesto(
         request, attiva="parco", righe=righe,
@@ -502,6 +526,14 @@ def pagina_parco(request: Request, test_salvato: int = Query(default=0),
         ordinamenti=ORDINAMENTI_PARCO,
         test_salvato=bool(test_salvato),
         errore_test=messaggi_errore.get(errore_test, ""),
+        nota_salvata=bool(nota_salvata),
+        allegato_salvato=bool(allegato_salvato),
+        allegato_tolto=bool(allegato_tolto),
+        # Il motivo del rifiuto arriva già scritto per esteso da
+        # `core/allegati.controlla`, non come codice da tradurre qui:
+        # dice il peso vero e il limite, che è quello che serve sapere.
+        errore_allegato=errore_allegato,
+        allegati_attivi=allegati.configurato(),
     ))
 
 
@@ -547,6 +579,9 @@ def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
             # PASSWORD sono state lette bene su Render?».
             ("Amministratore parco di test",
              STATO_AVVIO.get("amministratore parco di test", "avvio non ancora completato")),
+            ("Allegati del parco", allegati.stato()),
+            ("Salvataggio continuo",
+             STATO_AVVIO.get("salvataggio continuo", "avvio non ancora completato")),
         ],
         backup=P.stato_backup(),
         logica=C.DATA_LOGIC_VERSION,
@@ -723,6 +758,107 @@ def parco_segna_test(request: Request, chiave: str = Form(...), data_test: str =
     return RedirectResponse("/parco?test_salvato=1", status_code=303)
 
 
+# ----------------------------------------------------------------------
+# La nota e gli allegati di una riga del parco
+# ----------------------------------------------------------------------
+def _ritorno_parco(request: Request, **extra) -> RedirectResponse:
+    """Torna al parco mantenendo ricerca e ordinamento: chi stava
+    guardando `?q=galaxy&ordina=meno_recente` e salva una nota deve
+    ritrovarsi dove era, non su un elenco intero da riordinare a mano."""
+    parametri = {}
+    for nome in ("q", "ordina"):
+        valore = request.query_params.get(nome) or ""
+        if valore:
+            parametri[nome] = valore
+    parametri.update({k: v for k, v in extra.items() if v})
+    coda = "&".join(f"{k}={quote(str(v))}" for k, v in parametri.items())
+    return RedirectResponse(f"/parco{'?' + coda if coda else ''}", status_code=303)
+
+
+@app.post("/parco/nota")
+def parco_nota(request: Request, chiave: str = Form(...), nota: str = Form("")):
+    """La nota libera della riga. Sostituisce la colonna «Cosa fare», che
+    diceva sempre la stessa frase generica calcolata dal confronto: quello
+    che serve sapere su un telefono provato a mano lo sa solo chi lo ha
+    provato."""
+    _, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
+    if chiave not in storage.watched_keys():
+        return _ritorno_parco(request, errore_test="parco")
+    # Il testo si salva com'è scritto, senza ripulirlo: diventa HTML solo
+    # al momento di mostrarlo, con l'escape di `P.nota_con_link`.
+    storage.imposta_nota_parco(chiave, nota.strip())
+    _backup_subito()
+    return _ritorno_parco(request, nota_salvata=1)
+
+
+@app.post("/parco/allegato")
+async def parco_allegato_carica(request: Request, chiave: str = Form(...),
+                                file: UploadFile = File(...)):
+    _, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
+    if chiave not in storage.watched_keys():
+        return _ritorno_parco(request, errore_test="parco")
+    esistenti = storage.get_allegati_per_device().get(chiave, [])
+    if len(esistenti) >= C.ALLEGATI_MAX_PER_MODELLO:
+        return _ritorno_parco(request, errore_test="troppi_allegati")
+
+    contenuto = await file.read()
+    motivo = allegati.controlla(file.filename or "", file.content_type or "", contenuto)
+    if motivo:
+        return _ritorno_parco(request, errore_allegato=motivo)
+
+    ok, messaggio, impronta = allegati.salva(contenuto)
+    if not ok:
+        return _ritorno_parco(request, errore_allegato=messaggio)
+    storage.aggiungi_allegato(chiave, os.path.basename(file.filename or "allegato"),
+                              file.content_type or "", len(contenuto), impronta)
+    _backup_subito()
+    return _ritorno_parco(request, allegato_salvato=1)
+
+
+@app.get("/parco/allegato/{allegato_id}")
+def parco_allegato_scarica(request: Request, allegato_id: int):
+    """Dietro login come il resto del parco: un allegato è materiale di
+    lavoro, non una pagina pubblica."""
+    _, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
+    riga = storage.get_allegato(allegato_id)
+    if not riga:
+        return _ritorno_parco(request, errore_allegato="Allegato non trovato.")
+    contenuto = allegati.leggi(riga["impronta"])
+    if contenuto is None:
+        return _ritorno_parco(
+            request,
+            errore_allegato=("Il contenuto dell'allegato non è raggiungibile "
+                             "nell'archivio esterno."))
+    return Response(
+        content=contenuto, media_type=riga["tipo"] or "application/octet-stream",
+        # `inline`: una foto dello schermo si guarda, non si scarica. Il
+        # nome resta quello originale per quando invece la si salva.
+        headers={"Content-Disposition":
+                 f'inline; filename="{quote(riga["nome"])}"'},
+    )
+
+
+@app.post("/parco/allegato/{allegato_id}/elimina")
+def parco_allegato_elimina(request: Request, allegato_id: int):
+    _, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
+    riga = storage.elimina_allegato(allegato_id)
+    # Il contenuto si toglie dall'archivio esterno solo se NESSUN'ALTRA
+    # riga lo nomina: lo stesso file può essere allegato a due modelli, e
+    # cancellarlo dal primo non deve svuotare il secondo.
+    if riga and not storage.impronta_ancora_usata(riga["impronta"]):
+        allegati.elimina(riga["impronta"])
+    _backup_subito()
+    return _ritorno_parco(request, allegato_tolto=1)
+
+
 def _backup_subito() -> None:
     """Manda SUBITO al Gist esterno una correzione fatta a mano da una
     persona, invece di aspettare il prossimo giro di scansione.
@@ -745,20 +881,32 @@ def _backup_subito() -> None:
 
     Una correzione verificata da una persona è rara e piccola: vale la
     pena caricarla subito, ignorando l'intervallo minimo pensato per i
-    backup automatici dopo ogni scansione oraria. Gira in un thread,
-    stessa idea di `/scansione`: aspettare la risposta di GitHub dentro
-    la richiesta HTTP del modulo di correzione lo farebbe sembrare lento
-    per un salvataggio che l'utente non ha bisogno di stare a guardare.
+    backup automatici dopo ogni scansione oraria.
+
+    ## Come lo fa adesso (cambiato il 16/08/2026)
+
+    Prima questa funzione lanciava un thread che salvava SUBITO, uno per
+    click. Andava bene finché i click erano rari — una correzione di nome
+    modello ogni tanto. Da quando il parco ha note e allegati i click
+    diventano tanti e ravvicinati, e ogni salvataggio ricarica l'INTERO
+    database (5,7 MB compressi, ~7,6 MB in base64): dieci modifiche di
+    fila erano dieci invii da 7,6 MB.
+
+    Ora alza solo una bandierina (`backup.segna_modificato`), e il thread
+    di `backup` la raccoglie entro un minuto unendo le modifiche
+    ravvicinate in un invio solo. Per chi usa il sito non cambia niente —
+    non aspettava comunque la risposta di GitHub — e la modifica più
+    vecchia della raffica ha aspettato meno di sessanta secondi invece
+    dei trenta minuti del backup periodico.
 
     Se il backup non è configurato (`BACKUP_GIST_ID`/`BACKUP_GITHUB_TOKEN`
-    assenti), `backup.salva()` torna semplicemente `False` senza fare
-    niente: qui non c'è nulla da controllare prima, e nessun errore da
-    mostrare per una funzione che l'utente non ha attivato.
+    assenti), la bandierina non fa succedere niente: qui non c'è nulla da
+    controllare prima, e nessun errore da mostrare per una funzione che
+    l'utente non ha attivato.
     """
-    import threading
     from core import backup
 
-    threading.Thread(target=backup.salva, daemon=True).start()
+    backup.segna_modificato()
 
 
 @app.post("/tac/salva")
