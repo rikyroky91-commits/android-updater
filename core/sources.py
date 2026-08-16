@@ -3948,15 +3948,81 @@ def _code_candidates(query: str) -> list[str]:
     return variants
 
 
-def _news_attempts(text: str) -> list[str]:
+# Come si chiama il software di ciascuna famiglia. Serve a chiedere alle
+# notizie la cosa che PORTA UN NUMERO DI VERSIONE: «Honor Magic6 Pro
+# update» trova anche articoli di mercato, «Honor Magic6 Pro MagicOS»
+# trova quasi solo annunci di rilascio, che è dove sta scritto
+# «MagicOS 9.0.0.157».
+_SKIN_PER_TESTO = (
+    (("honor", "magic"), ("MagicOS",)),
+    (("huawei", "mate", "nova"), ("HarmonyOS", "EMUI")),
+    (("vivo", "iqoo"), ("OriginOS", "Funtouch OS")),
+    (("xiaomi", "redmi", "poco"), ("HyperOS",)),
+    (("oneplus",), ("OxygenOS",)),
+    (("realme",), ("realme UI",)),
+    (("oppo",), ("ColorOS",)),
+    (("samsung", "galaxy"), ("One UI",)),
+)
+
+
+def _skin_probabili(text: str, brand: str | None = None) -> tuple[str, ...]:
+    """Il nome risolto da un codice puo' essere NUDO: `V2309A` risolve in
+    «X100», senza la parola «vivo». Senza guardare anche la marca, la
+    query mirata non scatterebbe proprio sui modelli che ne hanno piu'
+    bisogno."""
+    testo = f"{text or ''} {brand or ''}".lower()
+    for parole, skin in _SKIN_PER_TESTO:
+        if any(p in testo for p in parole):
+            return skin
+    return ()
+
+
+def _porta_una_versione(items) -> bool:
+    """Almeno una di queste notizie dice a che versione sta il telefono?
+
+    Le stesse tre prove che `scan.normalize` accetta: un numero di build,
+    un livello di patch, o una versione di skin a tre o piu' parti. Si
+    guarda solo il titolo, che e' testo gia' in memoria: nessuna
+    richiesta di rete in piu'.
+    """
+    for item in items:
+        testo = getattr(item, "text", "") or getattr(item, "title", "")
+        dati = extract.extract_all(testo)
+        if dati.build or dati.patch_level or extract.versione_precisa(dati.skin_version):
+            return True
+    return False
+
+
+def _news_attempts(text: str, brand: str | None = None) -> list[str]:
     """Dalla più mirata alla più larga, per un singolo testo di ricerca
     (nome commerciale o query originale). Query BREVI e SEMPLICI, non
     frasi tra virgolette con gruppi OR e intitle: annidati insieme: il
     parser di Google News RSS non è documentato ed è noto restituire
     silenziosamente zero risultati con query troppo articolate, anche
     quando esistono notizie reali sull'argomento (verificato: una ricerca
-    generale trova notizie che la query complessa precedente non trovava)."""
-    return [
+    generale trova notizie che la query complessa precedente non trovava).
+
+    ## Perché il nome della skin viene per primo (16/08/2026)
+
+    Il ciclo che usa questa lista SI FERMA AL PRIMO TENTATIVO CHE TROVA
+    QUALCOSA. Con «{modello} update» in testa bastava un articolo di
+    mercato che citasse il telefono perché la ricerca si chiudesse lì,
+    senza mai provare una formulazione capace di riportare un numero di
+    versione — e senza numero la voce non conta come firmware (vedi la
+    regola in `scan.normalize`).
+
+    Chiedere il nome del software invece che la parola «update» cambia
+    proprio il tipo di articolo che torna: misurato su dieci modelli per
+    marca, Honor dava un firmware su 1 modello su 10 e vivo su 2 su 10,
+    che sono le due famiglie i cui aggiornamenti si annunciano quasi
+    sempre nella forma «MagicOS 9.0.0.157» o «OriginOS 5.1.0.3».
+
+    Le formulazioni generiche restano tutte, dopo: per un modello di cui
+    nessuno ha scritto la versione, una notizia qualsiasi è comunque
+    meglio del nulla.
+    """
+    mirate = [f"{text} {skin}" for skin in _skin_probabili(text, brand)]
+    return mirate + [
         f"{text} update",
         f"{text} software update",
         f"{text} security patch",
@@ -5638,11 +5704,21 @@ def search_model_live(model_query: str):
     # timeout, cioè diversi minuti: la pagina resta in caricamento e sembra
     # bloccata. Si prova finché c'è tempo, poi si risponde con quello che
     # si ha, dicendolo esplicitamente.
+    # PRIMA I NOMI CHE DICONO ANCHE LA MARCA. `V2309A` risolve in
+    # ['X100', 'Vivo X100']: cercando «X100» nudo tornavano la Fujifilm
+    # X100VI e uno script di Roblox, e il ciclo si fermava lì perché
+    # QUALCOSA l'aveva trovato. Un nome con la marca dentro è la stessa
+    # domanda fatta senza ambiguità, e non costa una richiesta in più:
+    # cambia solo l'ordine in cui si prova.
+    resolved_names = sorted(
+        resolved_names,
+        key=lambda n: 0 if extract.detect_brand(n) else 1)
     search_texts = (resolved_names + [model_query])[:C.SEARCH_MAX_CANDIDATES]
     scadenza = time.monotonic() + C.SEARCH_BUDGET_SECONDS
     tempo_scaduto = False
 
     last_error = "nessun risultato"
+    ripiego = None
     for text in search_texts:
         if time.monotonic() >= scadenza:
             tempo_scaduto = True
@@ -5672,7 +5748,15 @@ def search_model_live(model_query: str):
         if looks_like_model_code(text) and text not in resolved_names:
             display_model = None
         nota_codice = f" · codice {resolved_code}" if (resolved_code and text in resolved_names) else ""
-        for attempt_query in _news_attempts(text):
+        def _decora(items):
+            for item in items:
+                if display_model:
+                    item.device = display_model
+                if nota_codice:
+                    item.size_info = (item.size_info or "") + nota_codice
+            return items
+
+        for attempt_query in _news_attempts(text, brand):
             if time.monotonic() >= scadenza:
                 tempo_scaduto = True
                 break
@@ -5681,16 +5765,34 @@ def search_model_live(model_query: str):
                 limit=25, timeout=C.SEARCH_HTTP_TIMEOUT,
             )
             if items:
-                for item in items:
-                    if display_model:
-                        item.device = display_model
-                    if nota_codice:
-                        item.size_info = (item.size_info or "") + nota_codice
-                return items, None
+                # SI CERCA UNA RISPOSTA, NON UN RISULTATO QUALSIASI.
+                #
+                # Prima si tornava alla PRIMA formulazione che trovava
+                # qualcosa. Ma la domanda della pagina è «a che versione
+                # sta questo telefono», e un articolo di mercato che cita
+                # il modello non la risponde: la voce arriva senza
+                # versione e vale zero (vedi la regola in
+                # `scan.normalize`). Nel frattempo la formulazione
+                # successiva — quella che nomina il software — non veniva
+                # mai provata, perché il ciclo era già uscito.
+                #
+                # Misurato su dieci modelli vivo: fermandosi al primo
+                # risultato si otteneva un firmware su 1 modello su 10.
+                #
+                # Il primo risultato non si butta: resta come ripiego per
+                # i modelli di cui nessuno ha scritto la versione, dove
+                # una notizia qualsiasi è comunque meglio del nulla.
+                if _porta_una_versione(items):
+                    return _decora(items), None
+                if ripiego is None:
+                    ripiego = _decora(items)
             if error:
                 last_error = error
         if tempo_scaduto:
             break
+
+    if ripiego:
+        return ripiego, None
 
     if tempo_scaduto:
         return [], (

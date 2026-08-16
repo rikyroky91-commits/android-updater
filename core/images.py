@@ -55,11 +55,39 @@ def _titolo_pertinente(query: str, title: str) -> bool:
     per parola (abbreviazioni, «Galaxy» davanti o no, ecc.): lo scopo non
     è un confronto esatto, è scartare un titolo che non ha NULLA a che
     fare con la domanda, che è il caso di un errore vero.
+
+    ## LA SIGLA DEL MODELLO DEVE COMBACIARE (16/08/2026)
+
+    «Una parola in comune» basta a fermare il telefono di un'altra marca,
+    ma non quello della STESSA marca — ed è il caso più frequente, perché
+    per vivo, Honor e realme la marca è dentro il nome. Misurato:
+
+        «vivo V30» → Vivo V40          «vivo Y36» → Vivo X300 Pro
+        «Moto G24» → Motorola Moto     (la pagina generica della serie)
+
+    Tutti e tre passavano il controllo sulla parola «vivo» o «moto», e la
+    scheda mostrava la foto di un altro telefono. È lo stesso difetto del
+    logo Xiaomi descritto sopra, solo dentro la stessa marca — e più
+    insidioso, perché una foto plausibile non insospettisce nessuno.
+
+    Quando la domanda contiene una sigla di modello (una parola con
+    dentro una cifra: «x100», «v30», «g24», «s24»), quella sigla deve
+    esserci anche nel titolo. Non è una stretta generale: per i nomi
+    senza cifre — «Nothing Phone», «Pixel Fold» — resta la regola
+    permissiva di prima, che per loro funzionava già.
+
+    Meglio nessuna foto che la foto sbagliata: una casella vuota si vede,
+    un telefono sbagliato no.
     """
     parole_domanda = _parole_significative(query)
     if not parole_domanda:
         return True   # niente con cui confrontare: non si può scartare nulla
-    return bool(parole_domanda & _parole_significative(title))
+    parole_titolo = _parole_significative(title)
+
+    sigle_domanda = {p for p in parole_domanda if any(c.isdigit() for c in p)}
+    if sigle_domanda:
+        return bool(sigle_domanda & parole_titolo)
+    return bool(parole_domanda & parole_titolo)
 
 
 def _get(url: str, params: dict):
