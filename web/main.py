@@ -327,8 +327,14 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
         # nero» in «Galaxy A56 5G», chi guarda deve vedere che cosa è
         # stato cercato al posto suo — altrimenti la pagina risponde a una
         # domanda che non ricorda di aver fatto.
-        interpretato_da=ai.strip(),
-        interpretato_perche=perche.strip(),
+        # Due sorgenti, uno striscione solo. `ai=` nell'indirizzo resta
+        # per i link «Oppure:» qui sotto, che ricercano un'alternativa
+        # dichiarando da dove veniva; `ai_da` lo mette invece il soccorso
+        # automatico del server (`_soccorso_ai`), che nessuno ha
+        # premuto. Per chi guarda e' la stessa informazione — «hai
+        # scritto X, ho cercato Y» — e va detta allo stesso modo.
+        interpretato_da=ai.strip() or risultato.get("ai_da", ""),
+        interpretato_perche=perche.strip() or risultato.get("ai_perche", ""),
         alternative=[a for a in alt if a and a != q][:3],
     ))
 
@@ -1287,18 +1293,87 @@ def _chiave_ricerca(query: str) -> str:
     return " ".join(str(query or "").split()).lower()
 
 
+def _ricerca_debole(esito: dict) -> bool:
+    """Questa risposta lascia la domanda senza risposta?
+
+    Sono i due casi che una persona vede come «non ha funzionato»: non
+    ho trovato il telefono, oppure l'ho trovato ma non so dirti a che
+    versione sta.
+    """
+    return bool(esito) and (not esito.get("trovato") or esito.get("senza_firmware"))
+
+
+def _soccorso_ai(query: str) -> dict | None:
+    """Riprova la ricerca con quello che l'AI ha capito, e torna il
+    risultato migliore — oppure None se non c'è niente di meglio.
+
+    ## Perché l'AI non è più un tasto (16/08/2026)
+
+    Richiesta dell'utente: «vista l'attuale inutilità del tasto AI la
+    integrerei nella ricerca normale, migliorando le ricerche
+    attualmente critiche come quelle che hanno fonti peggiori».
+
+    Aveva ragione, e il motivo è nel codice: la correzione automatica dei
+    refusi e dei codici gira SEMPRE e per prima. Quando la ricerca
+    normale bastava, il tasto non aggiungeva niente; quando non bastava,
+    toccava accorgersene e premerlo — cioè proprio nel momento in cui una
+    persona conclude che il sito non sa rispondere e se ne va.
+
+    Ora parte da solo, ma SOLO sulla strada debole: se la ricerca normale
+    ha già una versione, l'AI non viene nemmeno interpellata. Costa una
+    chiamata al modello e una seconda ricerca, e le paga solo chi
+    altrimenti non avrebbe avuto niente.
+
+    Il risultato si tiene solo se è MIGLIORE: un'interpretazione che
+    porta a un altro buco viene scartata, e resta la risposta onesta
+    sulla domanda originale.
+    """
+    if not aiquery.disponibile():
+        return None
+    try:
+        interpretazione = aiquery.interpreta(query)
+    except Exception:      # pragma: no cover - l'AI non deve far cadere la ricerca
+        return None
+    if not interpretazione.riuscita:
+        return None
+
+    # Due tentativi al massimo: ognuno è una ricerca vera, e la pagina
+    # deve restare una pagina, non un'attesa.
+    for proposta in list(interpretazione.proposte)[:2]:
+        if not proposta or proposta.strip().lower() == query.strip().lower():
+            continue
+        candidato = _cerca_davvero(proposta)
+        if _ricerca_debole(candidato):
+            continue
+        candidato = dict(candidato)
+        candidato["ai_da"] = query
+        candidato["ai_a"] = proposta
+        candidato["ai_perche"] = interpretazione.motivo
+        return candidato
+    return None
+
+
 def _esito_ricerca(query: str) -> dict:
     """Cosa dicono le fonti su quello che è stato digitato.
 
     La stessa domanda posta due volte di seguito non ripaga tredici
     secondi di rete: la seconda risposta viene dalla memoria corta. La
     durata è in `SEARCH_CACHE_SECONDS`, e a zero questo ramo non esiste.
+
+    Se la risposta resta debole, ci prova l'AI — vedi `_soccorso_ai`.
+    Sta QUI e non nella rotta della ricerca di proposito: così vale anche
+    per il confronto fra due modelli, che condivide questa funzione, e
+    non si crea la seconda strada che questo file evita ovunque.
     """
     chiave = _chiave_ricerca(query)
     pronto = RICERCHE.leggi(chiave)
     if pronto is not None:
         return pronto
     esito = _cerca_davvero(query)
+    if _ricerca_debole(esito):
+        migliore = _soccorso_ai(query)
+        if migliore is not None:
+            esito = migliore
     RICERCHE.scrivi(chiave, esito)
     return esito
 
@@ -1890,6 +1965,30 @@ def _riga_confronto(etichetta: str, valore_a, valore_b) -> dict:
     }
 
 
+
+def _modello_da_imei(query: str) -> tuple[str, str]:
+    """`(testo_da_cercare, imei_riconosciuto)`.
+
+    Se la stringa e' un IMEI e il TAC lo identifica, torna il NOME del
+    modello: e' quello che le fonti conoscono, mentre quindici cifre non
+    compaiono in nessun catalogo ne' in nessun titolo di notizia.
+
+    Se l'IMEI non e' identificabile si restituisce il testo com'era: una
+    ricerca che non trova nulla dice comunque «non trovato» su quello che
+    hai scritto, che e' meglio di un errore.
+
+    Passa dallo STESSO `_esito_imei` della ricerca normale, non da una
+    seconda strada: e' la regola che questo file ripete ovunque, e nasce
+    dal bug «RMX3939 risponde con i dati di RMX3930», due funzioni che
+    facevano la stessa cosa in modo diverso.
+    """
+    testo = (query or "").strip()
+    if not testo or not imeicheck.is_imei_like(testo):
+        return testo, ""
+    esito = _esito_imei(testo)
+    return (esito.get("modello_cercato") or testo), testo
+
+
 def _confronta(query_a: str, query_b: str) -> dict:
     """Due ricerche vere, messe fianco a fianco — non una terza ricerca.
 
@@ -1903,6 +2002,20 @@ def _confronta(query_a: str, query_b: str) -> dict:
     la stessa cache, chiamata due volte.
     """
     query_a, query_b = (query_a or "").strip(), (query_b or "").strip()
+    # UN IMEI VA RIDOTTO AL MODELLO ANCHE QUI.
+    #
+    # Segnalato dall'utente: «quando cerco un dispositivo e poi faccio il
+    # confronto, la barra di ricerca del confronto non permette la
+    # ricerca tramite IMEI». Il riconoscimento viveva solo dentro la
+    # rotta della ricerca (`pagina_ricerca`), non dentro `_esito_ricerca`
+    # che il confronto condivide: quindici cifre arrivavano qui come un
+    # nome di modello, e si cercava un telefono chiamato
+    # «867051060315467».
+    #
+    # È anche il caso d'uso più naturale di questa pagina: due telefoni
+    # veri in mano, due IMEI da confrontare.
+    query_a, imei_a = _modello_da_imei(query_a)
+    query_b, imei_b = _modello_da_imei(query_b)
     ra = _esito_ricerca(query_a) if query_a else None
     rb = _esito_ricerca(query_b) if query_b else None
 
@@ -1952,4 +2065,9 @@ def _confronta(query_a: str, query_b: str) -> dict:
         "righe": righe,
         "pronto": bool(ra and rb),
         "stesso_modello": stesso_modello,
+        # Quale IMEI e' diventato quale modello: la casella mostra il nome
+        # risolto, e senza dirlo sembrerebbe che il testo scritto sia
+        # sparito da solo.
+        "imei_a": imei_a,
+        "imei_b": imei_b,
     }

@@ -773,6 +773,117 @@ class TestRicerca(_Sito):
                 lambda q: {"items": [], "error": None})
 
 
+class TestSoccorsoAI(_Sito):
+    """L'AI entra da sola quando la ricerca normale non porta una versione.
+
+    E' la sostanza della richiesta dell'utente: non un tasto da premere
+    dopo essersi accorti del fallimento, ma un soccorso che parte proprio
+    nel caso in cui il sito altrimenti non risponde. Costa una chiamata al
+    modello e una seconda ricerca, e le paga solo chi non aveva niente.
+    """
+
+    def test_una_ricerca_riuscita_non_chiama_lai(self):
+        """Chi ha gia' una versione non deve pagare ne' l'attesa ne' la
+        chiamata al modello."""
+        from web import main
+
+        chiamate = []
+        vero = main._soccorso_ai
+        main._soccorso_ai = lambda q: chiamate.append(q)
+        try:
+            forte = {"trovato": True, "senza_firmware": False}
+            self.assertFalse(main._ricerca_debole(forte))
+        finally:
+            main._soccorso_ai = vero
+        self.assertEqual(chiamate, [])
+
+    def test_le_due_forme_di_fallimento_contano_come_deboli(self):
+        from web import main
+
+        self.assertTrue(main._ricerca_debole({"trovato": False, "senza_firmware": False}))
+        self.assertTrue(main._ricerca_debole({"trovato": True, "senza_firmware": True}))
+
+    def test_senza_chiave_il_soccorso_non_parte(self):
+        from web import main
+
+        self.assertIsNone(main._soccorso_ai("qualcosa di illeggibile"))
+
+    def test_uninterpretazione_che_non_migliora_viene_scartata(self):
+        """Se l'AI porta a un altro buco, resta la risposta onesta sulla
+        domanda originale invece di una domanda diversa e altrettanto
+        vuota."""
+        from core import aiquery
+        from web import main
+
+        finta = aiquery.Interpretazione(proposte=("modello inesistente zzz",),
+                                        motivo="prova")
+        veri = (aiquery.disponibile, aiquery.interpreta, main._cerca_davvero)
+        aiquery.disponibile = lambda: True
+        aiquery.interpreta = lambda q, candidati=None: finta
+        main._cerca_davvero = lambda q: {"trovato": False, "senza_firmware": False}
+        try:
+            self.assertIsNone(main._soccorso_ai("xyz"))
+        finally:
+            aiquery.disponibile, aiquery.interpreta, main._cerca_davvero = veri
+
+    def test_uninterpretazione_migliore_viene_tenuta_e_dichiarata(self):
+        from core import aiquery
+        from web import main
+
+        finta = aiquery.Interpretazione(proposte=("Galaxy S24 Ultra",),
+                                        motivo="sembra un Samsung")
+        veri = (aiquery.disponibile, aiquery.interpreta, main._cerca_davvero)
+        aiquery.disponibile = lambda: True
+        aiquery.interpreta = lambda q, candidati=None: finta
+        main._cerca_davvero = lambda q: {"trovato": True, "senza_firmware": False}
+        try:
+            esito = main._soccorso_ai("quel samsung nero")
+        finally:
+            aiquery.disponibile, aiquery.interpreta, main._cerca_davvero = veri
+
+        self.assertIsNotNone(esito)
+        # Va DETTO: la pagina risponderebbe a una domanda che chi guarda
+        # non ricorda di aver fatto.
+        self.assertEqual(esito["ai_da"], "quel samsung nero")
+        self.assertEqual(esito["ai_a"], "Galaxy S24 Ultra")
+        self.assertEqual(esito["ai_perche"], "sembra un Samsung")
+
+
+class TestConfrontoConImei(_Sito):
+    """Segnalato dall'utente: «quando cerco un dispositivo e poi faccio il
+    confronto, la barra di ricerca del confronto non permette la ricerca
+    tramite IMEI».
+
+    Il riconoscimento viveva solo dentro la rotta della ricerca, non
+    dentro `_esito_ricerca` che il confronto condivide: quindici cifre
+    arrivavano al confronto come se fossero il nome di un modello. Ed e'
+    il caso d'uso piu' naturale di quella pagina — due telefoni veri in
+    mano, due IMEI da confrontare.
+    """
+
+    def test_un_imei_diventa_il_modello_prima_di_cercare(self):
+        from web.main import _modello_da_imei
+
+        testo, imei = _modello_da_imei("867051060315467")
+        self.assertEqual(imei, "867051060315467")
+        self.assertNotEqual(testo, "867051060315467",
+                            "l'IMEI doveva essere ridotto a un nome di modello")
+        self.assertTrue(testo)
+
+    def test_un_nome_normale_non_viene_toccato(self):
+        from web.main import _modello_da_imei
+
+        self.assertEqual(_modello_da_imei("realme C63"), ("realme C63", ""))
+        self.assertEqual(_modello_da_imei("SM-S928B"), ("SM-S928B", ""))
+
+    def test_la_pagina_dice_quale_imei_e_diventato_quale_modello(self):
+        risposta = self.client.get("/confronto?a=867051060315467&b=realme+C63")
+        self.assertEqual(risposta.status_code, 200)
+        # Sostituire il testo scritto senza dirlo sembrerebbe che il numero
+        # sia sparito da solo.
+        self.assertIn("867051060315467", risposta.text)
+
+
 class TestConfronto(_Sito):
     """La pagina che mette due modelli fianco a fianco.
 
@@ -1450,19 +1561,42 @@ class TestInterpreteAI(_Sito):
         self.assertNotIn('id="btn-ai"', pagina)
         self.assertNotIn("/static/ai.js", pagina)
 
-    def test_il_tasto_sta_accanto_a_cerca_su_ogni_pagina(self):
-        """Non più solo dopo un fallimento: sta nella barra di ricerca, che
-        è in ogni pagina. La correzione gratuita dei refusi gira comunque
-        per prima e in automatico, quindi il tasto non la scavalca."""
+    def test_un_tasto_solo_con_la_dicitura_sotto(self):
+        """IL TASTO AI NON ESISTE PIU' (16/08/2026).
+
+        Segnalato dall'utente: «vista l'attuale inutilita' del tasto AI la
+        integrerei nella ricerca normale». Aveva ragione, e il motivo era
+        nel codice: quel tasto non cercava sul web, riordinava candidati
+        gia' presenti nei cataloghi, e la correzione automatica dei refusi
+        girava comunque per prima. Quando la ricerca normale bastava non
+        aggiungeva niente; quando non bastava, bisognava accorgersene e
+        premerlo — cioe' proprio quando una persona conclude che il sito
+        non sa rispondere e se ne va.
+
+        Ora l'AI parte dal server sulla sola strada debole
+        (`_soccorso_ai`), quindi non c'e' piu' niente da premere. Resta
+        scritto che c'e', perche' e' giusto dirlo.
+        """
         os.environ["GEMINI_API_KEY"] = "finta"
         for percorso in ("/", "/aggiornamenti", "/diagnostica"):
             with self.subTest(percorso=percorso):
                 pagina = self.client.get(percorso).text
-                self.assertIn('id="btn-ai"', pagina)
-                self.assertIn("/static/ai.js", pagina)
+                self.assertNotIn('id="btn-ai"', pagina)
+                self.assertIn("powered by ai", pagina)
+                # Lo script pilotava solo quel tasto: mandarlo a tutti
+                # sarebbe far scaricare codice che non puo' piu' servire.
+                self.assertNotIn("/static/ai.js", pagina)
 
-    def test_lo_script_dell_ai_si_scarica(self):
-        os.environ["GEMINI_API_KEY"] = "finta"
+    def test_la_dicitura_non_compare_senza_chiave(self):
+        """Senza chiave l'AI non parte: dire «powered by ai» sarebbe
+        scrivere una cosa non vera."""
+        pagina = self.client.get("/").text
+        self.assertNotIn("powered by ai", pagina)
+
+    def test_lo_script_resta_servibile_anche_se_non_e_piu_incluso(self):
+        """`ai.js` e `/api/interpreta` restano nel repository: sono la
+        stessa funzione, e riattivare il tasto e' rimettere due righe in
+        `base.html`. Il test difende quel ritorno, non l'uso attuale."""
         risposta = self.client.get("/static/ai.js")
         self.assertEqual(risposta.status_code, 200)
         self.assertIn("/api/interpreta", risposta.text)

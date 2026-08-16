@@ -897,3 +897,20 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
   padding: .5rem .6rem; background: var(--carta); border: 1px solid var(--filo);
   border-radius: 4px;
 }
+
+/* --- Il tasto Cerca, con la dicitura sotto -----------------------------
+   Sostituisce la coppia «Cerca» + «✦ AI». L'AI non e' piu' qualcosa da
+   premere — parte da sola quando la ricerca normale non porta una
+   versione — quindi non e' piu' un comando: e' un'informazione, e sta
+   scritta come tale. Piccola e sotto, non accanto: accanto tornerebbe a
+   sembrare un secondo tasto. */
+.cerca-con-ai {
+  display: flex; flex-direction: column; align-items: stretch; gap: .15rem;
+}
+.powered-ai {
+  font-size: .62rem; letter-spacing: .04em; text-align: center;
+  color: var(--neutral); text-transform: lowercase; line-height: 1;
+  /* Non deve allargare il tasto: se la parola fosse piu' larga, la
+     colonna crescerebbe e la barra di ricerca si sposterebbe. */
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

@@ -30,25 +30,21 @@
          value="{{ query }}"{% if grande %} autofocus{% endif %}
          placeholder="Modello, codice o IMEI">
   <datalist id="ricerche-recenti"></datalist>
-  <button type="submit">Cerca</button>
-  {# IL TASTO AI ACCANTO A «CERCA», non più solo dopo un fallimento.
-     Il ragionamento di prima — nasconderlo finché la ricerca normale non
-     fallisce, per non far scavalcare la strada gratuita — resta valido
-     nella sostanza ma si regge da solo: la correzione dei refusi e dei
-     codici gira SEMPRE e per prima, in automatico, senza che nessuno
-     prema niente. Il tasto non la scavalca, la affianca. Nasconderlo
-     serviva solo a rendere la funzione difficile da trovare. Compare
-     comunque solo con una chiave configurata. #}
-  {% if ai_attiva %}
-  {# «AI» SCRITTO DENTRO, non una stellina da interpretare. Un'icona sola
-     costringe a passarci sopra col mouse per scoprire cosa fa, e su un
-     telefono il mouse non c'è. La stellina resta come segno, piccola e
-     davanti alla parola. #}
-  <button type="button" id="btn-ai" class="tasto-ai"
-          title="Interpreta con l'AI quello che hai scritto e traducilo in un modello che l'app conosce. Non produce dati tecnici.">
-    <span class="scintilla" aria-hidden="true">✦</span>AI
-    <span class="sr-only">— interpreta la ricerca con l'AI</span>
-  </button>
-  {% endif %}
+  {# UN TASTO SOLO, CON LA DICITURA SOTTO.
+
+     Prima qui c'erano due tasti: «Cerca» e «✦ AI». Il secondo non
+     cercava sul web — riordinava candidati già presenti nei cataloghi —
+     e la correzione automatica dei refusi girava comunque per prima:
+     quando la ricerca normale bastava non aggiungeva niente, quando non
+     bastava bisognava accorgersene e premerlo, cioè proprio nel momento
+     in cui una persona conclude che il sito non sa rispondere.
+
+     Ora l'AI è dentro la ricerca (vedi `_soccorso_ai` in web/main.py) e
+     parte da sola solo quando la strada normale non porta una versione.
+     Non c'è più niente da premere, quindi non c'è più un tasto: resta
+     scritto che c'è, perché è giusto dirlo. #}
+  <div class="cerca-con-ai">
+    <button type="submit">Cerca</button>
+    {% if ai_attiva %}<span class="powered-ai">powered by ai</span>{% endif %}
+  </div>
 </form>
-{% if ai_attiva %}<div id="esito-ai" class="esito-ai" hidden></div>{% endif %}

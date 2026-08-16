@@ -27,13 +27,23 @@ Confronta due modelli · {{ titolo_sito }}
 <form class="confronto-form" method="get" action="/confronto">
   <label class="sr-only" for="confronto-a">Primo modello</label>
   <input id="confronto-a" name="a" type="search" autocomplete="off"
-         value="{{ confronto.query_a }}" placeholder="Primo modello, es. realme C63">
+         value="{{ confronto.query_a }}" placeholder="Modello, codice o IMEI, es. realme C63">
   <span class="confronto-contro">contro</span>
   <label class="sr-only" for="confronto-b">Secondo modello</label>
   <input id="confronto-b" name="b" type="search" autocomplete="off"
-         value="{{ confronto.query_b }}" placeholder="Secondo modello, es. RMX3939">
+         value="{{ confronto.query_b }}" placeholder="Modello, codice o IMEI, es. RMX3939">
   <button type="submit">Confronta</button>
 </form>
+
+{% if confronto.imei_a or confronto.imei_b %}
+{# L'IMEI e' stato ridotto al modello: dirlo, altrimenti sembra che il
+   numero digitato sia sparito da solo. #}
+<p class="nota">
+  {% if confronto.imei_a %}IMEI {{ confronto.imei_a }} → <strong>{{ confronto.query_a }}</strong>{% endif %}
+  {% if confronto.imei_a and confronto.imei_b %} · {% endif %}
+  {% if confronto.imei_b %}IMEI {{ confronto.imei_b }} → <strong>{{ confronto.query_b }}</strong>{% endif %}
+</p>
+{% endif %}
 
 {% if not confronto.query_a or not confronto.query_b %}
 <p class="vuoto">Scrivi un nome o un codice modello in entrambi i campi per

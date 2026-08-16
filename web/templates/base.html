@@ -77,7 +77,11 @@
   <script src="/static/ricerca.js" defer></script>
   <script src="/static/ricerche-recenti.js" defer></script>
   <script src="/static/imei-links.js" defer></script>
-  {% if ai_attiva %}<script src="/static/ai.js" defer></script>{% endif %}
+  {# ai.js pilotava il tasto «✦ AI», che non esiste piu': l'AI ora e'
+     dentro la ricerca e parte dal server quando serve (vedi
+     `_soccorso_ai` in web/main.py). Il file resta nel repository,
+     insieme alla rotta /api/interpreta che usa: sono la stessa
+     funzione, e riattivarli e' rimettere queste due righe. #}
   {% block script %}{% endblock %}
 </body>
 </html>

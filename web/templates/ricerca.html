@@ -19,7 +19,8 @@
 {% if interpretato_da %}
 <p class="interpretato">
   <span class="segno-ai" aria-hidden="true">✦</span>
-  Hai scritto «{{ interpretato_da }}», ho cercato <strong>{{ query }}</strong>.
+  Hai scritto «{{ interpretato_da }}», ho cercato
+  <strong>{{ risultato.ai_a if risultato and risultato.ai_a else query }}</strong>.
   {% if interpretato_perche %}<span class="tenue">{{ interpretato_perche }}</span>{% endif %}
   {% if alternative %}
   <span class="alternative">Oppure:
