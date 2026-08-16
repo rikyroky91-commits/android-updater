@@ -53,5 +53,35 @@ class TestPertinenzaDelTitolo(unittest.TestCase):
         self.assertFalse(images._titolo_pertinente("realme C61", "Xiaomi Redmi 12C"))
 
 
+class TestLaDomandaPerLaFoto(unittest.TestCase):
+    """`brand` in questo progetto NON e' una marca: e' la sigla della
+    FAMIGLIA di fonti («Vivo / iQOO / Motorola»). Usarla nella domanda
+    produceva «Vivo / iQOO / Motorola vivo X90 smartphone», a cui
+    Wikipedia rispondeva «Android (operating system)» — su quasi tutti i
+    telefoni, perche' solo Samsung e Pixel hanno una sigla che e' davvero
+    una marca."""
+
+    def test_la_sigla_di_gruppo_non_finisce_nella_domanda(self):
+        from web.presenters import _domanda_per_la_foto
+
+        for gruppo in ("Vivo / iQOO / Motorola", "Xiaomi / Redmi / POCO",
+                       "Huawei / Honor", "Oppo / Realme / OnePlus"):
+            with self.subTest(gruppo=gruppo):
+                domanda = _domanda_per_la_foto(gruppo, "vivo X90")
+                self.assertNotIn("/", domanda)
+                self.assertEqual(domanda, "vivo X90")
+
+    def test_una_marca_vera_resta_nella_domanda(self):
+        from web.presenters import _domanda_per_la_foto
+
+        self.assertEqual(_domanda_per_la_foto("Samsung", "Galaxy S24 Ultra"),
+                         "Samsung Galaxy S24 Ultra")
+
+    def test_senza_marca_resta_il_solo_modello(self):
+        from web.presenters import _domanda_per_la_foto
+
+        self.assertEqual(_domanda_per_la_foto("", "Moto G24"), "Moto G24")
+
+
 if __name__ == "__main__":
     unittest.main()

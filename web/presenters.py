@@ -273,6 +273,35 @@ def marca_probabile(codice: str = "", nome: str = "", aer: dict | None = None) -
 # ======================================================================
 # La scheda tecnica
 # ======================================================================
+
+def _domanda_per_la_foto(marca: str, titolo: str) -> str:
+    """La stringa con cui si cerca la foto del modello.
+
+    IL DIFETTO, MISURATO IL 16/08/2026. Qui si scriveva
+    `f"{marca} {titolo}"`, ma in questo progetto `brand` NON è una marca:
+    è la sigla della FAMIGLIA di fonti a cui il telefono appartiene —
+    «Vivo / iQOO / Motorola», «Xiaomi / Redmi / POCO», «Huawei / Honor»,
+    «Oppo / Realme / OnePlus». La domanda che partiva era quindi
+
+        «Vivo / iQOO / Motorola vivo X90 smartphone»
+
+    e Wikipedia rispondeva **«Android (operating system)»**. Riguardava
+    ogni telefono di una famiglia raggruppata, cioè quasi tutti: solo
+    Samsung e Pixel hanno una sigla che è davvero una marca.
+
+    La sigla di gruppo si riconosce dalla barra e si toglie: il nome del
+    modello contiene già quasi sempre la marca vera («vivo X90», «HONOR
+    Magic6 Pro»), e quando non la contiene una ricerca sul solo modello
+    è comunque più precisa di una che nomina tre marche di cui due
+    sbagliate.
+    """
+    marca = (marca or "").strip()
+    titolo = (titolo or "").strip()
+    if "/" in marca:
+        return titolo
+    return f"{marca} {titolo}".strip()
+
+
 def scheda_tecnica(nome: str, codice: str = "", brand: str = "",
                    device: dict | None = None) -> dict:
     """Foto, hardware e supporto di un modello, pronti per il template.
@@ -322,7 +351,7 @@ def scheda_tecnica(nome: str, codice: str = "", brand: str = "",
     # rispondere il telefono sbagliato.
     foto = (scheda.foto if scheda else None) or (aer or {}).get("image_url")
     if not foto:
-        foto = images.find_device_image(f"{marca} {titolo}".strip())
+        foto = images.find_device_image(_domanda_per_la_foto(marca, titolo))
 
     voci = []
     if scheda:
