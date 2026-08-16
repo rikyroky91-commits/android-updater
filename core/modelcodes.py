@@ -594,7 +594,22 @@ def nome_canonico(codice: str) -> str | None:
     def rango(nome: str) -> tuple:
         ambiguo = codes_for_name(nome) != [codice_pulito]
         cinese = any("一" <= ch <= "鿿" for ch in nome)
-        return (_e_il_codice(nome, codice_pulito), ambiguo, cinese, len(nome), nome)
+        # L'ALFABETO VIENE PRIMA DELL'AMBIGUITA', non dopo.
+        #
+        # Misurato il 16/08/2026: `ASUS_AI2401_A` usciva come
+        # «ROG 游戏手机 8» pur avendo «ROG Phone 8» nello stesso elenco.
+        # Il nome cinese vinceva perche' era l'unico non condiviso con un
+        # altro codice, e l'ambiguita' veniva valutata per prima.
+        #
+        # Fra i due criteri, questo e' il piu' forte: un nome condiviso
+        # con una variante della stessa famiglia e' un fastidio, un nome
+        # in ideogrammi su un'app in italiano non e' leggibile affatto.
+        #
+        # NON tocca il caso che ha motivato la regola dell'ambiguita'
+        # (realme C61 contro C63): li' TUTTI i candidati sono latini,
+        # quindi questo termine e' costante e l'ordine ricade
+        # sull'ambiguita' esattamente come prima.
+        return (_e_il_codice(nome, codice_pulito), cinese, ambiguo, len(nome), nome)
 
     scelto = sorted(nomi, key=rango)[0]
     if not any(ch.isalpha() for ch in scelto):

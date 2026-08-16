@@ -270,5 +270,30 @@ class TestAccensioneConLUaConcordato(unittest.TestCase):
                 os.environ["DISABLED_SOURCES"] = prima
 
 
+class TestEuropaInTesta(unittest.TestCase):
+    """`_load_catalog` usa `setdefault`: la PRIMA regione che dichiara un
+    modello ne fissa il nome. Con l'India in testa vinceva la grafia
+    indiana — «cph 2219 e' oppo a74 invece mi trova oppo f19», segnalato
+    il 16/08/2026: A74 e' il nome europeo, F19 quello indiano, stesso
+    telefono.
+    """
+
+    def test_la_prima_regione_interrogata_e_europea(self):
+        from core import oppo_official as oo
+
+        primo_host, prima_regione = oo.CATALOG_REGIONS[0]
+        self.assertEqual(primo_host, oo.HOST_EU)
+        self.assertEqual(prima_regione, "pl")
+
+    def test_le_altre_regioni_restano_tutte(self):
+        """Riordinare non deve ridurre la copertura: le regioni
+        successive riempiono i modelli che l'Europa non vende — l'India da
+        sola ne dichiara 64 su 94."""
+        from core import oppo_official as oo
+
+        regioni = {r for _, r in oo.CATALOG_REGIONS}
+        self.assertEqual(regioni, {"pl", "in", "tw", "ae", "au"})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

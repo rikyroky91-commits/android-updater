@@ -74,11 +74,25 @@ HOST_APAC = "https://sgp-sow-cms.oppo.com/oppo-server"
 # quelle esistenti: sono il sottoinsieme MINIMO che copre 92 dei 94 modelli
 # noti (India da sola ne dà 64). Interrogarle tutte costerebbe una ventina
 # di richieste per guadagnare due modelli.
+# L'EUROPA VA INTERROGATA PER PRIMA, e non per campanilismo.
+#
+# `_load_catalog` usa `setdefault`: la prima regione che dichiara un
+# modello ne fissa il NOME. Con l'India in testa vinceva la grafia
+# indiana, ed e' l'origine del difetto segnalato il 16/08/2026 — «cph
+# 2219 e' oppo a74 invece mi trova oppo f19»: A74 e' il nome europeo,
+# F19 quello indiano, stesso telefono.
+#
+# Riordinare NON riduce la copertura: le regioni successive continuano a
+# riempire i modelli che l'Europa non vende (l'India da sola ne dichiara
+# 64 su 94, e restano tutti). Cambia solo quale nome vince quando lo
+# stesso telefono e' venduto in piu' mercati, che e' esattamente il caso
+# in cui bisogna scegliere — e per un'app usata in Italia la risposta e'
+# il nome europeo. Nessuna richiesta in piu'.
 CATALOG_REGIONS: list[tuple[str, str]] = [
+    (HOST_EU, "pl"),
     (HOST_APAC, "in"),
     (HOST_APAC, "tw"),
     (HOST_APAC, "ae"),
-    (HOST_EU, "pl"),
     (HOST_APAC, "au"),
 ]
 
