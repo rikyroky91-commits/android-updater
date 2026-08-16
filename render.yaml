@@ -93,6 +93,20 @@ services:
       # Impostarla accende da sola la fonte `oppo_official`
       # (vedi `sources.all_sources`): non serve toccare ENABLED_SOURCES.
       # Lasciata vuota, la fonte resta spenta e non compare come rossa.
+      #
+      # COME SI RICAVA IL VALORE. La loro app e' open source e costruisce
+      # l'intestazione cosi' (app/src/main/java/com/oxygenupdater/utils/
+      # Network.kt del repository oxygen-updater/os-updater):
+      #
+      #     const val AppUserAgent = "Oxygen_updater_" + BuildConfig.VERSION_NAME
+      #
+      # cioe' «Oxygen_updater_» seguito dal versionName dichiarato in
+      # app/build.gradle.kts (o dal tag dell'ultimo rilascio). Il valore
+      # VERO non e' scritto qui di proposito: questo repository e'
+      # pubblico, e l'autorizzazione ad accedere e' stata data ai
+      # manutentori di QUESTO deploy, non a chiunque cloni il progetto.
+      #
+      # Va rinfrescato quando la loro app cambia versione.
       - key: OXYGEN_USER_AGENT
         sync: false
 
