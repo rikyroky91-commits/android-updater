@@ -811,6 +811,105 @@ class TestLaMarcaNonSiConfondeNellIndiceInverso(unittest.TestCase):
 
 
 
+class TestPrefissoSbagliatoCifreGiuste(unittest.TestCase):
+    """Segnalato dall'utente il 16/08/2026: cercando «cph 3939» il sito
+    rispondeva «niente trovato», mentre `RMX3939` (realme C63) e' nei
+    cataloghi — anzi e' il modello su cui questo progetto ha gia'
+    lavorato a lungo.
+
+    E' l'errore piu' naturale su un codice tecnico: si ricorda il numero
+    e si sbaglia la sigla. Il suggeritore proponeva `CPH2399`, cioe'
+    teneva il prefisso sbagliato e storpiava le cifre giuste: confronta
+    le stringhe intere, e cosi' dava meno peso alla parte che chi cerca
+    ricorda meglio.
+    """
+
+    def test_le_stesse_cifre_con_un_altro_prefisso_si_propongono(self):
+        from core import modelcodes
+
+        trovati = modelcodes.codici_con_le_stesse_cifre("CPH3939")
+        if not trovati:
+            self.skipTest("catalogo dei codici non disponibile in questo ambiente")
+        self.assertIn("RMX3939", trovati)
+
+    def test_lo_spazio_dentro_il_codice_non_cambia_niente(self):
+        from core import modelcodes
+
+        con = modelcodes.codici_con_le_stesse_cifre("cph 3939")
+        senza = modelcodes.codici_con_le_stesse_cifre("CPH3939")
+        if not senza:
+            self.skipTest("catalogo dei codici non disponibile in questo ambiente")
+        self.assertEqual(con, senza)
+
+    def test_il_codice_cercato_non_propone_se_stesso(self):
+        from core import modelcodes
+
+        self.assertNotIn("RMX3939", modelcodes.codici_con_le_stesse_cifre("RMX3939"))
+
+    def test_poche_cifre_non_propongono_niente(self):
+        """Due cifre combaciano per caso con mezzo catalogo: un
+        suggerimento a caso e' peggio di nessun suggerimento."""
+        from core import modelcodes
+
+        self.assertEqual(modelcodes.codici_con_le_stesse_cifre("A5"), [])
+        self.assertEqual(modelcodes.codici_con_le_stesse_cifre(""), [])
+
+
+class TestIlCodiceDecideIlNomeAncheNellaRicercaLive(unittest.TestCase):
+    """Segnalato dall'utente il 16/08/2026: «cph 2219 e' oppo a74 invece
+    mi trova oppo f19».
+
+    LA RADICE. Il catalogo elenca `CPH2219` sotto quattro nomi — «OPPO
+    F19», «OPPO A74», «Oppo A74», «Oppo CPH2219» — e il primo dell'elenco
+    e' quello indiano. La ricerca live provava (giustamente) tutte le
+    forme, perche' ogni mercato scrive le notizie a modo suo, ma poi
+    etichettava il risultato con la forma usata per cercare: bastava che
+    il dataset avesse messo F19 davanti perche' un A74 diventasse un F19.
+
+    Non riguardava solo quel modello: il 17% dei codici ha piu' di un
+    nome. `nome_canonico` esiste apposta per rispondere «come si chiama
+    QUESTO codice», con una scala deterministica che tiene conto anche
+    degli override scritti a mano.
+    """
+
+    def _nomi(self, codice):
+        from core import scan
+
+        return {i.get("device_model") for i in scan.search_model(codice).get("items", [])
+                if i.get("device_model")}
+
+    def test_un_codice_con_piu_nomi_regionali_ne_mostra_uno_solo(self):
+        from core import modelcodes
+
+        if not modelcodes.resolve("CPH2219"):
+            self.skipTest("catalogo dei codici non disponibile in questo ambiente")
+        nomi = self._nomi("CPH2219")
+        self.assertEqual(len(nomi), 1, f"un codice, un nome: trovati {sorted(nomi)}")
+        self.assertEqual(nomi.pop(), modelcodes.nome_canonico("CPH2219"))
+
+    def test_il_nome_mostrato_non_e_in_caratteri_cinesi(self):
+        """`nome_canonico` mette gia' l'alfabeto latino prima del cinese
+        (punto 3 della sua scala). Una fonte che DICHIARA il nome cinese
+        scavalcava quella regola: «CPH2423» usciva come «一加 10R»."""
+        from core import modelcodes, scan
+
+        if not modelcodes.resolve("CPH2423"):
+            self.skipTest("catalogo dei codici non disponibile in questo ambiente")
+        for nome in self._nomi("CPH2423"):
+            self.assertFalse(scan._scritto_in_cinese(nome),
+                             f"nome in ideogrammi mostrato all'utente: {nome!r}")
+
+    def test_le_varianti_regionali_in_alfabeto_latino_restano_alla_fonte(self):
+        """La regola tocca SOLO gli ideogrammi: fra «OPPO A6 Pro» e «OPPO
+        F31» la scelta resta della fonte, che sa in quale mercato sta
+        guardando."""
+        from core import scan
+
+        self.assertFalse(scan._scritto_in_cinese("OPPO A6 Pro"))
+        self.assertFalse(scan._scritto_in_cinese("realme C63"))
+        self.assertTrue(scan._scritto_in_cinese("一加 10R"))
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main(verbosity=2)
 

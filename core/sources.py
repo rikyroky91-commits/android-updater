@@ -5757,7 +5757,30 @@ def search_model_live(model_query: str):
         # corrisponde a nulla. È così che una ricerca andata a buon fine
         # finiva per non mostrare alcun dispositivo.
         # Il codice resta visibile, ma nella descrizione, non nel nome.
-        display_model = text if text in resolved_names else extract.canonical_device(text)
+        # IL NOME MOSTRATO È QUELLO CANONICO DEL CODICE, non la variante
+        # regionale con cui si sta cercando in questo giro.
+        #
+        # Segnalato il 16/08/2026: «cph 2219 è oppo a74 invece mi trova
+        # oppo f19». Il catalogo elenca `CPH2219` sotto quattro nomi —
+        # «OPPO F19», «OPPO A74», «Oppo A74», «Oppo CPH2219» — e il primo
+        # dell'elenco e' quello indiano. Si cercava (giustamente) su tutte
+        # le forme, ma poi si etichettava il risultato con la forma usata
+        # per cercare: bastava che il dataset avesse messo F19 davanti
+        # perche' un A74 diventasse un F19.
+        #
+        # `nome_canonico` esiste apposta per rispondere «come si chiama
+        # QUESTO codice», e tiene conto degli override scritti a mano in
+        # `data/nomi_modello.csv`. La ricerca continua a provare tutte le
+        # varianti — servono a trovare le notizie, che ogni mercato scrive
+        # a modo suo — ma il telefono si chiama in un modo solo.
+        #
+        # E' la stessa regola che `scan.normalize` applica gia' quando la
+        # fonte dichiara un codice: qui non si attivava perche' la ricerca
+        # live riempie `raw.device` da se'.
+        if resolved_code and text in resolved_names:
+            display_model = modelcodes.nome_canonico(resolved_code) or text
+        else:
+            display_model = text if text in resolved_names else extract.canonical_device(text)
         # UN CODICE CHE NESSUN DATASET CONOSCE NON È UN NOME DI DISPOSITIVO.
         # Fissare il modello al testo digitato è ciò che rende tracciabile
         # un telefono di nicchia chiamato per nome — ma applicato a un

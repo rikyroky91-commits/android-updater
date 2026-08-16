@@ -35,6 +35,7 @@ il motivo per cui il salvataggio su Gist esiste già.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 from contextlib import asynccontextmanager
 from datetime import date
@@ -1564,8 +1565,34 @@ def _forse_cercavi(query: str, nome: str, brand: str, trovato: bool) -> list[str
     """
     scritto = (query or "").strip().lower()
     if not trovato:
-        return [voce for voce in suggest.did_you_mean(query, limit=6)
-                if voce.lower() != scritto][:5]
+        # PRIMA I CODICI CON LE STESSE CIFRE. Segnalato il 16/08/2026:
+        # cercando «cph 3939» il sito rispondeva «niente trovato» mentre
+        # `RMX3939` (realme C63) e' nei cataloghi — chi cerca ricorda il
+        # numero e sbaglia la sigla. `did_you_mean` confronta le stringhe
+        # intere e proponeva `CPH2399`: teneva il prefisso sbagliato e
+        # storpiava le cifre giuste, cioe' dava meno peso alla parte
+        # ricordata meglio.
+        cifre_cercate = re.sub(r"[^0-9]", "", query or "")
+        per_cifre = [modelcodes.nome_canonico(c) or c
+                     for c in modelcodes.codici_con_le_stesse_cifre(query)]
+        somiglianti = [voce for voce in suggest.did_you_mean(query, limit=6)
+                       if voce.lower() != scritto]
+        # CHI COMBACIA SU CIFRE **E** LETTERE VIENE PRIMA DI TUTTI.
+        # Mettere le sole cifre davanti a tutto scavalcava la correzione
+        # dei refusi: «SMA075F» ha come risposta giusta «SM-A075F», che
+        # combacia su entrambi i fronti, e finiva dietro a codici che
+        # avevano in comune solo il «075».
+        forti = [v for v in somiglianti
+                 if cifre_cercate and re.sub(r"[^0-9]", "", v) == cifre_cercate]
+        deboli = [v for v in somiglianti if v not in forti]
+        visti: set[str] = set()
+        proposte: list[str] = []
+        for voce in forti + per_cifre + deboli:
+            chiave = (voce or "").strip().lower()
+            if voce and chiave != scritto and chiave not in visti:
+                visti.add(chiave)
+                proposte.append(voce)
+        return proposte[:5]
 
     radice = extract.radice_modello(brand, nome) if nome else ""
     varianti: list[str] = []

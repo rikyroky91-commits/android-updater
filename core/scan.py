@@ -114,6 +114,17 @@ def _implausibilita(brand: str | None, data, os_version: str) -> list[str]:
     return motivi
 
 
+def _scritto_in_cinese(testo: str | None) -> bool:
+    """Il nome contiene ideogrammi CJK.
+
+    Non e' un giudizio sulla lingua: e' il criterio che `nome_canonico`
+    usa gia' al punto 3 della sua scala, «alfabeto latino prima dei
+    caratteri cinesi — l'app e' in italiano e confronta con fonti
+    occidentali».
+    """
+    return any("一" <= carattere <= "鿿" for carattere in str(testo or ""))
+
+
 def normalize(raw: sources.RawItem, source: sources.Source) -> dict:
     """Trasforma un `RawItem` in un record pronto per il database."""
     text = raw.text
@@ -153,6 +164,22 @@ def normalize(raw: sources.RawItem, source: sources.Source) -> dict:
     if raw.model_code and not raw.device:
         canonico = modelcodes.nome_canonico(raw.model_code)
         if canonico:
+            model = canonico
+    elif raw.model_code and _scritto_in_cinese(model):
+        # UNA FONTE PUÒ DICHIARARE IL NOME CINESE, e il nome dichiarato
+        # vince — per la ragione spiegata qui sopra, che resta valida.
+        # Ma «一加 10R» per un record «Globale / Export» non è una variante
+        # regionale piu' precisa: e' lo stesso telefono scritto in un
+        # alfabeto che questa applicazione non usa.
+        #
+        # `nome_canonico` ha gia' questa regola al punto 3 («alfabeto
+        # latino prima dei caratteri cinesi»): qui la si fa valere anche
+        # quando il nome arriva dichiarato da una fonte. Le varianti
+        # regionali in alfabeto latino non sono toccate — «OPPO A6 Pro»
+        # contro «OPPO F31» resta una scelta della fonte, ed e' giusto
+        # cosi'.
+        canonico = modelcodes.nome_canonico(raw.model_code)
+        if canonico and not _scritto_in_cinese(canonico):
             model = canonico
     brand = raw.brand or data.brand or source.brand or extract.detect_brand(text)
     if raw.build:

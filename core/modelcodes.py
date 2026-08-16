@@ -604,6 +604,47 @@ def nome_canonico(codice: str) -> str | None:
     return scelto
 
 
+
+# Cifre di un codice -> codici che le contengono. Costruito su richiesta,
+# come l'indice inverso dei nomi: serve solo quando una ricerca fallisce.
+_per_cifre: dict[str, list[str]] | None = None
+
+
+def codici_con_le_stesse_cifre(testo: str, limite: int = 5) -> list[str]:
+    """Codici noti che hanno le STESSE CIFRE di quello cercato, con un
+    prefisso diverso.
+
+    E' l'errore che fa una persona: si ricorda il numero e sbaglia la
+    sigla. Segnalato il 16/08/2026 — cercando «cph 3939» il sito
+    rispondeva «niente trovato», mentre `RMX3939` (realme C63) e' nei
+    cataloghi. Il suggeritore proponeva `CPH2399`, cioe' teneva il
+    prefisso sbagliato e storpiava le cifre giuste: confronta le stringhe
+    intere, e cosi' la parte che chi cerca ricorda MEGLIO conta meno di
+    quella che ricorda peggio.
+
+    Le cifre da sole non bastano a identificare un telefono, quindi
+    questa e' una PROPOSTA, non una correzione automatica: chi cerca
+    riconosce «realme C63» e capisce di aver sbagliato prefisso.
+    """
+    global _per_cifre, _memory_cache
+    cifre = re.sub(r"[^0-9]", "", testo or "")
+    if len(cifre) < 3:
+        # Meno di tre cifre combaciano per caso con mezzo catalogo.
+        return []
+    if _memory_cache is None:
+        _memory_cache = _build_index()
+    if _per_cifre is None:
+        mappa: dict[str, list[str]] = {}
+        for codice in _memory_cache:
+            solo_cifre = re.sub(r"[^0-9]", "", codice)
+            if len(solo_cifre) >= 3:
+                mappa.setdefault(solo_cifre, []).append(codice)
+        _per_cifre = mappa
+    scritto = re.sub(r"[^a-z0-9]", "", (testo or "").lower())
+    return [c for c in _per_cifre.get(cifre, [])
+            if re.sub(r"[^a-z0-9]", "", c.lower()) != scritto][:limite]
+
+
 def codici_per_prefisso(prefisso: str, limite: int = 12) -> list[str]:
     """Codici completi che cominciano per `prefisso`.
 
@@ -808,11 +849,12 @@ def _compatta(chiave: str) -> str:
 
 def reset_cache() -> None:
     """Usato dai test per forzare una nuova build dell'indice."""
-    global _memory_cache, _reverse_cache, _reverse_senza_suffisso, _status
+    global _memory_cache, _reverse_cache, _per_cifre, _reverse_senza_suffisso, _status
     global _reverse_compatto, _marca_di_codice
     _marca_di_codice = None
     _memory_cache = None
     _reverse_cache = None
     _reverse_senza_suffisso = None
     _reverse_compatto = None
+    _per_cifre = None
     _status = {"mobilemodels": "non ancora caricato", "google_play": "non ancora caricato"}
