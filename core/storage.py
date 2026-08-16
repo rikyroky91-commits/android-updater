@@ -206,6 +206,23 @@ CREATE TABLE IF NOT EXISTS utenti (
     bloccato_fino_a   TEXT
 );
 
+-- Il recupero della password. Stessa forma di `richieste_accesso` e per
+-- lo stesso motivo: nel database sta solo l'hash SHA-256 del token, mai
+-- il valore in chiaro che viaggia nel link. Una lettura del database (un
+-- backup, per esempio) non basta a fabbricare un reset e prendersi un
+-- account. La scadenza è molto più corta di quella delle richieste di
+-- accesso: qui in ballo c'è una credenziale, non un'approvazione.
+CREATE TABLE IF NOT EXISTS reset_password (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    utente_id  INTEGER NOT NULL,
+    token_hash TEXT NOT NULL,
+    scade_il   TEXT NOT NULL,
+    usata      INTEGER NOT NULL DEFAULT 0,
+    creata_il  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_reset_utente ON reset_password(utente_id);
+
 -- Allegati delle righe del parco di test: QUI CI SONO SOLO I METADATI.
 -- Il contenuto del file vive fuori da questo database (vedi
 -- core/allegati.py), e non per pignoleria: il salvataggio esterno
@@ -927,6 +944,54 @@ def get_richiesta_accesso(richiesta_id: int) -> dict | None:
 def segna_richiesta_usata(richiesta_id: int) -> None:
     with transaction() as conn:
         conn.execute("UPDATE richieste_accesso SET usata = 1 WHERE id = ?", (richiesta_id,))
+
+
+# ----------------------------------------------------------------------
+# Recupero della password
+# ----------------------------------------------------------------------
+def get_utente_per_email(email: str) -> dict | None:
+    """Case-insensitive, come per lo username: chi digita la propria
+    email non deve indovinare le maiuscole con cui l'ha scritta il giorno
+    della registrazione."""
+    conn = connect()
+    riga = conn.execute(
+        "SELECT * FROM utenti WHERE email = ? COLLATE NOCASE", (email,)).fetchone()
+    return dict(riga) if riga else None
+
+
+def get_utenti_approvati() -> list[dict]:
+    conn = connect()
+    return rows_to_dicts(conn.execute(
+        "SELECT * FROM utenti WHERE stato = ? ORDER BY admin DESC, username",
+        (STATO_APPROVATO,)).fetchall())
+
+
+def crea_reset_password(utente_id: int, token_hash: str, scade_il: str) -> int:
+    """Un reset nuovo INVALIDA quelli ancora aperti per la stessa
+    persona: due link vivi contemporaneamente vogliono dire che il più
+    vecchio, magari finito in una casella di posta che non controlla più,
+    apre ancora l'account."""
+    with transaction() as conn:
+        conn.execute("UPDATE reset_password SET usata = 1 WHERE utente_id = ? AND usata = 0",
+                     (utente_id,))
+        cur = conn.execute(
+            """INSERT INTO reset_password (utente_id, token_hash, scade_il, creata_il)
+               VALUES (?, ?, ?, ?)""",
+            (utente_id, token_hash, scade_il, now_iso()),
+        )
+        return cur.lastrowid
+
+
+def get_reset_password(reset_id: int) -> dict | None:
+    conn = connect()
+    riga = conn.execute(
+        "SELECT * FROM reset_password WHERE id = ?", (reset_id,)).fetchone()
+    return dict(riga) if riga else None
+
+
+def segna_reset_usato(reset_id: int) -> None:
+    with transaction() as conn:
+        conn.execute("UPDATE reset_password SET usata = 1 WHERE id = ?", (reset_id,))
 
 
 # ----------------------------------------------------------------------

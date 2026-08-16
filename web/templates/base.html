@@ -50,7 +50,7 @@
          qui si vede solo chi è collegato adesso, non un vero pannello. #}
       {% if utente %}
       <span class="conto">
-        {{ utente.username }}{% if utente.admin %} · <a href="/admin/richieste">richieste</a>{% endif %}
+        {{ utente.username }}{% if utente.admin %} · <a href="/admin/richieste">richieste</a> · <a href="/admin/utenti">account</a>{% endif %}
         · <a href="/account/password">password</a>
         <form method="post" action="/logout" class="logout-form">
           <button type="submit" class="link-bottone">Esci</button>

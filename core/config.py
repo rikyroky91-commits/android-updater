@@ -135,6 +135,9 @@ RICHIESTA_ACCESSO_SCADENZA_GIORNI = env_int("RICHIESTA_ACCESSO_SCADENZA_GIORNI",
 # Allegati delle righe del parco (vedi core/allegati.py). Il tetto non è
 # una scelta di gusto: l'archivio è un Gist, non uno spazio disco, e ogni
 # allegato ci resta finché non lo si toglie a mano.
+# Un link di reset è una credenziale che viaggia in una casella di posta:
+# dura poche ore, non una settimana come l'approvazione di un account.
+RESET_PASSWORD_SCADENZA_ORE = env_int("RESET_PASSWORD_SCADENZA_ORE", 2)
 ALLEGATI_MAX_MB = env_int("ALLEGATI_MAX_MB", 5)
 ALLEGATI_MAX_PER_MODELLO = env_int("ALLEGATI_MAX_PER_MODELLO", 10)
 

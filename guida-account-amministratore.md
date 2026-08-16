@@ -205,11 +205,60 @@ per 15 minuti, e vale anche con la password giusta. Aspetta.
 chiave di firma cambia a ogni riavvio e i cookie di prima non valgono
 più.
 
-**Hai perso la password dell'amministratore.** Non esiste un «password
-dimenticata»: l'email non è mai stata verificata, quindi non può essere
-un canale di recupero. La via è cambiare `ADMIN_PASSWORD` su Render e
-far ripartire il servizio — ma ricordati che l'account rinasce **solo
-se nel database non c'è più nessun amministratore**, quindi finché
-quello vecchio esiste la variabile non lo tocca. In pratica: tieni
-`ADMIN_PASSWORD` su Render allineata alla password vera, e questo caso
-non ti capita.
+**Hai perso una password.** Vedi la sezione qui sotto: dal 16/08/2026 ci
+sono tre vie, una per ogni situazione.
+
+## Recuperare una password
+
+### Se a perderla è una persona qualsiasi
+
+Due strade, e la seconda funziona sempre:
+
+1. **Da sola, con l'email** — va su `/password-dimenticata`, scrive il
+   proprio indirizzo e riceve un link che vale una volta sola e scade
+   dopo 2 ore. **Richiede SMTP configurato** (passo 5 sopra): senza, la
+   pagina risponde normalmente ma non parte niente. Il modulo dice la
+   stessa cosa anche quando l'indirizzo non corrisponde a nessuno — di
+   proposito: distinguere i due casi lo trasformerebbe in un modo per
+   scoprire chi ha un account qui dentro.
+2. **Gliela generi tu** — da `/admin/utenti` (in testata: **account**)
+   c'è un pulsante «Genera link di recupero» accanto a ogni persona. Il
+   link **compare a schermo**, non parte per email: lo copi e glielo dai
+   come preferisci. È la via che funziona anche senza SMTP, cioè quella
+   che ti serve oggi.
+
+In entrambi i casi, chi usa il link sceglie una password nuova e viene
+anche **sbloccato** se si era chiuso fuori a forza di tentativi
+sbagliati — altrimenti sarebbe un recupero che non fa recuperare niente.
+Le sessioni aperte altrove con la password vecchia smettono di valere:
+è quello che si vuole, se il motivo del recupero è il sospetto che
+qualcun altro sia entrato.
+
+Un link nuovo annulla quello di prima: due link vivi insieme vorrebbero
+dire che il più vecchio, magari in una casella che quella persona non
+controlla più, apre ancora l'account.
+
+### Se a perderla sei tu
+
+Qui non c'è nessuno che possa generarti un link — sei tu che li generi —
+e l'email non serve, perché non è mai stata verificata e quindi non
+dimostra chi sei. Resta una prova d'identità più forte di un'email: **chi
+può scrivere nelle variabili d'ambiente di Render controlla già il
+servizio**.
+
+Su Render, scheda Environment:
+
+1. Cambia `ADMIN_PASSWORD` con la password nuova che vuoi.
+2. Aggiungi `ADMIN_PASSWORD_RESET` con valore `true`.
+3. Save Changes, e aspetta il riavvio.
+4. Su `/diagnostica`, la riga «Amministratore parco di test» deve dire
+   `password di «godadmin» reimpostata da ADMIN_PASSWORD_RESET`.
+5. Entra con la password nuova.
+6. **Togli `ADMIN_PASSWORD_RESET`.** Lasciata accesa, ogni riavvio
+   riporterebbe la password a quella della variabile, cancellando ogni
+   cambio fatto da `/account/password`. La diagnostica te lo ricorda
+   nella riga stessa, finché non la togli.
+
+Serve l'azione esplicita a due tempi proprio per questo: senza la
+variabile, un riavvio non tocca mai la password: è il comportamento
+normale, e va difeso.

@@ -888,3 +888,12 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
 @media (max-width: 700px) {
   .tabella-parco .col-nota, .tabella-parco .col-allegati { min-width: 0; }
 }
+
+/* Il link di recupero mostrato all'amministratore: va COPIATO, quindi
+   deve andare a capo per intero invece di essere tagliato dai bordi —
+   un link troncato che sembra completo è peggio di nessun link. */
+.link-reset code {
+  display: block; overflow-wrap: anywhere; font-size: .82rem;
+  padding: .5rem .6rem; background: var(--carta); border: 1px solid var(--filo);
+  border-radius: 4px;
+}

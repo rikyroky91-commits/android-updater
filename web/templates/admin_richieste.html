@@ -21,6 +21,15 @@
 </div>
 {% endfor %}
 {% endif %}
+<p class="nota"><a href="/admin/utenti">Account già approvati</a> — da lì si genera
+  un link di recupero password per chi lo ha perso.</p>
+{% if email_attiva %}
 <p class="nota">Le stesse richieste arrivano anche via email, con un link diretto
   per approvare o rifiutare senza dover prima accedere qui.</p>
+{% else %}
+<p class="nota"><strong>L'invio delle email non è configurato</strong>
+  (<code>SMTP_USERNAME</code> / <code>SMTP_PASSWORD</code> su Render): le richieste
+  non ti arrivano in posta e si vedono solo qui. Non ne perdi nessuna — ma devi
+  ricordarti di passare da questa pagina.</p>
+{% endif %}
 {% endblock %}

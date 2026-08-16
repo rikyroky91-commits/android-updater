@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block titolo %}Account · {{ titolo_sito }}{% endblock %}
+{% block corpo %}
+<h3 class="occhiello">Account approvati</h3>
+
+{% if link_generato %}
+{# Il link si MOSTRA, non si manda: è la via che funziona anche senza
+   SMTP configurato, che è la situazione di adesso su Render. #}
+<div class="esito trovato">
+  <h2>Link di recupero per {{ link_per }}</h2>
+  <p class="nota">Consegnalo a {{ link_per }} come preferisci. Vale una sola
+    volta e scade fra {{ durata_ore }} ore. Generandone un altro, questo
+    smette di funzionare.</p>
+  <p class="link-reset"><code>{{ link_generato }}</code></p>
+</div>
+{% endif %}
+
+{% if not utenti %}
+<p class="nota">Nessun account approvato.</p>
+{% else %}
+{% for u in utenti %}
+<div class="richieste-riga">
+  <span><strong>{{ u.username }}</strong>{% if u.admin %} · <span class="tenue">amministratore</span>{% endif %}
+    · {{ u.email }}</span>
+  <form method="post" action="/admin/utenti/{{ u.id }}/reset">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="secondario">Genera link di recupero</button>
+  </form>
+</div>
+{% endfor %}
+{% endif %}
+
+<p class="nota">Chi ha accesso alla propria email può anche fare da solo da
+  <a href="/password-dimenticata">password dimenticata</a>, se l'invio delle
+  email è configurato. Se a perdere la password sei tu che sei l'unico
+  amministratore, nessuno può generarti un link: si passa dalla variabile
+  <code>ADMIN_PASSWORD_RESET</code> su Render — è spiegato in
+  <code>guida-account-amministratore.md</code>.</p>
+
+<p class="nota"><a href="/admin/richieste">Richieste di accesso in attesa</a></p>
+{% endblock %}

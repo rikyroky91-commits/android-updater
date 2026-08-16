@@ -105,6 +105,49 @@ def _imposta_cookie_sessione(risposta, utente: dict):
     return risposta
 
 
+def _forse_reimposta_admin() -> str:
+    """LA VIA D'USCITA QUANDO L'AMMINISTRATORE PERDE LA PASSWORD.
+
+    Tutti gli altri account si recuperano da `/password-dimenticata` o
+    con un link generato dall'amministratore. L'amministratore no: è
+    l'unico che può generare quei link, e se è lui a essere chiuso fuori
+    non resta nessun canale — l'email non è mai stata verificata, quindi
+    non può fare da prova d'identità, e il database sta in `/tmp` su un
+    servizio a cui non si accede con una shell.
+
+    Qui la prova d'identità è un'altra, ed è più forte di un'email: chi
+    può scrivere nelle variabili d'ambiente di Render controlla già il
+    servizio per intero. Serve un'azione ESPLICITA e a due tempi —
+    `ADMIN_PASSWORD_RESET=true` più la nuova `ADMIN_PASSWORD` — perché
+    reimpostare a ogni avvio la password dalla variabile è esattamente il
+    comportamento che `admin_bootstrap` evita di proposito: cancellerebbe
+    in silenzio ogni cambio fatto da `/account/password`.
+
+    La diagnostica dice a chiare lettere quando è avvenuto, così la
+    variabile lasciata accesa per distrazione non passa inosservata.
+    """
+    if not C.env_bool("ADMIN_PASSWORD_RESET", False):
+        return "già presente"
+    bootstrap = C.admin_bootstrap()
+    if not bootstrap:
+        return ("già presente · ADMIN_PASSWORD_RESET è attiva ma mancano "
+                "ADMIN_USERNAME / ADMIN_EMAIL / ADMIN_PASSWORD: nessuna password reimpostata")
+    username, _email, password = bootstrap
+    motivo = auth.password_valida(password)
+    if motivo:
+        return f"già presente · ADMIN_PASSWORD non valida, non reimpostata: {motivo}"
+    amministratore = storage.get_utente_per_username(username)
+    if not amministratore or not amministratore["admin"]:
+        return (f"già presente · ADMIN_PASSWORD_RESET attiva ma «{username}» non è "
+                "l'amministratore: nessuna password reimpostata")
+    storage.imposta_password(amministratore["id"], auth.hash_password(password))
+    # Chi si è chiuso fuori a forza di tentativi deve poter entrare
+    # subito, non aspettare che scada anche il blocco.
+    storage.reset_tentativi_falliti(amministratore["id"])
+    return (f"password di «{username}» reimpostata da ADMIN_PASSWORD_RESET — "
+            "togli quella variabile da Render, adesso che sei rientrato")
+
+
 def assicura_admin() -> str:
     """Crea l'account amministratore al primo avvio, se configurato e se
     non ne esiste già uno (vedi il docstring di `admin_bootstrap` in
@@ -120,7 +163,7 @@ def assicura_admin() -> str:
     """
     try:
         if storage.esiste_admin():
-            return "già presente"
+            return _forse_reimposta_admin()
         bootstrap = C.admin_bootstrap()
         if not bootstrap:
             return ("non configurato (ADMIN_USERNAME / ADMIN_EMAIL / ADMIN_PASSWORD "
@@ -152,12 +195,14 @@ def assicura_admin() -> str:
 # Login / logout
 # ======================================================================
 @router.get("/login", response_class=HTMLResponse)
-def pagina_login(request: Request, next: str = "/parco", errore: str = ""):
+def pagina_login(request: Request, next: str = "/parco", errore: str = "",
+                 reimpostata: int = 0):
     if auth_web.utente_da_richiesta(request):
         return RedirectResponse(_next_sicuro(next), status_code=303)
     csrf = auth.nuovo_token_csrf()
     risposta = rendi(request, "login.html", contesto(
         request, attiva="", next=_next_sicuro(next), csrf=csrf,
+        reimpostata=bool(reimpostata),
         errore_testo=MESSAGGI_ERRORE_LOGIN.get(errore, ""),
     ))
     return _imposta_cookie_csrf(risposta, csrf)
@@ -273,6 +318,9 @@ def pagina_richieste(request: Request):
     csrf = auth.nuovo_token_csrf()
     risposta = rendi(request, "admin_richieste.html", contesto(
         request, attiva="", richieste=storage.get_utenti_in_attesa(), csrf=csrf,
+        # Serve al template per non promettere un'email che non parte:
+        # vedi core/mail.py::stato per il perche' di questa distinzione.
+        email_attiva=bool(C.smtp_config()),
     ))
     return _imposta_cookie_csrf(risposta, csrf)
 
@@ -341,6 +389,157 @@ def approva_richiesta_token(richiesta_id: int, token: str = Form("")):
 @router.post("/admin/richieste/token/{richiesta_id}/rifiuta")
 def rifiuta_richiesta_token(richiesta_id: int, token: str = Form("")):
     return _decidi_richiesta_token(richiesta_id, token, storage.STATO_RIFIUTATO)
+
+
+# ======================================================================
+# Recupero della password
+# ======================================================================
+# TRE VIE, PERCHÉ UNA SOLA NON COPRE I CASI VERI.
+#
+# 1. `/password-dimenticata` — self-service via email. È la via normale,
+#    ma funziona solo con SMTP configurato, che oggi su Render non lo è.
+# 2. Il link generato dall'amministratore da `/admin/utenti` — non passa
+#    da nessuna email: si copia e si consegna a mano. È la via che
+#    funziona SEMPRE, ed è il motivo per cui esiste: senza, il punto 1
+#    sarebbe una funzione scritta e inutilizzabile.
+# 3. `ADMIN_PASSWORD_RESET` su Render, per l'amministratore stesso —
+#    vedi `assicura_admin`. Nessuno può generare un link per chi è
+#    l'unica persona che può generarli.
+#
+# L'email dell'account non è mai stata verificata con un link (vedi le
+# consegne precedenti): non è quindi una prova d'identità forte. Ma per
+# un account APPROVATO quell'indirizzo l'ha visto e accettato
+# l'amministratore al momento dell'approvazione, ed è la ragione per cui
+# la via 1 si limita agli account approvati.
+def _crea_link_reset(utente: dict) -> str:
+    token, token_hash = auth.nuovo_token_richiesta()
+    scade_il = (utcnow() + timedelta(hours=C.RESET_PASSWORD_SCADENZA_ORE)).isoformat()
+    reset_id = storage.crea_reset_password(utente["id"], token_hash, scade_il)
+    return f"{C.SITE_BASE_URL}/password-nuova/{reset_id}?token={quote(token)}"
+
+
+def _stato_reset(reset_id: int, token: str) -> dict:
+    reset = storage.get_reset_password(reset_id)
+    utente = storage.get_utente(reset["utente_id"]) if reset else None
+    if not reset or not utente:
+        return {"esito": "non_valido", "utente": None}
+    scadenza = to_dt(reset["scade_il"])
+    if reset["usata"] or not scadenza or scadenza <= utcnow():
+        return {"esito": "scaduto", "utente": utente}
+    if not auth.token_richiesta_valido(token, reset["token_hash"]):
+        return {"esito": "non_valido", "utente": utente}
+    if utente["stato"] != storage.STATO_APPROVATO:
+        return {"esito": "non_valido", "utente": utente}
+    return {"esito": "da_usare", "utente": utente}
+
+
+@router.get("/password-dimenticata", response_class=HTMLResponse)
+def pagina_password_dimenticata(request: Request, inviata: int = 0, errore: str = ""):
+    csrf = auth.nuovo_token_csrf()
+    risposta = rendi(request, "password_dimenticata.html", contesto(
+        request, attiva="", inviata=bool(inviata), csrf=csrf,
+        errore_testo=("La pagina era aperta da troppo tempo: riprova."
+                      if errore == "modulo_scaduto" else ""),
+    ))
+    return _imposta_cookie_csrf(risposta, csrf)
+
+
+@router.post("/password-dimenticata")
+def esegui_password_dimenticata(request: Request, email: str = Form(...),
+                                csrf: str = Form("")):
+    if not auth_web.csrf_valido_per(request, csrf):
+        return RedirectResponse("/password-dimenticata?errore=modulo_scaduto", status_code=303)
+
+    utente = storage.get_utente_per_email(email.strip())
+    if utente and utente["stato"] == storage.STATO_APPROVATO:
+        oggetto, corpo = mail.costruisci_reset(utente, _crea_link_reset(utente))
+        mail.invia(utente["email"], oggetto, corpo)
+    # LA RISPOSTA È LA STESSA IN OGNI CASO, anche quando l'indirizzo non
+    # corrisponde a nessuno e anche se l'invio fallisce: distinguere
+    # trasformerebbe questo modulo in un modo per scoprire quali indirizzi
+    # hanno un account qui dentro.
+    return RedirectResponse("/password-dimenticata?inviata=1", status_code=303)
+
+
+@router.get("/password-nuova/{reset_id}", response_class=HTMLResponse)
+def pagina_password_nuova(request: Request, reset_id: int, token: str = "",
+                          errore: str = ""):
+    stato = _stato_reset(reset_id, token)
+    csrf = auth.nuovo_token_csrf()
+    risposta = rendi(request, "password_nuova.html", contesto(
+        request, attiva="", reset_id=reset_id, token=token, csrf=csrf,
+        errore_testo=MESSAGGI_ERRORE_PASSWORD.get(errore, errore), **stato,
+    ))
+    return _imposta_cookie_csrf(risposta, csrf)
+
+
+@router.post("/password-nuova/{reset_id}")
+def esegui_password_nuova(request: Request, reset_id: int, token: str = Form(""),
+                          nuova: str = Form(...), conferma: str = Form(...),
+                          csrf: str = Form("")):
+    indirizzo = f"/password-nuova/{reset_id}?token={quote(token)}"
+    if not auth_web.csrf_valido_per(request, csrf):
+        return RedirectResponse(f"{indirizzo}&errore=modulo_scaduto", status_code=303)
+    stato = _stato_reset(reset_id, token)
+    if stato["esito"] != "da_usare":
+        return RedirectResponse(indirizzo, status_code=303)
+    if nuova != conferma:
+        return RedirectResponse(f"{indirizzo}&errore=conferma", status_code=303)
+    motivo = auth.password_valida(nuova)
+    if motivo:
+        return RedirectResponse(f"{indirizzo}&errore={quote(motivo)}", status_code=303)
+
+    utente = stato["utente"]
+    storage.imposta_password(utente["id"], auth.hash_password(nuova))
+    storage.segna_reset_usato(reset_id)
+    # CHI RECUPERA LA PASSWORD È SPESSO CHI ERA RIMASTO BLOCCATO FUORI a
+    # forza di tentativi: senza questo, reimposterebbe la password e si
+    # ritroverebbe comunque «troppi tentativi, riprova tra qualche
+    # minuto», cioè un recupero che non fa recuperare niente.
+    storage.reset_tentativi_falliti(utente["id"])
+    # Le sessioni aperte con la password vecchia cadono da sole: l'hash è
+    # cambiato, e il cookie ne porta l'impronta (vedi core/auth.py).
+    # È esattamente quello che si vuole se il motivo del recupero è che
+    # qualcun altro era entrato.
+    return RedirectResponse("/login?reimpostata=1", status_code=303)
+
+
+# ======================================================================
+# Utenti approvati — pannello amministratore
+# ======================================================================
+@router.get("/admin/utenti", response_class=HTMLResponse)
+def pagina_utenti(request: Request, link: str = "", per: str = ""):
+    utente = auth_web.utente_da_richiesta(request)
+    if not utente:
+        return RedirectResponse("/login?next=/admin/utenti", status_code=303)
+    if not auth_web.richiede_admin(utente):
+        return RedirectResponse("/parco", status_code=303)
+    csrf = auth.nuovo_token_csrf()
+    risposta = rendi(request, "admin_utenti.html", contesto(
+        request, attiva="", utenti=storage.get_utenti_approvati(),
+        link_generato=link, link_per=per, csrf=csrf,
+        durata_ore=C.RESET_PASSWORD_SCADENZA_ORE,
+    ))
+    return _imposta_cookie_csrf(risposta, csrf)
+
+
+@router.post("/admin/utenti/{utente_id}/reset")
+def genera_reset(request: Request, utente_id: int, csrf: str = Form("")):
+    """Genera il link e lo MOSTRA all'amministratore invece di mandarlo:
+    è la via che funziona anche senza SMTP, e oggi su Render SMTP non è
+    configurato. Il link si consegna a voce, a mano, come si preferisce."""
+    amministratore = auth_web.utente_da_richiesta(request)
+    if not amministratore or not auth_web.richiede_admin(amministratore):
+        return RedirectResponse("/login?next=/admin/utenti", status_code=303)
+    if not auth_web.csrf_valido_per(request, csrf):
+        return RedirectResponse("/admin/utenti", status_code=303)
+    bersaglio = storage.get_utente(utente_id)
+    if not bersaglio or bersaglio["stato"] != storage.STATO_APPROVATO:
+        return RedirectResponse("/admin/utenti", status_code=303)
+    link = _crea_link_reset(bersaglio)
+    return RedirectResponse(
+        f"/admin/utenti?link={quote(link)}&per={quote(bersaglio['username'])}",
+        status_code=303)
 
 
 # ======================================================================

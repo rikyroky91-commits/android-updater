@@ -46,7 +46,7 @@ from fastapi.responses import (HTMLResponse, JSONResponse, RedirectResponse,
 from fastapi.staticfiles import StaticFiles
 
 from core import aer_catalog, aiquery, allegati, appledevices, config as C
-from core import extract, imeicheck, modelcodes, retest, scan, soc, sources, specs
+from core import extract, imeicheck, mail, modelcodes, retest, scan, soc, sources, specs
 from core import storage, suggest, versus
 from core.util import fmt_date
 
@@ -579,6 +579,7 @@ def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
             # PASSWORD sono state lette bene su Render?».
             ("Amministratore parco di test",
              STATO_AVVIO.get("amministratore parco di test", "avvio non ancora completato")),
+            ("Invio email (richieste account)", mail.stato()),
             ("Allegati del parco", allegati.stato()),
             ("Salvataggio continuo",
              STATO_AVVIO.get("salvataggio continuo", "avvio non ancora completato")),

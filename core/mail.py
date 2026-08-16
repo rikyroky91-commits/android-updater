@@ -38,6 +38,46 @@ def costruisci_richiesta(utente: dict, link_approvazione: str) -> tuple[str, str
     return oggetto, corpo
 
 
+def costruisci_reset(utente: dict, link_reset: str) -> tuple[str, str]:
+    """(oggetto, corpo) dell'email di recupero password.
+
+    Dice esplicitamente cosa fare se NON è stato l'utente a chiederlo:
+    un messaggio di reset che non lo spiega lascia chi lo riceve col
+    dubbio di essere sotto attacco, quando nella quasi totalità dei casi
+    è solo qualcuno che ha sbagliato a digitare la propria email."""
+    oggetto = "Reimposta la password del parco di test"
+    corpo = (
+        f"Ciao {utente['username']},\n\n"
+        f"qualcuno ha chiesto di reimpostare la password di questo account. "
+        f"Apri questo link per sceglierne una nuova:\n"
+        f"{link_reset}\n\n"
+        f"Il link vale una sola volta e scade tra "
+        f"{C.RESET_PASSWORD_SCADENZA_ORE} ore.\n\n"
+        f"Se non sei stato tu, puoi ignorare questo messaggio: senza aprire "
+        f"il link non cambia nulla, e la password attuale resta valida."
+    )
+    return oggetto, corpo
+
+
+def stato() -> str:
+    """Riga per la Diagnostica.
+
+    ESISTE PER UN MOTIVO PRECISO, segnalato dall'utente: «non mi arriva
+    la mail di richiesta account». Non arrivava perché SMTP non era
+    configurato — il che è un modo di funzionare previsto, non un guasto
+    (la richiesta resta su `/admin/richieste`) — ma da fuori era
+    indistinguibile da un'email persa, da Gmail che rifiuta la password,
+    o da un difetto del codice. Senza una riga che lo dica, l'unica via
+    per scoprirlo era leggere il codice.
+    """
+    cfg = C.smtp_config()
+    if not cfg:
+        return ("non configurato (SMTP_USERNAME / SMTP_PASSWORD assenti su Render): "
+                "le richieste di accesso NON arrivano per email, restano su /admin/richieste")
+    return (f"attivo · da {cfg['mittente']} via {cfg['host']}:{cfg['port']} "
+            f"· le richieste vanno a {C.ADMIN_APPROVAL_EMAIL}")
+
+
 def invia(destinatario: str, oggetto: str, corpo: str) -> tuple[bool, str]:
     """Invia l'email via SMTP. Ritorna sempre (ok, messaggio): mai
     un'eccezione che risale fino alla richiesta HTTP di chi si registra."""

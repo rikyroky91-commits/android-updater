@@ -1,0 +1,49 @@
+# Tiene sveglio il sito, che è metà della lentezza percepita.
+#
+# RIMESSO IL 16/08/2026. Questo file era sparito da `origin/main` insieme
+# a tutta la cartella `.github/`, quando il repository è stato ricaricato
+# da uno zip che non la conteneva: da allora il sito si riaddormentava,
+# e il difetto che questo lavoro esiste per coprire era tornato senza che
+# nessuno lo avesse deciso. `scan.yml`, che stava nella stessa cartella,
+# NON è stato rimesso di proposito: committava `tracker.db` nel
+# repository pubblico a ogni ora, e da quando quel database contiene
+# account, email e hash delle password non è più una cosa da fare.
+#
+# IL PROBLEMA, MISURATO. Sul piano gratuito di Render il servizio si
+# addormenta dopo circa quindici minuti senza visite, e la prima
+# richiesta al risveglio impiega dai 30 ai 60 secondi. Chi apre il sito
+# una volta al giorno lo trova SEMPRE addormentato: per lui il sito non
+# è lento ogni tanto, è lento sempre.
+#
+# Dieci minuti è il numero giusto e non è scelto a caso: sta sotto la
+# soglia dei quindici con abbastanza margine da assorbire i ritardi di
+# GitHub Actions, che sotto carico può far partire un lavoro pianificato
+# con qualche minuto di ritardo.
+#
+# Si chiama `/health` di proposito, che è la rotta che NON tocca
+# l'archivio: tenere sveglio un servizio non deve costargli una query
+# ogni dieci minuti per sempre.
+name: sveglia
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+# Nessun permesso: questo lavoro non scrive niente, chiede solo una pagina.
+permissions: {}
+
+jobs:
+  sveglia:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chiama /health
+        # `--max-time 90` perché un risveglio da freddo può arrivare a
+        # un minuto: un timeout più corto farebbe fallire il lavoro
+        # proprio nel caso in cui sta facendo il suo mestiere.
+        # `-I` manda una HEAD, che è la richiesta più leggera possibile.
+        run: |
+          curl -fsS -I --max-time 90 \
+            https://android-updater.onrender.com/health \
+            && echo "sveglio" \
+            || { echo "non ha risposto entro 90s"; exit 1; }

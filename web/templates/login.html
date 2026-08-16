@@ -6,6 +6,10 @@
   <a href="/registrati">Richiedine uno</a> — va approvato da un amministratore
   prima di poter essere usato.</p>
 
+{% if reimpostata %}
+<p class="conferma-azione">✓ Password reimpostata: entra con quella nuova.</p>
+{% endif %}
+
 {% if errore_testo %}
 <p class="errore-modulo">{{ errore_testo }}</p>
 {% endif %}
@@ -19,4 +23,5 @@
   <input id="login-password" type="password" name="password" autocomplete="current-password" required>
   <button type="submit">Accedi</button>
 </form>
+<p class="nota"><a href="/password-dimenticata">Password dimenticata?</a></p>
 {% endblock %}

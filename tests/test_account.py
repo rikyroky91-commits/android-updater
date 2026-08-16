@@ -586,5 +586,322 @@ class TestLaSessioneSeguelaPassword(_SitoConAccount):
         }, follow_redirects=False)
 
 
+class _ConRecupero(_SitoConAccount):
+    """Base con un secondo account approvato, che è quello che dimentica
+    la password: l'amministratore serve a generare i link, non a farsi
+    resettare (per lui c'è una via a parte, vedi in fondo)."""
+
+    def setUp(self):
+        super().setUp()
+        from core import auth, storage
+
+        esistente = storage.get_utente_per_username("smemorato")
+        if not esistente:
+            storage.crea_utente("smemorato", "smemorato@example.com",
+                                auth.hash_password("la-password-di-prima"),
+                                stato=storage.STATO_APPROVATO)
+        else:
+            storage.imposta_password(esistente["id"],
+                                     auth.hash_password("la-password-di-prima"))
+            storage.imposta_stato_utente(esistente["id"], storage.STATO_APPROVATO)
+            storage.reset_tentativi_falliti(esistente["id"])
+
+    def _chiedi_recupero(self, email):
+        self.client.get("/password-dimenticata")
+        csrf = self.client.cookies.get("csrf_token")
+        with patch("web.account.mail.invia", return_value=(True, "")) as invio:
+            risposta = self.client.post("/password-dimenticata", data={
+                "email": email, "csrf": csrf,
+            }, follow_redirects=False)
+        return risposta, invio
+
+    def _percorso_dal_link(self, link):
+        """Dal link assoluto dell'email al percorso da chiamare nei test."""
+        return link.replace(C_SITE_BASE_URL(), "")
+
+    def _imposta_dal_link(self, percorso, password):
+        self.client.get(percorso)
+        csrf = self.client.cookies.get("csrf_token")
+        token = percorso.split("token=", 1)[1]
+        base = percorso.split("?", 1)[0]
+        return self.client.post(base, data={
+            "token": token, "nuova": password, "conferma": password, "csrf": csrf,
+        }, follow_redirects=False)
+
+
+def C_SITE_BASE_URL():
+    from core import config as C
+
+    return C.SITE_BASE_URL
+
+
+class TestRecuperoPasswordViaEmail(_ConRecupero):
+    def test_il_giro_completo_dal_link_al_nuovo_accesso(self):
+        risposta, invio = self._chiedi_recupero("smemorato@example.com")
+        self.assertEqual(risposta.headers["location"], "/password-dimenticata?inviata=1")
+
+        destinatario, _oggetto, corpo = invio.call_args[0]
+        self.assertEqual(destinatario, "smemorato@example.com")
+        link = [p for p in corpo.split() if "/password-nuova/" in p][0]
+
+        esito = self._imposta_dal_link(self._percorso_dal_link(link),
+                                       "una-password-nuova-lunga")
+        self.assertEqual(esito.headers["location"], "/login?reimpostata=1")
+
+        # La password nuova entra...
+        self.client.cookies.clear()
+        self.client.get("/login")
+        accesso = self.client.post("/login", data={
+            "username": "smemorato", "password": "una-password-nuova-lunga",
+            "next": "/parco", "csrf": self.client.cookies.get("csrf_token"),
+        }, follow_redirects=False)
+        self.assertEqual(accesso.headers["location"], "/parco")
+
+    def test_un_indirizzo_sconosciuto_risponde_uguale_e_non_manda_niente(self):
+        """Distinguere i due casi trasformerebbe il modulo in un modo per
+        scoprire quali indirizzi hanno un account qui dentro."""
+        noto, invio_noto = self._chiedi_recupero("smemorato@example.com")
+        ignoto, invio_ignoto = self._chiedi_recupero("nessuno@example.com")
+
+        self.assertEqual(noto.headers["location"], ignoto.headers["location"])
+        invio_noto.assert_called_once()
+        invio_ignoto.assert_not_called()
+
+    def test_un_account_non_approvato_non_si_recupera(self):
+        from core import auth, storage
+
+        storage.crea_utente("mai_approvato", "attesa2@example.com",
+                            auth.hash_password("una-password-qualunque"))
+        _risposta, invio = self._chiedi_recupero("attesa2@example.com")
+        invio.assert_not_called()
+
+    def test_il_link_vale_una_volta_sola(self):
+        _risposta, invio = self._chiedi_recupero("smemorato@example.com")
+        corpo = invio.call_args[0][2]
+        percorso = self._percorso_dal_link(
+            [p for p in corpo.split() if "/password-nuova/" in p][0])
+
+        self._imposta_dal_link(percorso, "prima-password-nuova-lunga")
+        # Secondo giro con lo stesso link: la pagina deve dirlo, e la
+        # password non deve cambiare di nuovo.
+        pagina = self.client.get(percorso).text
+        self.assertIn("Link scaduto o già usato", pagina)
+
+    def test_un_token_sbagliato_non_reimposta_niente(self):
+        _risposta, invio = self._chiedi_recupero("smemorato@example.com")
+        corpo = invio.call_args[0][2]
+        percorso = self._percorso_dal_link(
+            [p for p in corpo.split() if "/password-nuova/" in p][0])
+        falso = percorso.split("?", 1)[0] + "?token=inventato-di-sana-pianta"
+
+        self.assertIn("Link non valido", self.client.get(falso).text)
+        self._imposta_dal_link(falso, "password-mai-impostata-lunga")
+
+        # La password di prima è ancora quella buona.
+        self.client.cookies.clear()
+        self.client.get("/login")
+        accesso = self.client.post("/login", data={
+            "username": "smemorato", "password": "la-password-di-prima",
+            "next": "/parco", "csrf": self.client.cookies.get("csrf_token"),
+        }, follow_redirects=False)
+        self.assertEqual(accesso.headers["location"], "/parco")
+
+    def test_chiedere_un_secondo_link_annulla_il_primo(self):
+        _r1, invio1 = self._chiedi_recupero("smemorato@example.com")
+        primo = self._percorso_dal_link(
+            [p for p in invio1.call_args[0][2].split() if "/password-nuova/" in p][0])
+        _r2, _invio2 = self._chiedi_recupero("smemorato@example.com")
+
+        self.assertIn("Link scaduto o già usato", self.client.get(primo).text)
+
+    def test_il_recupero_sblocca_chi_era_chiuso_fuori_dai_tentativi(self):
+        """Chi recupera la password è spesso chi si è bloccato provandola:
+        senza questo, reimposterebbe e si ritroverebbe comunque «troppi
+        tentativi»."""
+        from datetime import timedelta
+
+        from core import storage
+        from core.util import utcnow
+
+        smemorato = storage.get_utente_per_username("smemorato")
+        storage.registra_tentativo_fallito(
+            smemorato["id"], (utcnow() + timedelta(minutes=30)).isoformat())
+
+        _risposta, invio = self._chiedi_recupero("smemorato@example.com")
+        percorso = self._percorso_dal_link(
+            [p for p in invio.call_args[0][2].split() if "/password-nuova/" in p][0])
+        self._imposta_dal_link(percorso, "password-dopo-lo-sblocco")
+
+        self.client.cookies.clear()
+        self.client.get("/login")
+        accesso = self.client.post("/login", data={
+            "username": "smemorato", "password": "password-dopo-lo-sblocco",
+            "next": "/parco", "csrf": self.client.cookies.get("csrf_token"),
+        }, follow_redirects=False)
+        self.assertEqual(accesso.headers["location"], "/parco",
+                         "il blocco doveva essere tolto insieme alla password")
+
+
+class TestResetGeneratoDallAmministratore(_ConRecupero):
+    """La via che funziona SENZA SMTP — cioè quella che serve davvero
+    finché su Render non sono impostate SMTP_USERNAME/SMTP_PASSWORD."""
+
+    def _accedi_admin(self):
+        self.client.get("/login")
+        return self.client.post("/login", data={
+            "username": "riccardo", "password": "password-admin-di-collaudo",
+            "next": "/parco", "csrf": self.client.cookies.get("csrf_token"),
+        }, follow_redirects=False)
+
+    def test_lamministratore_genera_un_link_e_quello_funziona(self):
+        from core import storage
+
+        self._accedi_admin()
+        self.client.get("/admin/utenti")
+        smemorato = storage.get_utente_per_username("smemorato")
+        risposta = self.client.post(
+            f"/admin/utenti/{smemorato['id']}/reset",
+            data={"csrf": self.client.cookies.get("csrf_token")},
+            follow_redirects=False)
+
+        # Il link si MOSTRA all'amministratore, non parte per email.
+        pagina = self.client.get(risposta.headers["location"]).text
+        self.assertIn("/password-nuova/", pagina)
+        self.assertIn("smemorato", pagina)
+
+    def test_chi_non_e_amministratore_non_puo_generare_reset(self):
+        from core import storage
+
+        self.client.get("/login")
+        self.client.post("/login", data={
+            "username": "smemorato", "password": "la-password-di-prima",
+            "next": "/parco", "csrf": self.client.cookies.get("csrf_token"),
+        }, follow_redirects=False)
+
+        admin = storage.get_utente_per_username("riccardo")
+        risposta = self.client.post(
+            f"/admin/utenti/{admin['id']}/reset",
+            data={"csrf": self.client.cookies.get("csrf_token")},
+            follow_redirects=False)
+        self.assertEqual(risposta.status_code, 303)
+        self.assertIn("/login", risposta.headers["location"])
+
+        pagina = self.client.get("/admin/utenti", follow_redirects=False)
+        self.assertEqual(pagina.headers["location"], "/parco")
+
+
+class TestViaDUscitaAmministratore(unittest.TestCase):
+    """Se a perdere la password è l'unico amministratore, nessuno può
+    generargli un link: è lui che li genera. L'unica prova d'identità
+    rimasta è il controllo delle variabili d'ambiente di Render."""
+
+    def setUp(self):
+        _archivio_vuoto()
+        os.environ["ADMIN_USERNAME"] = "capo"
+        os.environ["ADMIN_EMAIL"] = "capo@example.com"
+        os.environ["ADMIN_PASSWORD"] = "la-password-iniziale"
+        os.environ.pop("ADMIN_PASSWORD_RESET", None)
+
+        from web import account
+
+        account.assicura_admin()
+
+    def tearDown(self):
+        for chiave in ("ADMIN_USERNAME", "ADMIN_EMAIL", "ADMIN_PASSWORD",
+                       "ADMIN_PASSWORD_RESET"):
+            os.environ.pop(chiave, None)
+
+    def test_senza_la_variabile_un_riavvio_non_tocca_la_password(self):
+        """È il comportamento di sempre, e va difeso: reimpostare a ogni
+        avvio cancellerebbe in silenzio ogni cambio fatto a mano."""
+        from core import auth, storage
+        from web import account
+
+        storage.imposta_password(
+            storage.get_utente_per_username("capo")["id"],
+            auth.hash_password("cambiata-a-mano-dopo"))
+
+        self.assertEqual(account.assicura_admin(), "già presente")
+
+        capo = storage.get_utente_per_username("capo")
+        self.assertTrue(auth.verifica_password("cambiata-a-mano-dopo", capo["password_hash"]))
+
+    def test_con_la_variabile_la_password_torna_quella_di_render(self):
+        from core import auth, storage
+        from web import account
+
+        storage.imposta_password(
+            storage.get_utente_per_username("capo")["id"],
+            auth.hash_password("quella-che-ho-dimenticato"))
+        os.environ["ADMIN_PASSWORD_RESET"] = "true"
+        os.environ["ADMIN_PASSWORD"] = "la-password-di-rientro"
+
+        esito = account.assicura_admin()
+        self.assertIn("reimpostata", esito)
+        # Il messaggio deve ricordare di togliere la variabile: lasciata
+        # accesa, ogni riavvio riporterebbe la password a quella.
+        self.assertIn("togli quella variabile", esito)
+
+        capo = storage.get_utente_per_username("capo")
+        self.assertTrue(auth.verifica_password("la-password-di-rientro", capo["password_hash"]))
+
+    def test_la_variabile_non_reimposta_niente_se_la_password_e_troppo_corta(self):
+        from core import auth, storage
+        from web import account
+
+        os.environ["ADMIN_PASSWORD_RESET"] = "true"
+        os.environ["ADMIN_PASSWORD"] = "corta"
+
+        esito = account.assicura_admin()
+        self.assertIn("non valida", esito)
+        capo = storage.get_utente_per_username("capo")
+        self.assertTrue(auth.verifica_password("la-password-iniziale", capo["password_hash"]))
+
+
+class TestDiagnosticaInvioEmail(_SitoConAccount):
+    """Segnalato dall'utente: «non mi arriva la mail di richiesta account».
+    Non arrivava perché SMTP non era configurato — un modo di funzionare
+    previsto, non un guasto — ma nessuna pagina lo diceva, quindi da fuori
+    era indistinguibile da un'email persa o da un difetto del codice."""
+
+    def test_senza_smtp_la_diagnostica_lo_dice(self):
+        from core import mail
+
+        for chiave in ("SMTP_USERNAME", "SMTP_PASSWORD"):
+            os.environ.pop(chiave, None)
+        self.assertIn("non configurato", mail.stato())
+        self.assertIn("/admin/richieste", mail.stato())
+
+        pagina = self.client.get("/diagnostica").text
+        self.assertIn("Invio email", pagina)
+
+    def test_con_smtp_la_diagnostica_dice_da_dove_parte(self):
+        from core import mail
+
+        os.environ["SMTP_USERNAME"] = "mittente@example.com"
+        os.environ["SMTP_PASSWORD"] = "una-password-per-le-app"
+        try:
+            testo = mail.stato()
+            self.assertIn("attivo", testo)
+            self.assertIn("mittente@example.com", testo)
+        finally:
+            for chiave in ("SMTP_USERNAME", "SMTP_PASSWORD"):
+                os.environ.pop(chiave, None)
+
+    def test_il_pannello_richieste_avverte_che_le_email_non_partono(self):
+        for chiave in ("SMTP_USERNAME", "SMTP_PASSWORD"):
+            os.environ.pop(chiave, None)
+        self.client.get("/login")
+        self.client.post("/login", data={
+            "username": "riccardo", "password": "password-admin-di-collaudo",
+            "next": "/parco", "csrf": self.client.cookies.get("csrf_token"),
+        }, follow_redirects=False)
+
+        pagina = self.client.get("/admin/richieste").text
+        self.assertIn("non è configurato", pagina)
+        # E soprattutto NON deve promettere un'email che non parte.
+        self.assertNotIn("arrivano anche via email", pagina)
+
+
 if __name__ == "__main__":
     unittest.main()
