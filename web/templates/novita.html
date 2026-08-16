@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block titolo %}Novità · {{ titolo_sito }}{% endblock %}
+{% block corpo %}
+{#
+  UN FEED, NON UNA TABELLA.
+
+  «Aggiornamenti» era una griglia di sette colonne. Una tabella risponde
+  bene a «confronta queste righe fra loro», che non è la domanda di chi
+  apre questa pagina — la sua è «cosa è successo, e mi riguarda?». Per
+  rispondere serve il testo della notizia, e in una griglia non ci stava.
+
+  Niente immagini di copertina, di proposito: le fonti RSS le
+  pubblicano di rado e le altre foto che abbiamo sono del TELEFONO, non
+  dell'articolo. Metterle qui farebbe sembrare illustrata una notizia che
+  non lo è, e costerebbe una richiesta di rete per riga.
+#}
+<h3 class="occhiello">Novità · ultimi {{ giorni }} giorni</h3>
+
+<div class="filtri-feed">
+  <p class="proposte">
+    {% for g in [7, 30, 90] %}
+    <a class="proposta {{ 'attiva' if g == giorni }}" href="/novita?giorni={{ g }}{% if marca %}&marca={{ marca | urlencode }}{% endif %}">{{ g }} giorni</a>
+    {% endfor %}
+  </p>
+  {% if marche %}
+  <p class="proposte">
+    <a class="proposta {{ 'attiva' if not marca }}" href="/novita?giorni={{ giorni }}">Tutte le marche</a>
+    {% for m in marche %}
+    <a class="proposta {{ 'attiva' if m == marca }}" href="/novita?giorni={{ giorni }}&marca={{ m | urlencode }}">{{ m }}</a>
+    {% endfor %}
+  </p>
+  {% endif %}
+</div>
+
+{% if voci %}
+<ol class="feed">
+  {% for v in voci %}
+  <li class="feed-voce">
+    <div class="feed-testa">
+      {% if v.modello %}
+      <a class="feed-modello" href="/?q={{ v.modello | urlencode }}">{{ v.modello }}</a>
+      {% elif v.brand %}<span class="feed-modello tenue">{{ v.brand }}</span>{% endif %}
+      {% if v.severita %}<span class="tag" style="--tinta: {{ v.colore }}">{{ v.severita }}</span>{% endif %}
+    </div>
+
+    <h2 class="feed-titolo">
+      {% if v.link %}<a href="{{ v.link }}" target="_blank" rel="noopener noreferrer">{{ v.titolo }}</a>
+      {% else %}{{ v.titolo }}{% endif %}
+    </h2>
+
+    {% if v.riassunto %}<p class="feed-riassunto">{{ v.riassunto }}</p>{% endif %}
+
+    <p class="feed-piede">
+      {% if v.versione %}<span class="feed-versione">{{ v.versione }}</span>{% endif %}
+      <span class="tenue">{{ v.fonte }}</span>
+      <span class="tenue">{{ v.quando }}</span>
+      {% if v.link %}<a class="feed-fonte" href="{{ v.link }}" target="_blank" rel="noopener noreferrer">Apri la fonte →</a>{% endif %}
+    </p>
+  </li>
+  {% endfor %}
+</ol>
+{% else %}
+<p class="vuoto">Nessuna novità in questo intervallo.
+  {% if marca %}<a href="/novita?giorni={{ giorni }}">Prova senza filtro di marca</a>.{% endif %}
+</p>
+{% endif %}
+{% endblock %}

@@ -377,7 +377,14 @@ def pagina_dispositivi(request: Request,
     pagina non la fa: qui si filtra soltanto ciò che è già in archivio.
     Due cose diverse con lo stesso nome finiscono per essere scambiate,
     e la prima volta che succede è nel collegamento di qualcun altro.
+
+    Dietro login dal 16/08/2026 insieme al Catalogo: e' l'ARCHIVIO, e chi
+    arriva senza account cerca le novita' o un modello preciso, non
+    millecinquecento righe da sfogliare.
     """
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
     marche = [brand] if brand else None
     devices = storage.get_devices(brands=marche, search=filtro or None)
     if parco:
@@ -403,13 +410,39 @@ def pagina_dispositivi(request: Request,
     ))
 
 
-@app.get("/aggiornamenti", response_class=HTMLResponse)
-def pagina_aggiornamenti(request: Request, giorni: int = Query(default=30)):
+@app.get("/novita", response_class=HTMLResponse)
+def pagina_novita(request: Request, giorni: int = Query(default=30),
+                  marca: str = Query(default="")):
+    """Le ultime notizie sugli aggiornamenti, in forma di feed.
+
+    SOSTITUISCE «Dispositivi» E «Aggiornamenti». Erano due tabelle: una
+    elencava 1500 telefoni, l'altra 300 righe su sette colonne. Nessuna
+    delle due rispondeva alla domanda con cui si apre questa pagina —
+    «cosa è successo, e mi riguarda?» — perché per rispondere serve il
+    TESTO della notizia, e in una griglia non ci stava.
+
+    L'elenco completo dei dispositivi non è sparito: è finito in
+    «Catalogo», che è il posto dove si va quando si vuole guardare
+    l'archivio invece delle novità.
+    """
     voci = storage.get_updates(only_relevant=True, since_days=giorni, limit=300)
-    return _rendi(request, "aggiornamenti.html", _contesto(
-        request, attiva="aggiornamenti", giorni=giorni,
-        righe=[P.riga_aggiornamento(v) for v in voci],
+    # Le marche si ricavano da ciò che c'è DAVVERO in questo intervallo,
+    # non da un elenco fisso: un filtro che porta a zero risultati è
+    # peggio di un filtro assente.
+    marche = sorted({v.get("brand") for v in voci if v.get("brand")})
+    if marca:
+        voci = [v for v in voci if v.get("brand") == marca]
+    return _rendi(request, "novita.html", _contesto(
+        request, attiva="novita", giorni=giorni, marca=marca, marche=marche,
+        voci=[P.voce_feed(v) for v in voci],
     ))
+
+
+@app.get("/aggiornamenti")
+def aggiornamenti_spostati(giorni: int = Query(default=30)):
+    """Il vecchio indirizzo continua a funzionare: era nella navigazione
+    per mesi, e i segnalibri di chi lo usava non devono rompersi."""
+    return RedirectResponse(f"/novita?giorni={giorni}", status_code=301)
 
 
 def _accesso_parco_richiesto(request: Request):
@@ -544,8 +577,41 @@ def pagina_parco(request: Request, test_salvato: int = Query(default=0),
     ))
 
 
+def _accesso_catalogo_richiesto(request: Request):
+    """Catalogo e Diagnostica sono una pagina sola e stanno dietro login
+    (richiesta dell'utente il 16/08/2026).
+
+    Non e' solo una scelta di ordine: quella pagina dice quali fonti
+    stanno fallendo, come e' configurato il salvataggio esterno e quanti
+    record ci sono. Sono informazioni su COME e' fatto il servizio, utili
+    a chi lo amministra e a nessun altro.
+
+    E le due azioni di backup che vivono li' — creare l'archivio da un
+    token GitHub incollato nel modulo, forzare un salvataggio — erano
+    raggiungibili DA CHIUNQUE. Non era mai stato notato perche' la pagina
+    che le contiene sembrava di servizio, ma una POST non ha bisogno
+    della pagina per essere chiamata.
+    """
+    utente = auth_web.utente_da_richiesta(request)
+    if not utente:
+        return None, RedirectResponse("/login?next=/catalogo", status_code=303)
+    return utente, None
+
+
 @app.get("/catalogo", response_class=HTMLResponse)
 def pagina_catalogo(request: Request):
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
+    return _pagina_diagnostica(request)
+
+
+@app.get("/dispositivi-elenco", response_class=HTMLResponse)
+def pagina_marche(request: Request):
+    """La copertura per marca, che era la vecchia pagina «Catalogo»."""
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
     devices = storage.get_devices()
     per_marca: dict[str, int] = {}
     for d in devices:
@@ -560,6 +626,13 @@ def pagina_catalogo(request: Request):
     ))
 
 
+@app.get("/diagnostica")
+def diagnostica_spostata():
+    """Catalogo e Diagnostica sono la stessa pagina da oggi. Il vecchio
+    indirizzo resta valido: era in navigazione da mesi."""
+    return RedirectResponse("/catalogo", status_code=301)
+
+
 def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
     """Il corpo comune della pagina Diagnostica — estratto perché le
     rotte del backup (sotto) devono ririsegnare la STESSA pagina con in
@@ -569,7 +642,7 @@ def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
     stati = storage.get_source_status()
     stats = storage.stats()
     return _rendi(request, "diagnostica.html", _contesto(
-        request, attiva="diagnostica",
+        request, attiva="catalogo",
         righe=[P.riga_fonte(s) for s in stati],
         stats=stats,
         cataloghi=[
@@ -607,7 +680,7 @@ def pagina_diagnostica(request: Request):
     return _pagina_diagnostica(request)
 
 
-@app.post("/diagnostica/backup/crea", response_class=HTMLResponse)
+@app.post("/catalogo/backup/crea", response_class=HTMLResponse)
 def diagnostica_backup_crea(request: Request, token: str = Form(...)):
     """Crea da zero l'archivio (Gist privato) per il backup, a partire da
     un token GitHub incollato qui — invece dei passaggi manuali (creare
@@ -639,6 +712,9 @@ def diagnostica_backup_crea(request: Request, token: str = Form(...)):
     HTTP, come qualunque modulo su qualunque sito, ma mai scritto su
     disco da questa funzione.
     """
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
     from core import backup
 
     risultato_backup = {"token_valido": None, "gist_creato": None,
@@ -663,7 +739,7 @@ def diagnostica_backup_crea(request: Request, token: str = Form(...)):
     return _pagina_diagnostica(request, risultato_backup=risultato_backup)
 
 
-@app.post("/diagnostica/backup/salva", response_class=HTMLResponse)
+@app.post("/catalogo/backup/salva", response_class=HTMLResponse)
 def diagnostica_backup_salva(request: Request):
     """«Salva adesso»: forza un salvataggio vero con la configurazione
     ATTUALE (le variabili d'ambiente già impostate), invece di aspettare
@@ -671,6 +747,9 @@ def diagnostica_backup_salva(request: Request):
     sapere se quello che è stato messo su Render funziona davvero, senza
     aspettare un'ora o dover correggere un nome apposta per scoprirlo.
     """
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
     from core import backup
 
     ok, messaggio = backup.salva()

@@ -914,3 +914,45 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
      colonna crescerebbe e la barra di ricerca si sposterebbe. */
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+/* --- La pagina Novità: un feed, non una tabella ------------------------
+   «Aggiornamenti» era una griglia di sette colonne, e una griglia
+   risponde bene a «confronta queste righe fra loro» — che non è la
+   domanda di chi apre questa pagina. La sua è «cosa è successo, e mi
+   riguarda?», e per rispondere serve il testo della notizia. */
+.feed { list-style: none; padding: 0; margin: 1rem 0 0; }
+.feed-voce {
+  padding: 1rem 0;
+  border-top: 1px solid var(--filo);
+}
+.feed-voce:first-child { border-top: none; padding-top: .2rem; }
+
+.feed-testa {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  margin-bottom: .3rem;
+}
+.feed-modello { font-size: .78rem; font-weight: 700; letter-spacing: .02em; }
+
+.feed-titolo { font-size: 1.02rem; line-height: 1.35; margin: 0 0 .35rem; }
+.feed-titolo a { text-decoration: none; }
+.feed-titolo a:hover { text-decoration: underline; }
+
+/* Il riassunto è la ragione per cui questa pagina esiste: va letto, non
+   scansionato. Misura di riga contenuta e colore più tenue del titolo. */
+.feed-riassunto {
+  margin: 0 0 .45rem; font-size: .9rem; line-height: 1.5;
+  color: var(--neutral); max-width: 68ch;
+}
+
+.feed-piede {
+  display: flex; gap: .6rem; flex-wrap: wrap; align-items: baseline;
+  margin: 0; font-size: .8rem;
+}
+.feed-versione {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .76rem;
+}
+.feed-fonte { font-weight: 600; text-decoration: none; }
+.feed-fonte:hover { text-decoration: underline; }
+
+.filtri-feed { margin-bottom: .4rem; }

@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 {% block titolo %}Diagnostica · {{ titolo_sito }}{% endblock %}
 {% block corpo %}
+{# CATALOGO E DIAGNOSTICA SONO UNA PAGINA SOLA dal 16/08/2026: erano due
+   voci di menu che rispondevano alla stessa domanda — «com'e' messo il
+   servizio» — una con i numeri dell'archivio, l'altra con lo stato delle
+   fonti. Le due tabelle di dettaglio restano raggiungibili da qui. #}
+<p class="proposte">
+  <a class="proposta" href="/dispositivi">Elenco dei dispositivi</a>
+  <a class="proposta" href="/dispositivi-elenco">Copertura per marca</a>
+</p>
+
 <h3 class="occhiello">Fonti</h3>
 <table class="tabella">
   <thead><tr><th>Fonte</th><th>Stato</th><th>Voci</th><th>Dettaglio</th><th>Controllata</th></tr></thead>
@@ -128,7 +137,7 @@
     che scrittura e lettura funzionino — tre passaggi manuali in uno. Il
     token non viene salvato da nessuna parte: serve solo per questa
     chiamata.</p>
-  <form method="post" action="/diagnostica/backup/crea" class="correzione-form">
+  <form method="post" action="/catalogo/backup/crea" class="correzione-form">
     <label class="sr-only" for="token-backup">Token GitHub</label>
     <input id="token-backup" type="password" name="token"
            placeholder="ghp_..." autocomplete="off" required>
@@ -137,7 +146,7 @@
 </details>
 {% endif %}
 {% if backup.etichetta != "Non configurato" %}
-<form method="post" action="/diagnostica/backup/salva" class="correzione-form">
+<form method="post" action="/catalogo/backup/salva" class="correzione-form">
   <button type="submit" class="secondario">Salva adesso, per verificare</button>
 </form>
 {% endif %}

@@ -343,6 +343,10 @@ def normalize(raw: sources.RawItem, source: sources.Source) -> dict:
         "is_relevant": relevance.is_relevant,
         "relevance_score": relevance.score,
         "relevance_note": relevance.explanation,
+        # Il riassunto della fonte, ripulito dai tag: le descrizioni RSS
+        # arrivano spesso in HTML, e in una pagina che le mostra come
+        # testo diventerebbero «&lt;p&gt;» visibili.
+        "summary": sources.clean_text(raw.summary or "")[:600],
     }
 
 

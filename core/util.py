@@ -6,6 +6,7 @@ anche senza requests / feedparser installati.
 from __future__ import annotations
 
 import hashlib
+import html
 import re
 import unicodedata
 from datetime import datetime, timezone
@@ -152,15 +153,22 @@ def short_hash(text: str, length: int = 10) -> str:
 
 
 def clean_text(text: str) -> str:
-    """Rimuove tag HTML residui e normalizza gli spazi."""
+    """Rimuove tag HTML residui, decodifica le entità e normalizza gli spazi.
+
+    LE ENTITÀ SI DECODIFICANO TUTTE, non cinque scelte a mano. Qui c'era
+    un elenco — `&amp;`, `&#8217;`, `&#8216;`, `&quot;`, `&nbsp;` — e
+    bastava che una fonte ne usasse una sesta perché finisse a video così
+    com'era. Visto il 16/08/2026 sulla pagina Novità appena fatta:
+    «Samsung&#39;s decision to change...», dove `&#39;` è semplicemente un
+    apostrofo che non era nell'elenco.
+
+    `html.unescape` le conosce tutte ed è nella libreria standard. Si
+    decodifica DOPO aver tolto i tag: così un `&lt;b&gt;` scritto nel
+    testo resta testo invece di diventare un tag da rimuovere. Quello che
+    esce di qui è testo puro, e i template lo re-inseriscono con
+    l'autoescape di Jinja: nessuna via di ritorno verso l'HTML."""
     text = re.sub(r"<[^>]+>", " ", str(text or ""))
-    text = (
-        text.replace("&amp;", "&")
-        .replace("&#8217;", "'")
-        .replace("&#8216;", "'")
-        .replace("&quot;", '"')
-        .replace("&nbsp;", " ")
-    )
+    text = html.unescape(text)
     return re.sub(r"\s+", " ", text).strip()
 
 

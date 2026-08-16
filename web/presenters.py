@@ -472,3 +472,53 @@ def nota_con_link(testo: str | None) -> Markup:
         ultimo = trovato.end()
     pezzi.append(str(escape(testo[ultimo:])))
     return Markup("".join(pezzi))
+
+
+# ======================================================================
+# La pagina Novità — un feed, non una tabella
+# ======================================================================
+def voce_feed(item: dict) -> dict:
+    """Una notizia di aggiornamento come la si legge in un lettore RSS.
+
+    PERCHÉ NON UNA TABELLA. «Aggiornamenti» era una griglia di sette
+    colonne: data, marca, modello, notizia, build, severità, fonte. Una
+    tabella risponde bene a «confronta queste righe fra loro», che non è
+    la domanda di chi apre la pagina — quella è «cosa è successo, e mi
+    riguarda?». Per rispondere serve il TESTO della notizia, che la
+    tabella non aveva spazio di mostrare e che infatti non mostrava.
+
+    Il riassunto viene dalla fonte (vedi `summary` in `core/scan.py`), non
+    è generato: riassumere a macchina una notizia che si può citare
+    testualmente aggiunge un modo di sbagliare senza aggiungere niente.
+    Per le righe più vecchie della colonna il campo è vuoto, e allora si
+    ripiega su quello che il record sa già dire di sé.
+    """
+    riassunto = (item.get("summary") or "").strip()
+    if not riassunto:
+        # RIPIEGO PER LE RIGHE VECCHIE, e per le fonti strutturate che un
+        # riassunto non ce l'hanno mai avuto: un controllo versione
+        # ufficiale non pubblica un articolo, pubblica una build.
+        riassunto = " · ".join(p for p in (
+            item.get("size_info") or "",
+            item.get("severity_reason") or "",
+        ) if p)
+
+    versione = " · ".join(p for p in (
+        item.get("os_version") or "",
+        f"build {item['build']}" if item.get("build") else "",
+        f"patch {item['patch_level']}" if item.get("patch_level") else "",
+    ) if p)
+
+    return {
+        "titolo": item.get("title", ""),
+        "riassunto": truncate(riassunto, 320),
+        "modello": item.get("device_model") or "",
+        "brand": item.get("brand", ""),
+        "versione": versione,
+        "quando": data_voce(item),
+        "fonte": item.get("source_label", ""),
+        "severita": item.get("severity", ""),
+        "colore": item.get("color", "#5c5a59"),
+        "link": item.get("link") or "",
+        "chiave": item.get("device_key") or "",
+    }

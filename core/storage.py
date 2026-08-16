@@ -437,7 +437,7 @@ def init_db() -> None:
         # Migrazione difensiva: i database creati prima delle nuove colonne
         # non le hanno, e CREATE TABLE IF NOT EXISTS non le aggiunge da sola.
         existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(updates)")}
-        for colonna in ("source_trust", "model_code", "firmware_kind"):
+        for colonna in ("source_trust", "model_code", "firmware_kind", "summary"):
             if colonna not in existing_cols:
                 conn.execute(f"ALTER TABLE updates ADD COLUMN {colonna} TEXT")
         conn.commit()
@@ -495,6 +495,14 @@ _UPDATE_FIELDS = [
     "android_version", "skin_name", "skin_version", "build", "patch_level",
     "severity", "color", "severity_reason", "size_info", "link", "source",
     "source_label", "source_trust", "firmware_kind", "published", "is_relevant", "relevance_score", "relevance_note",
+    # IL RIASSUNTO DELLA FONTE, che fino al 16/08/2026 si buttava via.
+    #
+    # I feed RSS lo pubblicano insieme al titolo, `RawItem` lo trasporta
+    # gia' — e qui si fermava, perche' nessuna pagina lo mostrava. Con la
+    # pagina Novita' (`/novita`) serve: un titolo da solo dice DI COSA
+    # parla la notizia, non COSA dice, ed e' la differenza fra un elenco
+    # e qualcosa che si legge.
+    "summary",
 ]
 
 

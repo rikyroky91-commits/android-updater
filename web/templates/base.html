@@ -33,16 +33,18 @@
       <a class="marchio" href="/">{{ titolo_sito }}</a>
       <nav class="nav">
         <a href="/" class="{{ 'attiva' if attiva == 'cerca' }}">Cerca</a>
-        <a href="/dispositivi" class="{{ 'attiva' if attiva == 'dispositivi' }}">Dispositivi</a>
-        <a href="/aggiornamenti" class="{{ 'attiva' if attiva == 'aggiornamenti' }}">Aggiornamenti</a>
+        <a href="/novita" class="{{ 'attiva' if attiva == 'novita' }}">Novità</a>
         <a href="/parco" class="{{ 'attiva' if attiva == 'parco' }}">Parco di test</a>
-        <a href="/catalogo" class="{{ 'attiva' if attiva == 'catalogo' }}">Catalogo</a>
-        <a href="/diagnostica" class="{{ 'attiva' if attiva == 'diagnostica' }}">Diagnostica</a>
+        {# Catalogo e Diagnostica sono una voce sola e stanno dietro
+           login: dicono quali fonti falliscono e com'e' configurato il
+           salvataggio, cioe' come e' fatto il servizio. Chi non e'
+           collegato non ha niente da farci. #}
+        {% if utente %}<a href="/catalogo" class="{{ 'attiva' if attiva == 'catalogo' }}">Catalogo</a>{% endif %}
       </nav>
       {# Nel prototipo questo numero è scritto a mano. Qui è vero, e
          questo ne cambia la natura: non decora la testata, è la prima
          riga di diagnostica, leggibile da qualunque pagina. #}
-      <a class="stato-fonti" href="/diagnostica">
+      <a class="stato-fonti" href="{{ '/catalogo' if utente else '/novita' }}">
         {% if fonti_totali %}{{ fonti_ok }}/{{ fonti_totali }} fonti attive
         {% else %}nessuna scansione ancora{% endif %}
       </a>

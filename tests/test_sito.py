@@ -152,27 +152,27 @@ class _SitoConLogin(_Sito):
             utente["id"], auth.impronta_password(utente["password_hash"])))
 
 
-class TestLePagineSiDisegnano(_Sito):
+class TestLePagineSiDisegnano(_SitoConLogin):
     def test_ogni_pagina_risponde(self):
         # «/parco» non è qui: è l'unica pagina dietro login, collaudata a
         # parte in TestAccessoParco (sia il rifiuto anonimo sia l'accesso
         # con una sessione valida).
-        for percorso in ("/", "/dispositivi", "/aggiornamenti",
-                         "/catalogo", "/diagnostica", "/health"):
+        for percorso in ("/", "/novita", "/dispositivi",
+                         "/catalogo", "/health"):
             with self.subTest(percorso=percorso):
                 self.assertEqual(self.client.get(percorso).status_code, 200)
 
     def test_il_nome_del_sito_e_in_ogni_pagina(self):
         """Il difetto più stupido e più visibile della versione Streamlit:
         una testata alta zero, col solo filo nero e senza il nome."""
-        for percorso in ("/", "/aggiornamenti", "/diagnostica"):
+        for percorso in ("/", "/novita", "/catalogo"):
             with self.subTest(percorso=percorso):
                 self.assertIn("Mobile Update Tracker",
                               self.client.get(percorso).text)
 
     def test_la_navigazione_marca_la_pagina_corrente(self):
         pagina = self.client.get("/aggiornamenti").text
-        self.assertIn('href="/aggiornamenti" class="attiva"', pagina)
+        self.assertIn('href="/novita" class="attiva"', pagina)
 
     def test_il_contatore_delle_fonti_e_vero(self):
         """Nel prototipo è scritto a mano. Qui viene dall'archivio, e per
@@ -202,13 +202,13 @@ class TestLePagineSiDisegnano(_Sito):
         concreta a «la correzione che ho salvato sopravviverà a un
         riavvio?». Vedi `P.stato_backup` e `TestStatoBackup` in
         `test_presenters.py` per i dettagli dei quattro stati."""
-        pagina = self.client.get("/diagnostica").text
+        pagina = self.client.get("/catalogo").text
         self.assertIn("Backup esterno", pagina)
         self.assertIn("Ultimo salvataggio riuscito", pagina)
         self.assertIn("Ultimo ripristino", pagina)
 
 
-class TestDiagnosticaConfigurazioneBackup(_Sito):
+class TestDiagnosticaConfigurazioneBackup(_SitoConLogin):
     """Segnalato dall'utente: aveva seguito i passaggi manuali (creare il
     token, creare il Gist, incollare due valori su Render) e la pagina
     continuava a dire «Non configurato» — tre pagine diverse sono tre
@@ -219,6 +219,10 @@ class TestDiagnosticaConfigurazioneBackup(_Sito):
     verificare la configurazione attuale."""
 
     def setUp(self):
+        # Le rotte del backup sono passate dietro login insieme alla
+        # pagina che le contiene: senza questo la sessione non c'e' e
+        # ogni POST finisce sul modulo di accesso.
+        super().setUp()
         from core import backup
 
         self._configurato = backup.configurato
@@ -270,13 +274,13 @@ class TestDiagnosticaConfigurazioneBackup(_Sito):
 
     def test_il_modulo_di_configurazione_compare_solo_se_non_configurato(self):
         self._non_configurato()
-        pagina = self.client.get("/diagnostica").text
+        pagina = self.client.get("/catalogo").text
         self.assertIn("Configura il backup", pagina)
         self.assertIn('name="token"', pagina)
 
     def test_a_configurazione_attiva_compare_salva_adesso_non_il_modulo(self):
         self._configurato_e_attivo()
-        pagina = self.client.get("/diagnostica").text
+        pagina = self.client.get("/catalogo").text
         self.assertNotIn("Configura il backup", pagina)
         self.assertNotIn("Rifai la configurazione", pagina)
         self.assertIn("Salva adesso, per verificare", pagina)
@@ -287,7 +291,7 @@ class TestDiagnosticaConfigurazioneBackup(_Sito):
         # non «Non configurato» — chi lo vede deve poter sia riprovare sia
         # rifare la configurazione da capo, senza restare bloccato.
         self._configurato_con_errore()
-        pagina = self.client.get("/diagnostica").text
+        pagina = self.client.get("/catalogo").text
         self.assertIn("Rifai la configurazione", pagina)
         self.assertIn('name="token"', pagina)
         self.assertIn("Salva adesso, per verificare", pagina)
@@ -301,7 +305,7 @@ class TestDiagnosticaConfigurazioneBackup(_Sito):
         backup.prova_completa = lambda gid, t: (True, "scrittura e rilettura riuscite")
 
         pagina = self.client.post(
-            "/diagnostica/backup/crea", data={"token": "ghp_finto"}).text
+            "/catalogo/backup/crea", data={"token": "ghp_finto"}).text
         self.assertIn("Archivio creato e verificato", pagina)
         self.assertIn("abc123def456", pagina)
         self.assertIn("BACKUP_GIST_ID", pagina)
@@ -324,7 +328,7 @@ class TestDiagnosticaConfigurazioneBackup(_Sito):
         backup.crea_archivio = crea_vietata
 
         pagina = self.client.post(
-            "/diagnostica/backup/crea", data={"token": "ghp_scaduto"}).text
+            "/catalogo/backup/crea", data={"token": "ghp_scaduto"}).text
         self.assertIn("Il token non va bene", pagina)
         self.assertIn("token non valido o scaduto", pagina)
         self.assertFalse(chiamato["crea"],
@@ -336,7 +340,7 @@ class TestDiagnosticaConfigurazioneBackup(_Sito):
         self._configurato_e_attivo()
         backup.salva = lambda: (True, "salvato (9 KB compressi)")
 
-        pagina = self.client.post("/diagnostica/backup/salva").text
+        pagina = self.client.post("/catalogo/backup/salva").text
         self.assertIn("Salvataggio riuscito", pagina)
         self.assertIn("salvato (9 KB compressi)", pagina)
 
@@ -346,7 +350,7 @@ class TestDiagnosticaConfigurazioneBackup(_Sito):
         self._configurato_e_attivo()
         backup.salva = lambda: (False, "GitHub ha risposto 401: token non valido")
 
-        pagina = self.client.post("/diagnostica/backup/salva").text
+        pagina = self.client.post("/catalogo/backup/salva").text
         self.assertIn("Salvataggio non riuscito", pagina)
         self.assertIn("401", pagina)
 
@@ -1578,7 +1582,7 @@ class TestInterpreteAI(_Sito):
         scritto che c'e', perche' e' giusto dirlo.
         """
         os.environ["GEMINI_API_KEY"] = "finta"
-        for percorso in ("/", "/aggiornamenti", "/diagnostica"):
+        for percorso in ("/", "/novita", "/catalogo"):
             with self.subTest(percorso=percorso):
                 pagina = self.client.get(percorso).text
                 self.assertNotIn('id="btn-ai"', pagina)

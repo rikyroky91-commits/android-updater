@@ -864,6 +864,19 @@ class TestDiagnosticaInvioEmail(_SitoConAccount):
     previsto, non un guasto — ma nessuna pagina lo diceva, quindi da fuori
     era indistinguibile da un'email persa o da un difetto del codice."""
 
+    def _accedi_diagnostica(self):
+        """Catalogo e Diagnostica sono una pagina sola e stanno dietro
+        login dal 16/08/2026: dicono quali fonti falliscono e com'e'
+        configurato il salvataggio, cioe' come e' fatto il servizio."""
+        self.client.cookies.clear()
+        self.client.get("/login")
+        self.client.post("/login", data={
+            "username": "riccardo", "password": "password-admin-di-collaudo",
+            "next": "/parco", "csrf": self.client.cookies.get("csrf_token"),
+        }, follow_redirects=False)
+
+
+
     def test_senza_smtp_la_diagnostica_lo_dice(self):
         from core import mail
 
@@ -872,7 +885,9 @@ class TestDiagnosticaInvioEmail(_SitoConAccount):
         self.assertIn("non configurato", mail.stato())
         self.assertIn("/admin/richieste", mail.stato())
 
-        pagina = self.client.get("/diagnostica").text
+        # La pagina e' passata dietro login insieme al Catalogo.
+        self._accedi_diagnostica()
+        pagina = self.client.get("/catalogo").text
         self.assertIn("Invio email", pagina)
 
     def test_con_smtp_la_diagnostica_dice_da_dove_parte(self):
@@ -909,6 +924,19 @@ class TestVersioneInProduzione(_SitoConAccount):
     RENDER_GIT_COMMIT da solo nell'ambiente: qui si verifica che finisca
     dove si va a guardare."""
 
+    def _accedi_diagnostica(self):
+        """Catalogo e Diagnostica sono una pagina sola e stanno dietro
+        login dal 16/08/2026: dicono quali fonti falliscono e com'e'
+        configurato il salvataggio, cioe' come e' fatto il servizio."""
+        self.client.cookies.clear()
+        self.client.get("/login")
+        self.client.post("/login", data={
+            "username": "riccardo", "password": "password-admin-di-collaudo",
+            "next": "/parco", "csrf": self.client.cookies.get("csrf_token"),
+        }, follow_redirects=False)
+
+
+
     def test_fuori_da_render_lo_dice_invece_di_inventare(self):
         from core import config as C
 
@@ -928,7 +956,8 @@ class TestVersioneInProduzione(_SitoConAccount):
             # Accorciato: un commit intero in una tabella non si legge.
             self.assertNotIn("abcdef1234567890", testo)
 
-            pagina = self.client.get("/diagnostica").text
+            self._accedi_diagnostica()
+            pagina = self.client.get("/catalogo").text
             self.assertIn("Versione in produzione", pagina)
             self.assertIn("abcdef1", pagina)
         finally:
