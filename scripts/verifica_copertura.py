@@ -71,6 +71,18 @@ MODELLI: dict[str, list[str]] = {
         "vivo X100", "vivo X100 Pro", "vivo V30", "vivo Y36", "vivo X90",
         "vivo V29", "vivo Y27", "vivo X80", "vivo V27", "vivo Y100",
     ],
+    # Le due famiglie coperte dall'API di OxygenUpdater, aggiunte il
+    # 16/08/2026 per misurare che cosa porta davvero quella fonte: prima
+    # il banco non le guardava, quindi il suo effetto non si vedeva.
+    "oneplus": [
+        "OnePlus 13", "OnePlus 13R", "OnePlus 12", "OnePlus 12R",
+        "OnePlus 11", "OnePlus Open", "OnePlus Nord 4", "OnePlus Nord CE 4",
+        "OnePlus 10 Pro", "OnePlus 9 Pro",
+    ],
+    "oppo": [
+        "Find X8 Pro", "Find X7 Ultra", "Reno 12", "Reno 11", "Find N3",
+        "Reno 10", "Oppo A79", "Oppo A98", "Oppo A58", "Find X6 Pro",
+    ],
 }
 
 # Come si riconosce il codice DELLA MARCA GIUSTA fra i candidati che il
@@ -88,6 +100,10 @@ FORMA_CODICE = {
     "redmi": re.compile(r"^2[0-9]{3}[A-Z0-9]{4,}$", re.I),
     "honor": re.compile(r"^[A-Z]{3}-[A-Z0-9]{2,5}$", re.I),
     "vivo": re.compile(r"^(V\d{4}[A-Z]*|PD\d{4}[A-Z]*)$", re.I),
+    # OnePlus e Oppo condividono la famiglia CPH (piu' le sigle dei
+    # modelli venduti in Cina: PJ, PG, PH).
+    "oneplus": re.compile(r"^(CPH\d{4}|P[JGH][A-Z0-9]{4,})$", re.I),
+    "oppo": re.compile(r"^(CPH\d{4}|P[JGH][A-Z0-9]{4,})$", re.I),
 }
 
 
@@ -123,6 +139,30 @@ def _ha_firmware(risultato: dict) -> bool:
     return False
 
 
+# Fonti che hanno INTERROGATO il telefono, invece di leggere un titolo.
+_FONTI_UFFICIALI = ("official_lookup", "curated_lookup")
+
+
+def _ha_firmware_ufficiale(risultato: dict) -> bool:
+    """Il firmware viene da una fonte che l'ha verificato, o da una notizia?
+
+    PERCHE' QUESTA COLONNA ESISTE. Il 16/08/2026, misurando che cosa
+    portasse l'API di OxygenUpdater appena attivata, il conteggio del
+    firmware non si muoveva di una casella — eppure la ricerca per
+    `CPH2653` era passata da un titolo di giornale a
+    `CPH2653_16.0.9.401(EX01)`, cioe' la build ufficiale.
+
+    «Ha un firmware» e «sa quale firmware» sono due domande diverse, e il
+    banco ne misurava una sola: una fonte nuova che migliora la qualita'
+    senza aggiungere modelli risultava inutile.
+    """
+    for voce in risultato.get("items", []):
+        if voce.get("source") in _FONTI_UFFICIALI and (
+                voce.get("build") or voce.get("os_version") or voce.get("patch_level")):
+            return True
+    return False
+
+
 def _nome_coerente(atteso: str, nomi: list[str]) -> bool:
     """Il codice deve risolvere in QUEL modello, non in uno qualsiasi.
     Confronto sulle sole cifre e lettere, perché «Galaxy Z Fold5»,
@@ -141,7 +181,7 @@ def prova_modello(marca: str, nome: str) -> dict:
 
     esito = {"marca": marca, "nome": nome, "codice": None,
              "codice_ok": False, "nome_ok": False, "firmware": False,
-             "scheda": False, "foto": False, "errore": ""}
+             "ufficiale": False, "scheda": False, "foto": False, "errore": ""}
     try:
         codice = codice_per(marca, nome)
         esito["codice"] = codice
@@ -155,6 +195,7 @@ def prova_modello(marca: str, nome: str) -> dict:
 
         risultato = scan.search_model(codice)
         esito["firmware"] = _ha_firmware(risultato)
+        esito["ufficiale"] = _ha_firmware_ufficiale(risultato)
 
         scheda = P.scheda_tecnica(nome, codice=codice, brand=marca)
         # «trovata» da sola non basta: dice che una scheda esiste, non che
@@ -180,27 +221,28 @@ def main() -> int:
             print(f"marca sconosciuta: {marca}")
             return 2
         print(f"\n=== {marca.upper()} ===")
-        print(f"{'modello':22} {'codice':16} nome fw sch foto")
+        print(f"{'modello':22} {'codice':16} nome fw uff sch foto")
         for nome in MODELLI[marca]:
             esito = prova_modello(marca, nome)
             tutti.append(esito)
             segno = lambda b: "ok" if b else "--"
             print(f"{nome:22} {str(esito['codice'] or '-'):16} "
                   f"{segno(esito['nome_ok']):4} {segno(esito['firmware']):3} "
+                  f"{segno(esito['ufficiale']):4} "
                   f"{segno(esito['scheda']):3} {segno(esito['foto']):4}"
                   f"{'  ' + esito['errore'] if esito['errore'] else ''}")
             time.sleep(0.5)  # non martellare le fonti
 
     print("\n=== RIEPILOGO ===")
     print(f"{'marca':10} {'codice':>7} {'nome':>6} {'firmware':>9} "
-          f"{'scheda':>7} {'foto':>5}")
+          f"{'ufficiale':>10} {'scheda':>7} {'foto':>5}")
     for marca in marche:
         righe = [e for e in tutti if e["marca"] == marca]
         n = len(righe)
         def q(campo):
             return f"{sum(1 for e in righe if e[campo])}/{n}"
         print(f"{marca:10} {q('codice_ok'):>7} {q('nome_ok'):>6} "
-              f"{q('firmware'):>9} {q('scheda'):>7} {q('foto'):>5}")
+              f"{q('firmware'):>9} {q('ufficiale'):>10} {q('scheda'):>7} {q('foto'):>5}")
     return 0
 
 
