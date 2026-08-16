@@ -590,7 +590,40 @@ def search_model(model_query: str) -> dict:
                 storage.upsert_update(item)
             items.extend(news_items)
 
-    items.sort(key=lambda i: i.get("published") or i.get("first_seen") or "", reverse=True)
+    # PRIMA L'EUROPA, POI IL PIÙ RECENTE.
+    #
+    # Richiesta esplicita dell'utente il 16/08/2026: «ho bisogno che per
+    # ogni modello il primo risultato sia sempre quello europeo». Un
+    # codice puo' avere piu' righe, una per mercato, con firmware
+    # diversi: `2201123C` ne ha tre — EEA, Global, Turkey. Sono tutte
+    # vere, ma chi usa questa applicazione sta in Italia, e la prima
+    # risposta che vede dev'essere la sua.
+    #
+    # Il mercato viene PRIMA della data: una build turca uscita ieri non
+    # e' una risposta migliore di quella europea di un mese fa, per chi
+    # ha in mano un telefono europeo. Dentro lo stesso mercato l'ordine
+    # resta quello di sempre, il piu' recente in cima.
+    #
+    # Non si SCARTA niente: le altre regioni restano nell'elenco, sotto.
+    # Sono informazione vera, e servono a chi confronta due varianti.
+    def _ordine(voce: dict) -> tuple:
+        quando = voce.get("published") or voce.get("first_seen") or ""
+        # IL NOME DECIDE, la descrizione può solo MIGLIORARE il giudizio.
+        #
+        # Prendere il minimo fra i due campi sembrava più generoso ed era
+        # sbagliato: «Xiaomi 12 Turkey» ha un nome dichiaratamente non
+        # europeo (3), ma una descrizione senza marcatori (2), e il
+        # minimo lo faceva risalire a 2 — cioè lo pareggiava a un nome
+        # neutro. Un mercato dichiarato non si annulla perché un altro
+        # campo tace.
+        mercato = extract.rango_mercato(voce.get("device_model") or "")
+        if mercato == 2:      # il nome non dice niente: prova la descrizione
+            mercato = min(mercato, extract.rango_mercato(voce.get("size_info") or ""))
+        # `quando` si inverte da solo: le date ISO si ordinano come testo,
+        # e qui serve decrescente dentro un ordinamento crescente.
+        return (mercato, [-ord(c) for c in quando])
+
+    items.sort(key=_ordine)
 
     # Per la cronologia si privilegia un dato da fonte ufficiale, se c'è:
     # una build verificata vale più del titolo di una notizia.

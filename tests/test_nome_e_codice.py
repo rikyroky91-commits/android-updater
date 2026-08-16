@@ -910,6 +910,64 @@ class TestIlCodiceDecideIlNomeAncheNellaRicercaLive(unittest.TestCase):
         self.assertTrue(scan._scritto_in_cinese("一加 10R"))
 
 
+class TestPrimaLEuropa(unittest.TestCase):
+    """Richiesta esplicita dell'utente il 16/08/2026: «ho bisogno che per
+    ogni modello il primo risultato sia sempre quello europeo».
+
+    Un codice puo' avere piu' righe, una per mercato, con firmware
+    diversi: `2201123C` ne ha tre — EEA, Global, Turkey. Sono tutte vere,
+    ma chi usa questa applicazione sta in Italia.
+    """
+
+    def test_la_scala_dei_mercati(self):
+        from core import extract
+
+        self.assertEqual(extract.rango_mercato("Xiaomi 12 EEA"), 0)
+        self.assertEqual(extract.rango_mercato("Honor 90 EU"), 0)
+        self.assertEqual(extract.rango_mercato("Xiaomi 12 Global"), 1)
+        self.assertEqual(extract.rango_mercato("Xiaomi 12"), 2)
+        self.assertEqual(extract.rango_mercato("Xiaomi 12 Turkey"), 3)
+        self.assertEqual(extract.rango_mercato("realme C63 India"), 3)
+
+    def test_le_parole_comuni_non_sono_sigle_di_mercato(self):
+        """«IN» e «US» sono sigle, ma «in» e «us» sono parole inglesi:
+        cercarle senza distinzione di maiuscole marcherebbe come indiano
+        qualunque titolo."""
+        from core import extract
+
+        self.assertEqual(extract.rango_mercato("the update is out"), 2)
+        self.assertEqual(extract.rango_mercato("rolling out for users"), 2)
+
+    def test_il_mercato_dichiarato_non_si_annulla(self):
+        """Prendere il minimo fra nome e descrizione faceva risalire
+        «Xiaomi 12 Turkey» (3) a 2, perche' la descrizione taceva."""
+        from core import extract
+
+        self.assertEqual(extract.rango_mercato("Xiaomi 12 Turkey"), 3)
+        self.assertNotEqual(extract.rango_mercato("Xiaomi 12 Turkey"),
+                            extract.rango_mercato("Xiaomi 12"))
+
+    def test_il_primo_risultato_e_quello_europeo(self):
+        from core import scan, storage
+
+        storage.init_db()
+        voci = scan.search_model("2201123C").get("items", [])
+        if len(voci) < 2:
+            self.skipTest("archivio senza varianti regionali in questo ambiente")
+        primo = voci[0].get("device_model") or ""
+        self.assertIn("EEA", primo, f"il primo risultato non e' europeo: {primo!r}")
+
+    def test_le_altre_regioni_restano_nell_elenco(self):
+        """Non si scarta niente: servono a chi confronta due varianti."""
+        from core import scan, storage
+
+        storage.init_db()
+        nomi = [v.get("device_model") for v in scan.search_model("2201123C").get("items", [])]
+        if len(nomi) < 2:
+            self.skipTest("archivio senza varianti regionali in questo ambiente")
+        self.assertTrue(any("Turkey" in (n or "") or "Global" in (n or "") for n in nomi))
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main(verbosity=2)
 

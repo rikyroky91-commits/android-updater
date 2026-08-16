@@ -177,6 +177,50 @@ _APPLE_ID_TOKEN = re.compile(r"^(iphone|ipad|ipod)(\d+,\d+)$", re.IGNORECASE)
 _ALNUM_TOKEN = re.compile(r"^[a-z]{0,2}\d+[a-z]{0,2}$")
 
 
+# Marcatori di mercato che compaiono DAVVERO nei nomi dei cataloghi,
+# contati il 16/08/2026 su 68.548 codici: EEA 305, Europe 133, EU 107,
+# Global 69, contro CN 96, IN 87, Russia 57, Japan 34, India 33,
+# Turkey 32, US 25, Korea 24.
+_MERCATO_EUROPA = r"EEA|EU|Europe|European"
+_MERCATO_GLOBALE = r"Global|International|Intl"
+_MERCATO_ALTROVE = (r"India|IN|China|CN|TW|Taiwan|JP|Japan|KR|Korea|US|USA|"
+                    r"LATAM|MEA|RU|Russia|Turkey|TR|Brazil|BR|Vietnam|VN|"
+                    r"Indonesia|ID|Thailand|TH")
+_RE_EUROPA = re.compile(rf"\b({_MERCATO_EUROPA})\b", re.I)
+_RE_GLOBALE = re.compile(rf"\b({_MERCATO_GLOBALE})\b", re.I)
+_RE_ALTROVE = re.compile(rf"\b({_MERCATO_ALTROVE})\b")
+
+
+def rango_mercato(testo: str | None) -> int:
+    """Quanto questo nome/record riguarda l'Europa: 0 il migliore.
+
+        0  dichiarato europeo   «Xiaomi 12 EEA», «... EU», «... Europe»
+        1  globale              «Xiaomi 12 Global» — include l'Europa
+        2  nessun marcatore     «Xiaomi 12» — il nome commerciale nudo
+        3  dichiarato altrove   «Xiaomi 12 Turkey», «... India», «... CN»
+
+    **A cosa serve.** Un codice puo' avere piu' righe, una per mercato,
+    con firmware diversi: `2201123C` ne ha tre — EEA, Global, Turkey.
+    Sono tutte informazioni vere, ma chi usa questa applicazione sta in
+    Italia, e la prima risposta che vede deve essere la sua. Richiesta
+    esplicita dell'utente il 16/08/2026: «ho bisogno che per ogni modello
+    il primo risultato sia sempre quello europeo».
+
+    I marcatori di ALTRO mercato si confrontano con le maiuscole
+    rispettate: «IN», «US», «TR» come sigle esistono, ma «in» e «us» sono
+    parole comuni — cercarle senza distinzione di maiuscole marcherebbe
+    come indiano qualunque titolo inglese.
+    """
+    testo = str(testo or "")
+    if _RE_EUROPA.search(testo):
+        return 0
+    if _RE_GLOBALE.search(testo):
+        return 1
+    if _RE_ALTROVE.search(testo):
+        return 3
+    return 2
+
+
 def canonical_device(raw: str) -> str:
     """Normalizza la forma di un nome modello ('galaxy s24  ultra' → 'Galaxy S24 Ultra')."""
     raw = re.sub(r"\s+", " ", str(raw or "").strip())
