@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titolo %}Richiedi un account · {{ titolo_sito }}{% endblock %}
+{% block corpo %}
+<h3 class="occhiello">Richiedi un account per il parco di test</h3>
+
+{% if inviata %}
+<div class="esito trovato">
+  <h2>Richiesta inviata</h2>
+  <p>L'amministratore ha ricevuto la richiesta e deve approvarla prima che
+    tu possa accedere. Riceverai accesso non appena viene confermata —
+    non serve rifare la registrazione nel frattempo.</p>
+</div>
+{% else %}
+<p class="nota">L'account nasce subito ma resta in attesa finché
+  l'amministratore non lo approva: nessuno entra nel parco di test senza
+  una decisione presa da una persona.</p>
+
+{% if errore_testo %}
+<p class="errore-modulo">{{ errore_testo }}</p>
+{% endif %}
+
+<form method="post" action="/registrati" class="modulo-account">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label for="reg-username">Nome utente</label>
+  <input id="reg-username" type="text" name="username" autocomplete="username" required autofocus>
+  <label for="reg-email">Email</label>
+  <input id="reg-email" type="email" name="email" autocomplete="email" required>
+  <label for="reg-password">Password (almeno 10 caratteri)</label>
+  <input id="reg-password" type="password" name="password" autocomplete="new-password" required minlength="10">
+  <label for="reg-conferma">Conferma password</label>
+  <input id="reg-conferma" type="password" name="conferma" autocomplete="new-password" required minlength="10">
+  <button type="submit">Invia richiesta</button>
+</form>
+{% endif %}
+
+<p class="nota"><a href="/login">Hai già un account approvato? Accedi</a></p>
+{% endblock %}

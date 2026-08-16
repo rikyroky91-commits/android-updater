@@ -46,6 +46,34 @@ services:
         sync: false
       - key: BACKUP_GITHUB_TOKEN
         sync: false
+      # --- Accesso al parco di test (vedi core/auth.py, web/account.py) ---
+      # Le prime tre creano l'unico account amministratore al primo avvio
+      # (non lo ricreano né lo aggiornano più dopo — cambia la password
+      # da /account/password una volta collegato). Senza tutte e tre il
+      # parco di test resta senza nessuno che possa approvare un account.
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Firma i cookie di sessione. Senza, l'app ne genera una casuale a
+      # ogni avvio: funziona, ma disconnette tutti a ogni riavvio del
+      # piano gratuito. Va generata una volta (es. `openssl rand -hex 32`)
+      # e non cambiata, altrimenti invalida tutte le sessioni aperte.
+      - key: SESSION_SECRET
+        sync: false
+      # SMTP per la sola email che il sito manda: la richiesta di
+      # approvazione di un nuovo account, verso ADMIN_APPROVAL_EMAIL
+      # (di default Riccardo.cucurullo91@gmail.com, vedi core/config.py).
+      # Con Gmail: SMTP_USERNAME è l'indirizzo, SMTP_PASSWORD è una
+      # «password per le app» generata su myaccount.google.com — non la
+      # password normale dell'account. Se non impostate, la richiesta
+      # resta comunque visibile su /admin/richieste dopo il login.
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
 
 # IL DIFETTO DEL PIANO GRATUITO, detto prima e non dopo: il servizio si
 # addormenta dopo circa 15 minuti senza visite, e la prima richiesta al

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block titolo %}Richieste di accesso · {{ titolo_sito }}{% endblock %}
+{% block corpo %}
+<h3 class="occhiello">Richieste di accesso in attesa</h3>
+
+{% if not richieste %}
+<p class="nota">Nessuna richiesta in attesa al momento.</p>
+{% else %}
+{% for r in richieste %}
+<div class="richieste-riga">
+  <span><strong>{{ r.username }}</strong> · {{ r.email }} ·
+    <span class="tenue">chiesto il {{ fmt_date(r.creato_il) }}</span></span>
+  <form method="post" action="/admin/richieste/{{ r.id }}/approva">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit">Approva</button>
+  </form>
+  <form method="post" action="/admin/richieste/{{ r.id }}/rifiuta">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="secondario">Rifiuta</button>
+  </form>
+</div>
+{% endfor %}
+{% endif %}
+<p class="nota">Le stesse richieste arrivano anche via email, con un link diretto
+  per approvare o rifiutare senza dover prima accedere qui.</p>
+{% endblock %}

@@ -38,24 +38,21 @@ import os
 import shutil
 from contextlib import asynccontextmanager
 from datetime import date
-from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import FastAPI, Form, Query, Request
 from fastapi.responses import (HTMLResponse, JSONResponse, RedirectResponse,
                                Response)
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from core import aer_catalog, aiquery, appledevices, config as C
 from core import extract, imeicheck, modelcodes, retest, scan, soc, sources, specs
 from core import storage, suggest, versus
-from core.util import fmt_date, fmt_relative, truncate
+from core.util import fmt_date
 
-from . import presenters as P
+from . import account, auth_web, presenters as P
 from .cache import CacheATempo
-
-RADICE = Path(__file__).resolve().parent
+from .contesto import RADICE, contesto as _contesto, rendi as _rendi
 
 # La memoria corta delle ricerche. Vedi `web/cache.py` per i numeri che
 # l'hanno motivata: una ricerca costa fino a tredici secondi di rete, e
@@ -76,10 +73,7 @@ async def ciclo_di_vita(app: FastAPI):
 app = FastAPI(title=C.APP_TITLE, docs_url=None, redoc_url=None,
               lifespan=ciclo_di_vita)
 app.mount("/static", StaticFiles(directory=RADICE / "static"), name="static")
-templates = Jinja2Templates(directory=str(RADICE / "templates"))
-templates.env.globals["fmt_relative"] = fmt_relative
-templates.env.globals["truncate"] = truncate
-templates.env.globals["fmt_date"] = fmt_date
+app.include_router(account.router)
 
 
 # ======================================================================
@@ -137,6 +131,7 @@ def avvio() -> None:
     STATO_AVVIO["copia di partenza"] = _semina_archivio()
 
     storage.init_db()
+    STATO_AVVIO["amministratore parco di test"] = account.assicura_admin()
     rimossi = storage.rebuild_if_logic_changed()
     if rimossi:
         STATO_AVVIO["ricostruzione"] = (
@@ -240,37 +235,6 @@ def _semina_archivio() -> str:
         return f"copia non riuscita: {errore}"
     return (f"partito dalla copia del repository "
             f"({os.path.getsize(percorso) // 1024} KB)")
-
-
-def _rendi(request: Request, pagina: str, contesto: dict):
-    """UNA SOLA FIRMA PER TUTTE LE PAGINE.
-
-    Starlette ha cambiato l'ordine degli argomenti di `TemplateResponse`
-    (prima la richiesta, poi il nome del template) e la forma vecchia non
-    dà un errore chiaro: prova a usare il dizionario come chiave di cache
-    e muore con «unhashable type». Passandoci da un punto solo, il giorno
-    che cambia ancora si corregge qui.
-    """
-    return templates.TemplateResponse(request, pagina, contesto)
-
-
-def _contesto(request: Request, **extra) -> dict:
-    """Quello che serve a OGNI pagina: testata, stato fonti, ricerca."""
-    stati = storage.get_source_status()
-    base = {
-        "titolo_sito": "Mobile Update Tracker",
-        "sottotitolo": "Quale aggiornamento è arrivato, su quale modello, quando.",
-        "fonti_ok": sum(1 for s in stati if s.get("ok")),
-        "fonti_totali": len(stati),
-        "ai_attiva": aiquery.disponibile(),
-        "ai_verifica_attiva": bool(
-            aiquery.fornitore() and aiquery.fornitore()[0] == "Gemini"),
-        "query": "",
-        "attiva": "",
-        "verifica_ai": None,
-    }
-    base.update(extra)
-    return base
 
 
 # ======================================================================
@@ -433,9 +397,53 @@ def pagina_aggiornamenti(request: Request, giorni: int = Query(default=30)):
     ))
 
 
+def _accesso_parco_richiesto(request: Request):
+    """Il parco di test è l'unica parte del sito dietro login (richiesta
+    dell'utente): chi non ha una sessione valida e approvata torna al
+    modulo di accesso invece di vedere la pagina. Vedi `web/account.py`
+    per registrazione e approvazione degli account."""
+    utente = auth_web.utente_da_richiesta(request)
+    if not utente:
+        return None, RedirectResponse("/login?next=/parco", status_code=303)
+    return utente, None
+
+
+ORDINAMENTI_PARCO = {
+    # etichetta mostrata nel <select> del template, vedi _ordina_righe_parco
+    "meno_recente": "Test meno recente prima",
+    "piu_recente": "Test più recente prima",
+}
+
+
+def _ordina_righe_parco(righe: list[dict], ordina: str) -> list[dict]:
+    """Riordina le righe del parco per quando sono state provate l'ultima
+    volta, invece del solo ordine marca/modello di `get_watchlist`.
+
+    I MAI TESTATI non hanno una data con cui confrontarsi: infilarli in
+    mezzo agli altri per confronto di stringhe (una stringa vuota è
+    "minore" di qualunque data) li farebbe sembrare i più vecchi in un
+    ordinamento e sparire in fondo nell'altro, per un effetto collaterale
+    dell'ordinamento invece che per una scelta. Restano un gruppo a
+    parte: in cima quando si cerca cosa manca da testare (sono la cosa
+    più urgente), in fondo quando si cerca cosa ritestare per primo fra
+    ciò che è STATO testato.
+    """
+    testati = [r for r in righe if r["tested_at_iso"]]
+    mai_testati = [r for r in righe if not r["tested_at_iso"]]
+    if ordina == "piu_recente":
+        return sorted(testati, key=lambda r: r["tested_at_iso"], reverse=True) + mai_testati
+    if ordina == "meno_recente":
+        return mai_testati + sorted(testati, key=lambda r: r["tested_at_iso"])
+    return righe
+
+
 @app.get("/parco", response_class=HTMLResponse)
 def pagina_parco(request: Request, test_salvato: int = Query(default=0),
-                 errore_test: str = Query(default="")):
+                 errore_test: str = Query(default=""), q: str = Query(default=""),
+                 ordina: str = Query(default="")):
+    utente, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
     parco = storage.get_watchlist()
     baseline = storage.get_test_baselines()
     devices = {d["device_key"]: d for d in storage.get_devices()}
@@ -450,21 +458,39 @@ def pagina_parco(request: Request, test_salvato: int = Query(default=0),
         # confronto capovolto — «tornato indietro» al posto di
         # «aggiornato», che è peggio di non rispondere.
         confronto = retest.confronta(device, riferimento) if device else None
+        tested_at_iso = riferimento.get("tested_at") if riferimento else None
         righe.append({
             "chiave": chiave,
             "modello": voce.get("model") or device.get("model", ""),
             "brand": voce.get("brand") or device.get("brand", ""),
-            "provato_il": (fmt_date(riferimento["tested_at"])
-                           if riferimento and riferimento.get("tested_at") else None),
+            "provato_il": fmt_date(tested_at_iso) if tested_at_iso else None,
+            # Chiave grezza ISO per ordinare (vedi _ordina_righe_parco):
+            # `provato_il` sopra è già formattato per l'utente («12/08/2026»)
+            # e in quella forma NON si ordina correttamente come stringa.
+            "tested_at_iso": tested_at_iso,
             # Il controllo nativo ``date`` vuole YYYY-MM-DD; la baseline
             # conserva invece un istante ISO completo. Tenerli distinti
             # rende modificabile la data senza esporre un orario inutile.
-            "data_test": ((riferimento.get("tested_at") or "")[:10]
-                           if riferimento and riferimento.get("tested_at")
-                           else date.today().isoformat()),
+            "data_test": (tested_at_iso[:10] if tested_at_iso else date.today().isoformat()),
             "puo_segnare_test": bool(device),
             "confronto": confronto,
         })
+
+    totale_parco = len(righe)
+    # FILTRO IN PYTHON, NON IN SQL. Il parco è la lista di modelli che
+    # QUALCUNO ha scelto di seguire, non l'intero catalogo (che può
+    # avere migliaia di righe): resta piccolo per costruzione, quindi
+    # filtrarlo dopo averlo già caricato non pesa né in tempo né in
+    # memoria, ed evita una seconda query per un caso che non lo
+    # giustifica. Stessa tokenizzazione della ricerca dispositivi
+    # (`storage.parole_di_ricerca`), per coerenza con il resto del sito.
+    parole = storage.parole_di_ricerca(q)
+    if parole:
+        righe = [r for r in righe
+                if all(p in f"{r['brand']} {r['modello']}".lower() for p in parole)]
+
+    righe = _ordina_righe_parco(righe, ordina)
+
     messaggi_errore = {
         "data": "Inserisci una data valida per il test.",
         "dispositivo": "Questo modello non ha ancora dati firmware da salvare come riferimento.",
@@ -472,6 +498,8 @@ def pagina_parco(request: Request, test_salvato: int = Query(default=0),
     }
     return _rendi(request, "parco.html", _contesto(
         request, attiva="parco", righe=righe,
+        totale_parco=totale_parco, q=q, ordina=ordina,
+        ordinamenti=ORDINAMENTI_PARCO,
         test_salvato=bool(test_salvato),
         errore_test=messaggi_errore.get(errore_test, ""),
     ))
@@ -512,6 +540,13 @@ def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
             ("Processori", soc.status()),
             ("Specifiche hardware", specs.status()),
             ("Interprete AI della ricerca", aiquery.status()),
+            # Non uno "stato" interrogato al volo come gli altri sopra: è
+            # quello che l'avvio ha scritto in STATO_AVVIO una volta sola
+            # (vedi avvio()). Serve a rispondere da qui, senza dover
+            # provare a fare login, alla domanda «ADMIN_USERNAME/EMAIL/
+            # PASSWORD sono state lette bene su Render?».
+            ("Amministratore parco di test",
+             STATO_AVVIO.get("amministratore parco di test", "avvio non ancora completato")),
         ],
         backup=P.stato_backup(),
         logica=C.DATA_LOGIC_VERSION,
@@ -621,8 +656,11 @@ def pagina_dispositivo(request: Request, k: str = Query(default="")):
 # Azioni
 # ======================================================================
 @app.post("/parco/aggiungi")
-def parco_aggiungi(chiave: str = Form(...), brand: str = Form(""),
+def parco_aggiungi(request: Request, chiave: str = Form(...), brand: str = Form(""),
                    modello: str = Form(""), ritorno: str = Form("")):
+    _, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
     storage.add_to_watchlist(chiave, brand, modello)
     # Il risultato appena visto e' nella cache corta: se non la si svuota,
     # tornando dalla form il pulsante resterebbe «Aggiungi» anche se il
@@ -637,7 +675,10 @@ def parco_aggiungi(chiave: str = Form(...), brand: str = Form(""),
 
 
 @app.post("/parco/togli")
-def parco_togli(chiave: str = Form(...)):
+def parco_togli(request: Request, chiave: str = Form(...)):
+    _, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
     storage.remove_from_watchlist(chiave)
     return RedirectResponse(f"/dispositivo?k={quote(chiave)}", status_code=303)
 
@@ -656,13 +697,16 @@ def _istante_test(data_test: str) -> str | None:
 
 
 @app.post("/parco/segna-test")
-def parco_segna_test(chiave: str = Form(...), data_test: str = Form("")):
+def parco_segna_test(request: Request, chiave: str = Form(...), data_test: str = Form("")):
     """Registra quando il telefono e' stato provato e la baseline attuale.
 
     La data da sola non basta al parco: il suo scopo e' capire *cosa* e'
     cambiato dal test. PerciÃ² il click salva insieme la versione/build/patch
     che il tracker conosce in quel momento, senza chiedere una seconda form.
     """
+    _, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
     if chiave not in storage.watched_keys():
         return RedirectResponse("/parco?errore_test=parco", status_code=303)
     dispositivo = next((d for d in storage.get_devices()

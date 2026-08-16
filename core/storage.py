@@ -188,6 +188,38 @@ CREATE TABLE IF NOT EXISTS nomi_modello (
     nome        TEXT NOT NULL,
     impostato_il TEXT NOT NULL
 );
+
+-- Accesso al parco di test: l'unica parte del sito dietro login. Uno
+-- stato invece di un semplice booleano perché un account nasce sempre
+-- «in_attesa» e non deve poter entrare finché l'amministratore non lo
+-- porta ad «approvato» — vedi core/auth.py e web/account.py.
+CREATE TABLE IF NOT EXISTS utenti (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    username          TEXT NOT NULL UNIQUE,
+    email             TEXT NOT NULL,
+    password_hash     TEXT NOT NULL,
+    admin             INTEGER NOT NULL DEFAULT 0,
+    stato             TEXT NOT NULL DEFAULT 'in_attesa',
+    creato_il         TEXT NOT NULL,
+    approvato_il      TEXT,
+    tentativi_falliti INTEGER NOT NULL DEFAULT 0,
+    bloccato_fino_a   TEXT
+);
+
+-- La richiesta di approvazione inviata via email. Il link porta un token
+-- generato con secrets.token_urlsafe: qui si conserva solo il suo hash
+-- SHA-256, mai il valore in chiaro, con lo stesso principio delle
+-- password — una lettura del database non basta a fabbricare
+-- un'approvazione (vedi core/auth.py).
+CREATE TABLE IF NOT EXISTS richieste_accesso (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    utente_id   INTEGER NOT NULL,
+    token_hash  TEXT NOT NULL,
+    scade_il    TEXT NOT NULL,
+    usata       INTEGER NOT NULL DEFAULT 0,
+    creata_il   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_richieste_utente ON richieste_accesso(utente_id);
 """
 
 
@@ -484,12 +516,18 @@ def clear_notified() -> int:
         return cur.rowcount
 
 
-def _parole_di_ricerca(search: str) -> list[str]:
+def parole_di_ricerca(search: str) -> list[str]:
     """Parole da cercare, ripulite dalle decorazioni.
 
     Le precisazioni fra parentesi vanno tolte: cercando «Oppo A6x
     (CPH2819)» la parola «cph2819» non compare in nessun campo del
     catalogo e ridurrebbe a zero i risultati, pur essendo il nome giusto.
+
+    Pubblica (non `_parole_di_ricerca`) perché oltre alle query SQL qui
+    sotto la usa anche `web/main.py::pagina_parco` per filtrare in
+    Python la lista già caricata del parco di test — stessa
+    tokenizzazione, nessuna query duplicata per un elenco che resta
+    piccolo per costruzione.
     """
     senza_parentesi = re.sub(r"\([^)]*\)", " ", search or "")
     return [p for p in senza_parentesi.lower().split() if p]
@@ -526,7 +564,7 @@ def get_updates(
         sql.append("AND COALESCE(published, first_seen) >= datetime('now', ?)")
         params.append(f"-{int(since_days)} days")
     if search:
-        for word in _parole_di_ricerca(search):
+        for word in parole_di_ricerca(search):
             sql.append(
                 "AND (LOWER(title) LIKE ? OR LOWER(COALESCE(device_model,'')) LIKE ? "
                 "OR LOWER(COALESCE(build,'')) LIKE ? OR LOWER(brand) LIKE ?)"
@@ -693,7 +731,7 @@ def get_devices(brands: list[str] | None = None, search: str | None = None) -> l
         # Si cerca in TUTTI i nomi noti del dispositivo, non solo in quello
         # mostrato: chi ha cercato «Samsung S24 Ultra» deve ritrovarlo
         # anche ora che la scheda si chiama «Galaxy S24 Ultra».
-        for word in _parole_di_ricerca(search):
+        for word in parole_di_ricerca(search):
             sql += " AND (LOWER(COALESCE(a.nomi_noti, r.device_model)) LIKE ? OR LOWER(r.brand) LIKE ?)"
             needle = f"%{word}%"
             params += [needle, needle]
@@ -745,6 +783,110 @@ def get_watchlist() -> list[dict]:
 def watched_keys() -> set[str]:
     conn = connect()
     return {r["device_key"] for r in conn.execute("SELECT device_key FROM watchlist").fetchall()}
+
+
+# ----------------------------------------------------------------------
+# Utenti e accesso al parco di test
+# ----------------------------------------------------------------------
+STATO_IN_ATTESA = "in_attesa"
+STATO_APPROVATO = "approvato"
+STATO_RIFIUTATO = "rifiutato"
+
+
+def crea_utente(username: str, email: str, password_hash: str, *,
+                 admin: bool = False, stato: str = STATO_IN_ATTESA) -> int:
+    ora = now_iso()
+    with transaction() as conn:
+        cur = conn.execute(
+            """INSERT INTO utenti (username, email, password_hash, admin, stato,
+                                    creato_il, approvato_il)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (username, email, password_hash, int(admin), stato, ora,
+             ora if stato == STATO_APPROVATO else None),
+        )
+        return cur.lastrowid
+
+
+def get_utente(utente_id: int) -> dict | None:
+    conn = connect()
+    riga = conn.execute("SELECT * FROM utenti WHERE id = ?", (utente_id,)).fetchone()
+    return dict(riga) if riga else None
+
+
+def get_utente_per_username(username: str) -> dict | None:
+    """Case-insensitive: due username diversi solo per maiuscole
+    creerebbero confusione, non due account distinti utili a qualcuno."""
+    conn = connect()
+    riga = conn.execute(
+        "SELECT * FROM utenti WHERE username = ? COLLATE NOCASE", (username,)
+    ).fetchone()
+    return dict(riga) if riga else None
+
+
+def esiste_admin() -> bool:
+    conn = connect()
+    return conn.execute("SELECT 1 FROM utenti WHERE admin = 1 LIMIT 1").fetchone() is not None
+
+
+def get_utenti_in_attesa() -> list[dict]:
+    conn = connect()
+    return rows_to_dicts(conn.execute(
+        "SELECT * FROM utenti WHERE stato = ? ORDER BY creato_il", (STATO_IN_ATTESA,)
+    ).fetchall())
+
+
+def imposta_stato_utente(utente_id: int, stato: str) -> None:
+    with transaction() as conn:
+        conn.execute(
+            "UPDATE utenti SET stato = ?, approvato_il = ? WHERE id = ?",
+            (stato, now_iso() if stato == STATO_APPROVATO else None, utente_id),
+        )
+
+
+def registra_tentativo_fallito(utente_id: int, blocca_fino_a: str | None) -> None:
+    with transaction() as conn:
+        conn.execute(
+            """UPDATE utenti SET tentativi_falliti = tentativi_falliti + 1,
+                                  bloccato_fino_a = ? WHERE id = ?""",
+            (blocca_fino_a, utente_id),
+        )
+
+
+def reset_tentativi_falliti(utente_id: int) -> None:
+    with transaction() as conn:
+        conn.execute(
+            "UPDATE utenti SET tentativi_falliti = 0, bloccato_fino_a = NULL WHERE id = ?",
+            (utente_id,),
+        )
+
+
+def imposta_password(utente_id: int, password_hash: str) -> None:
+    with transaction() as conn:
+        conn.execute("UPDATE utenti SET password_hash = ? WHERE id = ?",
+                     (password_hash, utente_id))
+
+
+def crea_richiesta_accesso(utente_id: int, token_hash: str, scade_il: str) -> int:
+    with transaction() as conn:
+        cur = conn.execute(
+            """INSERT INTO richieste_accesso (utente_id, token_hash, scade_il, creata_il)
+               VALUES (?, ?, ?, ?)""",
+            (utente_id, token_hash, scade_il, now_iso()),
+        )
+        return cur.lastrowid
+
+
+def get_richiesta_accesso(richiesta_id: int) -> dict | None:
+    conn = connect()
+    riga = conn.execute(
+        "SELECT * FROM richieste_accesso WHERE id = ?", (richiesta_id,)
+    ).fetchone()
+    return dict(riga) if riga else None
+
+
+def segna_richiesta_usata(richiesta_id: int) -> None:
+    with transaction() as conn:
+        conn.execute("UPDATE richieste_accesso SET usata = 1 WHERE id = ?", (richiesta_id,))
 
 
 # ----------------------------------------------------------------------

@@ -120,9 +120,44 @@ class _Sito(unittest.TestCase):
     RISPOSTA_RICERCA = staticmethod(lambda q: {"items": [], "error": None})
 
 
+class _SitoConLogin(_Sito):
+    """Il parco di test è dietro login (segnalato dall'utente): le classi
+    che ne esercitano le rotte collegano qui un account già approvato,
+    così ogni singolo test resta su «cosa fa la funzionalità» invece di
+    ripetere la procedura di accesso. Vedi `web/account.py` per come
+    nasce un account e `TestAccessoParco` per il collaudo del login vero
+    e proprio, cookie compresi."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from core import auth, storage
+
+        cls._utente_test_id = storage.crea_utente(
+            "collaudo", "collaudo@example.com",
+            auth.hash_password("password-di-collaudo-lunga"),
+            stato=storage.STATO_APPROVATO,
+        )
+
+    def setUp(self):
+        super().setUp()
+        from core import auth, storage
+        from web.auth_web import COOKIE_SESSIONE
+
+        # L'impronta della password è parte della sessione (vedi
+        # `core/auth.py::impronta_password`): una sessione costruita senza
+        # verrebbe rifiutata come una qualsiasi sessione scaduta.
+        utente = storage.get_utente(self._utente_test_id)
+        self.client.cookies.set(COOKIE_SESSIONE, auth.crea_sessione(
+            utente["id"], auth.impronta_password(utente["password_hash"])))
+
+
 class TestLePagineSiDisegnano(_Sito):
     def test_ogni_pagina_risponde(self):
-        for percorso in ("/", "/dispositivi", "/aggiornamenti", "/parco",
+        # «/parco» non è qui: è l'unica pagina dietro login, collaudata a
+        # parte in TestAccessoParco (sia il rifiuto anonimo sia l'accesso
+        # con una sessione valida).
+        for percorso in ("/", "/dispositivi", "/aggiornamenti",
                          "/catalogo", "/diagnostica", "/health"):
             with self.subTest(percorso=percorso):
                 self.assertEqual(self.client.get(percorso).status_code, 200)
@@ -1472,7 +1507,7 @@ class TestInterpreteAI(_Sito):
         self.assertIsNone(dati["errore"])
 
 
-class TestParcoDiTest(_Sito):
+class TestParcoDiTest(_SitoConLogin):
     def test_aggiungere_e_togliere(self):
         from core import storage
 
@@ -1541,6 +1576,83 @@ class TestParcoDiTest(_Sito):
         )
         self.assertEqual(risposta.headers["location"], "/parco?errore_test=data")
         self.assertIsNone(storage.get_test_baseline(chiave))
+
+    def test_la_ricerca_nel_parco_filtra_per_marca_o_modello(self):
+        """Segnalato dall'utente: con più modelli nel parco serve poter
+        cercare invece di scorrere tutta la tabella a occhio."""
+        from core import storage
+
+        for frammento in ("A07", "S24"):
+            chiave = next(d["device_key"] for d in storage.get_devices()
+                          if frammento in d["model"])
+            storage.add_to_watchlist(chiave, "Samsung", f"Galaxy {frammento}")
+
+        pagina = self.client.get("/parco", params={"q": "A07"}).text
+        self.assertIn("Galaxy A07", pagina)
+        self.assertNotIn("Galaxy S24", pagina)
+        self.assertIn("1 dispositivi su 2", pagina)
+
+        pagina = self.client.get("/parco", params={"q": "Samsung"}).text
+        self.assertIn("Galaxy A07", pagina)
+        self.assertIn("Galaxy S24", pagina)
+
+    def test_la_ricerca_senza_risultati_non_dice_che_il_parco_e_vuoto(self):
+        from core import storage
+
+        chiave = next(d["device_key"] for d in storage.get_devices()
+                      if "S24" in d["model"])
+        storage.add_to_watchlist(chiave, "Samsung", "Galaxy S24")
+
+        pagina = self.client.get("/parco", params={"q": "xiaomi"}).text
+        self.assertIn("Nessun modello nel parco corrisponde", pagina)
+        self.assertNotIn("Il parco è vuoto", pagina)
+
+    def test_ordina_per_test_piu_recente_e_meno_recente(self):
+        """Segnalato dall'utente: vuole poter ordinare il parco per quando
+        i telefoni sono stati provati, non solo per marca/modello."""
+        from core import storage
+
+        chiave_a07 = next(d["device_key"] for d in storage.get_devices()
+                          if "A07" in d["model"])
+        chiave_s24 = next(d["device_key"] for d in storage.get_devices()
+                          if "S24" in d["model"])
+        storage.add_to_watchlist(chiave_a07, "Samsung", "Galaxy A07")
+        storage.add_to_watchlist(chiave_s24, "Samsung", "Galaxy S24")
+
+        dispositivo_a07 = next(d for d in storage.get_devices() if d["device_key"] == chiave_a07)
+        dispositivo_s24 = next(d for d in storage.get_devices() if d["device_key"] == chiave_s24)
+        # A07 provato per primo (maggio), S24 provato dopo (giugno): il
+        # test verifica l'ordine relativo, non solo che non vada in errore.
+        storage.set_test_baseline(dispositivo_a07, tested_at="2026-05-01T12:00:00+00:00")
+        storage.set_test_baseline(dispositivo_s24, tested_at="2026-06-01T12:00:00+00:00")
+
+        pagina = self.client.get("/parco", params={"ordina": "piu_recente"}).text
+        self.assertLess(pagina.index("Galaxy S24"), pagina.index("Galaxy A07"))
+
+        pagina = self.client.get("/parco", params={"ordina": "meno_recente"}).text
+        self.assertLess(pagina.index("Galaxy A07"), pagina.index("Galaxy S24"))
+
+    def test_i_mai_testati_restano_un_gruppo_a_parte_nellordinamento(self):
+        from core import storage
+
+        chiave_a07 = next(d["device_key"] for d in storage.get_devices()
+                          if "A07" in d["model"])
+        chiave_s24 = next(d["device_key"] for d in storage.get_devices()
+                          if "S24" in d["model"])
+        storage.add_to_watchlist(chiave_a07, "Samsung", "Galaxy A07")  # mai testato
+        storage.add_to_watchlist(chiave_s24, "Samsung", "Galaxy S24")
+        dispositivo_s24 = next(d for d in storage.get_devices() if d["device_key"] == chiave_s24)
+        storage.set_test_baseline(dispositivo_s24, tested_at="2026-06-01T12:00:00+00:00")
+
+        # «meno recente prima»: chi non è mai stato testato è il più
+        # urgente da testare, quindi in cima.
+        pagina = self.client.get("/parco", params={"ordina": "meno_recente"}).text
+        self.assertLess(pagina.index("Galaxy A07"), pagina.index("Galaxy S24"))
+
+        # «più recente prima»: chi non è mai stato testato non ha una
+        # recency con cui competere, quindi in fondo.
+        pagina = self.client.get("/parco", params={"ordina": "piu_recente"}).text
+        self.assertLess(pagina.index("Galaxy S24"), pagina.index("Galaxy A07"))
 
 
 class TestControlliDiSalute(_Sito):

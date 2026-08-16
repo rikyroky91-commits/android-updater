@@ -46,6 +46,19 @@
         {% if fonti_totali %}{{ fonti_ok }}/{{ fonti_totali }} fonti attive
         {% else %}nessuna scansione ancora{% endif %}
       </a>
+      {# Il parco di test è l'unica pagina dietro login (vedi web/account.py):
+         qui si vede solo chi è collegato adesso, non un vero pannello. #}
+      {% if utente %}
+      <span class="conto">
+        {{ utente.username }}{% if utente.admin %} · <a href="/admin/richieste">richieste</a>{% endif %}
+        · <a href="/account/password">password</a>
+        <form method="post" action="/logout" class="logout-form">
+          <button type="submit" class="link-bottone">Esci</button>
+        </form>
+      </span>
+      {% else %}
+      <a class="conto" href="/login">Accedi</a>
+      {% endif %}
     </div>
   </header>
 

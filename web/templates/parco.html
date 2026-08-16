@@ -1,7 +1,24 @@
 {% extends "base.html" %}
 {% block titolo %}Parco di test · {{ titolo_sito }}{% endblock %}
 {% block corpo %}
-<h3 class="occhiello">Parco di test · {{ righe | length }} dispositivi</h3>
+<h3 class="occhiello">Parco di test · {{ righe | length }} dispositivi
+  {%- if q %} su {{ totale_parco }}{% endif %}</h3>
+
+{% if totale_parco %}
+<form method="get" action="/parco" class="parco-filtri">
+  <label class="sr-only" for="parco-q">Cerca nel parco</label>
+  <input id="parco-q" type="text" name="q" value="{{ q }}" placeholder="Cerca marca o modello…">
+  <label class="sr-only" for="parco-ordina">Ordina per</label>
+  <select id="parco-ordina" name="ordina">
+    <option value="">Marca e modello</option>
+    {% for valore, etichetta in ordinamenti.items() %}
+    <option value="{{ valore }}" {{ "selected" if ordina == valore }}>{{ etichetta }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="secondario">Filtra</button>
+</form>
+{% endif %}
+
 {% if righe %}
 {% if test_salvato %}<p class="conferma-azione">✓ Test registrato: salvata la data e la versione corrente.</p>{% endif %}
 {% if errore_test %}<p class="errore-azione">{{ errore_test }}</p>{% endif %}
@@ -32,6 +49,9 @@
     {% endfor %}
   </tbody>
 </table>
+{% elif q %}
+<p class="vuoto">Nessun modello nel parco corrisponde a «{{ q }}».
+  <a href="/parco">Azzera la ricerca</a> per vedere tutti i {{ totale_parco }} dispositivi.</p>
 {% else %}
 <p class="vuoto">Il parco è vuoto. Apri un dispositivo e aggiungilo: da quel
   momento il sito dice quando è cambiato qualcosa da quando lo hai provato.</p>

@@ -122,6 +122,23 @@ a { color: inherit; }
 }
 .stato-fonti:hover { color: var(--accent); }
 
+/* Login/logout in testata: chi è dentro vede il proprio nome, chi non lo
+   è vede un solo link «Accedi» — niente occupa spazio per due stati alla
+   volta. */
+.conto {
+  font-size: .8rem; color: var(--neutral); text-decoration: none;
+  white-space: nowrap; display: flex; align-items: center; gap: .5rem;
+}
+.conto a { color: var(--neutral); text-decoration: none; }
+.conto a:hover { color: var(--accent); }
+.logout-form { margin: 0; display: inline; }
+.link-bottone {
+  font: inherit; font-size: .8rem; color: var(--neutral);
+  background: none; border: none; padding: 0; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.link-bottone:hover { color: var(--accent); }
+
 /* --- Impaginato -------------------------------------------------------
    `width: 100%` NON È RIDONDANTE, ed è la stessa trappola del tasto
    grande: da quando `body` è una colonna flessibile (serve al piede in
@@ -335,6 +352,20 @@ a { color: inherit; }
 }
 .data-test-form button.secondario { padding: .3rem .55rem; font-size: .78rem; white-space: nowrap; }
 @media (max-width: 620px) { .data-test-form { flex-wrap: wrap; } }
+
+/* Ricerca + ordinamento sopra la tabella del parco. Un GET, non JS: il
+   parco resta utilizzabile anche senza JavaScript, come il resto del
+   sito, e l'esito è un indirizzo condivisibile (?q=...&ordina=...). */
+.parco-filtri {
+  display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
+  margin: .8rem 0 1.1rem;
+}
+.parco-filtri input[type="text"], .parco-filtri select {
+  font: inherit; font-size: .88rem; padding: .4rem .6rem;
+  border: 1px solid var(--filo); background: var(--carta); color: inherit;
+  border-radius: 4px;
+}
+.parco-filtri input[type="text"] { flex: 1 1 220px; min-width: 160px; }
 .conferma-azione, .errore-azione {
   margin: 0 0 1rem; padding: .65rem .8rem; font-size: .88rem;
   background: var(--carta); border-left: 3px solid var(--cerca);
@@ -371,6 +402,33 @@ a { color: inherit; }
 }
 .correzione-form button[type="submit"]:hover { background: var(--ai-scuro); }
 .correzione-reset { margin: 0 0 .4rem; }
+
+/* --- Login, registrazione, approvazione account ------------------------ */
+.modulo-account {
+  display: flex; flex-direction: column; gap: .55rem;
+  max-width: 360px; margin: 1rem 0;
+}
+.modulo-account label { font-size: .82rem; color: var(--neutral); }
+.modulo-account input {
+  font: inherit; font-size: .92rem; padding: .5rem .65rem;
+  border: 1px solid var(--filo); background: var(--carta); color: inherit;
+  border-radius: 4px;
+}
+.modulo-account button[type="submit"] {
+  font: inherit; font-weight: 600; font-size: .88rem;
+  color: var(--carta); padding: .55rem 1rem;
+  background: var(--ai); border: 1px solid var(--ai);
+  border-radius: 6px; cursor: pointer; margin-top: .2rem;
+}
+.modulo-account button[type="submit"]:hover { background: var(--ai-scuro); }
+.errore-modulo {
+  color: var(--accent-scuro); font-size: .85rem; margin: 0 0 .3rem;
+}
+.richieste-riga {
+  display: flex; align-items: center; gap: .8rem; flex-wrap: wrap;
+  padding: .5rem 0; border-bottom: 1px solid var(--filo);
+}
+.richieste-riga form { margin: 0; }
 
 /* Il testo libero è annidato dentro un secondo <details>, chiuso di
    default: è la via d'uscita per il caso raro (nessuna delle forme

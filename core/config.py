@@ -116,6 +116,71 @@ NOTIFY_MIN_SEVERITY = env("NOTIFY_MIN_SEVERITY", "SECURITY")
 NOTIFY_ONLY_WATCHLIST = env_bool("NOTIFY_ONLY_WATCHLIST", False)
 NOTIFY_MAX_PER_SCAN = env_int("NOTIFY_MAX_PER_SCAN", 25)
 
+# --- Accesso al parco di test -------------------------------------------
+# Il parco di test è l'unica parte del sito dietro login: contiene lo
+# storico di cosa è stato provato su ciascun device, non è materiale da
+# lasciare pubblico come la ricerca. Vedi core/auth.py e web/account.py.
+ADMIN_APPROVAL_EMAIL = env("ADMIN_APPROVAL_EMAIL", "Riccardo.cucurullo91@gmail.com")
+# Serve per comporre link assoluti nell'email di approvazione (un link
+# relativo non si può cliccare da un client di posta). Da impostare
+# sull'host reale in produzione; il default è quello del deploy attuale.
+SITE_BASE_URL = env("SITE_BASE_URL", "https://android-updater.onrender.com").rstrip("/")
+# Sopra HTTPS (Render lo termina sempre) il cookie di sessione deve avere
+# l'attributo Secure. Si disattiva solo per collaudare in locale su http.
+COOKIE_SECURE = env_bool("COOKIE_SECURE", True)
+LOGIN_MAX_TENTATIVI = env_int("LOGIN_MAX_TENTATIVI", 5)
+LOGIN_BLOCCO_MINUTI = env_int("LOGIN_BLOCCO_MINUTI", 15)
+SESSIONE_DURATA_ORE = env_int("SESSIONE_DURATA_ORE", 12)
+RICHIESTA_ACCESSO_SCADENZA_GIORNI = env_int("RICHIESTA_ACCESSO_SCADENZA_GIORNI", 7)
+
+
+def session_secret() -> str:
+    """Chiave per firmare i cookie di sessione. Vedi core/auth.py per cosa
+    succede quando non è impostata: mai una stringa vuota o fissa nel
+    codice, che chiunque legga la repository pubblica potrebbe leggere e
+    usare per firmare una sessione falsa."""
+    return env("SESSION_SECRET")
+
+
+def admin_bootstrap() -> tuple[str, str, str] | None:
+    """(username, email, password) per creare il primo amministratore —
+    l'unico che può approvare le richieste di accesso al parco di test.
+
+    Le tre variabili si leggono a runtime, non solo al primo avvio: se il
+    database non ha ancora nessun amministratore (prima installazione, o
+    dopo che il disco effimero di Render è stato ricreato) e queste sono
+    impostate, `web/main.py` crea l'account admin. Se un amministratore
+    esiste già, l'app non lo ricrea né ne cambia la password da sola —
+    altrimenti riavvii periodici del piano gratuito la riporterebbero
+    ogni volta alla password iniziale. Nessuna delle tre ha un default:
+    meglio un sito senza parco di test accessibile finché non sono
+    configurate, che un amministratore con credenziali indovinabili."""
+    username = env("ADMIN_USERNAME")
+    email = env("ADMIN_EMAIL")
+    password = env("ADMIN_PASSWORD")
+    if username and email and password:
+        return username, email, password
+    return None
+
+
+def smtp_config() -> dict | None:
+    """Configurazione SMTP per la sola email che il sito manda: la
+    richiesta di approvazione di un nuovo account. None se non è
+    impostata — l'invio va allora in errore dichiarato (vedi
+    core/mail.py), mai in un tentativo silenzioso che non parte."""
+    username = env("SMTP_USERNAME")
+    password = env("SMTP_PASSWORD")
+    if not (username and password):
+        return None
+    return {
+        "host": env("SMTP_HOST", "smtp.gmail.com"),
+        "port": env_int("SMTP_PORT", 587),
+        "username": username,
+        "password": password,
+        "mittente": env("SMTP_MITTENTE") or username,
+    }
+
+
 # --- Filtro di rilevanza ----------------------------------------------
 RELEVANCE_THRESHOLD = env_int("RELEVANCE_THRESHOLD", 3)
 

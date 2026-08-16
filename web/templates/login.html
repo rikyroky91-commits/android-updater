@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block titolo %}Accedi · {{ titolo_sito }}{% endblock %}
+{% block corpo %}
+<h3 class="occhiello">Accedi</h3>
+<p class="nota">Solo per il parco di test. Non hai ancora un account?
+  <a href="/registrati">Richiedine uno</a> — va approvato da un amministratore
+  prima di poter essere usato.</p>
+
+{% if errore_testo %}
+<p class="errore-modulo">{{ errore_testo }}</p>
+{% endif %}
+
+<form method="post" action="/login" class="modulo-account">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="next" value="{{ next }}">
+  <label for="login-username">Nome utente</label>
+  <input id="login-username" type="text" name="username" autocomplete="username" required autofocus>
+  <label for="login-password">Password</label>
+  <input id="login-password" type="password" name="password" autocomplete="current-password" required>
+  <button type="submit">Accedi</button>
+</form>
+{% endblock %}

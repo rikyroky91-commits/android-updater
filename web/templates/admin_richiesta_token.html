@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block titolo %}Richiesta di accesso · {{ titolo_sito }}{% endblock %}
+{% block corpo %}
+<h3 class="occhiello">Richiesta di accesso al parco di test</h3>
+
+{% if esito == "da_decidere" %}
+<div class="esito trovato">
+  <h2>{{ utente.username }}</h2>
+  <p>{{ utente.email }} ha chiesto un account per il parco di test.</p>
+  <div class="richieste-riga">
+    <form method="post" action="/admin/richieste/token/{{ richiesta_id }}/approva">
+      <input type="hidden" name="token" value="{{ token }}">
+      <button type="submit">Approva</button>
+    </form>
+    <form method="post" action="/admin/richieste/token/{{ richiesta_id }}/rifiuta">
+      <input type="hidden" name="token" value="{{ token }}">
+      <button type="submit" class="secondario">Rifiuta</button>
+    </form>
+  </div>
+</div>
+{% elif esito == "gia_decisa" %}
+<div class="esito trovato">
+  <h2>Richiesta già decisa</h2>
+  <p>La richiesta di {{ utente.username }} risulta già
+    {{ "approvata" if utente.stato == "approvato" else "rifiutata" }}. Nessuna
+    azione ulteriore necessaria.</p>
+</div>
+{% elif esito == "scaduta" %}
+<div class="esito incerto">
+  <h2>Link scaduto o già usato</h2>
+  <p>Questo link di approvazione non è più valido. La richiesta di
+    {{ utente.username if utente else "questo account" }} resta comunque
+    visibile accedendo come amministratore su
+    <a href="/admin/richieste">/admin/richieste</a>.</p>
+</div>
+{% else %}
+<div class="esito incerto">
+  <h2>Link non valido</h2>
+  <p>Questo link non corrisponde a nessuna richiesta conosciuta.</p>
+</div>
+{% endif %}
+{% endblock %}
