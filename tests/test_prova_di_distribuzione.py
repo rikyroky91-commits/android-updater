@@ -126,5 +126,65 @@ class TestNienteDispositivoFantasma(unittest.TestCase):
         self.assertIn("prova di distribuzione", scartati[0]["relevance_note"])
 
 
+
+class TestVersionePrecisaComeProva(unittest.TestCase):
+    """Una versione di skin a TRE O PIU' parti vale quanto un numero di
+    build: entrambi esistono solo se un pacchetto e' stato distribuito.
+
+    La regola in `scan.normalize` chiede una PROVA di distribuzione, non
+    letteralmente una build. Honor e vivo pubblicano le versioni in forma
+    puntata («MagicOS 9.0.0.157», «Funtouch OS 14.0.1.2») e quasi mai un
+    build number in stile Samsung: senza questa equivalenza il dato
+    veniva estratto correttamente e poi buttato via.
+
+    Misurato il 16/08/2026 su dieci modelli per marca: Honor dava un
+    firmware su 1 modello su 10, vivo su 2 su 10.
+    """
+
+    def test_una_versione_a_tre_parti_e_una_prova(self):
+        self.assertTrue(extract.versione_precisa("9.0.0.157"))
+        self.assertTrue(extract.versione_precisa("14.0.1.2"))
+
+    def test_una_versione_corta_non_lo_e(self):
+        """«MagicOS 10» o «One UI 6.1» possono essere un annuncio, un
+        elenco di modelli idonei o un'attesa: sono esattamente il caso che
+        la regola anti-rumore esiste per fermare."""
+        self.assertFalse(extract.versione_precisa("10"))
+        self.assertFalse(extract.versione_precisa("6.1"))
+        self.assertFalse(extract.versione_precisa(None))
+
+    def test_la_versione_completa_si_estrae_per_intero(self):
+        """Il gruppo si fermava a due parti e «9.0.0.157» diventava
+        «9.0» — cioe' le due cifre che dimostrano il rilascio venivano
+        tolte prima ancora di poter essere valutate."""
+        e = extract.extract_all(
+            "MagicOS 9.0.0.157 feature update rolling out for Honor Magic 7/6 series")
+        self.assertEqual(e.skin_name, "MagicOS")
+        self.assertEqual(e.skin_version, "9.0.0.157")
+
+    def test_una_notizia_rumorosa_con_versione_precisa_tiene_la_versione(self):
+        fonte = sources.Source(key="prova", label="Prova", trust=C.TRUST_NOISY, fetch=None)
+        voce = scan.normalize(
+            sources.RawItem(
+                title="MagicOS 9.0.0.157 rolling out for Honor Magic6 Pro",
+                link="https://esempio.invalid/1"),
+            fonte)
+        self.assertEqual(voce["skin_name"], "MagicOS")
+        self.assertEqual(voce["skin_version"], "9.0.0.157")
+
+    def test_una_notizia_rumorosa_con_versione_vaga_la_perde_ancora(self):
+        """La difesa che ha prodotto «Samsung A32 - Android 14» resta in
+        piedi: e' il caso per cui la regola e' nata."""
+        fonte = sources.Source(key="prova", label="Prova", trust=C.TRUST_NOISY, fetch=None)
+        voce = scan.normalize(
+            sources.RawItem(
+                title="Galaxy A32 will get Android 14 One UI 6",
+                link="https://esempio.invalid/2"),
+            fonte)
+        self.assertFalse(voce["skin_version"])
+        self.assertFalse(voce["os_version"])
+        self.assertIsNone(voce["android_version"])
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main(verbosity=2)

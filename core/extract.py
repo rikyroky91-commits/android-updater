@@ -356,6 +356,18 @@ def device_key(brand: str, model: str) -> str:
 # ======================================================================
 _ANDROID_RE = re.compile(r"\bandroid\s*(\d{1,2})(?:\.\d+)?\b", re.IGNORECASE)
 
+# LE VERSIONI DELLE SKIN SI CATTURANO PER INTERO, fino a quattro parti.
+#
+# Prima il gruppo si fermava a due (`\d{1,2}(?:\.\d{1,2})?`), e «MagicOS
+# 9.0.0.157» diventava «MagicOS 9.0». Le due cifre buttate via erano
+# proprio quelle che contano: una versione a tre o quattro parti esiste
+# solo se un pacchetto e' stato davvero distribuito — e' una prova di
+# distribuzione forte quanto un numero di build, mentre «MagicOS 9» da
+# solo puo' essere un annuncio, un'attesa o un elenco di modelli idonei.
+# Vedi `versione_precisa` piu' sotto e la regola in `scan.normalize`.
+#
+# Misurato il 16/08/2026: Honor dava firmware su 1 modello su 10 e vivo su
+# 2 su 10, pur avendo notizie con la versione completa nel titolo.
 SKIN_PATTERNS = [
     # iOS/iPadOS non sono "skin" sopra Android: sono il sistema operativo
     # stesso. Vivono comunque in questa lista perché il meccanismo che ne
@@ -363,18 +375,18 @@ SKIN_PATTERNS = [
     # iPhone `android_version` resta correttamente vuoto.
     ("iPadOS", r"\bipados\s*(\d{1,2}(?:\.\d{1,2}){0,2})"),
     ("iOS", r"\bios\s*(\d{1,2}(?:\.\d{1,2}){0,2})"),
-    ("One UI", r"\bone\s*ui\s*(\d{1,2}(?:\.\d{1,2})?)"),
-    ("HyperOS", r"\bhyper\s*os\s*(\d{1,2}(?:\.\d{1,2})?)"),
-    ("MIUI", r"\bmiui\s*(\d{1,2}(?:\.\d{1,2})?)"),
-    ("ColorOS", r"\bcolor\s*os\s*(\d{1,2}(?:\.\d{1,2})?)"),
-    ("OxygenOS", r"\boxygen\s*os\s*(\d{1,2}(?:\.\d{1,2})?)"),
-    ("realme UI", r"\brealme\s*ui\s*(\d{1,2}(?:\.\d{1,2})?)"),
-    ("MagicOS", r"\bmagic\s*os\s*(\d{1,2}(?:\.\d{1,2})?)"),
-    ("HarmonyOS", r"\bharmony\s*os\s*(?:next\s*)?(\d{1,2}(?:\.\d{1,2})?)"),
-    ("EMUI", r"\bemui\s*(\d{1,2}(?:\.\d{1,2})?)"),
-    ("Funtouch OS", r"\bfuntouch\s*os\s*(\d{1,2}(?:\.\d{1,2})?)"),
-    ("OriginOS", r"\borigin\s*os\s*(\d{1,2}(?:\.\d{1,2})?)"),
-    ("Nothing OS", r"\bnothing\s*os\s*(\d{1,2}(?:\.\d{1,2})?)"),
+    ("One UI", r"\bone\s*ui\s*(\d{1,2}(?:\.\d{1,3}){0,3})"),
+    ("HyperOS", r"\bhyper\s*os\s*(\d{1,2}(?:\.\d{1,3}){0,3})"),
+    ("MIUI", r"\bmiui\s*(\d{1,2}(?:\.\d{1,3}){0,3})"),
+    ("ColorOS", r"\bcolor\s*os\s*(\d{1,2}(?:\.\d{1,3}){0,3})"),
+    ("OxygenOS", r"\boxygen\s*os\s*(\d{1,2}(?:\.\d{1,3}){0,3})"),
+    ("realme UI", r"\brealme\s*ui\s*(\d{1,2}(?:\.\d{1,3}){0,3})"),
+    ("MagicOS", r"\bmagic\s*os\s*(\d{1,2}(?:\.\d{1,3}){0,3})"),
+    ("HarmonyOS", r"\bharmony\s*os\s*(?:next\s*)?(\d{1,2}(?:\.\d{1,3}){0,3})"),
+    ("EMUI", r"\bemui\s*(\d{1,2}(?:\.\d{1,3}){0,3})"),
+    ("Funtouch OS", r"\bfuntouch\s*os\s*(\d{1,2}(?:\.\d{1,3}){0,3})"),
+    ("OriginOS", r"\borigin\s*os\s*(\d{1,2}(?:\.\d{1,3}){0,3})"),
+    ("Nothing OS", r"\bnothing\s*os\s*(\d{1,2}(?:\.\d{1,3}){0,3})"),
 ]
 _COMPILED_SKINS = [(name, re.compile(p, re.IGNORECASE)) for name, p in SKIN_PATTERNS]
 
@@ -465,6 +477,18 @@ def extract_skin(text: str) -> tuple[str, str] | None:
         if m:
             return name, m.group(1)
     return None
+
+
+def versione_precisa(versione: str | None) -> bool:
+    """Una versione di skin a TRE O PIU' parti («9.0.0.157»).
+
+    E' il discrimine fra «questo pacchetto e' uscito» e «si parla di
+    questa versione». Un numero cosi' lungo non compare in un annuncio o
+    in un elenco di modelli idonei: lo si scrive solo copiandolo da un
+    aggiornamento reale, esattamente come un numero di build.
+    """
+    pezzi = [p for p in re.split(r"[^\d]+", str(versione or "")) if p]
+    return len(pezzi) >= 3
 
 
 def extract_build(text: str) -> str | None:

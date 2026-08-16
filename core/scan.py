@@ -212,7 +212,21 @@ def normalize(raw: sources.RawItem, source: sources.Source) -> dict:
     #
     # Vale SOLO per le fonti inaffidabili: le fonti ufficiali che danno la
     # versione senza build (rare ma esistono) non sono toccate.
-    if source.trust == C.TRUST_NOISY and not data.build:
+    #
+    # E NON VALE PER UNA VERSIONE DI SKIN PRECISA. «MagicOS 9.0.0.157» non
+    # è la stessa cosa di «Android 14»: un numero a tre o quattro parti
+    # non compare in un annuncio né in un elenco di modelli idonei, lo si
+    # scrive solo copiandolo da un aggiornamento uscito davvero. È la
+    # stessa prova che porta un numero di build, e la regola qui sopra
+    # chiede una prova, non chiede letteralmente una build.
+    #
+    # Perché è stato necessario: Honor e vivo pubblicano le versioni in
+    # questa forma e quasi mai un build number in stile Samsung. Misurato
+    # il 16/08/2026 su dieci modelli per marca, Honor dava un firmware su
+    # 1 modello su 10 e vivo su 2 su 10 — non perché il dato mancasse, ma
+    # perché veniva tolto qui dopo essere stato estratto correttamente.
+    versione_provata = extract.versione_precisa(data.skin_version)
+    if source.trust == C.TRUST_NOISY and not data.build and not versione_provata:
         # `os_version` è una proprietà calcolata da skin e Android:
         # si azzerano le fonti, non il risultato.
         data.android_version = None
@@ -224,7 +238,9 @@ def normalize(raw: sources.RawItem, source: sources.Source) -> dict:
         # sempre di attese, di idoneità o di elenchi di esclusi.
 
     os_version = data.os_version or (raw.version or "")
-    if source.trust == C.TRUST_NOISY and not data.build:
+    # Stessa eccezione della regola qui sopra, e va tenuta allineata: se la
+    # skin resta, deve restare anche l'etichetta che la mostra.
+    if source.trust == C.TRUST_NOISY and not data.build and not versione_provata:
         os_version = ""
     # `data.android_version` PUÒ essere stata appena azzerata dalla regola
     # qui sopra, e in quel caso non c'è nessuna versione da riscrivere.

@@ -673,6 +673,51 @@ def _normalize_name(name: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+# Le stesse marche che `_normalize_name` toglie dalla testa del nome.
+_MARCHE_NOTE = ("samsung", "xiaomi", "honor", "huawei", "motorola",
+                "oneplus", "oppo", "realme", "vivo", "google")
+
+
+def _prima_la_marca_giusta(nome_cercato: str, codici: list[str]) -> list[str]:
+    """Riordina i candidati mettendo davanti quelli della marca nominata
+    nella richiesta.
+
+    IL PROBLEMA, MISURATO IL 16/08/2026. `_normalize_name` toglie il
+    prefisso della marca — cosa giusta e voluta, senza cui «Samsung
+    Galaxy S24» e «Galaxy S24» sarebbero due telefoni diversi (vedi il suo
+    docstring e `test_quattro_segnalazioni`). Ma per i marchi il cui nome
+    commerciale è *marca + numero* non resta nient'altro: «Xiaomi 14» e
+    «realme 14» diventano tutti e due la chiave «14», e finiscono nello
+    stesso secchio dell'indice inverso.
+
+    L'effetto era concreto: `codes_for_name("Xiaomi 14")` restituiva
+    `RMX5075` come PRIMO candidato, che è un realme. Chi prende il primo
+    codice — e i chiamanti fanno così — interrogava le fonti ufficiali
+    per il telefono di un'altra marca. Un codice sbagliato è molto peggio
+    di nessun codice, come dice il docstring di `codes_for_name` stesso.
+
+    Non si toglie niente dall'elenco, si riordina soltanto: parecchie
+    voci di catalogo non ripetono la marca dentro il nome («Galaxy S24»
+    non contiene «Samsung»), e scartarle perderebbe codici buoni. Chi
+    prende il primo ora prende quello giusto; chi li scorre tutti trova
+    le stesse cose di prima.
+
+    La correzione sta QUI e non in `_normalize_name` di proposito: quella
+    è usata in una cinquantina di punti fra `sources.py` e `web/main.py`,
+    e cambiarne il significato per risolvere un problema dell'indice
+    inverso avrebbe spostato il rischio su tutto il resto del progetto.
+    """
+    testo = (nome_cercato or "").lower()
+    marca = next((m for m in _MARCHE_NOTE if testo.startswith(m)), None)
+    if not marca or not codici:
+        return codici
+    combacia, resto = [], []
+    for codice in codici:
+        nomi = " ".join(_memory_cache.get(codice, [])).lower() if _memory_cache else ""
+        (combacia if marca in nomi else resto).append(codice)
+    return combacia + resto if combacia else codici
+
+
 def codes_for_name(name: str) -> list[str]:
     """Indice INVERSO: codici tecnici noti per un nome commerciale
     (es. 'Galaxy S24 Ultra' → ['SM-S928B', 'SM-S928U', ...]).
@@ -715,7 +760,7 @@ def codes_for_name(name: str) -> list[str]:
     chiave = _normalize_name(name)
     trovati = _reverse_cache.get(chiave)
     if trovati:
-        return trovati
+        return _prima_la_marca_giusta(name, trovati)
 
     # LO SPAZIO FRA LA GAMMA E IL NUMERO NON DISTINGUE NIENTE.
     # Il catalogo scrive «OPPO Reno14», le persone scrivono «oppo reno 14»,
@@ -734,7 +779,7 @@ def codes_for_name(name: str) -> list[str]:
     if stretta:
         trovati = (_reverse_compatto or {}).get(stretta)
         if trovati:
-            return trovati
+            return _prima_la_marca_giusta(name, trovati)
     # RIPIEGO SUI SUFFISSI COMMERCIALI. Il catalogo scrive «Galaxy A55 5G»,
     # le persone cercano «Galaxy A55»: con il solo confronto esatto quel
     # modello non aveva NESSUN codice, e senza codice il controllo versione
@@ -748,11 +793,12 @@ def codes_for_name(name: str) -> list[str]:
     if ridotta and ridotta != chiave:
         trovati = _reverse_cache.get(ridotta)
         if trovati:
-            return trovati
+            return _prima_la_marca_giusta(name, trovati)
         trovati = (_reverse_compatto or {}).get(_compatta(ridotta))
         if trovati:
-            return trovati
-    return (_reverse_senza_suffisso or {}).get(ridotta or chiave, [])
+            return _prima_la_marca_giusta(name, trovati)
+    return _prima_la_marca_giusta(
+        name, (_reverse_senza_suffisso or {}).get(ridotta or chiave, []))
 
 
 def _compatta(chiave: str) -> str:

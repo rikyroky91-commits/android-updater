@@ -763,6 +763,54 @@ class TestEtichettaVersione(unittest.TestCase):
         self.assertNotIn("None", item["os_version"] or "")
 
 
+
+class TestLaMarcaNonSiConfondeNellIndiceInverso(unittest.TestCase):
+    """`_normalize_name` toglie il prefisso della marca — voluto, senza
+    non combacerebbero «Samsung Galaxy S24» e «Galaxy S24». Ma per i
+    marchi il cui nome commerciale e' *marca + numero* non resta
+    nient'altro: «Xiaomi 14» e «realme 14» diventano tutti e due la
+    chiave «14» e finiscono nello stesso secchio dell'indice inverso.
+
+    Misurato il 16/08/2026: `codes_for_name("Xiaomi 14")` restituiva
+    `RMX5075` come PRIMO candidato, che e' un realme. I chiamanti
+    prendono il primo codice, quindi si interrogavano le fonti ufficiali
+    per il telefono di un'altra marca.
+    """
+
+    def _codici(self, nome):
+        from core import modelcodes
+
+        return modelcodes.codes_for_name(nome)
+
+    def test_un_nome_marca_piu_numero_non_prende_il_codice_di_un_altra_marca(self):
+        from core import modelcodes
+
+        primo_xiaomi = self._codici("Xiaomi 14")[:1]
+        primo_realme = self._codici("realme 14")[:1]
+        if not primo_xiaomi or not primo_realme:
+            self.skipTest("catalogo dei codici non disponibile in questo ambiente")
+
+        nomi_x = " ".join(modelcodes.resolve(primo_xiaomi[0])).lower()
+        nomi_r = " ".join(modelcodes.resolve(primo_realme[0])).lower()
+        self.assertIn("xiaomi", nomi_x,
+                      f"«Xiaomi 14» ha dato {primo_xiaomi[0]}, che non e' uno Xiaomi")
+        self.assertIn("realme", nomi_r,
+                      f"«realme 14» ha dato {primo_realme[0]}, che non e' un realme")
+        self.assertNotEqual(primo_xiaomi, primo_realme)
+
+    def test_riordinare_non_toglie_nessun_codice(self):
+        """Molte voci di catalogo non ripetono la marca nel nome («Galaxy
+        S24» non contiene «Samsung»): scartarle invece di riordinarle
+        perderebbe codici buoni."""
+        from core import modelcodes
+
+        codici = self._codici("Galaxy S24 Ultra")
+        if not codici:
+            self.skipTest("catalogo dei codici non disponibile in questo ambiente")
+        self.assertTrue(any(c.startswith("SM-") for c in codici))
+
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main(verbosity=2)
 
