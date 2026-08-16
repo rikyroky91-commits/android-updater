@@ -3794,7 +3794,12 @@ def _extra_sources() -> list[Source]:
 RETIRED_SOURCES = [
     Source("oppo_official", "Oppo/OnePlus/realme — versione ufficiale (OxygenUpdater)",
            C.TRUST_STRUCTURED, fetch_oppo_official, C.OPPO, "https://oxygenupdater.com",
-           "Richiede un UA concordato con i manutentori (vedi OXYGEN_USER_AGENT)."),
+           "Interroga l'API di OxygenUpdater, che risponde 403 a chi non si "
+           "dichiara come la loro app. Si accende impostando OXYGEN_USER_AGENT "
+           "con il valore concordato con i manutentori: non serve altro. "
+           "DA NON CONFONDERE con `core/oppo_official.py`, che parla invece con "
+           "i server ufficiali Oppo, non chiede nessun UA particolare ed e' gia' "
+           "attivo come ricerca a comando (`_lookup_oppo_support`)."),
     Source("oplus_telegram", "Oppo/OnePlus/realme — canale rollout OxygenOS/ColorOS",
            C.TRUST_CURATED, fetch_oplus_telegram, C.OPPO, TELEGRAM_OPLUS_URL,
            "Numeri di build reali per i modelli recenti, che nessuna fonte "
@@ -3816,6 +3821,20 @@ RETIRED_SOURCES = [
 def all_sources() -> list[Source]:
     disabled = {s.strip() for s in C.env("DISABLED_SOURCES").split(",") if s.strip()}
     enabled_extra = {s.strip() for s in C.env("ENABLED_SOURCES").split(",") if s.strip()}
+    # IMPOSTARE L'UA CONCORDATO BASTA AD ACCENDERE LA FONTE.
+    #
+    # `oppo_official` è ferma per un motivo solo: l'API di OxygenUpdater
+    # risponde 403 a chi non si dichiara come la loro app, e finché non
+    # c'è un accordo con i manutentori non c'è niente da mandare. Nel
+    # momento in cui quell'accordo esiste, `OXYGEN_USER_AGENT` viene
+    # valorizzata — ed è l'unico segnale che serviva.
+    #
+    # Chiedere ANCHE `ENABLED_SOURCES="oppo_official"` sarebbe una
+    # seconda variabile che fa la stessa affermazione, con l'unico
+    # effetto possibile di dimenticarla: si imposta l'UA, non succede
+    # niente, e non c'è niente che spieghi perché.
+    if C.env("OXYGEN_USER_AGENT"):
+        enabled_extra.add("oppo_official")
     riattivate = [s for s in RETIRED_SOURCES if s.key in enabled_extra]
     return [s for s in SOURCES + riattivate + _extra_sources() if s.key not in disabled]
 

@@ -84,6 +84,17 @@ services:
         sync: false
       - key: SMTP_PASSWORD
         sync: false
+      # L'API di OxygenUpdater (Oppo / OnePlus / realme) risponde 403 a
+      # chi non si dichiara come la loro app. Il 16/08/2026 i manutentori
+      # hanno dato il via libera all'accesso, precisando pero' di non
+      # poter cambiare niente dalla loro parte: serve quindi mandare il
+      # valore che la loro API accetta, chiesto a loro.
+      #
+      # Impostarla accende da sola la fonte `oppo_official`
+      # (vedi `sources.all_sources`): non serve toccare ENABLED_SOURCES.
+      # Lasciata vuota, la fonte resta spenta e non compare come rossa.
+      - key: OXYGEN_USER_AGENT
+        sync: false
 
 # IL DIFETTO DEL PIANO GRATUITO, detto prima e non dopo: il servizio si
 # addormenta dopo circa 15 minuti senza visite, e la prima richiesta al

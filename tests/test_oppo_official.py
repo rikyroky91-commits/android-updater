@@ -217,5 +217,58 @@ class TestGuastiDiRete(unittest.TestCase):
         self.assertIn("rete assente", errore)
 
 
+
+class TestAccensioneConLUaConcordato(unittest.TestCase):
+    """La fonte OxygenUpdater si accende impostando una variabile sola.
+
+    Il 16/08/2026 i manutentori hanno dato il via libera all'accesso ma
+    hanno detto di non poter cambiare niente lato loro: l'API continua
+    quindi a rispondere 403 a chi non si dichiara come la loro app, e
+    l'unica cosa che serve e' mandare il valore concordato in
+    OXYGEN_USER_AGENT.
+
+    Chiedere ANCHE ENABLED_SOURCES sarebbe una seconda variabile che dice
+    la stessa cosa, con l'unico effetto possibile di dimenticarla: si
+    imposta l'UA, non succede niente, e niente spiega perche'.
+    """
+
+    def setUp(self):
+        self._prima = os.environ.get("OXYGEN_USER_AGENT")
+        os.environ.pop("OXYGEN_USER_AGENT", None)
+
+    def tearDown(self):
+        if self._prima is None:
+            os.environ.pop("OXYGEN_USER_AGENT", None)
+        else:
+            os.environ["OXYGEN_USER_AGENT"] = self._prima
+
+    def _chiavi(self):
+        from core import sources
+
+        return [s.key for s in sources.all_sources()]
+
+    def test_senza_ua_la_fonte_resta_spenta(self):
+        """Accesa senza UA sarebbe una riga rossa fissa in Diagnostica per
+        una fonte che non puo' rispondere."""
+        self.assertNotIn("oppo_official", self._chiavi())
+
+    def test_con_lua_impostato_la_fonte_si_accende_da_sola(self):
+        os.environ["OXYGEN_USER_AGENT"] = "valore-concordato-coi-manutentori"
+        self.assertIn("oppo_official", self._chiavi())
+
+    def test_resta_disattivabile_a_mano(self):
+        """DISABLED_SOURCES deve continuare ad avere l'ultima parola."""
+        os.environ["OXYGEN_USER_AGENT"] = "valore-concordato"
+        prima = os.environ.get("DISABLED_SOURCES")
+        os.environ["DISABLED_SOURCES"] = "oppo_official"
+        try:
+            self.assertNotIn("oppo_official", self._chiavi())
+        finally:
+            if prima is None:
+                os.environ.pop("DISABLED_SOURCES", None)
+            else:
+                os.environ["DISABLED_SOURCES"] = prima
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
