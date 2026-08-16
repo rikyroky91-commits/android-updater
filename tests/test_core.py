@@ -2275,6 +2275,19 @@ class TestTettoDiTempoRicerca(unittest.TestCase):
             os.remove(self._db)
 
     def test_ricerca_lenta_viene_interrotta_entro_il_tetto(self):
+        # I CATALOGHI SI SCALDANO PRIMA DI FAR PARTIRE IL CRONOMETRO.
+        #
+        # `setUp` chiama `storage.reset_state()`, che svuota anche gli
+        # indici dei codici modello: senza questa riga, la prima ricerca
+        # del test li ricostruisce da 68.000 voci DENTRO la misura, e il
+        # test attribuisce al tetto di tempo un secondo e mezzo che il
+        # tetto non governa — misurato: la prima richiesta di rete partiva
+        # a t=1,33s su una macchina scarica, molto piu' tardi con la suite
+        # intera in esecuzione. Il tetto vale sul ciclo delle richieste
+        # (`scadenza` si calcola DOPO la risoluzione dei nomi), ed e'
+        # quello che questo test vuole verificare.
+        modelcodes.codes_for_name("Galaxy S24")
+
         C.SEARCH_BUDGET_SECONDS = 1
         chiamate = {"n": 0}
 
@@ -2456,6 +2469,17 @@ class TestRealmeNomiRegionali(unittest.TestCase):
             text = TestRealmeNomiRegionali.PAGINA
 
         sources.http_get = lambda url, timeout=None: Resp()
+        # LA CACHE DELLA PAGINA realme VA AZZERATA, come fanno tutte le
+        # altre classi realme di questo file (`TestRealmeUfficiale` e le
+        # successive). Senza, questa classe leggeva la pagina lasciata in
+        # cache da chi ha girato prima e il finto `http_get` qui sopra non
+        # veniva mai interpellato: i due test fallivano SOLO nella suite
+        # intera e passavano da soli, che e' il modo piu' efficace di far
+        # cercare il difetto dove non c'e'. La cache dura un'ora
+        # (`_AER_TTL_SECONDI`), quindi l'ordine di esecuzione decideva
+        # l'esito.
+        sources.reset_realme_aer_cache()
+        self.addCleanup(sources.reset_realme_aer_cache)
 
     def tearDown(self):
         sources.http_get = self._orig_http_get
