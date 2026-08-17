@@ -16,6 +16,7 @@ accorgeva»).
 from __future__ import annotations
 
 import smtplib
+from datetime import datetime, timezone
 from email.message import EmailMessage
 
 from . import config as C
@@ -74,13 +75,53 @@ def stato() -> str:
     if not cfg:
         return ("non configurato (SMTP_USERNAME / SMTP_PASSWORD assenti su Render): "
                 "le richieste di accesso NON arrivano per email, restano su /admin/richieste")
-    return (f"attivo · da {cfg['mittente']} via {cfg['host']}:{cfg['port']} "
-            f"· le richieste vanno a {C.ADMIN_APPROVAL_EMAIL}")
+    testo = (f"attivo · da {cfg['mittente']} via {cfg['host']}:{cfg['port']} "
+             f"· le richieste vanno a {C.ADMIN_APPROVAL_EMAIL}")
+    if _ultimo["ok"] is True:
+        testo += f" · ultimo invio riuscito ({_ultimo['quando']}) a {_ultimo['destinatario']}"
+    elif _ultimo["ok"] is False:
+        testo += (f" · ULTIMO INVIO FALLITO ({_ultimo['quando']}) "
+                  f"verso {_ultimo['destinatario']}: {_ultimo['messaggio']}")
+    else:
+        testo += " · nessun invio tentato da quando il servizio è partito"
+    return testo
+
+
+# L'ESITO DELL'ULTIMO INVIO, che altrimenti non lo sapeva nessuno.
+#
+# `web/account.py` ignora di proposito il risultato di `invia`: se la
+# pagina del recupero password dicesse «invio fallito» per un indirizzo e
+# «fatto» per un altro, direbbe anche quali indirizzi hanno un account
+# qui dentro. La conseguenza pero' era che un errore VERO — password per
+# le app sbagliata, Gmail che rifiuta la connessione — spariva senza
+# lasciare traccia da nessuna parte, e da fuori restava solo «non arriva
+# la mail». Segnalato due volte, il 16 e il 17/08/2026.
+#
+# Qui l'esito si conserva e la Diagnostica lo mostra: quella pagina e'
+# dietro login, quindi lo legge solo chi amministra il servizio.
+_ultimo = {"quando": None, "ok": None, "messaggio": "", "destinatario": ""}
+
+
+def ultimo_invio() -> dict:
+    return dict(_ultimo)
 
 
 def invia(destinatario: str, oggetto: str, corpo: str) -> tuple[bool, str]:
     """Invia l'email via SMTP. Ritorna sempre (ok, messaggio): mai
     un'eccezione che risale fino alla richiesta HTTP di chi si registra."""
+    esito = _invia_davvero(destinatario, oggetto, corpo)
+    _ultimo.update({
+        "quando": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "ok": esito[0], "messaggio": esito[1],
+        # Il destinatario si conserva per capire QUALE invio e' fallito
+        # quando ce ne sono di due tipi (richiesta account, recupero
+        # password). Lo legge solo l'amministratore.
+        "destinatario": destinatario,
+    })
+    return esito
+
+
+def _invia_davvero(destinatario: str, oggetto: str, corpo: str) -> tuple[bool, str]:
     cfg = C.smtp_config()
     if not cfg:
         return False, "SMTP non configurato (SMTP_USERNAME / SMTP_PASSWORD mancanti su Render)"

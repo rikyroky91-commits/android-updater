@@ -626,6 +626,35 @@ def pagina_marche(request: Request):
     ))
 
 
+@app.post("/catalogo/email/prova", response_class=HTMLResponse)
+def prova_invio_email(request: Request):
+    """Manda un'email di prova e MOSTRA l'errore vero.
+
+    PERCHE' SERVE. Il recupero password ignora di proposito l'esito
+    dell'invio: dire «fallito» per un indirizzo e «fatto» per un altro
+    rivelerebbe quali indirizzi hanno un account. Ma cosi' un errore
+    vero — la password per le app sbagliata, Gmail che rifiuta — non lo
+    vedeva nessuno, e da fuori restava solo «non arriva la mail».
+
+    Qui non c'e' niente da proteggere: chi preme questo tasto e' gia'
+    collegato, e il destinatario e' l'indirizzo dell'amministratore, non
+    quello di un utente. L'errore si puo' mostrare per intero.
+    """
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
+    ok, messaggio = mail.invia(
+        C.ADMIN_APPROVAL_EMAIL,
+        "Prova di invio — Mobile Update Tracker",
+        "Se stai leggendo questo messaggio, l'invio delle email funziona. "
+        "L'ha chiesto qualcuno dalla pagina Catalogo del sito.",
+    )
+    return _pagina_diagnostica(request, prova_email={
+        "fatta": True, "ok": ok,
+        "messaggio": messaggio or f"inviata a {C.ADMIN_APPROVAL_EMAIL}",
+    })
+
+
 @app.get("/diagnostica")
 def diagnostica_spostata():
     """Catalogo e Diagnostica sono la stessa pagina da oggi. Il vecchio

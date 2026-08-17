@@ -10,6 +10,20 @@
   <a class="proposta" href="/dispositivi-elenco">Copertura per marca</a>
 </p>
 
+{# PROVA DELL'INVIO EMAIL. Il recupero password ignora l'esito per non
+   rivelare quali indirizzi hanno un account: qui invece l'errore vero si
+   puo' mostrare, perche' chi preme e' gia' collegato e il destinatario e'
+   l'amministratore. #}
+{% if prova_email and prova_email.fatta %}
+<p class="{{ 'conferma-azione' if prova_email.ok else 'errore-azione' }}">
+  {{ "✓ Email di prova inviata" if prova_email.ok else "Invio non riuscito" }}:
+  {{ prova_email.messaggio }}
+</p>
+{% endif %}
+<form method="post" action="/catalogo/email/prova" class="correzione-form">
+  <button type="submit" class="secondario">Manda un'email di prova</button>
+</form>
+
 <h3 class="occhiello">Fonti</h3>
 <table class="tabella">
   <thead><tr><th>Fonte</th><th>Stato</th><th>Voci</th><th>Dettaglio</th><th>Controllata</th></tr></thead>

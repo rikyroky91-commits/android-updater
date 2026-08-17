@@ -1013,5 +1013,60 @@ class TestSenzaSmtpLoDiceSubito(_SitoConAccount):
         self.assertEqual(noto, ignoto)
 
 
+class TestProvaInvioEmail(_SitoConAccount):
+    """«Configurato ma non arriva la mail», 17/08/2026.
+
+    Il recupero password ignora di proposito l'esito dell'invio: dire
+    «fallito» per un indirizzo e «fatto» per un altro rivelerebbe quali
+    indirizzi hanno un account qui dentro. La conseguenza era pero' che
+    un errore VERO — password per le app sbagliata, Gmail che rifiuta la
+    connessione — non lo vedeva nessuno, e da fuori restava solo «non
+    arriva la mail», che non si puo' diagnosticare.
+    """
+
+    def _accedi_admin(self):
+        self.client.cookies.clear()
+        self.client.get("/login")
+        self.client.post("/login", data={
+            "username": "riccardo", "password": "password-admin-di-collaudo",
+            "next": "/parco", "csrf": self.client.cookies.get("csrf_token"),
+        }, follow_redirects=False)
+
+    def test_lanonimo_non_puo_far_partire_email(self):
+        self.client.cookies.clear()
+        r = self.client.post("/catalogo/email/prova", follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertIn("/login", r.headers["location"])
+
+    def test_lerrore_vero_si_vede(self):
+        """E' il punto: qui non c'e' niente da proteggere — chi preme e'
+        gia' collegato e il destinatario e' l'amministratore."""
+        self._accedi_admin()
+        with patch("core.mail._invia_davvero",
+                   return_value=(False, "535 Username and Password not accepted")):
+            pagina = self.client.post("/catalogo/email/prova").text
+        self.assertIn("Invio non riuscito", pagina)
+        self.assertIn("535", pagina)
+
+    def test_linvio_riuscito_lo_dice(self):
+        self._accedi_admin()
+        with patch("core.mail._invia_davvero", return_value=(True, "")):
+            pagina = self.client.post("/catalogo/email/prova").text
+        self.assertIn("Email di prova inviata", pagina)
+
+    def test_lesito_resta_scritto_nella_diagnostica(self):
+        """Cosi' si vede anche l'esito di un invio VERO — quello del
+        recupero password — che nessuno aveva potuto guardare."""
+        from core import mail
+
+        with patch("core.mail._invia_davvero",
+                   return_value=(False, "connessione rifiutata")):
+            mail.invia("qualcuno@example.com", "o", "c")
+        ultimo = mail.ultimo_invio()
+        self.assertFalse(ultimo["ok"])
+        self.assertEqual(ultimo["destinatario"], "qualcuno@example.com")
+        self.assertIn("connessione rifiutata", ultimo["messaggio"])
+
+
 if __name__ == "__main__":
     unittest.main()
