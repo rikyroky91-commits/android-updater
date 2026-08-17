@@ -15,6 +15,28 @@
 # una volta al giorno lo trova SEMPRE addormentato: per lui il sito non
 # è lento ogni tanto, è lento sempre.
 #
+# QUANTO FUNZIONA DAVVERO, misurato il 17/08/2026 sulle esecuzioni
+# reali di questo workflow (API di GitHub, ultime sei):
+#
+#   05:21  ← 2h 05m dopo la precedente
+#   03:16  ← 3h 17m
+#   23:59  ← 20m
+#   23:39  ← 47m
+#   22:52  ← 52m
+#   22:00
+#
+# GitHub STROZZA le esecuzioni pianificate sugli account gratuiti: il
+# `cron` qui sotto è una richiesta, non una garanzia, e sotto carico le
+# salta o le rimanda anche di ore. Con buchi così e un servizio che si
+# addormenta dopo quindici minuti, questo file NON basta a tenerlo
+# sveglio — copre una parte dei casi, non tutti.
+#
+# Alzare la frequenza non aiuta: la strozzatura peggiora con le
+# pianificazioni frequenti. Le vie che funzionano davvero sono un
+# servizio di monitoraggio esterno (UptimeRobot e simili chiamano ogni
+# cinque minuti sul serio) oppure un piano Render a pagamento, che non
+# dorme affatto.
+#
 # Dieci minuti è il numero giusto e non è scelto a caso: sta sotto la
 # soglia dei quindici con abbastanza margine da assorbire i ritardi di
 # GitHub Actions, che sotto carico può far partire un lavoro pianificato
