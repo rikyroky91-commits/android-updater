@@ -1583,6 +1583,19 @@ def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
         modello = canonico
         marca = ""       # il nome curato è già completo di marca
 
+    # E SOPRA TUTTO, LA CORREZIONE SCRITTA A MANO.
+    #
+    # Questa catena non l'ha mai consultata: chi correggeva il nome dalla
+    # pagina lo vedeva cambiare cercando il codice e tornare quello di
+    # prima cercando l'IMEI dello stesso telefono. Una correzione che vale
+    # su tre strade su quattro non è una correzione, è una trappola — e
+    # l'IMEI è proprio la strada di chi ha il telefono in mano e sa come
+    # si chiama.
+    corretto_a_mano = _correzione_salvata(codice, identita)
+    if corretto_a_mano:
+        modello = corretto_a_mano
+        marca = ""                # la correzione è già completa di marca
+
     ancorato["query"] = identita
     ancorato["nome"] = _modello_con_marca(marca, modello, codice) or modello
     ancorato["codice"] = codice
@@ -2341,9 +2354,17 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
         # scheda dice «realme C63» e `nome_canonico` pure, quindi qui non
         # si sceglie nulla di diverso. Cambia solo dove i due DISCORDANO,
         # ed e' esattamente il caso in cui serve un criterio.
-        titolo = _nome_del_codice(codice) or scheda["titolo"]
-        nome = (_modello_con_marca(scheda.get("marca") or marca, titolo, codice)
-                or titolo)
+        #
+        # ...MA NON SOPRA UNA CORREZIONE SCRITTA A MANO. Questa
+        # assegnazione non guardava `nome_corretto` e lo cancellava: il
+        # tasto «Non è il nome giusto?» salvava, faceva pure il backup, e
+        # la pagina continuava a mostrare il nome di prima. È il modo
+        # peggiore di fallire — chi lo usa crede di aver sistemato il
+        # dato, e invece ha corretto il vuoto.
+        if not nome_corretto:
+            titolo = _nome_del_codice(codice) or scheda["titolo"]
+            nome = (_modello_con_marca(scheda.get("marca") or marca, titolo, codice)
+                    or titolo)
 
     # QUANDO NON C'È UN FIRMWARE MA C'È UN TELEFONO VERO.
     #

@@ -1671,3 +1671,65 @@ class TestLaFamigliaPiuNumerosaVince(unittest.TestCase):
             self.assertNotEqual(modelcodes.nome_canonico("RMX3939"), "C61")
         finally:
             modelcodes._override_nomi = originale
+
+
+class TestLaCorrezioneAManoValeSuOgniStrada(unittest.TestCase):
+    """«Non è il nome giusto?» deve valere comunque si cerchi il telefono.
+
+    Il tasto salvava, faceva pure il backup, e la pagina continuava a
+    mostrare il nome di prima: dentro `_cerca_davvero` due assegnazioni
+    successive sovrascrivevano la correzione senza guardarla, e il
+    percorso IMEI non la consultava affatto. È il modo peggiore di
+    fallire — chi lo usa crede di aver sistemato il dato, e invece ha
+    corretto il vuoto.
+
+    Una correzione che vale su tre strade su quattro non è una
+    correzione, è una trappola: l'IMEI è proprio la strada di chi ha il
+    telefono in mano e sa come si chiama.
+
+    NIENTE CLIENT HTTP QUI. La prima versione ne creava uno, e farlo
+    avvia l'applicazione: stato globale che i file di test successivi si
+    ritrovavano addosso, fallendo per ragioni che non li riguardavano.
+    Il difetto stava nel calcolo del nome, e lì si collauda.
+    """
+
+    def setUp(self):
+        from core import storage
+
+        storage.init_db()
+        self._salvato = storage.get_nome_modello("CPH2781")
+
+    def tearDown(self):
+        from core import storage
+
+        storage.set_nome_modello("CPH2781", self._salvato or "")
+
+    def _nome_cercando_il_codice(self):
+        from web import main as M
+
+        return M._esito_ricerca("CPH2781", senza_rete=True).get("nome")
+
+    def _nome_dall_imei(self):
+        from web import main as M
+
+        imei = {"riconosciuto": True, "marca": "OPPO", "modello": "Oppo Cph2781",
+                "codice": "CPH2781", "modello_cercato": "CPH2781"}
+        return M._ancora_esito_imei(
+            M._esito_ricerca("CPH2781", senza_rete=True), imei).get("nome")
+
+    def test_vale_sia_per_codice_sia_da_imei(self):
+        from core import storage
+
+        storage.set_nome_modello("CPH2781", "OPPO Nome Mio")
+        self.assertEqual(self._nome_cercando_il_codice(), "OPPO Nome Mio")
+        self.assertEqual(self._nome_dall_imei(), "OPPO Nome Mio")
+
+    def test_annullarla_riporta_al_nome_automatico(self):
+        from core import storage
+
+        automatico_codice = self._nome_cercando_il_codice()
+        automatico_imei = self._nome_dall_imei()
+        storage.set_nome_modello("CPH2781", "OPPO Nome Mio")
+        storage.set_nome_modello("CPH2781", "")
+        self.assertEqual(self._nome_cercando_il_codice(), automatico_codice)
+        self.assertEqual(self._nome_dall_imei(), automatico_imei)
