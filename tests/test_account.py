@@ -1068,5 +1068,99 @@ class TestProvaInvioEmail(_SitoConAccount):
         self.assertIn("connessione rifiutata", ultimo["messaggio"])
 
 
+class TestInvioViaHttps(_SitoConAccount):
+    """Su Render gratuito le porte SMTP sono chiuse.
+
+    Verificato dal vivo il 17/08/2026: con SMTP configurato correttamente
+    — mittente, host e porta giusti, la Diagnostica diceva «attivo» —
+    l'invio falliva con «[Errno 101] Network is unreachable». Render
+    blocca il traffico in uscita verso le porte 25, 465 e 587 sui servizi
+    gratuiti dal 26/09/2025. Nessuna credenziale puo' risolverlo: e' un
+    blocco di rete prima del login SMTP, esattamente come quello che le
+    consegne precedenti avevano gia' incontrato dall'ambiente di sviluppo.
+
+    L'unica strada che esce da li' e' la 443.
+    """
+
+    def setUp(self):
+        super().setUp()
+        for chiave in ("BREVO_API_KEY", "BREVO_MITTENTE",
+                       "SMTP_USERNAME", "SMTP_PASSWORD"):
+            os.environ.pop(chiave, None)
+
+    def tearDown(self):
+        for chiave in ("BREVO_API_KEY", "BREVO_MITTENTE",
+                       "SMTP_USERNAME", "SMTP_PASSWORD"):
+            os.environ.pop(chiave, None)
+
+    def test_con_la_chiave_https_non_si_tenta_nemmeno_smtp(self):
+        """Se SMTP e' bloccato, provarlo per primo significa solo
+        aspettare il timeout prima di fallire."""
+        from core import mail
+
+        os.environ["BREVO_API_KEY"] = "chiave-finta"
+        os.environ["BREVO_MITTENTE"] = "mittente@example.com"
+        with patch("core.mail._invia_via_smtp") as smtp,              patch("core.mail._invia_via_brevo", return_value=(True, "")) as https:
+            mail.invia("a@example.com", "oggetto", "corpo")
+        https.assert_called_once()
+        smtp.assert_not_called()
+
+    def test_senza_la_chiave_https_resta_smtp(self):
+        """SMTP resta la prima scelta ovunque non sia bloccato: un piano a
+        pagamento, un altro host."""
+        from core import mail
+
+        os.environ["SMTP_USERNAME"] = "a@gmail.com"
+        os.environ["SMTP_PASSWORD"] = "x"
+        with patch("core.mail._invia_via_smtp", return_value=(True, "")) as smtp:
+            mail.invia("a@example.com", "oggetto", "corpo")
+        smtp.assert_called_once()
+
+    def test_la_chiave_senza_mittente_lo_dice(self):
+        from core import mail
+
+        os.environ["BREVO_API_KEY"] = "chiave-finta"
+        ok, messaggio = mail.invia("a@example.com", "o", "c")
+        self.assertFalse(ok)
+        self.assertIn("BREVO_MITTENTE", messaggio)
+
+    def test_la_diagnostica_avverte_che_smtp_da_solo_non_bastera(self):
+        """La riga diceva «attivo» mentre ogni invio falliva: e' il
+        motivo per cui la diagnosi e' costata due giri."""
+        from core import mail
+
+        os.environ["SMTP_USERNAME"] = "a@gmail.com"
+        os.environ["SMTP_PASSWORD"] = "x"
+        testo = mail.stato()
+        self.assertIn("attivo via SMTP", testo)
+        self.assertIn("bloccate", testo)
+
+    def test_la_diagnostica_dice_quale_via_e_attiva(self):
+        from core import mail
+
+        os.environ["BREVO_API_KEY"] = "chiave-finta"
+        os.environ["BREVO_MITTENTE"] = "mittente@example.com"
+        self.assertIn("via HTTPS", mail.stato())
+
+    def test_lerrore_di_brevo_arriva_per_esteso(self):
+        """Il corpo della risposta contiene il motivo vero — mittente non
+        validato, chiave revocata, quota finita: senza, resterebbe solo
+        un numero."""
+        from core import mail
+
+        os.environ["BREVO_API_KEY"] = "chiave-finta"
+        os.environ["BREVO_MITTENTE"] = "mittente@example.com"
+
+        class Risposta:
+            status_code = 400
+            text = '{"message":"Sender not valid"}'
+
+        with patch("core.mail.requests") as rete:
+            rete.post.return_value = Risposta()
+            ok, messaggio = mail.invia("a@example.com", "o", "c")
+        self.assertFalse(ok)
+        self.assertIn("Sender not valid", messaggio)
+
+
 if __name__ == "__main__":
     unittest.main()

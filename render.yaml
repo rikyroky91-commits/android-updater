@@ -93,6 +93,30 @@ services:
       # l'intestazione distingue i due formati.
       - key: BACKUP_ENCRYPTION_KEY
         sync: false
+      # L'INVIO EMAIL SU RENDER GRATUITO PASSA DA HTTPS, NON DA SMTP.
+      #
+      # Dal 26/09/2025 Render blocca il traffico in uscita verso le porte
+      # SMTP (25, 465, 587) sui servizi gratuiti. Con SMTP configurato
+      # correttamente l'invio fallisce con «[Errno 101] Network is
+      # unreachable» — verificato dal vivo il 17/08/2026 — che sembra un
+      # guasto di rete e manda a cercare il problema nelle credenziali.
+      #
+      # Brevo accetta le email su HTTPS (porta 443, non bloccata) e
+      # permette di spedire validando un SINGOLO indirizzo mittente, senza
+      # possedere un dominio ne' inserire una carta:
+      #   1. crea un account su brevo.com
+      #   2. Senders & IP -> aggiungi il tuo indirizzo e clicca il link
+      #      di conferma che ti arriva
+      #   3. SMTP & API -> API Keys -> genera una chiave v3
+      #   4. incolla qui la chiave e l'indirizzo validato
+      #
+      # Impostate queste due, la via SMTP non viene nemmeno tentata.
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_MITTENTE
+        sync: false
+      # SMTP resta la prima scelta ovunque NON sia bloccato (un piano a
+      # pagamento, un altro host): si usa solo se BREVO_API_KEY e' vuota.
       - key: SMTP_USERNAME
         sync: false
       - key: SMTP_PASSWORD

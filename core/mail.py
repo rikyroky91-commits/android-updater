@@ -19,6 +19,11 @@ import smtplib
 from datetime import datetime, timezone
 from email.message import EmailMessage
 
+try:
+    import requests
+except ImportError:  # pragma: no cover
+    requests = None
+
 from . import config as C
 
 
@@ -71,12 +76,23 @@ def stato() -> str:
     o da un difetto del codice. Senza una riga che lo dica, l'unica via
     per scoprirlo era leggere il codice.
     """
-    cfg = C.smtp_config()
-    if not cfg:
-        return ("non configurato (SMTP_USERNAME / SMTP_PASSWORD assenti su Render): "
-                "le richieste di accesso NON arrivano per email, restano su /admin/richieste")
-    testo = (f"attivo · da {cfg['mittente']} via {cfg['host']}:{cfg['port']} "
-             f"· le richieste vanno a {C.ADMIN_APPROVAL_EMAIL}")
+    if C.env("BREVO_API_KEY"):
+        mittente = C.env("BREVO_MITTENTE") or C.env("SMTP_USERNAME") or "mittente non impostato"
+        testo = (f"attivo via HTTPS (Brevo) · da {mittente} "
+                 f"· le richieste vanno a {C.ADMIN_APPROVAL_EMAIL}")
+    else:
+        cfg = C.smtp_config()
+        if not cfg:
+            return ("non configurato: le richieste di accesso NON arrivano per "
+                    "email, restano su /admin/richieste. Su Render gratuito le "
+                    "porte SMTP sono bloccate — imposta BREVO_API_KEY e "
+                    "BREVO_MITTENTE, che passano da HTTPS")
+        testo = (f"attivo via SMTP · da {cfg['mittente']} via {cfg['host']}:{cfg['port']} "
+                 f"· le richieste vanno a {C.ADMIN_APPROVAL_EMAIL}"
+                 # Su Render gratuito questa via non funziona, e la riga
+                 # diceva «attivo» anche mentre ogni invio falliva.
+                 " · ATTENZIONE: su Render gratuito le porte SMTP sono"
+                 " bloccate, l'invio fallirà con «Network is unreachable»")
     if _ultimo["ok"] is True:
         testo += f" · ultimo invio riuscito ({_ultimo['quando']}) a {_ultimo['destinatario']}"
     elif _ultimo["ok"] is False:
@@ -122,6 +138,68 @@ def invia(destinatario: str, oggetto: str, corpo: str) -> tuple[bool, str]:
 
 
 def _invia_davvero(destinatario: str, oggetto: str, corpo: str) -> tuple[bool, str]:
+    # PRIMA LA VIA HTTPS, POI SMTP. Vedi il docstring del modulo: su
+    # Render gratuito le porte SMTP sono chiuse, e l'unica strada che
+    # esce e' la 443.
+    if C.env("BREVO_API_KEY"):
+        return _invia_via_brevo(destinatario, oggetto, corpo)
+    return _invia_via_smtp(destinatario, oggetto, corpo)
+
+
+def _invia_via_brevo(destinatario: str, oggetto: str, corpo: str) -> tuple[bool, str]:
+    """Invio attraverso l'API HTTP di Brevo, sulla porta 443.
+
+    PERCHE' NON BASTA SMTP. Dal 26/09/2025 Render blocca il traffico in
+    uscita verso le porte SMTP (25, 465, 587) sui servizi gratuiti: la
+    connessione non parte proprio, e l'errore che arriva e'
+    «[Errno 101] Network is unreachable» — che sembra un guasto di rete
+    generico e manda a cercare il problema nelle credenziali, dove non
+    e'. Verificato dal vivo il 17/08/2026 con SMTP configurato
+    correttamente.
+    Le due vie d'uscita sono passare a un piano a pagamento oppure usare
+    un servizio che accetti le email su HTTPS. Questa e' la seconda.
+
+    PERCHE' BREVO fra i tanti: si puo' spedire validando un singolo
+    indirizzo mittente (un clic su un link ricevuto per email), senza
+    possedere un dominio ne' inserire una carta — che sono i due
+    ostacoli degli altri servizi transazionali per chi ha un progetto
+    personale.
+
+    SMTP resta la prima scelta ovunque non sia bloccato: `_invia_davvero`
+    usa questa via solo se la chiave c'e'.
+    """
+    if requests is None:  # pragma: no cover - dipendenze non installate
+        return False, "libreria 'requests' non disponibile"
+    mittente = C.env("BREVO_MITTENTE") or C.env("SMTP_USERNAME")
+    if not mittente:
+        return False, ("BREVO_API_KEY impostata ma manca l'indirizzo mittente: "
+                       "imposta BREVO_MITTENTE con l'indirizzo che hai validato "
+                       "su Brevo")
+    try:
+        risposta = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={"api-key": C.env("BREVO_API_KEY"),
+                     "content-type": "application/json",
+                     "accept": "application/json"},
+            json={
+                "sender": {"email": mittente, "name": "Mobile Update Tracker"},
+                "to": [{"email": destinatario}],
+                "subject": oggetto,
+                "textContent": corpo,
+            },
+            timeout=C.HTTP_TIMEOUT + 15,
+        )
+    except Exception as errore:
+        return False, f"connessione a Brevo fallita: {errore}"
+    if risposta.status_code in (200, 201, 202):
+        return True, ""
+    # Il corpo della risposta contiene il motivo vero (mittente non
+    # validato, chiave revocata, quota finita): senza, resterebbe solo un
+    # numero.
+    return False, f"Brevo ha risposto {risposta.status_code}: {risposta.text[:200]}"
+
+
+def _invia_via_smtp(destinatario: str, oggetto: str, corpo: str) -> tuple[bool, str]:
     cfg = C.smtp_config()
     if not cfg:
         return False, "SMTP non configurato (SMTP_USERNAME / SMTP_PASSWORD mancanti su Render)"

@@ -160,6 +160,43 @@ l'amministratore), **password** e **Esci**.
 
 ### 5. L'email, passo per passo
 
+> **SU RENDER GRATUITO SMTP NON FUNZIONA, E NON È COLPA DELLE
+> CREDENZIALI.** Dal 26/09/2025 Render blocca il traffico in uscita
+> verso le porte SMTP (25, 465, 587) sui servizi gratuiti. Con Gmail
+> configurato correttamente l'invio fallisce con
+> `[Errno 101] Network is unreachable` — verificato dal vivo il
+> 17/08/2026. Le vie d'uscita sono due: passare a un piano a pagamento,
+> oppure usare un servizio che accetti le email su HTTPS. La seconda è
+> qui sotto, ed è gratuita.
+
+#### 5.0 — Brevo, che passa dalla porta 443
+
+Serve perché la 443 non è bloccata. Fra i servizi transazionali, Brevo
+è quello che si attiva senza possedere un dominio né inserire una carta:
+basta validare **un singolo indirizzo mittente**.
+
+1. crea un account su [brevo.com](https://www.brevo.com);
+2. **Senders, Domains & Dedicated IPs** → **Senders** → aggiungi il tuo
+   indirizzo (`riccardo.cucurullo91@gmail.com` va benissimo) e clicca il
+   link di conferma che ti arriva per email;
+3. **SMTP & API** → **API Keys** → genera una chiave `v3`;
+4. su Render, **Environment**, due variabili:
+
+| Nome | Valore |
+|---|---|
+| `BREVO_API_KEY` | la chiave del punto 3 |
+| `BREVO_MITTENTE` | l'indirizzo validato al punto 2 |
+
+5. Save Changes, aspetta il riavvio, poi **Catalogo** → **Manda
+   un'email di prova**. La riga «Invio email» deve dire
+   `attivo via HTTPS (Brevo)`.
+
+Impostate queste due, la via SMTP non viene nemmeno tentata: se un
+giorno passi a un piano a pagamento o a un altro host, basta togliere
+`BREVO_API_KEY` e tornano valide le istruzioni SMTP qui sotto.
+
+### 5-bis. L'email via SMTP (solo dove NON è bloccato)
+
 Senza questa parte il sito funziona: le richieste di accesso restano su
 `/admin/richieste` e i link di recupero password li generi tu da
 `/admin/utenti`. Serve solo se vuoi che quelle due cose arrivino da sole
