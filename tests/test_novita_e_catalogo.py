@@ -142,5 +142,64 @@ class TestCatalogoUnitoDietroLogin(_SitoNuovo):
         self.assertIn('href="/catalogo"', self.client.get("/novita").text)
 
 
+class TestLetturaSuSchermoStretto(_SitoNuovo):
+    """Rifiniture nate guardando la pagina su un telefono, non sul
+    portatile: «sembra tutto confuso», 17/08/2026."""
+
+    def test_i_filtri_di_marca_stanno_chiusi(self):
+        """Sette voci lunghe («Oppo / Realme / OnePlus») occupavano mezza
+        schermata PRIMA della prima notizia. Chi apre questa pagina vuole
+        leggere le novita', non scegliere un filtro."""
+        self.client.cookies.clear()
+        pagina = self.client.get("/novita?giorni=90").text
+        self.assertIn("<details", pagina)
+        self.assertIn("filtro-marca", pagina)
+        # Chiuso non deve nascondere QUALE filtro e' attivo.
+        self.assertIn("Marca:", pagina)
+
+    def test_il_filtro_attivo_apre_il_pannello(self):
+        """Se un filtro c'e', chiuderlo lo renderebbe invisibile: si
+        vedrebbe un elenco corto senza capire perche'."""
+        self.client.cookies.clear()
+        pagina = self.client.get("/novita?giorni=90&marca=Samsung").text
+        self.assertIn("<details class=\"filtro-marca\" open>", pagina)
+
+    def test_la_fonte_non_compare_due_volte(self):
+        """Visto sullo screenshot: «GSMArena · patch di sicurezza» sopra e
+        «Multi-brand — GSMArena» sotto, in quattro righe."""
+        from web.presenters import voce_feed
+
+        v = voce_feed({"title": "prova", "size_info": "GSMArena",
+                       "severity_reason": "patch di sicurezza",
+                       "source_label": "Multi-brand — GSMArena"})
+        self.assertNotIn("GSMArena", v["riassunto"])
+        self.assertEqual(v["riassunto"], "patch di sicurezza")
+        self.assertTrue(v["riassunto_di_servizio"])
+
+    def test_la_versione_non_si_ripete(self):
+        """Per una patch, `os_version` vale gia' «Patch 2026-08» e
+        `patch_level` «2026-08»: usciva «Patch 2026-08 · patch 2026-08»."""
+        from web.presenters import voce_feed
+
+        v = voce_feed({"title": "x", "os_version": "Patch 2026-08",
+                       "patch_level": "2026-08"})
+        self.assertEqual(v["versione"], "Patch 2026-08")
+
+    def test_la_coda_del_feed_non_finisce_nel_riassunto(self):
+        """«The post <titolo> appeared first on <sito>» e' la firma che i
+        plugin WordPress attaccano a ogni descrizione. Arrivava tagliata
+        a meta' dal limite di caratteri e sembrava un guasto dell'app."""
+        from web.presenters import voce_feed
+
+        v = voce_feed({
+            "title": "x",
+            "summary": "La versione stabile e' vicina […] The post New One UI "
+                       "9 beta appeared first on SamMobile.",
+        })
+        self.assertNotIn("The post", v["riassunto"])
+        self.assertNotIn("[…]", v["riassunto"])
+        self.assertTrue(v["riassunto"].endswith("vicina"))
+
+
 if __name__ == "__main__":
     unittest.main()

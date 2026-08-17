@@ -11,50 +11,67 @@
 
   Niente immagini di copertina, di proposito: le fonti RSS le
   pubblicano di rado e le altre foto che abbiamo sono del TELEFONO, non
-  dell'articolo. Metterle qui farebbe sembrare illustrata una notizia che
-  non lo è, e costerebbe una richiesta di rete per riga.
+  dell'articolo.
 #}
-<h3 class="occhiello">Novità · ultimi {{ giorni }} giorni</h3>
+<div class="feed-barra">
+  <h3 class="occhiello">Novità · ultimi {{ giorni }} giorni</h3>
 
-<div class="filtri-feed">
-  <p class="proposte">
+  <p class="proposte periodi">
     {% for g in [7, 30, 90] %}
-    <a class="proposta {{ 'attiva' if g == giorni }}" href="/novita?giorni={{ g }}{% if marca %}&marca={{ marca | urlencode }}{% endif %}">{{ g }} giorni</a>
+    <a class="proposta {{ 'attiva' if g == giorni }}" href="/novita?giorni={{ g }}{% if marca %}&marca={{ marca | urlencode }}{% endif %}">{{ g }}g</a>
     {% endfor %}
   </p>
-  {% if marche %}
+</div>
+
+{% if marche %}
+{# I FILTRI DI MARCA STANNO CHIUSI. Sono sette voci lunghe («Oppo /
+   Realme / OnePlus», «Xiaomi / Redmi / POCO») e su un telefono
+   occupavano mezza schermata PRIMA della prima notizia: chi apre questa
+   pagina vuole leggere le novità, non scegliere un filtro. Il riassunto
+   nel `summary` dice quale filtro è attivo, così chiuso non nasconde
+   un'informazione. #}
+<details class="filtro-marca"{% if marca %} open{% endif %}>
+  <summary>
+    Marca: <strong>{{ marca if marca else "tutte" }}</strong>
+  </summary>
   <p class="proposte">
-    <a class="proposta {{ 'attiva' if not marca }}" href="/novita?giorni={{ giorni }}">Tutte le marche</a>
+    <a class="proposta {{ 'attiva' if not marca }}" href="/novita?giorni={{ giorni }}">Tutte</a>
     {% for m in marche %}
     <a class="proposta {{ 'attiva' if m == marca }}" href="/novita?giorni={{ giorni }}&marca={{ m | urlencode }}">{{ m }}</a>
     {% endfor %}
   </p>
-  {% endif %}
-</div>
+</details>
+{% endif %}
 
 {% if voci %}
 <ol class="feed">
   {% for v in voci %}
   <li class="feed-voce">
-    <div class="feed-testa">
-      {% if v.modello %}
-      <a class="feed-modello" href="/?q={{ v.modello | urlencode }}">{{ v.modello }}</a>
+    {# IL TITOLO PER PRIMO, e più grande di tutto il resto: è quello che
+       si legge scorrendo. Modello e severità sono etichette piccole
+       sopra, non due blocchi che competono con lui. #}
+    <p class="feed-testa">
+      {% if v.modello %}<a class="feed-modello" href="/?q={{ v.modello | urlencode }}">{{ v.modello }}</a>
       {% elif v.brand %}<span class="feed-modello tenue">{{ v.brand }}</span>{% endif %}
-      {% if v.severita %}<span class="tag" style="--tinta: {{ v.colore }}">{{ v.severita }}</span>{% endif %}
-    </div>
+      {% if v.severita %}<span class="feed-tag" style="--tinta: {{ v.colore }}">{{ v.severita }}</span>{% endif %}
+    </p>
 
     <h2 class="feed-titolo">
       {% if v.link %}<a href="{{ v.link }}" target="_blank" rel="noopener noreferrer">{{ v.titolo }}</a>
       {% else %}{{ v.titolo }}{% endif %}
     </h2>
 
-    {% if v.riassunto %}<p class="feed-riassunto">{{ v.riassunto }}</p>{% endif %}
+    {% if v.riassunto %}
+    <p class="feed-riassunto {{ 'di-servizio' if v.riassunto_di_servizio }}">{{ v.riassunto }}</p>
+    {% endif %}
+
+    {% if v.versione %}<p class="feed-versione">{{ v.versione }}</p>{% endif %}
 
     <p class="feed-piede">
-      {% if v.versione %}<span class="feed-versione">{{ v.versione }}</span>{% endif %}
       <span class="tenue">{{ v.fonte }}</span>
+      <span class="tenue">·</span>
       <span class="tenue">{{ v.quando }}</span>
-      {% if v.link %}<a class="feed-fonte" href="{{ v.link }}" target="_blank" rel="noopener noreferrer">Apri la fonte →</a>{% endif %}
+      {% if v.link %}<a class="feed-fonte" href="{{ v.link }}" target="_blank" rel="noopener noreferrer">Apri →</a>{% endif %}
     </p>
   </li>
   {% endfor %}

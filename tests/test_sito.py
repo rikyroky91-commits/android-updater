@@ -1586,7 +1586,12 @@ class TestInterpreteAI(_Sito):
             with self.subTest(percorso=percorso):
                 pagina = self.client.get(percorso).text
                 self.assertNotIn('id="btn-ai"', pagina)
-                self.assertIn("powered by ai", pagina)
+                # «AI» e' in grassetto maiuscolo dal 17/08/2026: la
+                # scritta tutta minuscola sembrava una nota dimenticata
+                # li'. Si controlla la classe, non il testo esatto, cosi'
+                # il test non si rompe alla prossima rifinitura.
+                self.assertIn('class="powered-ai"', pagina)
+                self.assertIn("<b>AI</b>", pagina)
                 # Lo script pilotava solo quel tasto: mandarlo a tutti
                 # sarebbe far scaricare codice che non puo' piu' servire.
                 self.assertNotIn("/static/ai.js", pagina)
@@ -1595,7 +1600,7 @@ class TestInterpreteAI(_Sito):
         """Senza chiave l'AI non parte: dire «powered by ai» sarebbe
         scrivere una cosa non vera."""
         pagina = self.client.get("/").text
-        self.assertNotIn("powered by ai", pagina)
+        self.assertNotIn('class="powered-ai"', pagina)
 
     def test_lo_script_resta_servibile_anche_se_non_e_piu_incluso(self):
         """`ai.js` e `/api/interpreta` restano nel repository: sono la

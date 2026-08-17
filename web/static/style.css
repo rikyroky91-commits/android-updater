@@ -907,52 +907,120 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
 .cerca-con-ai {
   display: flex; flex-direction: column; align-items: stretch; gap: .15rem;
 }
+.powered-ai b {
+  font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--ai);
+}
 .powered-ai {
   font-size: .62rem; letter-spacing: .04em; text-align: center;
   color: var(--neutral); text-transform: lowercase; line-height: 1;
+  /* «AI» in grassetto maiuscolo: la scritta tutta minuscola e tenue
+     sembrava una nota a piè di pagina dimenticata li'. Le due lettere
+     che contano si vedono, il resto resta al suo posto. */
   /* Non deve allargare il tasto: se la parola fosse piu' larga, la
      colonna crescerebbe e la barra di ricerca si sposterebbe. */
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 /* --- La pagina Novità: un feed, non una tabella ------------------------
-   «Aggiornamenti» era una griglia di sette colonne, e una griglia
-   risponde bene a «confronta queste righe fra loro» — che non è la
-   domanda di chi apre questa pagina. La sua è «cosa è successo, e mi
-   riguarda?», e per rispondere serve il testo della notizia. */
-.feed { list-style: none; padding: 0; margin: 1rem 0 0; }
+   Rifatta il 17/08/2026 dopo averla vista su un telefono: era leggibile
+   sullo schermo largo e confusa su quello stretto, che è dove la si usa.
+
+   I due difetti, guardando lo screenshot: i filtri di marca occupavano
+   mezza schermata prima della prima notizia, e dentro la voce quattro
+   blocchi si contendevano l'attenzione — modello, pastiglia della
+   severità, titolo, riga di servizio — senza che nessuno fosse
+   chiaramente il primo. Ora c'è UNA gerarchia: il titolo domina, il
+   resto lo accompagna. */
+.feed { list-style: none; padding: 0; margin: .6rem 0 0; }
 .feed-voce {
-  padding: 1rem 0;
+  padding: 1.15rem 0;
   border-top: 1px solid var(--filo);
 }
-.feed-voce:first-child { border-top: none; padding-top: .2rem; }
+.feed-voce:first-child { border-top: none; }
 
+/* Etichette, non blocchi: stanno su una riga sola sopra il titolo e
+   pesano meno di lui. */
 .feed-testa {
-  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
-  margin-bottom: .3rem;
+  display: flex; align-items: center; gap: .45rem; flex-wrap: wrap;
+  margin: 0 0 .3rem;
 }
-.feed-modello { font-size: .78rem; font-weight: 700; letter-spacing: .02em; }
+.feed-modello {
+  font-size: .74rem; font-weight: 700; letter-spacing: .03em;
+  text-transform: uppercase; text-decoration: none;
+}
+.feed-modello:hover { text-decoration: underline; }
+/* La pastiglia della severità era grande quanto il modello e più
+   colorata: attirava l'occhio per prima pur essendo l'informazione meno
+   importante delle tre. */
+.feed-tag {
+  font-size: .64rem; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; padding: .1rem .4rem; border-radius: 3px;
+  color: var(--tinta, var(--neutral));
+  border: 1px solid color-mix(in srgb, var(--tinta, #888) 35%, transparent);
+  background: color-mix(in srgb, var(--tinta, #888) 8%, transparent);
+  white-space: nowrap;
+}
 
-.feed-titolo { font-size: 1.02rem; line-height: 1.35; margin: 0 0 .35rem; }
-.feed-titolo a { text-decoration: none; }
+.feed-titolo {
+  font-size: 1.05rem; line-height: 1.3; margin: 0 0 .4rem;
+  font-weight: 650; letter-spacing: -.01em;
+}
+.feed-titolo a { text-decoration: none; color: inherit; }
 .feed-titolo a:hover { text-decoration: underline; }
 
 /* Il riassunto è la ragione per cui questa pagina esiste: va letto, non
-   scansionato. Misura di riga contenuta e colore più tenue del titolo. */
+   scansionato. Misura di riga contenuta, colore più tenue del titolo. */
 .feed-riassunto {
   margin: 0 0 .45rem; font-size: .9rem; line-height: 1.5;
-  color: var(--neutral); max-width: 68ch;
+  color: var(--neutral); max-width: 66ch;
+}
+/* Quando la fonte non pubblica un riassunto si ripiega su una nota
+   nostra («patch di sicurezza / manutenzione»). Farla sembrare il testo
+   della notizia era metà della confusione: qui si dichiara per quello
+   che è. */
+.feed-riassunto.di-servizio {
+  font-size: .84rem; font-style: italic; opacity: .85;
+}
+
+.feed-versione {
+  margin: 0 0 .35rem; font-size: .76rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--neutral); overflow-wrap: anywhere;
 }
 
 .feed-piede {
-  display: flex; gap: .6rem; flex-wrap: wrap; align-items: baseline;
-  margin: 0; font-size: .8rem;
+  display: flex; gap: .4rem; flex-wrap: wrap; align-items: baseline;
+  margin: 0; font-size: .78rem;
 }
-.feed-versione {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: .76rem;
-}
-.feed-fonte { font-weight: 600; text-decoration: none; }
+.feed-fonte { font-weight: 600; text-decoration: none; margin-left: auto; }
 .feed-fonte:hover { text-decoration: underline; }
 
-.filtri-feed { margin-bottom: .4rem; }
+/* La barra in cima: titolo a sinistra, periodi a destra, su una riga
+   sola finché ci stanno. */
+.feed-barra {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: .6rem; flex-wrap: wrap;
+}
+.feed-barra .occhiello { margin-bottom: 0; }
+.periodi { margin: 0; }
+
+/* I filtri di marca, chiusi. Sette voci lunghe («Oppo / Realme /
+   OnePlus») che su un telefono diventavano sei righe prima della prima
+   notizia. */
+.filtro-marca { margin: .5rem 0 .2rem; font-size: .85rem; }
+.filtro-marca > summary {
+  cursor: pointer; color: var(--neutral); padding: .2rem 0;
+  list-style-position: inside;
+}
+.filtro-marca > summary:hover { color: inherit; }
+.filtro-marca > summary strong { color: inherit; }
+.filtro-marca .proposte { margin: .35rem 0 0; }
+
+@media (max-width: 640px) {
+  .feed-voce { padding: .95rem 0; }
+  .feed-titolo { font-size: 1rem; }
+  /* A schermo stretto «Apri →» va a capo da solo: incollarlo a destra
+     lo staccherebbe dal resto del piede. */
+  .feed-fonte { margin-left: 0; }
+}

@@ -477,6 +477,26 @@ def nota_con_link(testo: str | None) -> Markup:
 # ======================================================================
 # La pagina Novità — un feed, non una tabella
 # ======================================================================
+# La firma che i plugin WordPress attaccano in fondo a ogni descrizione
+# RSS: «The post <titolo> appeared first on <sito>». Non è parte della
+# notizia, è una nota di copyright del feed — e nel riassunto arrivava
+# tagliata a metà dal limite di caratteri, il che la faceva sembrare un
+# guasto dell'app: «[…] The post New One UI 9 b…». Visto su mobile il
+# 17/08/2026, sulla pagina appena fatta.
+_CODA_RSS = re.compile(r"\s*(\[[.…]+\]\s*)?The post\b.*$",
+                       re.IGNORECASE | re.DOTALL)
+# Il segnaposto di troncamento della fonte, quando resta appeso in fondo
+# senza niente dopo.
+_TRONCAMENTO_FONTE = re.compile(r"\s*\[\s*[.…]+\s*\]\s*$")
+
+
+def _riassunto_pulito(testo: str) -> str:
+    """Il testo della notizia senza le code che il feed ci attacca."""
+    testo = _CODA_RSS.sub("", str(testo or ""))
+    testo = _TRONCAMENTO_FONTE.sub("", testo)
+    return " ".join(testo.split())
+
+
 def voce_feed(item: dict) -> dict:
     """Una notizia di aggiornamento come la si legge in un lettore RSS.
 
@@ -493,30 +513,53 @@ def voce_feed(item: dict) -> dict:
     Per le righe più vecchie della colonna il campo è vuoto, e allora si
     ripiega su quello che il record sa già dire di sé.
     """
-    riassunto = (item.get("summary") or "").strip()
+    fonte = item.get("source_label", "")
+    riassunto = _riassunto_pulito(item.get("summary") or "")
+    ripiego = False
     if not riassunto:
         # RIPIEGO PER LE RIGHE VECCHIE, e per le fonti strutturate che un
         # riassunto non ce l'hanno mai avuto: un controllo versione
         # ufficiale non pubblica un articolo, pubblica una build.
-        riassunto = " · ".join(p for p in (
-            item.get("size_info") or "",
-            item.get("severity_reason") or "",
-        ) if p)
+        #
+        # NON SI RIPETE QUELLO CHE IL PIEDE DICE GIA'. Visto su mobile il
+        # 17/08/2026: «GSMArena · patch di sicurezza / manutenzione»
+        # sopra, e «Multi-brand — GSMArena · 16/08/2026» sotto. Lo stesso
+        # nome due volte in quattro righe fa sembrare disordinata una
+        # voce che ha solo poco da dire.
+        pezzi = []
+        for pezzo in (item.get("size_info") or "", item.get("severity_reason") or ""):
+            pezzo = pezzo.strip()
+            if pezzo and pezzo.lower() not in fonte.lower():
+                pezzi.append(pezzo)
+        riassunto = " · ".join(pezzi)
+        ripiego = True
 
-    versione = " · ".join(p for p in (
-        item.get("os_version") or "",
-        f"build {item['build']}" if item.get("build") else "",
-        f"patch {item['patch_level']}" if item.get("patch_level") else "",
-    ) if p)
+    # NIENTE RIPETIZIONI. Per una patch di sicurezza `os_version` vale
+    # gia' «Patch 2026-08» e `patch_level` «2026-08»: la riga usciva
+    # «Patch 2026-08 · patch 2026-08». Visto su mobile il 17/08/2026.
+    pezzi_versione: list[str] = []
+    for pezzo in (item.get("os_version") or "",
+                  f"build {item['build']}" if item.get("build") else "",
+                  f"patch {item['patch_level']}" if item.get("patch_level") else ""):
+        pezzo = pezzo.strip()
+        if pezzo and not any(pezzo.lower() in gia_visto.lower()
+                             or gia_visto.lower() in pezzo.lower()
+                             for gia_visto in pezzi_versione):
+            pezzi_versione.append(pezzo)
+    versione = " · ".join(pezzi_versione)
 
     return {
         "titolo": item.get("title", ""),
         "riassunto": truncate(riassunto, 320),
+        # Il template lo mostra piu' sottotono: e' una nota di servizio,
+        # non il testo della notizia, e confonderli e' proprio cio' che
+        # rendeva la pagina difficile da leggere.
+        "riassunto_di_servizio": ripiego,
         "modello": item.get("device_model") or "",
         "brand": item.get("brand", ""),
         "versione": versione,
         "quando": data_voce(item),
-        "fonte": item.get("source_label", ""),
+        "fonte": fonte,
         "severita": item.get("severity", ""),
         "colore": item.get("color", "#5c5a59"),
         "link": item.get("link") or "",
