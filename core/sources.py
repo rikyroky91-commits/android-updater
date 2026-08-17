@@ -4012,6 +4012,44 @@ def _porta_una_versione(items) -> bool:
     return False
 
 
+def _a_gruppi(elenco, quanti: int):
+    """Spezza un elenco in gruppi di `quanti`, mantenendone l'ordine."""
+    quanti = max(1, int(quanti or 1))
+    elenco = list(elenco)
+    for inizio in range(0, len(elenco), quanti):
+        yield elenco[inizio:inizio + quanti]
+
+
+def _news_in_parallelo(query: list[str], brand: str | None):
+    """Interroga Google News su più formulazioni insieme.
+
+    Restituisce `(query, items, error)` NELL'ORDINE IN CUI LE QUERY SONO
+    STATE PASSATE, non nell'ordine in cui rispondono. È la parte che
+    conta: quell'ordine è la priorità decisa da `_news_attempts`, e chi
+    chiama sceglie la prima formulazione che porta una versione. Se qui
+    tornassero in ordine di arrivo, la formulazione più veloce vincerebbe
+    su quella migliore, e il risultato della pagina dipenderebbe dalla
+    latenza della rete invece che dal merito.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    def una(q):
+        try:
+            return rss_items([_google_news(q)], brand, "Ricerca live",
+                             limit=25, timeout=C.SEARCH_HTTP_TIMEOUT)
+        except Exception as errore:  # una formulazione in meno, non un guasto
+            return [], str(errore)
+
+    if len(query) == 1:                       # niente thread per una sola
+        items, error = una(query[0])
+        return [(query[0], items, error)]
+
+    with ThreadPoolExecutor(max_workers=len(query),
+                            thread_name_prefix="news") as pool:
+        esiti = list(pool.map(una, query))
+    return [(q, items, error) for q, (items, error) in zip(query, esiti)]
+
+
 def _news_attempts(text: str, brand: str | None = None) -> list[str]:
     """Dalla più mirata alla più larga, per un singolo testo di ricerca
     (nome commerciale o query originale). Query BREVI e SEMPLICI, non
@@ -5798,38 +5836,49 @@ def search_model_live(model_query: str):
                     item.size_info = (item.size_info or "") + nota_codice
             return items
 
-        for attempt_query in _news_attempts(text, brand):
+        # LE FORMULAZIONI SI PROVANO A ONDATE, NON UNA ALLA VOLTA.
+        #
+        # Misurato il 17/08/2026 su `V2352`: 18 richieste a Google News in
+        # fila, 10,7 secondi dei 24 totali della pagina. Le richieste non
+        # dipendono l'una dall'altra — nessuna usa il risultato della
+        # precedente — quindi attenderle in sequenza è tempo regalato.
+        #
+        # La semantica resta IDENTICA: dentro un'ondata i risultati si
+        # valutano nell'ordine originale delle formulazioni, e vince la
+        # prima che porta una versione, esattamente come prima. Le ondate
+        # restano piccole e si smette appena una risponde, perché lanciare
+        # tutte le formulazioni in una volta significherebbe interrogare
+        # Google News anche quando la prima bastava — più veloce per noi,
+        # più carico per loro, e il rischio di finire limitati.
+        for ondata in _a_gruppi(_news_attempts(text, brand), C.SEARCH_ONDATA):
             if time.monotonic() >= scadenza:
                 tempo_scaduto = True
                 break
-            items, error = rss_items(
-                [_google_news(attempt_query)], brand, "Ricerca live",
-                limit=25, timeout=C.SEARCH_HTTP_TIMEOUT,
-            )
-            if items:
-                # SI CERCA UNA RISPOSTA, NON UN RISULTATO QUALSIASI.
-                #
-                # Prima si tornava alla PRIMA formulazione che trovava
-                # qualcosa. Ma la domanda della pagina è «a che versione
-                # sta questo telefono», e un articolo di mercato che cita
-                # il modello non la risponde: la voce arriva senza
-                # versione e vale zero (vedi la regola in
-                # `scan.normalize`). Nel frattempo la formulazione
-                # successiva — quella che nomina il software — non veniva
-                # mai provata, perché il ciclo era già uscito.
-                #
-                # Misurato su dieci modelli vivo: fermandosi al primo
-                # risultato si otteneva un firmware su 1 modello su 10.
-                #
-                # Il primo risultato non si butta: resta come ripiego per
-                # i modelli di cui nessuno ha scritto la versione, dove
-                # una notizia qualsiasi è comunque meglio del nulla.
-                if _porta_una_versione(items):
-                    return _decora(items), None
-                if ripiego is None:
-                    ripiego = _decora(items)
-            if error:
-                last_error = error
+            for _query, items, error in _news_in_parallelo(ondata, brand):
+                if items:
+                    # SI CERCA UNA RISPOSTA, NON UN RISULTATO QUALSIASI.
+                    #
+                    # Prima si tornava alla PRIMA formulazione che trovava
+                    # qualcosa. Ma la domanda della pagina è «a che versione
+                    # sta questo telefono», e un articolo di mercato che cita
+                    # il modello non la risponde: la voce arriva senza
+                    # versione e vale zero (vedi la regola in
+                    # `scan.normalize`). Nel frattempo la formulazione
+                    # successiva — quella che nomina il software — non veniva
+                    # mai provata, perché il ciclo era già uscito.
+                    #
+                    # Misurato su dieci modelli vivo: fermandosi al primo
+                    # risultato si otteneva un firmware su 1 modello su 10.
+                    #
+                    # Il primo risultato non si butta: resta come ripiego per
+                    # i modelli di cui nessuno ha scritto la versione, dove
+                    # una notizia qualsiasi è comunque meglio del nulla.
+                    if _porta_una_versione(items):
+                        return _decora(items), None
+                    if ripiego is None:
+                        ripiego = _decora(items)
+                if error:
+                    last_error = error
         if tempo_scaduto:
             break
 

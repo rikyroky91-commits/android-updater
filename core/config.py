@@ -531,6 +531,13 @@ SEARCH_HTTP_TIMEOUT = env_int("SEARCH_HTTP_TIMEOUT", 5)
 # risolverne parecchi: RMX3939 ne dà quattro, e provarli tutti moltiplica
 # le richieste di rete).
 SEARCH_MAX_CANDIDATES = env_int("SEARCH_MAX_CANDIDATES", 3)
+# Quante formulazioni si chiedono a Google News insieme. Erano una alla
+# volta: misurato su `V2352`, 18 richieste in fila per 10,7 secondi dei 24
+# della pagina. Tre per ondata perché le formulazioni sono in ordine di
+# priorità e ci si ferma appena una risponde: lanciarle tutte assieme
+# sarebbe più rapido ma interrogherebbe la fonte anche quando la prima
+# bastava, con il rischio concreto di finire limitati.
+SEARCH_ONDATA = env_int("SEARCH_ONDATA", 3)
 
 # --- Per quanto si ricorda l'esito di una ricerca ------------------------
 # Fra due ricerche identiche non c'era NESSUNA memoria: ricaricare la

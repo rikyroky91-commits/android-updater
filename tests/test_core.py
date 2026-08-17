@@ -2288,12 +2288,21 @@ class TestTettoDiTempoRicerca(unittest.TestCase):
         # quello che questo test vuole verificare.
         modelcodes.codes_for_name("Galaxy S24")
 
+        # LA DURATA DELLA SINGOLA RICHIESTA È TARATA SULLE ONDATE. Dal
+        # 17/08/2026 le formulazioni si chiedono tre alla volta e la
+        # scadenza si controlla FRA un'ondata e la successiva. Questa
+        # ricerca ha quattro formulazioni, cioè due sole ondate: con 0,4s
+        # a richiesta finivano entrambe dentro il tetto di un secondo e la
+        # ricerca usciva dalla porta normale, senza mai esercitare il
+        # tetto — l'unica cosa che questo test esiste per verificare.
+        # Con 1,1s la prima ondata sfora da sola, e la seconda trova la
+        # scadenza già passata.
         C.SEARCH_BUDGET_SECONDS = 1
         chiamate = {"n": 0}
 
         def rss_lento(urls, brand, size_info, limit=None, timeout=None):
             chiamate["n"] += 1
-            time.sleep(0.4)
+            time.sleep(1.1)
             return [], "nessun risultato"
 
         sources.rss_items = rss_lento

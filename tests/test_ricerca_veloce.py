@@ -247,5 +247,74 @@ class TestAzzeraCacheFonti(unittest.TestCase):
         self.assertFalse(any(c.fresca() for c in sources._CacheDiFonte._tutte))
 
 
+class TestOndateDiFormulazioni(unittest.TestCase):
+    """Le formulazioni si chiedono a Google News insieme, non in fila.
+
+    Misurato il 17/08/2026 su `V2352`: 18 richieste in sequenza, 10,7 dei
+    24 secondi della pagina. Segnalato dall'utente come «seconda ricerca
+    30 secondi». Le richieste non dipendono l'una dall'altra, quindi
+    attenderle una per volta è tempo regalato — ma l'ORDINE con cui si
+    valutano le risposte è la priorità decisa da `_news_attempts`, e non
+    può diventare l'ordine di arrivo.
+    """
+
+    def test_i_gruppi_conservano_l_ordine(self):
+        from core.sources import _a_gruppi
+
+        self.assertEqual(list(_a_gruppi([1, 2, 3, 4, 5], 3)),
+                         [[1, 2, 3], [4, 5]])
+        self.assertEqual(list(_a_gruppi([], 3)), [])
+        self.assertEqual(list(_a_gruppi([1, 2], 0)), [[1], [2]])
+
+    def test_vince_la_formulazione_migliore_non_la_piu_veloce(self):
+        """Se contasse l'ordine di arrivo, il risultato della pagina
+        dipenderebbe dalla latenza della rete invece che dal merito."""
+        import time as _t
+
+        from core import sources
+
+        def finta(fonti, brand, etichetta, limit=25, timeout=None):
+            query = fonti[0]
+            # La PRIMA formulazione è la più lenta: se l'ordine fosse
+            # quello di arrivo, arriverebbe per ultima e perderebbe.
+            _t.sleep(0.20 if "primo" in query else 0.01)
+            return [f"esito di {query}"], None
+
+        originale_rss = sources.rss_items
+        originale_news = sources._google_news
+        sources.rss_items = finta
+        sources._google_news = lambda q: q
+        try:
+            esiti = sources._news_in_parallelo(["primo", "secondo", "terzo"], None)
+        finally:
+            sources.rss_items = originale_rss
+            sources._google_news = originale_news
+
+        self.assertEqual([q for q, _i, _e in esiti], ["primo", "secondo", "terzo"])
+        self.assertEqual(esiti[0][1], ["esito di primo"])
+
+    def test_una_formulazione_che_esplode_non_ferma_le_altre(self):
+        from core import sources
+
+        def finta(fonti, brand, etichetta, limit=25, timeout=None):
+            if fonti[0] == "rotta":
+                raise RuntimeError("fonte irraggiungibile")
+            return ["ok"], None
+
+        originale_rss = sources.rss_items
+        originale_news = sources._google_news
+        sources.rss_items = finta
+        sources._google_news = lambda q: q
+        try:
+            esiti = sources._news_in_parallelo(["rotta", "buona"], None)
+        finally:
+            sources.rss_items = originale_rss
+            sources._google_news = originale_news
+
+        self.assertEqual(esiti[0][1], [])
+        self.assertIn("irraggiungibile", esiti[0][2])
+        self.assertEqual(esiti[1][1], ["ok"])
+
+
 if __name__ == "__main__":
     unittest.main()
