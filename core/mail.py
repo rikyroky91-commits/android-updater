@@ -194,9 +194,16 @@ def _invia_via_brevo(destinatario: str, oggetto: str, corpo: str) -> tuple[bool,
     if risposta.status_code in (200, 201, 202):
         return True, ""
     # Il corpo della risposta contiene il motivo vero (mittente non
-    # validato, chiave revocata, quota finita): senza, resterebbe solo un
-    # numero.
-    return False, f"Brevo ha risposto {risposta.status_code}: {risposta.text[:200]}"
+    # validato, chiave revocata, IP non autorizzato): senza, resterebbe
+    # solo un numero.
+    #
+    # 400 CARATTERI E NON 200. A 200 il messaggio dell'IP non autorizzato
+    # veniva tagliato a meta' dell'indirizzo da aprire per risolverlo —
+    # «...make sure to add the new IP address in this link:
+    # https://app.brevo.com/security/autho» — cioe' proprio sulla parte
+    # che serviva. Un errore troncato dove comincia la soluzione e' un
+    # errore che non aiuta.
+    return False, f"Brevo ha risposto {risposta.status_code}: {risposta.text[:400]}"
 
 
 def _invia_via_smtp(destinatario: str, oggetto: str, corpo: str) -> tuple[bool, str]:

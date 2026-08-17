@@ -1142,6 +1142,29 @@ class TestInvioViaHttps(_SitoConAccount):
         os.environ["BREVO_MITTENTE"] = "mittente@example.com"
         self.assertIn("via HTTPS", mail.stato())
 
+    def test_lerrore_non_viene_tagliato_dove_comincia_la_soluzione(self):
+        """Il messaggio dell'IP non autorizzato porta in fondo l'indirizzo
+        da aprire per risolverlo, e a 200 caratteri veniva tagliato
+        proprio li': «...add the new IP address in this link:
+        https://app.brevo.com/security/autho». Segnalato il 17/08/2026."""
+        from core import mail
+
+        os.environ["BREVO_API_KEY"] = "chiave-finta"
+        os.environ["BREVO_MITTENTE"] = "mittente@example.com"
+
+        class Risposta:
+            status_code = 401
+            text = ('{"message":"We have detected you are using an unrecognised '
+                    'IP address 74.220.51.139. If you performed this action make '
+                    'sure to add the new IP address in this link: '
+                    'https://app.brevo.com/security/authorised_ips"}')
+
+        with patch("core.mail.requests") as rete:
+            rete.post.return_value = Risposta()
+            _ok, messaggio = mail.invia("a@example.com", "o", "c")
+        self.assertIn("authorised_ips", messaggio)
+
+
     def test_lerrore_di_brevo_arriva_per_esteso(self):
         """Il corpo della risposta contiene il motivo vero — mittente non
         validato, chiave revocata, quota finita: senza, resterebbe solo
