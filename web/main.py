@@ -307,6 +307,7 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
             risultato = (_esito_solo_identita(imei["modello_cercato"])
                          if saved else _esito_ricerca(imei["modello_cercato"]))
             risultato = _ancora_esito_imei(risultato, imei)
+            imei = _identita_da_mostrare(imei, risultato.get("nome") or "")
         else:
             risultato = _esito_vuoto(domanda)
     else:
@@ -1342,6 +1343,43 @@ def _android_da_scheda(scheda: dict) -> str:
         if etichetta == "Sistema di lancio" and valore:
             return " ".join(str(valore).split())
     return ""
+
+
+def _semplifica_nome(testo: str) -> str:
+    """Solo lettere e cifre minuscole: serve a confrontare due grafie."""
+    return "".join(c for c in (testo or "").lower() if c.isalnum())
+
+
+def _identita_da_mostrare(imei: dict, nome_pagina: str) -> dict:
+    """Il nome commerciale davanti, la risposta grezza del database dietro.
+
+    La riga «IMEI riconosciuto» riporta di proposito quello che ha detto la
+    fonte, alla lettera: è la stessa onestà per cui più sotto si mostra il
+    confronto fra database TAC discordi. Ma quando quel database conosce
+    solo il codice — risponde «Oppo Cph2781», «Motorola Webb25» — la riga
+    finiva per contraddire il titolo appena sopra («Oppo A6 Pro»), e chi
+    legge non poteva sapere quale delle due credere.
+
+    Si mostrano quindi entrambi, ma soltanto quando dicono cose diverse:
+    ripetere lo stesso nome due volte nella stessa riga sarebbe rumore. Un
+    nome contenuto nell'altro («A6 Pro» dentro «Oppo A6 Pro») è la stessa
+    cosa detta più corta, non un disaccordo.
+
+    Qui non si tocca `modello_cercato`: è la chiave con cui si interrogano
+    le fonti, ed è quella che porta scheda tecnica e foto.
+    """
+    if not imei or not imei.get("riconosciuto"):
+        return imei
+
+    annotato = dict(imei)
+    nome = (nome_pagina or "").strip()
+    dal_database = (imei.get("modello") or "").strip()
+    annotato["nome_mostrato"] = nome or dal_database
+
+    a, b = _semplifica_nome(nome), _semplifica_nome(dal_database)
+    annotato["nome_diverso_dal_database"] = bool(
+        a and b and a not in b and b not in a)
+    return annotato
 
 
 def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:

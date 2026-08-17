@@ -3,8 +3,20 @@
    telefono li dice già `risultato.nome`/`risultato.riga` qui sotto: questa
    riga aggiunge solo il TAC, che altrove non compare. #}
 {% if imei.riconosciuto %}
+{# QUANDO IL DATABASE CONOSCE SOLO IL CODICE si dicono tutt'e due. Il TAC
+   risponde «Oppo Cph2781» dove il telefono si chiama «Oppo A6 Pro»: la
+   riga contraddiceva il titolo qui sopra. Il nome commerciale sta davanti
+   perché è quello che serve per riconoscere il telefono in mano; la
+   risposta grezza resta, in secondo piano, perché è il dato di partenza e
+   nasconderlo renderebbe questa riga un'affermazione senza fonte. #}
+{% if imei.nome_diverso_dal_database %}
+<p class="etichetta-imei">IMEI riconosciuto: <strong>{{ imei.nome_mostrato }}</strong>
+  · TAC <code>{{ imei.tac }}</code>
+  <span class="tenue">— il database risponde: {{ imei.descrizione }}</span></p>
+{% else %}
 <p class="etichetta-imei">IMEI riconosciuto: <strong>{{ imei.descrizione }}</strong>
   · TAC <code>{{ imei.tac }}</code></p>
+{% endif %}
 {% else %}
 <p class="etichetta-imei etichetta-imei-incerta">IMEI a 15 cifre, modello sconosciuto
   · TAC <code>{{ imei.tac }}</code></p>

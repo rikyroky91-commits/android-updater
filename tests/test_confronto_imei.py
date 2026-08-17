@@ -242,5 +242,46 @@ class TestLinkDiVerifica(unittest.TestCase):
         self.assertFalse(imeicheck.is_valid_imei("356909222457120"))
 
 
+class TestRigaDellIdentita(unittest.TestCase):
+    """La riga «IMEI riconosciuto» quando il database conosce solo il codice.
+
+    Chiesto dall'utente il 17/08/2026: il titolo diceva «Oppo A6 Pro» e la
+    riga sotto «Oppo Cph2781», senza modo di capire quale credere. Si
+    mostrano entrambi — nome commerciale davanti, risposta grezza dietro —
+    ma solo quando dicono cose diverse.
+    """
+
+    def _riga(self, dal_database, nome_pagina):
+        from web.main import _identita_da_mostrare
+
+        return _identita_da_mostrare(
+            {"riconosciuto": True, "modello": dal_database}, nome_pagina)
+
+    def test_il_codice_travestito_da_nome_non_contraddice_piu_il_titolo(self):
+        riga = self._riga("Oppo Cph2781", "Oppo A6 Pro")
+        self.assertEqual(riga["nome_mostrato"], "Oppo A6 Pro")
+        self.assertTrue(riga["nome_diverso_dal_database"])
+
+    def test_lo_stesso_nome_non_si_ripete_due_volte(self):
+        riga = self._riga("Galaxy A07", "Galaxy A07")
+        self.assertFalse(riga["nome_diverso_dal_database"])
+
+    def test_un_nome_piu_corto_non_e_un_disaccordo(self):
+        """«A6 Pro» dentro «Oppo A6 Pro» è la stessa cosa detta più corta."""
+        self.assertFalse(self._riga("A6 Pro", "Oppo A6 Pro")["nome_diverso_dal_database"])
+        self.assertFalse(self._riga("GALAXY  A07", "Galaxy A07")["nome_diverso_dal_database"])
+
+    def test_senza_nome_dalla_pagina_resta_quello_del_database(self):
+        riga = self._riga("Oppo Cph2781", "")
+        self.assertEqual(riga["nome_mostrato"], "Oppo Cph2781")
+        self.assertFalse(riga["nome_diverso_dal_database"])
+
+    def test_un_imei_non_riconosciuto_non_si_tocca(self):
+        from web.main import _identita_da_mostrare
+
+        grezzo = {"riconosciuto": False, "modello": ""}
+        self.assertIs(_identita_da_mostrare(grezzo, "Qualcosa"), grezzo)
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main(verbosity=2)
