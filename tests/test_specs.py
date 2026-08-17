@@ -464,6 +464,31 @@ class TestMarcaChiestaColNomeCorto(unittest.TestCase):
                 self.assertTrue(
                     specs._marca_compatibile(self._scheda(gruppo), corto))
 
+    def test_il_marchio_si_riconosce_dentro_la_ragione_sociale(self):
+        """Il banco di prova ha trovato 40 modelli su 40 senza scheda né
+        foto, col nome giusto sopra: quei TAC hanno per marca «Samsung
+        Electronics Co Ltd», che il confronto esatto non riconosceva."""
+        self.assertEqual(specs.gruppo_marca("Samsung Electronics Co Ltd"),
+                         C.SAMSUNG)
+        self.assertTrue(specs._marca_compatibile(
+            self._scheda(C.SAMSUNG), "Samsung Electronics Co Ltd"))
+
+    def test_le_etichette_di_gruppo_restano_se_stesse(self):
+        """Contengono più marchi, ma della stessa famiglia."""
+        for etichetta in (C.OPPO, C.XIAOMI, C.HUAWEI, C.VIVO, C.PIXEL):
+            with self.subTest(etichetta=etichetta):
+                self.assertEqual(specs.gruppo_marca(etichetta), etichetta)
+
+    def test_davanti_a_due_famiglie_non_si_indovina(self):
+        """Un filtro che sbaglia famiglia è peggio di uno che non filtra:
+        assegnerebbe il telefono alle specifiche di un altro."""
+        self.assertEqual(specs.gruppo_marca("Samsung Xiaomi Trading"),
+                         "Samsung Xiaomi Trading")
+
+    def test_una_marca_sconosciuta_resta_intatta(self):
+        self.assertEqual(specs.gruppo_marca("Fairphone"), "Fairphone")
+        self.assertEqual(specs.gruppo_marca(""), "")
+
     def test_il_gruppo_continua_a_funzionare(self):
         self.assertTrue(
             specs._marca_compatibile(self._scheda(C.OPPO), C.OPPO))

@@ -398,6 +398,34 @@ def _a_scheda(riga: dict) -> Scheda:
     )
 
 
+def gruppo_marca(testo: str) -> str:
+    """Il gruppo del tracker a cui appartiene una marca, comunque sia scritta.
+
+    Una ricerca esatta in `_MARCHE` copre solo le grafie previste. I nomi
+    delle marche però arrivano dai database TAC, che sono alimentati dalla
+    community e scrivono la stessa azienda in molti modi: accanto a
+    ``SAMSUNG`` c'è ``Samsung Electronics Co Ltd``. Con il confronto esatto
+    quella forma non corrispondeva a niente e il filtro scartava ogni
+    scheda — quaranta modelli su quaranta senza specifiche né foto nel
+    banco di prova, col nome giusto sopra.
+
+    Si cerca quindi un marchio noto DENTRO la stringa. Se ne compaiono di
+    gruppi diversi non si indovina: si restituisce il testo com'è, e il
+    confronto fallirà come prima. Meglio un filtro che non riconosce una
+    marca ambigua di uno che assegna il telefono alla famiglia sbagliata,
+    che è il motivo per cui questo filtro esiste.
+    """
+    testo = (testo or "").strip()
+    if not testo:
+        return testo
+    diretto = _MARCHE.get(testo.lower())
+    if diretto:
+        return diretto
+    parole = re.split(r"[^0-9a-zA-Z]+", testo.lower())
+    gruppi = {_MARCHE[p] for p in parole if p in _MARCHE}
+    return gruppi.pop() if len(gruppi) == 1 else testo
+
+
 def _marca_compatibile(scheda: Scheda, richiesta: str | None) -> bool:
     """Evita che una coincidenza di nome attraversi una famiglia di marchi.
 
@@ -415,13 +443,13 @@ def _marca_compatibile(scheda: Scheda, richiesta: str | None) -> bool:
     commerciale, scheda tecnica e foto, mentre cercando lo stesso telefono
     a mano (senza marca, quindi senza filtro) compariva tutto: è il guasto
     segnalato dall'utente su CPH2781 e XT2553-1.
+
+    La normalizzazione vera e propria sta in `gruppo_marca`: il nome corto
+    non era l'unica grafia che mancava all'appello.
     """
     if not richiesta:
         return True
-    trovata = (scheda.marca or "").strip()
-    canonica = _MARCHE.get(trovata.lower(), trovata)
-    chiesta = richiesta.strip()
-    return canonica == _MARCHE.get(chiesta.lower(), chiesta)
+    return gruppo_marca(scheda.marca or "") == gruppo_marca(richiesta)
 
 
 # ======================================================================
