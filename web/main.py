@@ -1493,14 +1493,24 @@ def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
     # 865229072199770:
     #
     #     il TAC dice        «Realme C65 5G (RMX3997)»
-    #     ma RMX3997 è       realme 12x 5G
-    #     e C65 5G è         RMX3910, un telefono diverso
+    #     l'utente ha in mano realme 12x 5G
     #
-    # Due modelli mescolati in una riga sola. Il codice è la parte
-    # esatta — è la chiave che le fonti ufficiali accettano, ed è il
-    # motivo per cui tutta questa applicazione cerca per codice e non per
-    # nome; il nome è la parte che i database alimentati dalla community
-    # sbagliano. Fra i due si crede al codice.
+    # ATTENZIONE, QUI MI ERO SBAGLIATO UNA PRIMA VOLTA: avevo concluso
+    # che «C65 5G» fosse un altro telefono, leggendo un catalogo caricato
+    # a metà. Con il catalogo intero quel codice risulta venduto sotto
+    # TRE nomi — C65 5G, NARZO N65, 12x 5G — tutti veri, in mercati
+    # diversi. Non c'era nessun nome sbagliato da scartare: c'era da
+    # SCEGLIERE, e la scelta è quella europea, perché è il nome sotto cui
+    # il telefono riceve gli aggiornamenti che si devono provare.
+    #
+    # Sceglie `nome_canonico`, che applica anche le righe curate di
+    # `data/nomi_modello.csv` — e quelle righe non inventano niente:
+    # valgono solo per scegliere fra nomi che il dataset già conosce.
+    # Il nome del TAC, che è community, non le scavalca.
+    #
+    # Il codice resta comunque la parte esatta — è la chiave che le fonti
+    # ufficiali accettano, ed è il motivo per cui tutta questa
+    # applicazione cerca per codice e non per nome.
     #
     # Il freno buono non è la forma del nome ma la sua APPARTENENZA: se
     # il nome del TAC è fra quelli noti per quel codice, è una variante
@@ -1513,6 +1523,20 @@ def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
     # appartenergli e il solo controllo di appartenenza lo lascerebbe
     # passare. Un nome che contiene il codice non è mai un nome
     # commerciale, qualunque catalogo lo elenchi.
+    #
+    # E VINCE SOLO LA RIGA CURATA, non il nome canonico in generale.
+    # Provato a farlo vincere sempre: si perdeva «Galaxy A16 4G», che è
+    # la grafia completa conservata dal catalogo tecnico, sostituita dal
+    # più corto «Galaxy A16». Un nome scelto automaticamente non è più
+    # informato di una scheda verificata; una riga scritta a mano sì.
+    #
+    # «CURATO» SIGNIFICA «LA RIGA HA AVUTO EFFETTO», non «la riga esiste».
+    # `nome_canonico` applica una riga di `nomi_modello.csv` solo se quel
+    # nome compare già fra quelli noti per il codice — è la garanzia che
+    # una riga scelga fra nomi verificati invece di inventarne uno. Quando
+    # quella condizione non è soddisfatta la riga non fa nulla, e trattarla
+    # ugualmente come una decisione presa faceva perdere «Redmi A7 Pro»
+    # del catalogo tecnico in favore del «REDMI A7 Pro» tutto maiuscolo.
     canonico = _nome_del_codice(codice) if codice else None
     if canonico and (not _nome_appartiene_al_codice(modello, codice)
                      or _semplifica_nome(codice) in _semplifica_nome(modello)):
@@ -1525,10 +1549,39 @@ def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
     # tutto maiuscolo: per la UI si privilegia quindi il titolo della scheda
     # che Ã¨ stata appena trovata per lo stesso codice, senza permettere alla
     # ricerca firmware di rinominare l'identitÃ .
+    #
+    # ...ma NON sopra il nome canonico del codice, quando c'è. Anche il
+    # titolo della scheda è uno dei nomi di mercato («Realme C65 5G» per
+    # RMX3997), e lasciarlo vincere rimetteva la pagina dell'IMEI in
+    # disaccordo con la stessa ricerca fatta per codice: lo stesso
+    # telefono con due nomi a seconda di come lo si è cercato.
     titolo_scheda = (ancorato["scheda"].get("titolo") or "").strip()
     if ancorato["scheda"].get("trovata") and titolo_scheda:
         modello = titolo_scheda
         marca = ancorato["scheda"].get("marca") or marca
+
+    # ULTIMA PAROLA ALLA RIGA SCRITTA A MANO, e solo quando cambia
+    # davvero telefono.
+    #
+    # RMX3997 è venduto come «C65 5G», «NARZO N65» e «realme 12x 5G»:
+    # tutti nomi veri, e sia il TAC sia il catalogo tecnico ne
+    # restituiscono uno qualsiasi. In Europa serve l'ultimo, perché è il
+    # nome sotto cui quel telefono riceve gli aggiornamenti da provare, e
+    # nessun automatismo può saperlo: lo sa `data/nomi_modello.csv`.
+    #
+    # La condizione «cambia davvero telefono» è ciò che ha reso questa
+    # regola innocua dopo due tentativi sbagliati. Le prime due versioni
+    # facevano vincere il nome curato anche quando differiva solo nella
+    # grafia, e così «Redmi A7 Pro» del catalogo tecnico diventava
+    # «REDMI A7 Pro»: una regola nata per dare il nome giusto che
+    # peggiorava quello che era già giusto.
+    scritto_a_mano = modelcodes.nome_scelto_a_mano(codice) if codice else None
+    if (scritto_a_mano and canonico
+            and _semplifica_nome(scritto_a_mano) == _semplifica_nome(canonico)
+            and _semplifica_nome(modello) != _semplifica_nome(canonico)):
+        modello = canonico
+        marca = ""       # il nome curato è già completo di marca
+
     ancorato["query"] = identita
     ancorato["nome"] = _modello_con_marca(marca, modello, codice) or modello
     ancorato["codice"] = codice
@@ -2091,7 +2144,14 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
     versione_certa = corrente or riportata or base_android
     identita = versione_certa or (fonti_dirette[0] if fonti_dirette else {})
 
+    # IL CODICE PUÒ ESSERE QUELLO CHE È STATO DIGITATO. Prima si prendeva
+    # solo da chi aveva risposto, e le righe più vecchie dell'archivio non
+    # lo portano: cercando «RMX3997» il codice risultava sconosciuto
+    # proprio mentre era scritto nella barra di ricerca, e tutto ciò che
+    # dipende dal codice — a partire dal nome curato — restava spento.
     codice = identita.get("model_code") or ""
+    if not codice and sources.looks_like_model_code(query):
+        codice = " ".join((query or "").split()).upper()
     nome = identita.get("device_model") or query
     marca = identita.get("brand", "")
 
@@ -2102,7 +2162,19 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
     # `scan.normalize` conserva il nome fornito da una fonte strutturata
     # quando è più preciso del dataset community dei codici (CPH2781 è A6
     # Pro in Europa, F31 in India). Qui non si deve annullare quella scelta.
-    if codice and not identita.get("device_model"):
+    #
+    # UNA RIGA CURATA A MANO BATTE ANCHE LA FONTE. La condizione qui sopra
+    # protegge la scelta di una fonte strutturata, che conosce il mercato
+    # meglio del dataset community: giusto. Ma `data/nomi_modello.csv` non
+    # è il dataset community — è una decisione presa dopo aver verificato,
+    # e su un codice con più nomi veri è l'unica cosa che sappia quale
+    # serve qui. RMX3997 è insieme «C65 5G», «NARZO N65» e «realme 12x
+    # 5G»: la fonte ne restituisce uno qualsiasi, e chi prova il telefono
+    # in Europa ha bisogno dell'ultimo. Senza questa eccezione la ricerca
+    # per IMEI e quella per codice davano due nomi diversi per lo stesso
+    # telefono, che è il difetto che l'utente ha segnalato.
+    scelto_a_mano = modelcodes.nome_scelto_a_mano(codice) if codice else None
+    if codice and (scelto_a_mano or not identita.get("device_model")):
         try:
             canonico = modelcodes.nome_canonico(codice)
         except Exception:

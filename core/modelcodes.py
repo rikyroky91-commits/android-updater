@@ -250,6 +250,26 @@ def _indice_override_nomi() -> dict[str, str]:
     return _override_nomi
 
 
+def nome_scelto_a_mano(codice: str) -> str | None:
+    """Il nome deciso in `data/nomi_modello.csv` per questo codice, se c'è.
+
+    Serve a chi deve distinguere due cose che `nome_canonico` restituisce
+    allo stesso modo: una scelta AUTOMATICA fra i nomi noti — legittima,
+    ma che una fonte strutturata può battere, perché conosce il mercato —
+    e una riga scritta a mano dopo aver verificato, che invece non deve
+    essere battuta da nessuno.
+
+    Il caso che l'ha resa necessaria: RMX3997 è venduto come «C65 5G»,
+    «NARZO N65» e «realme 12x 5G». Sono tutti nomi veri, e la fonte
+    strutturata ne restituisce uno qualsiasi; in Europa serve l'ultimo,
+    perché è quello sotto cui il telefono riceve gli aggiornamenti.
+    Nessun automatismo può saperlo — la riga curata sì.
+    """
+    if not codice:
+        return None
+    return _indice_override_nomi().get(codice.strip().upper()) or None
+
+
 def _add_names(index: dict[str, list[str]], code: str, name: str) -> None:
     code = code.strip().upper()
     name = name.strip()
