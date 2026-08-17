@@ -1214,7 +1214,26 @@ def _esito_imei(imei: str) -> dict:
         # diversi, e arriva in forme incoerenti; il codice è esatto ed è
         # la chiave che le fonti ufficiali accettano. È la differenza fra
         # «trova qualcosa» e «trova quel telefono».
-        modello_cercato = codice or dettagli.get("model") or ""
+        # ...MA SOLO SE QUEL CODICE LO CONOSCE QUALCUNO.
+        #
+        # Segnalato dall'utente il 17/08/2026: «cercando un IMEI mi trova
+        # il codice modello ma non quello commerciale ed e' scollegato
+        # dalla scheda tecnica; se cerco il modello a mano trovo scheda e
+        # foto». Ecco il perche': il database TAC dava ENTRAMBI — codice e
+        # nome — e qui il codice vinceva sempre. Quando quel codice non e'
+        # nei cataloghi (MobileModels, Google Play) non risolve niente, e
+        # la pagina restava con il codice grezzo come titolo e nessuna
+        # scheda — buttando via il nome commerciale che avevamo gia' in
+        # mano e che avrebbe trovato tutto.
+        #
+        # Il codice resta la prima scelta quando serve davvero, cioe'
+        # quando qualcuno sa tradurlo: e' piu' preciso del nome, che e'
+        # ambiguo fra le varianti di mercato. Se non lo sa nessuno, un
+        # nome che trova il telefono vale piu' di un codice che non trova
+        # niente.
+        modello = dettagli.get("model") or ""
+        codice_utile = bool(codice) and bool(modelcodes.resolve(codice))
+        modello_cercato = (codice if codice_utile else (modello or codice)) or ""
 
     return {
         "imei": imei,
@@ -1971,9 +1990,30 @@ def _cerca_davvero(query: str) -> dict:
     # chiude i casi di alias regionali: RMX3939 non può tornare C61 se la
     # scheda per RMX3939 dichiara realme C63.
     if codice and scheda.get("trovata") and scheda.get("titolo"):
-        nome = (_modello_con_marca(scheda.get("marca") or marca,
-                                   scheda["titolo"], codice)
-                or scheda["titolo"])
+        # MA IL NOME CANONICO DEL CODICE VIENE PRIMA DELLA SCHEDA.
+        #
+        # La regola qui sopra nasce per non farsi rinominare dal nome
+        # libero di una fonte firmware, e resta giusta. Il catalogo delle
+        # specifiche pero' non e' un arbitro sui NOMI DI MERCATO: per
+        # `CPH2219` dichiara «Oppo F19», che e' la grafia indiana, mentre
+        # `nome_canonico` risponde «OPPO A74», quella europea.
+        #
+        # `nome_canonico` e' la funzione il cui unico mestiere e'
+        # rispondere «come si chiama QUESTO codice», con una scala
+        # deterministica e — soprattutto — con gli override scritti a
+        # mano in `data/nomi_modello.csv` in cima a tutto. Lasciarla
+        # scavalcare dalla scheda significava che quella tabella curata
+        # non aveva effetto sulla pagina, che e' l'unico posto dove
+        # serve.
+        #
+        # Il caso che aveva motivato la regola non cambia: per RMX3939 la
+        # scheda dice «realme C63» e `nome_canonico` pure, quindi qui non
+        # si sceglie nulla di diverso. Cambia solo dove i due DISCORDANO,
+        # ed e' esattamente il caso in cui serve un criterio.
+        canonico = modelcodes.nome_canonico(codice)
+        titolo = canonico or scheda["titolo"]
+        nome = (_modello_con_marca(scheda.get("marca") or marca, titolo, codice)
+                or titolo)
 
     # QUANDO NON C'È UN FIRMWARE MA C'È UN TELEFONO VERO.
     #
@@ -2001,8 +2041,21 @@ def _cerca_davvero(query: str) -> dict:
         # preciso, anche se la fonte conosce una versione Android.
         if (titolo_scheda and titolo_scheda.lower() != query.strip().lower()
                 and (not versione_certa or nome_tecnico)):
+            # STESSA REGOLA DEL BLOCCO SOPRA, e va tenuta allineata: se il
+            # codice ha un nome canonico, quello viene prima del titolo
+            # della scheda. Questo ramo e' il ripiego per i codici che
+            # NESSUNA fonte firmware conosce (il caso «m1910f4g»), e li'
+            # il titolo della scheda resta l'unica risposta — ma quando il
+            # codice e' noto ai cataloghi, chi decide come si chiama e'
+            # `nome_canonico`, che tiene conto anche di
+            # `data/nomi_modello.csv`.
+            #
+            # Senza questa riga la correzione del blocco sopra non aveva
+            # effetto: `CPH2219` tornava «Oppo F19» qui, due assegnazioni
+            # piu' in basso.
+            titolo = (modelcodes.nome_canonico(codice) if codice else None) or titolo_scheda
             nome = _modello_con_marca(
-                scheda.get("marca") or marca, titolo_scheda, codice) or titolo_scheda
+                scheda.get("marca") or marca, titolo, codice) or titolo
             # Il nome è cambiato: il codice di correzione e un'eventuale
             # correzione già salvata per QUEL nome vanno ricalcolati, stessa
             # ragione del blocco sopra.

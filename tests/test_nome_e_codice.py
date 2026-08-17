@@ -968,6 +968,94 @@ class TestPrimaLEuropa(unittest.TestCase):
         self.assertTrue(any("Turkey" in (n or "") or "Global" in (n or "") for n in nomi))
 
 
+class TestIlNomeSullaPaginaSegueIlCodice(unittest.TestCase):
+    """Segnalato il 17/08/2026: «cercando un IMEI mi trova il codice
+    modello ma non quello commerciale ed e' scollegato dalla scheda
+    tecnica; se cerco il modello a mano trovo scheda e foto».
+
+    Due difetti distinti, tutti e due su come la PAGINA sceglie il nome —
+    ed e' il motivo per cui la correzione del giorno prima sembrava fatta
+    e non lo era: era stata verificata su `scan.search_model`, che dava
+    gia' la risposta giusta, mentre la pagina la sovrascriveva due volte
+    piu' in basso.
+    """
+
+    def _nome(self, testo):
+        from core import storage
+        from web.main import _esito_ricerca
+
+        storage.init_db()
+        return _esito_ricerca(testo)["nome"]
+
+    def test_il_nome_canonico_batte_il_titolo_della_scheda(self):
+        """Il catalogo delle specifiche dichiara «Oppo F19» per CPH2219,
+        che e' la grafia indiana; `nome_canonico` dice «OPPO A74», quella
+        europea. Il catalogo delle specifiche non e' un arbitro sui nomi
+        di mercato."""
+        from core import modelcodes
+
+        if not modelcodes.resolve("CPH2219"):
+            self.skipTest("catalogo dei codici non disponibile in questo ambiente")
+        self.assertEqual(self._nome("CPH2219"), modelcodes.nome_canonico("CPH2219"))
+
+    def test_il_ripiego_per_i_codici_sconosciuti_resta(self):
+        """`M1910F4G` non e' in nessuna fonte firmware: li' il titolo
+        della scheda e' l'unica risposta, e deve continuare a vincere."""
+        from core import modelcodes
+
+        if not modelcodes.resolve("CPH2219"):
+            self.skipTest("catalogo dei codici non disponibile in questo ambiente")
+        self.assertIn("Mi Note 10", self._nome("M1910F4G"))
+
+    def test_un_codice_che_nessuno_conosce_resta_se_stesso(self):
+        """Non si inventa un nome: meglio il codice grezzo di una
+        risposta sbagliata."""
+        self.assertEqual(self._nome("CPH9999"), "CPH9999")
+
+
+class TestImeiRipiegaSulNomeCommerciale(unittest.TestCase):
+    """Il database TAC da' SIA il codice SIA il nome commerciale, e il
+    codice vinceva sempre. Quando quel codice non e' nei cataloghi non
+    risolve niente: la pagina restava con il codice grezzo per titolo e
+    senza scheda, buttando via un nome che avrebbe trovato tutto."""
+
+    def test_col_codice_noto_si_cerca_il_codice(self):
+        """Resta la prima scelta quando serve: e' piu' preciso del nome,
+        che e' ambiguo fra le varianti di mercato."""
+        from core import imeicheck, storage
+        from web.main import _esito_imei
+
+        storage.init_db()
+        imei = imeicheck.imei_con_cifra_di_controllo("351355310000000")
+        esito = _esito_imei(imei)
+        if not esito.get("codice"):
+            self.skipTest("database TAC non disponibile in questo ambiente")
+        self.assertEqual(esito["modello_cercato"], esito["codice"])
+
+    def test_col_codice_ignoto_si_cerca_il_nome(self):
+        from core import imeicheck, storage
+        from web.main import _esito_imei
+
+        storage.init_db()
+        imei = imeicheck.imei_con_cifra_di_controllo("351355310000000")
+        vero = imeicheck.parse_specs
+
+        def finta(marca, grezzi):
+            dettagli = dict(vero(marca, grezzi))
+            dettagli["code"] = "ZZZ9999"   # nessun catalogo lo conosce
+            return dettagli
+
+        imeicheck.parse_specs = finta
+        try:
+            esito = _esito_imei(imei)
+        finally:
+            imeicheck.parse_specs = vero
+        if not esito.get("modello"):
+            self.skipTest("database TAC non disponibile in questo ambiente")
+        self.assertEqual(esito["modello_cercato"], esito["modello"])
+        self.assertNotEqual(esito["modello_cercato"], "ZZZ9999")
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main(verbosity=2)
 
