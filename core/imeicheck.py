@@ -222,6 +222,11 @@ def carica_tac_curati(testo: str) -> dict[str, tuple[str, str]]:
 # l'app mostra comunque la riga da incollare nel CSV per renderlo
 # permanente. Le due strade non si escludono, si completano.
 _META_TAC_UTENTE = "imei_tac_inseriti"
+#: Le risposte già pagate al servizio esterno. Tenute SEPARATE da quelle
+#: inserite a mano: le prime sono un acquisto, le seconde una verifica di
+#: una persona, e mescolarle farebbe sparire la differenza proprio nella
+#: tabella che il sito mostra per dire da dove viene una risposta.
+_META_TAC_ESTERNI = "imei_tac_esterni"
 
 # I siti dove verificare un TAC a mano. Nessuno di questi viene
 # interrogato dall'app: bloccano l'accesso automatico o lo vietano nei
@@ -270,6 +275,44 @@ def tac_inseriti() -> dict[str, tuple[str, str]]:
         if isinstance(valore, (list, tuple)) and len(valore) == 2:
             voci[str(tac)] = (str(valore[0]), str(valore[1]))
     return voci
+
+
+def tac_esterni() -> dict[str, tuple[str, str]]:
+    """Le risposte già ottenute dal servizio esterno, e già pagate."""
+    grezzo = storage.get_meta(_META_TAC_ESTERNI)
+    if not grezzo:
+        return {}
+    try:
+        dati = json.loads(grezzo) if isinstance(grezzo, str) else grezzo
+    except Exception:
+        return {}
+    if not isinstance(dati, dict):
+        return {}
+    return {str(t): (str(v[0]), str(v[1])) for t, v in dati.items()
+            if isinstance(v, (list, tuple)) and len(v) == 2}
+
+
+def _ricorda_tac_esterno(tac: str, marca: str, modello: str) -> None:
+    """Conserva una risposta comprata, perché non si compri due volte.
+
+    Il piano gratuito è di cento interrogazioni al mese e la risposta
+    finiva nel solo indice in memoria: su Render il processo riparte a
+    ogni deploy e dopo ogni sonno, quindi lo stesso TAC sarebbe stato
+    richiesto — e pagato — di nuovo. Con un archivio che viene salvato su
+    Gist, invece, una risposta vale per sempre.
+
+    I dati TAC non invecchiano: un codice assegnato a un modello resta
+    quel modello. Non serve nessuna scadenza.
+    """
+    tac = "".join(c for c in (tac or "") if c.isdigit())[:8]
+    if len(tac) != 8:
+        return
+    voci = tac_esterni()
+    voci[tac] = (marca or "", modello or "")
+    try:
+        storage.set_meta(_META_TAC_ESTERNI, json.dumps(voci, ensure_ascii=False))
+    except Exception:      # un archivio non scrivibile non deve far fallire una ricerca
+        pass
 
 
 def aggiungi_tac(tac: str, marca: str, modello: str) -> bool:
@@ -502,6 +545,11 @@ def _build_index() -> dict[str, list[tuple[str, str, str]]]:
 
     aggiungi(FONTE_UTENTE, inseriti, filtrabile=False)
     aggiungi(FONTE_CURATA, curati, filtrabile=False)
+    # Le risposte comprate al servizio esterno stanno sotto le verifiche
+    # umane e sopra i database scaricati: sono puntuali e recenti, ma
+    # restano di una fonte automatica. Non si filtrano per età — si sono
+    # pagate proprio perché nessun altro conosceva quel TAC.
+    aggiungi(FONTE_ESTERNA, tac_esterni(), filtrabile=False)
     aggiungi(FONTE_PRINCIPALE, principale)
     aggiungi(FONTE_IMEIDB, imeidb)
     aggiungi(FONTE_OSMOCOM, storica)
@@ -728,6 +776,26 @@ def _chiave_api() -> str:
     return C.env("TAC_API_KEY").strip()
 
 
+def stato_servizio_esterno() -> str:
+    """Se il servizio a pagamento è configurato, e quanto ha già risposto.
+
+    Senza questa riga chi metteva la chiave non aveva NESSUN modo di
+    sapere se era stata letta: la fonte si interroga solo per i TAC che
+    nessun database locale conosce, quindi può passare molto tempo prima
+    che un errore di configurazione si manifesti — e quando si manifesta
+    sembra un buco dei dati, non una chiave sbagliata.
+    """
+    if not _chiave_api():
+        return ("non configurata — con una chiave in TAC_API_KEY i TAC che "
+                "nessun database locale conosce vengono chiesti al servizio "
+                "esterno (solo le 8 cifre del TAC, mai l'IMEI intero)")
+    quante = len(tac_esterni())
+    if not quante:
+        return "chiave presente · nessun TAC ancora chiesto al servizio"
+    return (f"chiave presente · {quante} TAC risolti dal servizio e conservati "
+            f"(non verranno richiesti di nuovo)")
+
+
 def cerca_tac_online(tac: str) -> tuple[str, str] | None:
     """Marca e modello per un TAC, chiedendoli al servizio esterno.
 
@@ -912,10 +980,17 @@ def identify(imei: str) -> tuple[str, str] | None:
     # Solo adesso, e solo se configurato, si chiede fuori: le
     # interrogazioni gratuite sono cento al mese e vanno spese sui
     # codici che i database locali non hanno.
+    # Prima di spendere, si guarda se questa risposta è già stata comprata.
+    gia_pagato = tac_esterni().get(tac)
+    if gia_pagato:
+        return gia_pagato
+
     esterno = cerca_tac_online(tac)
     if esterno:
-        _memory_index.setdefault(tac, []).append(
-            (FONTE_ESTERNA, esterno[0], esterno[1]))
+        if _memory_index is not None:
+            _memory_index.setdefault(tac, []).append(
+                (FONTE_ESTERNA, esterno[0], esterno[1]))
+        _ricorda_tac_esterno(tac, esterno[0], esterno[1])
     return esterno
 
 

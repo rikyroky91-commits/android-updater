@@ -724,6 +724,7 @@ def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
             ("Catalogo aziendale (AER)", aer_catalog.status()),
             ("Processori", soc.status()),
             ("Specifiche hardware", specs.status()),
+            ("Servizio TAC esterno", imeicheck.stato_servizio_esterno()),
             ("Interprete AI della ricerca", aiquery.status()),
             # Non uno "stato" interrogato al volo come gli altri sopra: è
             # quello che l'avvio ha scritto in STATO_AVVIO una volta sola

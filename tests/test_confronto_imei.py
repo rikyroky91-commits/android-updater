@@ -375,3 +375,51 @@ class TestLaCopiaNelRepository(unittest.TestCase):
             self.assertEqual(imeicheck._istantanea_locale(), {})
         finally:
             imeicheck.CARTELLA_DATI = originale
+
+
+class TestUnaRispostaCompratraSiPagaUnaVoltaSola(BaseImei):
+    """Il servizio esterno ha cento interrogazioni al mese: non si sprecano.
+
+    L'aggancio esisteva già ma la risposta finiva nel solo indice in
+    memoria, e su Render il processo riparte a ogni deploy e dopo ogni
+    sonno: lo stesso TAC sarebbe stato richiesto — e pagato — di nuovo.
+    I dati TAC non invecchiano, quindi una risposta conservata vale per
+    sempre e non ha bisogno di scadenza.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._online = imeicheck.cerca_tac_online
+        self.chiamate = {"n": 0}
+
+        def finto(tac):
+            self.chiamate["n"] += 1
+            return ("ZTE", "Blade A75 5G")
+
+        imeicheck.cerca_tac_online = finto
+
+    def tearDown(self):
+        imeicheck.cerca_tac_online = self._online
+        super().tearDown()
+
+    def test_si_chiede_una_volta_e_poi_si_ricorda(self):
+        ignoto = "998877660000000"
+        self.assertEqual(imeicheck.identify(ignoto), ("ZTE", "Blade A75 5G"))
+        self.assertEqual(self.chiamate["n"], 1)
+
+        imeicheck.reset_cache()                      # come un riavvio
+        self.assertEqual(imeicheck.identify(ignoto), ("ZTE", "Blade A75 5G"))
+        self.assertEqual(self.chiamate["n"], 1, "il TAC è stato ricomprato")
+
+    def test_non_si_chiede_per_un_tac_che_i_database_locali_conoscono(self):
+        """Le interrogazioni vanno spese sui buchi, non sulle risposte
+        che abbiamo già in casa."""
+        imeicheck.identify("356924110000000")        # è nel CSV di prova
+        self.assertEqual(self.chiamate["n"], 0)
+
+    def test_le_risposte_comprate_restano_distinte_da_quelle_verificate(self):
+        """Il sito mostra da dove viene ogni risposta: un acquisto e la
+        verifica di una persona non devono confondersi nella stessa riga."""
+        imeicheck.identify("998877660000000")
+        self.assertIn("99887766", imeicheck.tac_esterni())
+        self.assertNotIn("99887766", imeicheck.tac_inseriti())
