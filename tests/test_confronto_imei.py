@@ -340,3 +340,38 @@ class TestRigaDellIdentita(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main(verbosity=2)
+
+
+class TestLaCopiaNelRepository(unittest.TestCase):
+    """Il database TAC non deve esistere solo in rete.
+
+    Il 17/08/2026 la fonte ha risposto `HTTP 429` e il risultato è stato
+    che nessun IMEI veniva più riconosciuto: un dato che si trova solo in
+    rete è un dato che si può perdere. La copia in `data/` contiene la
+    sola era Android — mezzo megabyte compresso, un decimo di quanto
+    l'app già scarica per i codici Google Play — e resta l'ULTIMA delle
+    scelte: quando la rete risponde si usa il dato fresco, che conosce
+    anche i modelli usciti dopo l'ultima istantanea.
+    """
+
+    def test_la_copia_c_e_e_si_legge(self):
+        istantanea = imeicheck._istantanea_locale()
+        self.assertGreater(len(istantanea), 50_000,
+                           "l'istantanea sembra troppo piccola o mancante")
+
+    def test_contiene_telefoni_veri(self):
+        istantanea = imeicheck._istantanea_locale()
+        for tac, atteso in (("86789908", "oppo"), ("35719772", "motorola"),
+                            ("86120607", "realme")):
+            with self.subTest(tac=tac):
+                self.assertIn(tac, istantanea)
+                marca, _specs = istantanea[tac]
+                self.assertIn(atteso, marca.lower())
+
+    def test_un_file_mancante_non_fa_esplodere_niente(self):
+        originale = imeicheck.CARTELLA_DATI
+        imeicheck.CARTELLA_DATI = os.path.join(originale, "cartella-che-non-esiste")
+        try:
+            self.assertEqual(imeicheck._istantanea_locale(), {})
+        finally:
+            imeicheck.CARTELLA_DATI = originale

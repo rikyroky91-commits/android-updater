@@ -1424,9 +1424,18 @@ class TestRicercaPerImei(_Sito):
         realme Note 50, anche quando nessuna fonte firmware ha ancora dati
         da rendere nel resto del risultato.
         """
-        pagina = self.client.get("/", params={"q": "861206074094914"}).text
-        self.assertIn("IMEI riconosciuto: <strong>Note 50</strong>", pagina)
-        self.assertIn("<h2>realme Note 50</h2>", pagina)
+        # `completo=1` PERCHÉ QUI SI GUARDA ANCHE IL FIRMWARE. Dal
+        # 17/08/2026 la pagina risponde in due tempi e la riga della
+        # versione arriva dal secondo, che un client HTTP senza
+        # JavaScript non fa partire. L'identità — le prime due
+        # asserzioni, il motivo per cui questo test esiste — resta invece
+        # nel primo tempo, e infatti si verifica anche senza.
+        subito = self.client.get("/", params={"q": "861206074094914"}).text
+        self.assertIn("IMEI riconosciuto: <strong>Note 50</strong>", subito)
+        self.assertIn("<h2>realme Note 50</h2>", subito)
+
+        pagina = self.client.get(
+            "/", params={"q": "861206074094914", "completo": 1}).text
         self.assertIn("Versione Android verificata: Android 13", pagina)
 
     def test_l_imei_non_puo_essere_rinominato_dalla_ricerca_firmware(self):
@@ -1465,7 +1474,11 @@ class TestRicercaPerImei(_Sito):
                 "model_code": "SM-A165F",
             }], "error": None})
         try:
-            pagina = self.client.get("/", params={"q": "351355315430630"}).text
+            # `completo=1`: la riga della versione arriva dal secondo
+            # tempo della ricerca (vedi la nota estesa più sopra). Il
+            # titolo, che è ciò che questo test difende, sta nel primo.
+            pagina = self.client.get(
+                "/", params={"q": "351355315430630", "completo": 1}).text
             self.assertIn("<h2>Samsung Galaxy A16 4G</h2>", pagina)
             self.assertIn("Versione Android verificata: Android 14", pagina)
             self.assertNotIn("<h2>SM-A165F</h2>", pagina)

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 import csv
+import gzip
 import io
 import json
 import os
@@ -353,7 +354,37 @@ def _indice_principale() -> dict[str, tuple[str, str]]:
     indice = _leggi_base_principale(grezzo)
     if indice:
         _status += " (dal foglio di calcolo, il CSV non era disponibile)"
+        return indice
+
+    # ULTIMA SPIAGGIA: LA COPIA CHE VIAGGIA NEL REPOSITORY.
+    #
+    # Fin qui ogni strada passava dalla rete. Il 17/08/2026 quella fonte
+    # ha risposto `HTTP 429` e il risultato è stato che nessun IMEI veniva
+    # più riconosciuto: un dato che esiste solo in rete è un dato che si
+    # può perdere, e questo qui cambia raramente — sono codici assegnati
+    # ai modelli, non notizie.
+    #
+    # La copia contiene la sola era Android (mezzo megabyte compresso, la
+    # genera `scripts/aggiorna_istantanea_tac.py`) e resta l'ULTIMA delle
+    # scelte: quando la rete risponde si usa il dato fresco, che conosce
+    # anche i modelli usciti dopo l'ultima istantanea.
+    indice = _istantanea_locale()
+    if indice:
+        _status += (f" — nessuna fonte in rete disponibile, si usa la copia "
+                    f"nel repository ({len(indice)} TAC)")
     return indice
+
+
+def _istantanea_locale() -> dict[str, tuple[str, str]]:
+    """La copia del database TAC conservata dentro il repository."""
+    percorso = os.path.join(CARTELLA_DATI, "tac_era_android.csv.gz")
+    try:
+        with gzip.open(percorso, "rt", encoding="utf-8", errors="replace") as f:
+            return _leggi_csv_tac(f.read())
+    except FileNotFoundError:
+        return {}
+    except Exception:  # un file corrotto non deve impedire l'avvio
+        return {}
 
 
 # `PK\x03\x04` è l'inizio di ogni archivio zip, e un `.xlsx` è uno zip.
