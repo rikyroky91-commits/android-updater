@@ -2096,6 +2096,31 @@ def _codice_con_gli_spazi(query: str) -> str:
     return query
 
 
+def _correzione_salvata(*codici: str) -> str | None:
+    """Il nome corretto a mano, cercato su più codici in ordine.
+
+    Un telefono ha spesso più codici, e il nome mostrato può cambiare
+    durante il calcolo della pagina: cercare la correzione sotto UN codice
+    solo — per giunta dedotto dal nome appena cambiato — significava non
+    trovarla, cioè un tasto «Non è il nome giusto?» che non faceva niente.
+    Chi lo usa crede di aver sistemato il dato, ed è il modo peggiore di
+    fallire.
+    """
+    visti = set()
+    for codice in codici:
+        codice = (codice or "").strip()
+        if not codice or codice in visti:
+            continue
+        visti.add(codice)
+        try:
+            nome = storage.get_nome_modello(codice)
+        except Exception:
+            nome = None
+        if nome:
+            return nome
+    return None
+
+
 def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
     query = _codice_con_gli_spazi(query)
     risultato = scan.search_model(query, senza_rete=senza_rete)
@@ -2282,8 +2307,7 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
     # esattamente l'incoerenza che questo intero fix esiste per chiudere.
     codice_per_correzione = (codice or
                               next(iter(_codici_del_risultato(query, nome)), ""))
-    nome_corretto = (storage.get_nome_modello(codice_per_correzione)
-                     if codice_per_correzione else None)
+    nome_corretto = _correzione_salvata(codice, codice_per_correzione)
     if nome_corretto:
         nome = nome_corretto
 
@@ -2367,8 +2391,15 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
             # ragione del blocco sopra.
             codice_per_correzione = (next(iter(_codici_del_risultato(query, nome)), "")
                                      or codice_per_correzione)
-            nome_corretto = (storage.get_nome_modello(codice_per_correzione)
-                             if codice_per_correzione else None)
+            # SI GUARDA PRIMA IL CODICE ESATTO, poi quello dedotto dal
+            # nome. Qui sopra il nome è appena cambiato, e da un nome si
+            # possono ricavare più codici: prendendone uno qualsiasi si
+            # finiva a cercare la correzione sotto un codice DIVERSO da
+            # quello scritto da chi l'ha salvata, e la correzione spariva
+            # senza dire niente. Cioè il tasto «Non è il nome giusto?»
+            # non faceva nulla, che è il modo peggiore di fallire: chi lo
+            # usa crede di aver sistemato il dato.
+            nome_corretto = _correzione_salvata(codice, codice_per_correzione)
             if nome_corretto:
                 nome = nome_corretto
 

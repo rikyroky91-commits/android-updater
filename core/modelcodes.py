@@ -548,6 +548,28 @@ def _e_il_codice(nome: str, codice: str) -> bool:
     return c in n and len(n.replace(c, "", 1)) <= 8
 
 
+#: Le parole di marca si tolgono prima di confrontare due nomi: le fonti
+#: le aggiungono e le tolgono a piacere, e «OPPO Reno12 F» e «Reno12 F»
+#: sono lo stesso telefono.
+_PAROLE_DI_MARCA = {
+    "oppo", "realme", "oneplus", "samsung", "xiaomi", "redmi", "poco",
+    "vivo", "iqoo", "motorola", "moto", "honor", "huawei", "google",
+    "nokia", "zte", "tecno", "infinix", "itel", "asus", "sony", "nothing",
+}
+
+
+def _radice_famiglia(nome: str) -> str:
+    """La parte del nome che identifica il modello, senza marca né grafia.
+
+    «OPPO Reno12 F 5G» → «reno12f5g». Serve a capire se due nomi dello
+    stesso codice sono lo stesso telefono scritto in due modi o due
+    telefoni diversi.
+    """
+    parole = [p for p in re.split(r"[^0-9A-Za-z]+", (nome or "").lower()) if p]
+    utili = [p for p in parole if p not in _PAROLE_DI_MARCA]
+    return "".join(utili or parole)
+
+
 def nome_canonico(codice: str) -> str | None:
     """UN nome solo per un codice, scelto sempre allo stesso modo.
 
@@ -674,7 +696,61 @@ def nome_canonico(codice: str) -> str | None:
         # (realme C61 contro C63): li' TUTTI i candidati sono latini,
         # quindi questo termine e' costante e l'ordine ricade
         # sull'ambiguita' esattamente come prima.
-        return (_e_il_codice(nome, codice_pulito), cinese, ambiguo, len(nome), nome)
+        # LA FAMIGLIA PIU' NUMEROSA VIENE PRIMA DELLA LUNGHEZZA.
+        #
+        # Segnalato dall'utente il 17/08/2026 su `CPH2637`: la pagina
+        # diceva «OPPO F27», che è il nome indiano, mentre in Europa quel
+        # telefono si chiama «OPPO Reno12 F» — e l'app lo sapeva, tanto da
+        # elencarlo fra i gemelli appena sotto. Vinceva solo perché è più
+        # corto, e la lunghezza non dice niente su quale nome sia quello
+        # giusto qui.
+        #
+        # Il segnale sta nei dati che abbiamo già: dei cinque nomi noti
+        # per quel codice, QUATTRO sono varianti di «Reno12 F» e uno solo
+        # è «F27». Un nome di distribuzione larga viene registrato più
+        # volte, in più forme, dai cataloghi; la variante di un mercato
+        # singolo compare una volta sola. Non è conoscenza dei mercati —
+        # che non abbiamo — è il peso dell'evidenza che abbiamo.
+        #
+        # Resta sotto ai due criteri più forti (il codice travestito da
+        # nome, e gli ideogrammi) e sopra la lunghezza, che diventa il
+        # criterio di parità dentro la famiglia vincente: fra «Reno12 F»,
+        # «Reno12 F 5G» e «Reno12 F/FS 5G» continua a vincere il più
+        # corto, che è quello che si legge meglio.
+        # ...e passa DAVANTI all'ambiguità solo quando una famiglia domina.
+        #
+        # L'ambiguità è lì per un bug peggiore («realme C63» che rispondeva
+        # «C61», due telefoni diversi), quindi non si scavalca alla
+        # leggera. Ma quando quattro nomi su cinque dicono «Reno12 F» e
+        # uno solo dice «F27», il dubbio non c'è: quel codice è un Reno12
+        # F che in un mercato si chiama diversamente.
+        #
+        # La soglia (una famiglia di almeno tre nomi, e almeno doppia
+        # della seconda) tiene fuori i casi incerti, che restano governati
+        # dai criteri di prima: `RMX3939` ha due nomi «C63» contro uno per
+        # ciascuno degli altri, ed è troppo poco per decidere così.
+        domina = quanti_nella_famiglia(nome) == massimo_famiglia and famiglia_dominante
+        return (_e_il_codice(nome, codice_pulito), cinese, not domina, ambiguo,
+                len(nome), nome)
+
+    def quanti_nella_famiglia(nome: str) -> int:
+        """Quanti degli altri nomi di questo codice sono lo stesso modello.
+
+        Il confronto ignora marca, spazi e maiuscole e guarda se un nome
+        è il prefisso dell'altro: «Reno12 F» sta dentro «Reno12 F 5G» e
+        «Reno12 FS», non dentro «F27».
+        """
+        mio = _radice_famiglia(nome)
+        if not mio:
+            return 1
+        return sum(1 for altro in nomi
+                   if (r := _radice_famiglia(altro))
+                   and (r.startswith(mio) or mio.startswith(r)))
+
+    conteggi = sorted((quanti_nella_famiglia(n) for n in nomi), reverse=True)
+    massimo_famiglia = conteggi[0] if conteggi else 0
+    secondo = next((c for c in conteggi if c < massimo_famiglia), 0)
+    famiglia_dominante = massimo_famiglia >= 3 and massimo_famiglia >= 2 * max(1, secondo)
 
     scelto = sorted(nomi, key=rango)[0]
     if not any(ch.isalpha() for ch in scelto):

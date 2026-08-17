@@ -1620,3 +1620,54 @@ class TestIlCodiceBatteIlNomeSbagliatoDelTac(unittest.TestCase):
             M._esito_ricerca("RMX3997", senza_rete=True), imei)
         self.assertIn("12", pagina.get("nome") or "")
         self.assertNotIn("C65", pagina.get("nome") or "")
+
+
+class TestLaFamigliaPiuNumerosaVince(unittest.TestCase):
+    """Fra i nomi di un codice, quello che i cataloghi ripetono di più.
+
+    Segnalato dall'utente il 17/08/2026 su `CPH2637`: la pagina diceva
+    «OPPO F27», il nome indiano, mentre in Europa quel telefono è «OPPO
+    Reno12 F» — e l'app lo sapeva, tanto da elencarlo fra i gemelli
+    appena sotto. Vinceva solo perché più corto.
+
+    La sua obiezione, giusta: «è il sito a dovermi dire il modello
+    giusto, se devo correggere io faccio il lavoro dell'app». Quindi non
+    una riga scritta a mano ma un criterio, preso dai dati che abbiamo:
+    un nome di distribuzione larga viene registrato più volte e in più
+    forme, la variante di un mercato singolo compare una volta sola.
+    """
+
+    def test_il_nome_di_famiglia_larga_batte_quello_corto(self):
+        from core import modelcodes
+
+        if not modelcodes.resolve("CPH2637"):
+            self.skipTest("catalogo dei codici non disponibile qui")
+        originale = dict(modelcodes._indice_override_nomi())
+        modelcodes._override_nomi = {}          # senza aiuti manuali
+        try:
+            self.assertEqual(modelcodes.nome_canonico("CPH2637"), "OPPO Reno12 F")
+        finally:
+            modelcodes._override_nomi = originale
+
+    def test_la_radice_ignora_marca_e_grafia(self):
+        from core.modelcodes import _radice_famiglia
+
+        self.assertEqual(_radice_famiglia("OPPO Reno12 F 5G"), "reno12f5g")
+        self.assertEqual(_radice_famiglia("Oppo Reno12 F/FS 5G"), "reno12ffs5g")
+        self.assertEqual(_radice_famiglia("realme C63"), "c63")
+
+    def test_una_famiglia_risicata_non_scavalca_l_ambiguita(self):
+        """La regola dell'ambiguità esiste per un bug peggiore («realme
+        C63» che rispondeva «C61», due telefoni diversi): si scavalca solo
+        davanti a una maggioranza netta, non a due nomi contro uno."""
+        from core import modelcodes
+
+        if not modelcodes.resolve("RMX3939"):
+            self.skipTest("catalogo dei codici non disponibile qui")
+        originale = dict(modelcodes._indice_override_nomi())
+        modelcodes._override_nomi = {}
+        try:
+            # Comportamento invariato rispetto a prima della regola nuova.
+            self.assertNotEqual(modelcodes.nome_canonico("RMX3939"), "C61")
+        finally:
+            modelcodes._override_nomi = originale
