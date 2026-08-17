@@ -65,6 +65,17 @@
      per nome diventa «realme C60»). Il secondo tempo deve rifare la
      STESSA domanda che ha fatto la persona. #}
   <div class="firmware-in-arrivo" data-firmware-per="{{ risultato.domanda_originale or risultato.query }}">
+    {# IL NOME C'È SUBITO ANCHE MENTRE SI ASPETTA. Spostando il titolo
+       dentro il frammento — perché quando il primo tempo non risolve
+       deve poter essere corretto dal secondo — era sparito del tutto
+       dalla fase di attesa: restava la rotellina sopra una scheda
+       tecnica senza intestazione, cioè l'esatto contrario di «prima si
+       trova il modello». Qui il titolo si scrive se lo si conosce, e non
+       si scrive MAI «Nessun firmware»: la ricerca è ancora in corso, e
+       dichiarare un esito che non c'è ancora è peggio del silenzio. #}
+    {% if risultato.nome and risultato.nome != risultato.query %}
+    <h2>{{ risultato.nome }}</h2>
+    {% endif %}
     <p class="riga-esito attesa">
       <span class="rotella" aria-hidden="true"></span>
       <span>Cerco il firmware più recente…</span>

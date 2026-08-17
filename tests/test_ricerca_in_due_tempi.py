@@ -98,6 +98,27 @@ class TestPrimoTempo(BaseDueTempi):
         pagina = self.client.get("/?q=SM-A546B").text
         self.assertIn("Galaxy A54", pagina)
 
+    def test_il_nome_c_e_anche_mentre_si_aspetta(self):
+        """SPARITO IN PRODUZIONE il 17/08/2026. Spostando il titolo dentro
+        il frammento — perché quando il primo tempo non risolve deve poter
+        essere corretto dal secondo — era sparito del tutto dalla fase di
+        attesa: rotellina sopra una scheda tecnica senza intestazione,
+        cioè l'esatto contrario di «prima si trova il modello»."""
+        # Si usa un IMEI e non un codice modello perché il nome arriva
+        # dalla copia del database TAC che viaggia nel repository: è
+        # l'unico modo di verificare questa cosa senza dipendere da un
+        # catalogo scaricato, cioè dalla connessione di chi lancia i test.
+        pagina = self.client.get("/?q=861206074094914").text
+        self.assertIn("firmware-in-arrivo", pagina)
+        self.assertIn("<h2>realme Note 50</h2>", pagina)
+
+    def test_mentre_si_aspetta_non_si_dichiara_un_esito(self):
+        """«Nessun firmware» durante la ricerca è una risposta che non
+        c'è ancora: peggio del silenzio, perché sembra definitiva."""
+        pagina = self.client.get("/?q=codice-che-non-esiste-xyz").text
+        blocco = pagina.split('firmware-in-arrivo')[1].split('</div>')[0]
+        self.assertNotIn("Nessun firmware", blocco)
+
     def test_la_rotellina_sta_dove_andranno_i_dati(self):
         """Richiesta esplicita dell'utente: «lo fai capire a schermo con
         una rotellina fatta bene dove dovrebbero stare gli altri dati»."""
