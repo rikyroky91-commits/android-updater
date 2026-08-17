@@ -406,12 +406,22 @@ def _marca_compatibile(scheda: Scheda, richiesta: str | None) -> bool:
     può trasformare il primo nel secondo. Le schede curate talvolta salvano
     il nome breve della marca (``Xiaomi``), mentre il catalogo usa il gruppo
     del tracker: `_MARCHE` normalizza entrambi prima del confronto.
+
+    ENTRAMBI, appunto: fino al 17/08/2026 qui si normalizzava solo la marca
+    TROVATA, e la richiesta si confrontava alla lettera. Chi chiedeva con il
+    nome corto — il database TAC risponde ``OPPO``, ``MOTOROLA`` — non
+    trovava mai niente, perché il catalogo indicizza il gruppo
+    ``Oppo / Realme / OnePlus``. Da un IMEI sparivano insieme nome
+    commerciale, scheda tecnica e foto, mentre cercando lo stesso telefono
+    a mano (senza marca, quindi senza filtro) compariva tutto: è il guasto
+    segnalato dall'utente su CPH2781 e XT2553-1.
     """
     if not richiesta:
         return True
     trovata = (scheda.marca or "").strip()
     canonica = _MARCHE.get(trovata.lower(), trovata)
-    return canonica == richiesta
+    chiesta = richiesta.strip()
+    return canonica == _MARCHE.get(chiesta.lower(), chiesta)
 
 
 # ======================================================================

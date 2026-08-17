@@ -1056,6 +1056,34 @@ class TestImeiRipiegaSulNomeCommerciale(unittest.TestCase):
         self.assertNotEqual(esito["modello_cercato"], "ZZZ9999")
 
 
+class TestMaiuscoleSoloDoveMancano(unittest.TestCase):
+    """Il catalogo ufficiale Motorola scrive i modelli tutti minuscoli —
+    «motorola razr 60» — e mostrarlo cosi' sembra un errore dell'app.
+    Ma passare OGNI nome dal correttore di maiuscole ne romperebbe altri:
+    «OPPO A74» e «realme C63» sono grafie volute dai rispettivi
+    produttori.
+    """
+
+    def test_un_nome_tutto_minuscolo_viene_sistemato(self):
+        from web.main import _nome_del_codice
+
+        nome = _nome_del_codice("XT2553-1")
+        if not nome:
+            self.skipTest("catalogo Motorola non disponibile in questo ambiente")
+        self.assertEqual(nome, "Motorola Razr 60")
+
+    def test_le_grafie_volute_non_si_toccano(self):
+        from core import modelcodes
+        from web.main import _nome_del_codice
+
+        if not modelcodes.resolve("RMX3939"):
+            self.skipTest("catalogo dei codici non disponibile in questo ambiente")
+        # realme si scrive minuscolo, OPPO maiuscolo: entrambi hanno gia'
+        # una maiuscola da qualche parte, quindi non si correggono.
+        self.assertEqual(_nome_del_codice("RMX3939"), "realme C63")
+        self.assertEqual(_nome_del_codice("CPH2219"), "OPPO A74")
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main(verbosity=2)
 

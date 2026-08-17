@@ -1809,6 +1809,33 @@ def _storico_del_modello(nome: str, brand: str) -> tuple[list[dict], str, str]:
     return [], "", ""
 
 
+
+def _nome_del_codice(codice: str) -> str | None:
+    """Il nome canonico di un codice, scritto in modo leggibile.
+
+    LE MAIUSCOLE SI SISTEMANO SOLO SE MANCANO DEL TUTTO. Il catalogo
+    ufficiale Motorola scrive i suoi modelli tutti minuscoli — «motorola
+    razr 60» — e mostrarlo cosi' sembra un errore dell'app. Ma passare
+    OGNI nome dal correttore di maiuscole ne romperebbe altri: «OPPO A74»
+    diventerebbe «Oppo A74» e «realme C63» diventerebbe «Realme C63»,
+    mentre quelle due grafie sono volute e i rispettivi produttori le
+    scrivono cosi'.
+    """
+    if not codice:
+        return None
+    try:
+        nome = modelcodes.nome_canonico(codice)
+    except Exception:      # pragma: no cover - percorso difensivo
+        return None
+    if not nome:
+        return None
+    # Nessuna maiuscola da nessuna parte: e' lo stile della fonte, non una
+    # scelta editoriale del produttore.
+    if nome == nome.lower():
+        return extract.canonical_device(nome)
+    return nome
+
+
 def _cerca_davvero(query: str) -> dict:
     risultato = scan.search_model(query)
     fonti_dirette = [i for i in risultato.get("items", [])
@@ -2010,8 +2037,7 @@ def _cerca_davvero(query: str) -> dict:
         # scheda dice «realme C63» e `nome_canonico` pure, quindi qui non
         # si sceglie nulla di diverso. Cambia solo dove i due DISCORDANO,
         # ed e' esattamente il caso in cui serve un criterio.
-        canonico = modelcodes.nome_canonico(codice)
-        titolo = canonico or scheda["titolo"]
+        titolo = _nome_del_codice(codice) or scheda["titolo"]
         nome = (_modello_con_marca(scheda.get("marca") or marca, titolo, codice)
                 or titolo)
 
@@ -2053,7 +2079,7 @@ def _cerca_davvero(query: str) -> dict:
             # Senza questa riga la correzione del blocco sopra non aveva
             # effetto: `CPH2219` tornava «Oppo F19» qui, due assegnazioni
             # piu' in basso.
-            titolo = (modelcodes.nome_canonico(codice) if codice else None) or titolo_scheda
+            titolo = _nome_del_codice(codice) or titolo_scheda
             nome = _modello_con_marca(
                 scheda.get("marca") or marca, titolo, codice) or titolo
             # Il nome è cambiato: il codice di correzione e un'eventuale

@@ -443,5 +443,38 @@ class TestNienteRete(unittest.TestCase):
         self.assertIn("non ancora caricato", specs.status())
 
 
+class TestMarcaChiestaColNomeCorto(unittest.TestCase):
+    """Il filtro di marca accetta il nome corto, non solo il gruppo.
+
+    Segnalato dall'utente il 17/08/2026 su un IMEI OPPO: «non è giusto per
+    niente, manca nome commerciale scheda tecnica completa e foto». La
+    causa era qui: il database TAC risponde `OPPO`, il catalogo indicizza
+    `Oppo / Realme / OnePlus`, e il confronto letterale scartava la scheda
+    giusta. Cercando lo stesso telefono a mano — senza marca, quindi senza
+    filtro — compariva tutto: ecco perché il guasto si vedeva solo da IMEI.
+    """
+
+    def _scheda(self, marca):
+        return specs.Scheda(nome="Oppo A6 Pro", marca=marca)
+
+    def test_il_nome_corto_del_tac_riconosce_il_gruppo(self):
+        for corto in ("OPPO", "oppo", "Realme", "MOTOROLA", "Redmi", "Honor"):
+            with self.subTest(marca=corto):
+                gruppo = specs._MARCHE[corto.lower()]
+                self.assertTrue(
+                    specs._marca_compatibile(self._scheda(gruppo), corto))
+
+    def test_il_gruppo_continua_a_funzionare(self):
+        self.assertTrue(
+            specs._marca_compatibile(self._scheda(C.OPPO), C.OPPO))
+
+    def test_non_attraversa_le_famiglie(self):
+        """La ragione per cui il filtro esiste resta intatta."""
+        self.assertFalse(
+            specs._marca_compatibile(self._scheda(C.OPPO), "Samsung"))
+        self.assertFalse(
+            specs._marca_compatibile(self._scheda(C.XIAOMI), "OnePlus"))
+
+
 if __name__ == "__main__":
     unittest.main()
