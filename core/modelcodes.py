@@ -349,6 +349,37 @@ def _build_index() -> dict[str, list[str]]:
     return merged
 
 
+#: Un codice modello scritto con degli spazi in mezzo: una sigla di marca
+#: (`CPH`, `XT`, `SM`, `RMX`) e dei numeri, separati da spazi che nel
+#: codice vero non ci sono. NON deve riconoscere i nomi commerciali —
+#: «Galaxy A54 5G» ha la stessa forma a occhio, e attaccarne le parole
+#: produrrebbe una chiave che non esiste — per questo la sigla iniziale è
+#: limitata a quattro lettere e il resto deve essere numerico.
+_CODICE_CON_SPAZI = re.compile(
+    r"^([A-Z]{1,4})\s+(\d{3,5})(?:\s+(\d{1,2}))?$")
+
+
+def _varianti_senza_spazi(codice: str) -> list[str]:
+    """Le forme compatte di un codice scritto con gli spazi.
+
+    «CPH 2695» → «CPH2695»; «XT2553 1» → «XT25531» e «XT2553-1», perché
+    le varianti Motorola si separano col trattino e chi le trascrive a
+    mano ci mette uno spazio.
+    """
+    pezzi = _CODICE_CON_SPAZI.match((codice or "").strip().upper())
+    if not pezzi:
+        # «XT2553 1»: la sigla è già attaccata al numero, resta la coda.
+        coda = re.fullmatch(r"^([A-Z]{1,4}\d{3,5})\s+(\d{1,2})$",
+                            (codice or "").strip().upper())
+        if not coda:
+            return []
+        return [f"{coda.group(1)}-{coda.group(2)}", f"{coda.group(1)}{coda.group(2)}"]
+    marca, numero, variante = pezzi.groups()
+    if not variante:
+        return [f"{marca}{numero}"]
+    return [f"{marca}{numero}-{variante}", f"{marca}{numero}{variante}"]
+
+
 def resolve(code: str) -> list[str]:
     """Nomi commerciali noti per un codice modello (es. 'RMX3939' →
     ['realme C61 Global', 'realme C63', 'realme C65s', 'realme NARZO N63']),
@@ -362,6 +393,24 @@ def resolve(code: str) -> list[str]:
         _memory_cache = _build_index()
     codice = (code or "").strip().upper()
     nomi = _memory_cache.get(codice, [])
+    if not nomi:
+        # UNO SPAZIO DENTRO UN CODICE NON LO RENDE UN ALTRO TELEFONO.
+        #
+        # Segnalato dall'utente il 17/08/2026 cercando «cph 2695»: la
+        # pagina rispondeva «Nessun firmware», senza nome, senza scheda e
+        # senza foto, mentre «CPH2695» dà Oppo A5 Pro 5G con tutto. Chi
+        # copia un codice da un'etichetta o da una scheda tecnica se lo
+        # porta dietro come è scritto lì, spazi compresi, e non ha modo
+        # di sapere che questa applicazione li vuole attaccati.
+        #
+        # Si prova la forma compatta e quella col trattino, perché i
+        # codici Motorola la variante la separano così (`XT2553-1`, che
+        # trascritto a mano diventa «xt2553 1»).
+        for variante in _varianti_senza_spazi(codice):
+            nomi = _memory_cache.get(variante, [])
+            if nomi:
+                codice = variante
+                break
     # Il catalogo di certificazioni Motorola e' la fonte primaria per i
     # codici XT europei che i due dataset generici non elencano. E' una
     # risposta di identita' soltanto: firmware e versione continuano a

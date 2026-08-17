@@ -37,3 +37,12 @@ tac,marca,modello,nota
 
 # TAC segnalato: modello globale Redmi A7 Pro con codice 25128RN17Y.
 86720708,Redmi,"Redmi A7 Pro, Xiaomi 25128RN17Y",verificato su documentazione Xiaomi e catalogo europeo
+
+# TAC 86095807: nessuna delle basi dati scaricate lo conosce — verificato il
+# 17/08/2026, il confronto fra le fonti tornava vuoto. Modello identificato
+# dall'utente sul telefono che ha in mano.
+86095807,ZTE,"Blade A75",identificato dall'utente sul dispositivo, assente da tutte le basi dati pubbliche
+
+# TAC 35185179: stesso caso. I marchi minori sono il buco piu' grande dei
+# database TAC alimentati dalla community, e Unihertz e' fra i piu' piccoli.
+35185179,Unihertz,"Jelly 2E",identificato dall'utente sul dispositivo, assente da tutte le basi dati pubbliche

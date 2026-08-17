@@ -1516,3 +1516,52 @@ class TestIlNomeCanonicoNellAncoraggioImei(unittest.TestCase):
         peggioramento travestito da correzione."""
         nome = self._pagina("SM-A546B", "Galaxy A54 5G", "SAMSUNG").get("nome") or ""
         self.assertIn("Galaxy A54", nome)
+
+
+class TestCodiceScrittoConGliSpazi(unittest.TestCase):
+    """Uno spazio dentro un codice non lo rende un altro telefono.
+
+    Segnalato dall'utente il 17/08/2026 cercando «cph 2695»: la pagina
+    rispondeva «Nessun firmware», senza nome, senza scheda e senza foto,
+    mentre «CPH2695» dà Oppo A5 Pro 5G con tutto quanto — e la pagina
+    stessa lo suggeriva in fondo, sotto «Forse cercavi». Sapeva la
+    risposta e la teneva per ultima.
+
+    Chi copia un codice da un'etichetta o da una scatola se lo porta
+    dietro come è scritto lì, spazi compresi.
+    """
+
+    def test_le_varianti_compatte(self):
+        from core.modelcodes import _varianti_senza_spazi
+
+        self.assertEqual(_varianti_senza_spazi("CPH 2695"), ["CPH2695"])
+        self.assertEqual(_varianti_senza_spazi("XT2553 1"),
+                         ["XT2553-1", "XT25531"])
+
+    def test_un_nome_commerciale_non_viene_compattato(self):
+        """«Galaxy A54 5G» ha la stessa forma a occhio: attaccarne le
+        parole produrrebbe una chiave che non esiste, e il rischio è
+        trasformare una ricerca per nome in una ricerca a vuoto."""
+        from core.modelcodes import _varianti_senza_spazi
+
+        for nome in ("GALAXY A54 5G", "REALME C63", "MOTO G84 5G",
+                     "OPPO A5 PRO 5G"):
+            with self.subTest(nome=nome):
+                self.assertEqual(_varianti_senza_spazi(nome), [])
+
+    def test_la_sostituzione_avviene_solo_se_risolve(self):
+        """È la condizione che rende sicuro il cambio di domanda."""
+        from web.main import _codice_con_gli_spazi
+
+        self.assertEqual(_codice_con_gli_spazi("Galaxy A54 5G"), "Galaxy A54 5G")
+        self.assertEqual(_codice_con_gli_spazi("zzz 9999"), "zzz 9999")
+
+    def test_la_pagina_trova_nome_e_scheda(self):
+        from core import modelcodes
+        from web.main import _esito_ricerca
+
+        if not modelcodes.resolve("CPH2695"):
+            self.skipTest("catalogo dei codici non disponibile qui")
+        esito = _esito_ricerca("cph 2695", senza_rete=True)
+        self.assertIn("A5 Pro", esito.get("nome") or "")
+        self.assertTrue(esito["scheda"].get("trovata"))

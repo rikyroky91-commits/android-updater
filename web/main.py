@@ -1961,7 +1961,34 @@ def _nome_del_codice(codice: str) -> str | None:
     return nome
 
 
+def _codice_con_gli_spazi(query: str) -> str:
+    """«cph 2695» → «CPH2695», ma solo se quella forma risolve davvero.
+
+    Segnalato dall'utente il 17/08/2026: cercando «cph 2695» la pagina
+    rispondeva «Nessun firmware», senza nome, senza scheda e senza foto,
+    mentre «CPH2695» dà Oppo A5 Pro 5G con tutto quanto — e la pagina
+    stessa lo suggeriva sotto, in «Forse cercavi». Sapeva la risposta e
+    la metteva in fondo invece di usarla.
+
+    Chi copia un codice da un'etichetta, da una scatola o da una scheda
+    tecnica se lo porta dietro come è scritto lì, spazi compresi, e non
+    ha modo di sapere che questa applicazione li vuole attaccati.
+
+    La condizione «solo se risolve davvero» è ciò che rende sicura la
+    sostituzione: un nome commerciale che somigli a un codice non viene
+    toccato, perché attaccarne le parole non produce niente di noto.
+    """
+    grezzo = " ".join((query or "").split())
+    if " " not in grezzo:
+        return query
+    for variante in modelcodes._varianti_senza_spazi(grezzo.upper()):
+        if modelcodes.resolve(variante):
+            return variante
+    return query
+
+
 def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
+    query = _codice_con_gli_spazi(query)
     risultato = scan.search_model(query, senza_rete=senza_rete)
     fonti_dirette = [i for i in risultato.get("items", [])
                      if i.get("source") in ("official_lookup", "curated_lookup")]

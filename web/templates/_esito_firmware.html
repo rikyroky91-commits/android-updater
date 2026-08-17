@@ -6,8 +6,17 @@
    prendere. Averne una copia sola è ciò che impedisce alle due strade di
    dire cose diverse sullo stesso telefono.
 
-   Il titolo NON sta qui: il nome del modello si sa subito, senza rete, ed
-   è il primo dato che deve comparire. #}
+   IL TITOLO STA QUI DENTRO, e ci è dovuto arrivare a forza. Prima era
+   fuori, nella pagina, perché il nome si sa subito senza rete — ma «si sa
+   subito» non vuol dire «si sa sempre»: per «cph 2695», scritto con uno
+   spazio, il primo tempo non risolve niente e il titolo diventava
+   «Nessun firmware per «cph 2695»», mentre il secondo tempo trovava
+   eccome Oppo A5 Pro 5G con la sua build. Risultato: un titolo che
+   smentiva le righe sotto di sé, congelato sul verdetto di prima.
+   Il titolo dipende dall'esito della ricerca, quindi va sostituito
+   insieme all'esito. #}
+<h2>{% if risultato.trovato or risultato.senza_firmware or (risultato.nome and risultato.nome != risultato.query) %}{{ risultato.nome }}{% else %}Nessun firmware per «{{ risultato.query }}»{% endif %}</h2>
+
 {% if risultato.trovato and not risultato.senza_firmware %}
   <p class="riga-esito">{{ risultato.riga }}</p>
   <p class="nota">{{ risultato.fonte }}</p>

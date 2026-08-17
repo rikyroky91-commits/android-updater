@@ -52,12 +52,6 @@
      modello e dalla scheda tecnica — mentre il firmware costa fino a
      dodici secondi: erano due domande diverse dentro la stessa attesa.
      Chi ha scritto un codice vuole prima sapere CHE TELEFONO È. #}
-  {# `nome` vale la QUERY STESSA quando nessuno ha riconosciuto il
-     modello: stamparlo così com'è darebbe per titolo il codice grezzo
-     che è stato digitato, come se fosse il nome di un telefono. Il
-     titolo è un nome solo quando è diverso dalla domanda. #}
-  <h2>{% if risultato.trovato or risultato.senza_firmware or (risultato.nome and risultato.nome != risultato.query) %}{{ risultato.nome }}{% else %}Nessun firmware per «{{ risultato.query }}»{% endif %}</h2>
-
   {% if risultato.firmware_in_arrivo %}
   {# LA ROTELLINA STA DOVE ANDRANNO I DATI, non in cima alla pagina: chi
      guarda deve vedere che MANCA QUALCOSA LÌ, non che il sito sta
