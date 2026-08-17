@@ -92,7 +92,7 @@ class _Sito(unittest.TestCase):
         # scheda tecnica, suggerimenti — resta quello vero, ed è quello
         # che si vuole collaudare.
         cls._search_vera = scan.search_model
-        scan.search_model = lambda q: cls.RISPOSTA_RICERCA(q)
+        scan.search_model = lambda q, senza_rete=False: cls.RISPOSTA_RICERCA(q)
         cls.client = TestClient(app)
 
     @classmethod
@@ -390,7 +390,7 @@ class TestNotaCoperturaConChipTrovato(unittest.TestCase):
         from web.main import app
 
         cls._search_vera = scan.search_model
-        scan.search_model = lambda q: {"items": [], "error": None}
+        scan.search_model = lambda q, senza_rete=False: {"items": [], "error": None}
         cls.client = TestClient(app)
 
     @classmethod

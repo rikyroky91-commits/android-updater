@@ -48,34 +48,38 @@
 <section class="esito {{ 'trovato' if risultato.trovato and not risultato.senza_firmware else 'incerto' }}{{ ' esito-con-scheda' if risultato.scheda.trovata or risultato.trovato }}">
   {% if imei %}{% include "_imei_identita.html" %}{% endif %}
 
-  {% if risultato.trovato and not risultato.senza_firmware %}
-    <h2>{{ risultato.nome }}</h2>
-    <p class="riga-esito">{{ risultato.riga }}</p>
-    <p class="nota">{{ risultato.fonte }}</p>
-    {% if risultato.fonte_url %}<p class="nota"><a href="{{ risultato.fonte_url }}" target="_blank" rel="noopener">Apri la fonte del firmware →</a></p>{% endif %}
-  {% elif risultato.senza_firmware %}
-    {# ONESTÀ DEL RISULTATO. La fonte conferma che il modello esiste ma
-       non pubblica la versione. Scrivere «trovato» qui farebbe credere
-       di avere una risposta che non c'è. #}
-    <h2>{{ risultato.nome }}</h2>
-    <p>Il modello è riconosciuto, ma nessuna fonte ne pubblica la versione
-       firmware attuale.</p>
-    <p class="nota">{{ risultato.fonte }}</p>
-  {% elif risultato.nome and risultato.nome != risultato.query %}
-    {# STESSA ONESTÀ, UN GRADINO PIÙ INDIETRO. Qui non è nemmeno una
-       fonte firmware a riconoscere il modello: è la scheda tecnica (foto,
-       processore) che ha risolto un telefono vero dal codice scritto,
-       senza che nessuna fonte firmware ne sappia niente. Prima questo
-       ramo diceva solo «Nessun firmware per «m1910f4g»» — il codice
-       grezzo, ripetuto, sopra una scheda con la foto del telefono giusto:
-       a chi guardava sembrava che l'app non avesse capito il modello,
-       quando in realtà lo aveva capito benissimo e solo il firmware
-       mancava. #}
-    <h2>{{ risultato.nome }}</h2>
-    <p>Il modello è riconosciuto dalla scheda tecnica, ma nessuna fonte
-       firmware conosce il codice «{{ risultato.query }}».</p>
+  {# IL NOME PRIMA DI TUTTO. Si sa senza toccare la rete — dal codice
+     modello e dalla scheda tecnica — mentre il firmware costa fino a
+     dodici secondi: erano due domande diverse dentro la stessa attesa.
+     Chi ha scritto un codice vuole prima sapere CHE TELEFONO È. #}
+  {# `nome` vale la QUERY STESSA quando nessuno ha riconosciuto il
+     modello: stamparlo così com'è darebbe per titolo il codice grezzo
+     che è stato digitato, come se fosse il nome di un telefono. Il
+     titolo è un nome solo quando è diverso dalla domanda. #}
+  <h2>{% if risultato.trovato or risultato.senza_firmware or (risultato.nome and risultato.nome != risultato.query) %}{{ risultato.nome }}{% else %}Nessun firmware per «{{ risultato.query }}»{% endif %}</h2>
+
+  {% if risultato.firmware_in_arrivo %}
+  {# LA ROTELLINA STA DOVE ANDRANNO I DATI, non in cima alla pagina: chi
+     guarda deve vedere che MANCA QUALCOSA LÌ, non che il sito sta
+     pensando a qualcosa di imprecisato. Se il secondo caricamento non
+     parte (niente JavaScript, o va storto), il collegamento qui sotto
+     porta alla stessa pagina fatta tutta dal server: nessuno resta
+     davanti a una rotellina che gira per sempre. #}
+  <div class="firmware-in-arrivo" data-firmware-per="{{ risultato.query }}">
+    <p class="riga-esito attesa">
+      <span class="rotella" aria-hidden="true"></span>
+      <span>Cerco il firmware più recente…</span>
+    </p>
+    <p class="nota attesa-nota">Le fonti ufficiali e le notizie rispondono
+      in qualche secondo. Il modello e la scheda tecnica qui sotto sono
+      già definitivi.</p>
+    <noscript>
+      <p class="nota"><a href="/?q={{ risultato.query | urlencode }}&amp;completo=1">Carica
+        anche il firmware →</a></p>
+    </noscript>
+  </div>
   {% else %}
-    <h2>Nessun firmware per «{{ risultato.query }}»</h2>
+  {% include "_esito_firmware.html" %}
   {% endif %}
 
   {% if risultato.chiave_parco %}

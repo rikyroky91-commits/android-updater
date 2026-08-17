@@ -273,7 +273,8 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
                     perche: str = Query(default=""),
                     verifica_ai: str = Query(default=""),
                     parco: int = Query(default=0),
-                    saved: int = Query(default=0)):
+                    saved: int = Query(default=0),
+                    completo: int = Query(default=0)):
     """La home, e la pagina di un modello cercato.
 
     SENZA DOMANDA È LA SOLA BARRA DI RICERCA. Prima qui c'era anche
@@ -309,13 +310,15 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
             # fonte news. Dopo un salvataggio manuale non la avviamo proprio:
             # la conferma deve tornare subito, senza aspettare la rete.
             risultato = (_esito_solo_identita(imei["modello_cercato"])
-                         if saved else _esito_ricerca(imei["modello_cercato"]))
+                         if saved
+                         else _esito_ricerca(imei["modello_cercato"],
+                                             senza_rete=_in_due_tempi(completo)))
             risultato = _ancora_esito_imei(risultato, imei)
             imei = _identita_da_mostrare(imei, risultato.get("nome") or "")
         else:
             risultato = _esito_vuoto(domanda)
     else:
-        risultato = _esito_ricerca(domanda)
+        risultato = _esito_ricerca(domanda, senza_rete=_in_due_tempi(completo))
 
     verifica = None
     if verifica_ai == "1" and aiquery.fornitore() and aiquery.fornitore()[0] == "Gemini":
@@ -343,6 +346,31 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
         interpretato_perche=perche.strip() or risultato.get("ai_perche", ""),
         alternative=[a for a in alt if a and a != q][:3],
     ))
+
+
+@app.get("/ricerca/firmware", response_class=HTMLResponse)
+def frammento_firmware(request: Request, q: str = Query(default="")):
+    """Il secondo tempo della ricerca: solo le righe del firmware.
+
+    Restituisce un pezzo di HTML, non una pagina: lo va a prendere la
+    pagina già aperta e lo mette al posto della rotellina. È la STESSA
+    `_esito_ricerca` di sempre — stessa cache, stesse fonti — perché due
+    strade diverse per la stessa domanda finirebbero prima o poi per
+    rispondere due cose diverse sullo stesso telefono.
+
+    Il risultato completo entra in cache: chi ricarica la pagina la vede
+    già intera, senza rotellina e senza rifare la ricerca.
+    """
+    domanda = (q or "").strip()
+    if not domanda:
+        return HTMLResponse("")
+    if imeicheck.is_imei_like(domanda):
+        imei = _esito_imei(domanda)
+        risultato = (_ancora_esito_imei(_esito_ricerca(imei["modello_cercato"]), imei)
+                     if imei.get("modello_cercato") else _esito_vuoto(domanda))
+    else:
+        risultato = _esito_ricerca(domanda)
+    return _rendi(request, "_esito_firmware.html", {"risultato": risultato})
 
 
 @app.get("/confronto", response_class=HTMLResponse)
@@ -1524,7 +1552,18 @@ def _soccorso_ai(query: str) -> dict | None:
     return None
 
 
-def _esito_ricerca(query: str) -> dict:
+def _in_due_tempi(completo: int = 0) -> bool:
+    """Se la pagina deve rispondere subito e chiedere il firmware dopo.
+
+    `completo=1` la disattiva: è la via d'uscita del `<noscript>` e serve
+    a chi non ha JavaScript, che altrimenti resterebbe con la rotellina
+    per sempre. È anche l'interruttore per capire, davanti a una pagina
+    strana, se il problema è nel secondo caricamento o nella ricerca.
+    """
+    return not completo and C.RICERCA_IN_DUE_TEMPI
+
+
+def _esito_ricerca(query: str, senza_rete: bool = False) -> dict:
     """Cosa dicono le fonti su quello che è stato digitato.
 
     La stessa domanda posta due volte di seguito non ripaga tredici
@@ -1540,6 +1579,16 @@ def _esito_ricerca(query: str) -> dict:
     pronto = RICERCHE.leggi(chiave)
     if pronto is not None:
         return pronto
+    if senza_rete:
+        # NON SI SCRIVE IN CACHE. Questa è una risposta volutamente
+        # parziale — identità e scheda, firmware ancora da chiedere — e
+        # metterla in memoria significherebbe servirla come se fosse
+        # completa a chiunque cerchi lo stesso modello nei minuti
+        # successivi, compreso il secondo caricamento che sta per
+        # arrivare. Il risultato sarebbe una pagina ferma sulla rotellina.
+        esito = _cerca_davvero(query, senza_rete=True)
+        esito["firmware_in_arrivo"] = True
+        return esito
     esito = _cerca_davvero(query)
     if _ricerca_debole(esito):
         migliore = _soccorso_ai(query)
@@ -1878,8 +1927,8 @@ def _nome_del_codice(codice: str) -> str | None:
     return nome
 
 
-def _cerca_davvero(query: str) -> dict:
-    risultato = scan.search_model(query)
+def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
+    risultato = scan.search_model(query, senza_rete=senza_rete)
     fonti_dirette = [i for i in risultato.get("items", [])
                      if i.get("source") in ("official_lookup", "curated_lookup")]
     notizie = [i for i in risultato.get("items", [])

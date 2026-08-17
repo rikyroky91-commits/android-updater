@@ -1,0 +1,31 @@
+{# LA PARTE DELLA PAGINA CHE COSTA LA RETE.
+
+   Sta in un file suo perché viene resa DUE volte da due strade diverse:
+   dentro la pagina, quando la risposta completa è già in memoria, e da
+   sola — come frammento — quando il secondo caricamento la va a
+   prendere. Averne una copia sola è ciò che impedisce alle due strade di
+   dire cose diverse sullo stesso telefono.
+
+   Il titolo NON sta qui: il nome del modello si sa subito, senza rete, ed
+   è il primo dato che deve comparire. #}
+{% if risultato.trovato and not risultato.senza_firmware %}
+  <p class="riga-esito">{{ risultato.riga }}</p>
+  <p class="nota">{{ risultato.fonte }}</p>
+  {% if risultato.fonte_url %}<p class="nota"><a href="{{ risultato.fonte_url }}" target="_blank" rel="noopener">Apri la fonte del firmware →</a></p>{% endif %}
+{% elif risultato.senza_firmware %}
+  {# ONESTÀ DEL RISULTATO. La fonte conferma che il modello esiste ma
+     non pubblica la versione. Scrivere «trovato» qui farebbe credere
+     di avere una risposta che non c'è. #}
+  <p>Il modello è riconosciuto, ma nessuna fonte ne pubblica la versione
+     firmware attuale.</p>
+  <p class="nota">{{ risultato.fonte }}</p>
+{% elif risultato.nome and risultato.nome != risultato.query %}
+  {# STESSA ONESTÀ, UN GRADINO PIÙ INDIETRO. Qui non è nemmeno una
+     fonte firmware a riconoscere il modello: è la scheda tecnica (foto,
+     processore) che ha risolto un telefono vero dal codice scritto,
+     senza che nessuna fonte firmware ne sappia niente. #}
+  <p>Il modello è riconosciuto dalla scheda tecnica, ma nessuna fonte
+     firmware conosce il codice «{{ risultato.query }}».</p>
+{% else %}
+  <p>Nessuna fonte conosce il firmware di «{{ risultato.query }}».</p>
+{% endif %}

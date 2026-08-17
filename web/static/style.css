@@ -1024,3 +1024,28 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
      lo staccherebbe dal resto del piede. */
   .feed-fonte { margin-left: 0; }
 }
+
+/* --- Il firmware che sta arrivando ------------------------------------- */
+/* LA ROTELLINA STA DOVE ANDRANNO I DATI. Messa in cima alla pagina
+   direbbe «il sito sta pensando»; messa qui dice «manca questo, e sta
+   per arrivare» — che è l'informazione utile, visto che il modello, la
+   scheda tecnica e la foto qui sotto sono già definitivi.
+   Il blocco tiene l'altezza che avranno le righe vere, così quando il
+   testo arriva non fa saltare la pagina sotto le dita. */
+.firmware-in-arrivo { min-height: 4.2rem; }
+.riga-esito.attesa {
+  display: flex; align-items: center; gap: .6rem;
+  color: var(--neutral);
+}
+.attesa-nota { max-width: 42ch; }
+/* Il passaggio dall'attesa al dato non è un lampo: comparire di colpo
+   sembra un errore di caricamento, e a schermo stretto non ci si accorge
+   nemmeno che qualcosa è cambiato. */
+.firmware-arrivato { animation: comparsa .25s ease-out; }
+@keyframes comparsa {
+  from { opacity: 0; transform: translateY(-.25rem); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .firmware-arrivato { animation: none; }
+}

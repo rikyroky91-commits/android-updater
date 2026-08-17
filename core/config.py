@@ -538,6 +538,12 @@ SEARCH_MAX_CANDIDATES = env_int("SEARCH_MAX_CANDIDATES", 3)
 # sarebbe più rapido ma interrogherebbe la fonte anche quando la prima
 # bastava, con il rischio concreto di finire limitati.
 SEARCH_ONDATA = env_int("SEARCH_ONDATA", 3)
+# La pagina di ricerca risponde in due tempi: prima il modello e la scheda
+# tecnica, che si sanno senza toccare la rete, poi il firmware. Misurato il
+# 17/08/2026 su cinque modelli: identità e scheda costano zero a cataloghi
+# caldi, la ricerca firmware fino a dodici secondi su dodici. Erano due
+# domande diverse dentro la stessa attesa.
+RICERCA_IN_DUE_TEMPI = env_bool("RICERCA_IN_DUE_TEMPI", True)
 
 # --- Per quanto si ricorda l'esito di una ricerca ------------------------
 # Fra due ricerche identiche non c'era NESSUNA memoria: ricaricare la

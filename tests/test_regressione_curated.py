@@ -59,7 +59,7 @@ class TestChiaveCurated(unittest.TestCase):
                 "build": "CPH2649_16.0.7.201", "title": "", "severity": "",
                 "color": "#00CC66"}
         vera = scan.search_model
-        scan.search_model = lambda q: {"items": [voce], "error": None}
+        scan.search_model = lambda q, senza_rete=False: {"items": [voce], "error": None}
         try:
             esito = M._cerca_davvero("OnePlus 13")
         finally:

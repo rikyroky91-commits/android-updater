@@ -514,7 +514,7 @@ def _ha_firmware(voce: dict) -> bool:
     )
 
 
-def search_model(model_query: str) -> dict:
+def search_model(model_query: str, senza_rete: bool = False) -> dict:
     """Risponde a «qual è l'ultimo aggiornamento di questo modello, e di
     quando è» combinando due fonti di verità, in ordine di precisione:
 
@@ -533,6 +533,17 @@ def search_model(model_query: str) -> dict:
     con `upsert_update`, così entrano anche nello storico del dispositivo e
     nel Feed, non solo in questa risposta. Ogni ricerca riuscita viene anche
     condensata in una riga della cronologia ricerche (modello + firmware).
+
+    ## `senza_rete`: la parte che si sa subito
+
+    Con `senza_rete=True` si saltano entrambi i passaggi di rete e si
+    risponde con il solo archivio locale. Misurato il 17/08/2026 sui
+    modelli lenti: identità e scheda tecnica costano zero a cataloghi
+    caldi, mentre la ricerca firmware vale 12 secondi su 12. Sono due
+    domande diverse incollate in una sola attesa — e chi guarda la pagina
+    ha già davanti la foto e le specifiche del telefono giusto mentre
+    aspetta un dato che riguarda altro. La pagina usa questa modalità per
+    la prima risposta e chiede il firmware in un secondo momento.
     """
     existing = storage.get_devices(search=model_query)
     existing_device = existing[0] if existing else None
@@ -567,7 +578,8 @@ def search_model(model_query: str) -> dict:
     #    anche per un modello mai visto prima dal giro periodico (situazione
     #    normale su Streamlit Cloud, dove il database si azzera a ogni
     #    riavvio del container).
-    structured_items, structured_note = _lookup_structured_for(model_query)
+    structured_items, structured_note = (
+        ([], None) if senza_rete else _lookup_structured_for(model_query))
     for item in structured_items:
         _aggiungi_chip(item, model_query)
         storage.upsert_update(item)
@@ -586,7 +598,7 @@ def search_model(model_query: str) -> dict:
     #    e' gia' disponibile.
     structured_has_firmware = any(_ha_firmware(item) for item in structured_items)
     raw_items, error = ([], None)
-    if not structured_has_firmware:
+    if not structured_has_firmware and not senza_rete:
         raw_items, error = sources.search_model_live(model_query)
         if not (error and not raw_items):
             news_items = [normalize(raw, _LIVE_SOURCE) for raw in raw_items]
