@@ -65,7 +65,12 @@
      parte (niente JavaScript, o va storto), il collegamento qui sotto
      porta alla stessa pagina fatta tutta dal server: nessuno resta
      davanti a una rotellina che gira per sempre. #}
-  <div class="firmware-in-arrivo" data-firmware-per="{{ risultato.query }}">
+  {# `domanda_originale` E NON `query`: per un IMEI sono cose diverse —
+     `query` è il modello già risolto dal TAC, e da solo può risolvere su
+     un altro telefono (l'IMEI 861206074094914 dà «Note 50», che cercato
+     per nome diventa «realme C60»). Il secondo tempo deve rifare la
+     STESSA domanda che ha fatto la persona. #}
+  <div class="firmware-in-arrivo" data-firmware-per="{{ risultato.domanda_originale or risultato.query }}">
     <p class="riga-esito attesa">
       <span class="rotella" aria-hidden="true"></span>
       <span>Cerco il firmware più recente…</span>
@@ -74,7 +79,7 @@
       in qualche secondo. Il modello e la scheda tecnica qui sotto sono
       già definitivi.</p>
     <noscript>
-      <p class="nota"><a href="/?q={{ risultato.query | urlencode }}&amp;completo=1">Carica
+      <p class="nota"><a href="/?q={{ (risultato.domanda_originale or risultato.query) | urlencode }}&amp;completo=1">Carica
         anche il firmware →</a></p>
     </noscript>
   </div>

@@ -28,12 +28,22 @@
 
   // Un tetto anche qui: il server ha il suo, ma se la risposta non
   // arriva proprio (rete caduta, istanza riavviata) nessuno lo applica
-  // al browser. Trenta secondi sono oltre il peggio misurato.
+  // al browser.
+  //
+  // SESSANTA SECONDI, NON TRENTA. Il primo valore l'avevo preso da una
+  // misura fatta sul portatile; segnalato dall'utente il 17/08/2026 su
+  // un IMEI realme, dove il frammento costa 14 secondi in locale e su
+  // Render — macchina condivisa, istanza appena sveglia — supera i
+  // trenta. Il risultato era il peggiore possibile: una ricerca che
+  // stava per riuscire veniva buttata via, e il ripiego offerto rifà da
+  // capo la stessa ricerca, più lenta. Meglio aspettare: il budget del
+  // server (dodici secondi per le notizie) è il vero limite, questo è
+  // solo la rete di sicurezza per quando non risponde nessuno.
   var scaduto = false;
   var timer = setTimeout(function () {
     scaduto = true;
     ripiego("La ricerca del firmware sta impiegando troppo.");
-  }, 30000);
+  }, 60000);
 
   fetch("/ricerca/firmware?q=" + encodeURIComponent(query), {
     headers: { "Accept": "text/html" },

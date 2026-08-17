@@ -1469,3 +1469,50 @@ class TestOpzioniCorrezione(unittest.TestCase):
         from web import main as M
 
         self.assertEqual(M._opzioni_correzione("Nota Test", ["Gemello"], ""), ["Gemello"])
+
+
+class TestIlNomeCanonicoNellAncoraggioImei(unittest.TestCase):
+    """Da un IMEI, il nome del codice viene prima di quello del TAC.
+
+    Il database TAC scrive spesso il codice travestito da nome — «POCO
+    25028pc03y», «Redmi 25057rn09g», «Oppo Cph2785» — e questa catena
+    poteva prendere il nome solo dal titolo della scheda tecnica o dal
+    TAC stesso: `modelcodes`, che sa benissimo trattarsi di «POCO C71»,
+    «REDMI 15 5G» e «OPPO A6», non veniva interrogato. La risposta era in
+    casa e non veniva chiesta a nessuno.
+
+    Il danno non era il solo titolo: con un nome finto in mano anche la
+    scheda veniva cercata per quel nome, quindi sparivano insieme
+    specifiche e foto — lo stesso guasto a cascata di CPH2781, per
+    un'altra strada.
+    """
+
+    def _pagina(self, codice, dice_il_tac, marca):
+        from web import main as M
+
+        imei = {"riconosciuto": True, "marca": marca, "modello": dice_il_tac,
+                "codice": codice, "modello_cercato": codice}
+        return M._ancora_esito_imei(M._esito_ricerca(codice, senza_rete=True), imei)
+
+    def test_il_codice_travestito_da_nome_viene_tradotto(self):
+        from core import modelcodes
+
+        for codice, tac, marca, atteso in (
+            ("25028pc03y", "POCO 25028pc03y", "POCO", "C71"),
+            ("25057RN09G", "Redmi 25057rn09g", "REDMI", "15 5G"),
+            ("CPH2785", "Oppo Cph2785", "OPPO", "A6"),
+        ):
+            with self.subTest(codice=codice):
+                if not modelcodes.nome_canonico(codice):
+                    self.skipTest("catalogo dei codici non disponibile qui")
+                nome = self._pagina(codice, tac, marca).get("nome") or ""
+                self.assertIn(atteso, nome)
+                self.assertNotIn(codice.lower(), nome.lower())
+
+    def test_un_nome_vero_del_tac_non_viene_scavalcato(self):
+        """`modelcodes` sceglie UN nome fra i tanti che un codice può
+        avere. Dove il TAC ha già dato un nome commerciale vero,
+        sostituirlo con un'altra variante regionale sarebbe un
+        peggioramento travestito da correzione."""
+        nome = self._pagina("SM-A546B", "Galaxy A54 5G", "SAMSUNG").get("nome") or ""
+        self.assertIn("Galaxy A54", nome)

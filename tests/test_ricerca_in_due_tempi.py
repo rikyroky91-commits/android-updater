@@ -151,6 +151,21 @@ class TestSecondoTempo(BaseDueTempi):
                 self.assertTrue(pezzo)
                 self.assertIn(pezzo[:60], intera)
 
+    def test_un_imei_richiede_l_imei_non_il_modello(self):
+        """Segnalato dall'utente il 17/08/2026 con l'IMEI
+        861206074094914: il TAC risponde «Note 50», e il secondo tempo
+        chiedeva QUEL nome invece dell'IMEI. Cercato da solo, senza
+        l'ancoraggio al TAC, «Note 50» risolve su «realme C60» — un altro
+        telefono, con un'altra scheda tecnica e un'altra foto. La pagina
+        cambiava telefono sotto gli occhi di chi guardava."""
+        imei = "861206074094914"
+        pagina = self.client.get(f"/?q={imei}").text
+        chiesto = re.search(r'data-firmware-per="([^"]*)"', pagina)
+        self.assertIsNotNone(chiesto, "manca il blocco del secondo tempo")
+        self.assertEqual(chiesto.group(1), imei)
+        # E la via d'uscita senza JavaScript deve portare allo stesso posto.
+        self.assertIn(f"/?q={imei}&amp;completo=1", pagina)
+
     def test_una_domanda_vuota_non_da_errore(self):
         risposta = self.client.get("/ricerca/firmware?q=")
         self.assertEqual(risposta.status_code, 200)

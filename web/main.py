@@ -320,6 +320,17 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
     else:
         risultato = _esito_ricerca(domanda, senza_rete=_in_due_tempi(completo))
 
+    # IL SECONDO TEMPO DEVE RICHIEDERE LA DOMANDA ORIGINALE, non
+    # `risultato.query`. Per un IMEI quei due campi sono cose diverse:
+    # `query` è il modello GIÀ risolto dal TAC, e rimandarlo indietro da
+    # solo perde l'ancoraggio all'IMEI. Segnalato dall'utente il
+    # 17/08/2026 con l'IMEI 861206074094914: il TAC risponde «Note 50»,
+    # che cercato per nome — senza sapere che veniva da quell'IMEI —
+    # risolve su «realme C60», un altro telefono. La pagina finiva per
+    # mostrare la scheda tecnica sbagliata dopo il secondo caricamento.
+    if risultato.get("firmware_in_arrivo"):
+        risultato["domanda_originale"] = domanda
+
     verifica = None
     if verifica_ai == "1" and aiquery.fornitore() and aiquery.fornitore()[0] == "Gemini":
         contesto = " · ".join(x for x in (
@@ -1429,6 +1440,29 @@ def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
     codice = imei.get("codice") or ancorato.get("codice", "")
     modello = imei.get("modello") or identita
     marca = imei.get("marca", "")
+
+    # IL NOME CANONICO DEL CODICE VIENE PRIMA DI QUELLO DEL TAC.
+    #
+    # Mancava del tutto da questa catena: il nome poteva arrivare solo
+    # dal titolo della scheda o dal database TAC. Ma il TAC scrive spesso
+    # il codice travestito da nome — «POCO 25028pc03y», «Redmi
+    # 25057rn09g», «Oppo Cph2785» — e in quei casi la pagina mostrava
+    # quello, mentre `modelcodes` sapeva benissimo che sono «POCO C71»,
+    # «REDMI 15 5G» e «OPPO A6». La risposta era in casa e non veniva
+    # chiesta a nessuno.
+    #
+    # E il danno non era solo il titolo: con un nome finto in mano anche
+    # la scheda tecnica veniva cercata per quel nome, quindi sparivano
+    # insieme specifiche e foto. È lo stesso guasto a cascata segnalato
+    # dall'utente su CPH2781, per un'altra strada.
+    #
+    # Non scavalca un nome VERO del TAC: `_nome_del_codice` si applica
+    # solo quando quello che il TAC ha dato è il codice stesso. Se il
+    # database dice «Galaxy A54 5G», resta «Galaxy A54 5G».
+    canonico = _nome_del_codice(codice) if codice else None
+    if canonico and _semplifica_nome(codice) in _semplifica_nome(modello):
+        modello = canonico
+
     ancorato["scheda"] = P.scheda_tecnica(
         modello, codice=codice or identita, brand=marca)
     # Il catalogo tecnico curato conserva la grafia commerciale completa
