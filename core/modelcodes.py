@@ -393,24 +393,20 @@ def resolve(code: str) -> list[str]:
         _memory_cache = _build_index()
     codice = (code or "").strip().upper()
     nomi = _memory_cache.get(codice, [])
-    if not nomi:
-        # UNO SPAZIO DENTRO UN CODICE NON LO RENDE UN ALTRO TELEFONO.
-        #
-        # Segnalato dall'utente il 17/08/2026 cercando «cph 2695»: la
-        # pagina rispondeva «Nessun firmware», senza nome, senza scheda e
-        # senza foto, mentre «CPH2695» dà Oppo A5 Pro 5G con tutto. Chi
-        # copia un codice da un'etichetta o da una scheda tecnica se lo
-        # porta dietro come è scritto lì, spazi compresi, e non ha modo
-        # di sapere che questa applicazione li vuole attaccati.
-        #
-        # Si prova la forma compatta e quella col trattino, perché i
-        # codici Motorola la variante la separano così (`XT2553-1`, che
-        # trascritto a mano diventa «xt2553 1»).
-        for variante in _varianti_senza_spazi(codice):
-            nomi = _memory_cache.get(variante, [])
-            if nomi:
-                codice = variante
-                break
+    # QUI NON SI NORMALIZZANO GLI SPAZI, DI PROPOSITO.
+    #
+    # Ci avevo messo un ripiego che risolveva anche «rmx 3939», e sembrava
+    # innocuo. Non lo era: chi chiama questa funzione usa il codice che le
+    # ha passato per costruire la descrizione del risultato, e trovando
+    # una risposta sul testo grezzo si teneva quel testo — «codice rmx
+    # 3939» invece di «codice RMX3939». Il compito di raddrizzare quello
+    # che è stato digitato spetta all'ingresso della ricerca
+    # (`web.main._codice_con_gli_spazi`), che sostituisce la domanda una
+    # volta sola: da lì in poi tutti vedono la stessa forma, e nessuno
+    # deve indovinare quale delle due sta guardando.
+    #
+    # `_varianti_senza_spazi` resta pubblica in questo modulo perché è lì
+    # che sa di codici — la usa l'ingresso della ricerca.
     # Il catalogo di certificazioni Motorola e' la fonte primaria per i
     # codici XT europei che i due dataset generici non elencano. E' una
     # risposta di identita' soltanto: firmware e versione continuano a
