@@ -59,8 +59,24 @@ HTTP_TIMEOUT = env_int("HTTP_TIMEOUT", 15)
 # pronto a rispondere. Su Render la memoria e' limitata: avviarli insieme al
 # worker e' il picco che produceva gli OOM, avviarli uno alla volta evita che
 # la prima ricerca li debba invece scaricare tutti da zero.
-PRERISCALDA_CATALOGHI = env_bool("PRERISCALDA_CATALOGHI", False)
+# Acceso dal 17/08/2026, dopo aver ridotto l'indice TAC: misurato, tutti i
+# cataloghi caldi insieme stanno in 120 MB dei 512 disponibili. Prima erano
+# ~200 e il rischio di riavvio per memoria era reale, quindi conveniva far
+# aspettare il primo visitatore; ora non conviene più.
+PRERISCALDA_CATALOGHI = env_bool("PRERISCALDA_CATALOGHI", True)
 PRERISCALDA_ATTESA_SECONDI = env_int("PRERISCALDA_ATTESA_SECONDI", 8)
+# L'INDICE TAC TIENE SOLO L'ERA ANDROID. Il database dei TAC copre
+# trent'anni di telefonia — Motorola StarTAC, Nokia a tasti, moduli per
+# automobili — e tenerlo intero costa ~114 MB di RAM su un piano che ne ha
+# 512 in tutto. È il motivo per cui il preriscaldamento dei cataloghi era
+# spento, e quindi il motivo per cui la prima ricerca dopo un risveglio
+# faceva aspettare quaranta secondi: chi arrivava per primo pagava per
+# tutti. Si tiene una voce se dichiara un anno dal 2017 (Android 8, agosto
+# 2017) OPPURE se ha un codice modello — senza codice non esiste scheda
+# tecnica, quindi un telefono senza codice e senza anno non è comunque
+# qualcosa a cui l'app sappia rispondere.
+TAC_SOLO_ERA_ANDROID = env_bool("TAC_SOLO_ERA_ANDROID", True)
+TAC_ANNO_MINIMO = env_int("TAC_ANNO_MINIMO", 2017)
 MAX_ITEMS_PER_SOURCE = env_int("MAX_ITEMS_PER_SOURCE", 100)
 # Il tracker Xiaomi è un catalogo strutturato (~1300 device unici), non un
 # feed di notizie recenti: qui il limite serve solo da tetto di sicurezza,

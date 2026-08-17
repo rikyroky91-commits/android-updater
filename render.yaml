@@ -27,10 +27,17 @@ services:
         value: 8000
       - key: DB_PATH
         value: /tmp/tracker.db
-      # I cataloghi sono gia' nel database-seme dell'immagine Docker. Non
-      # si espandono tutti in RAM dopo l'avvio, per restare sotto 512 MB.
+      # I cataloghi si scaldano in sottofondo appena il sito e' su. Restava
+      # spento finche' l'indice TAC costava 114 MB da solo; ora che tiene
+      # la sola era Android ne costa 34, e tutti i cataloghi caldi insieme
+      # stanno in 120 MB dei 512. Spegnerlo significa far pagare a chi
+      # cerca per primo, dopo ogni risveglio, l'attesa di tutti.
       - key: PRERISCALDA_CATALOGHI
-        value: "false"
+        value: "true"
+      # Indice TAC: solo dall'era Android 8 in poi (piu' tutto cio' che ha
+      # un codice modello). "false" rimette i trent'anni completi.
+      - key: TAC_SOLO_ERA_ANDROID
+        value: "true"
       - key: PRERISCALDA_ATTESA_SECONDI
         value: "8"
       # I segreti NON stanno qui: si inseriscono dal pannello di Render.

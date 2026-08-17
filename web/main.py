@@ -183,6 +183,10 @@ def _scalda_i_cataloghi() -> None:
         time.sleep(max(0, C.PRERISCALDA_ATTESA_SECONDI))
         passi = (
             ("schede tecniche", specs.carica),
+            # L'INDICE TAC MANCAVA DA QUESTO ELENCO, ed è il catalogo che
+            # la ricerca per IMEI aspetta: chi cercava quindici cifre
+            # pagava l'attesa per intero anche a preriscaldamento acceso.
+            ("indice IMEI", lambda: imeicheck.identify("000000000000000")),
             ("codici modello", lambda: modelcodes.resolve("SM-S921B")),
             ("processori", lambda: soc.per_modello("SM-S921B")),
             ("catalogo aziendale", aer_catalog.carica),

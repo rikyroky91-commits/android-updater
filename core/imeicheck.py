@@ -403,6 +403,25 @@ def _leggi_csv_tac(testo: str) -> dict[str, tuple[str, str]]:
     return indice
 
 
+def _dell_era_android(specs: str) -> bool:
+    """Se questa voce del database TAC merita di stare in RAM.
+
+    Il criterio è dichiarato in `C.TAC_ANNO_MINIMO` (2017, Android 8) e
+    ammorbidito dal codice modello: la maggioranza delle voci non dichiara
+    nessun anno, e buttarle tutte significherebbe perdere anche telefoni
+    recenti. Chi ha un codice resta, perché è il codice a rendere
+    possibile una scheda tecnica; chi non ha né anno né codice non è
+    comunque qualcosa a cui questa app sappia rispondere.
+    """
+    codice, anno = _split_code_and_year(_unglue_year(" ".join((specs or "").split())))
+    if codice:
+        return True
+    try:
+        return anno is not None and int(anno) >= C.TAC_ANNO_MINIMO
+    except (TypeError, ValueError):
+        return False
+
+
 def _build_index() -> dict[str, list[tuple[str, str, str]]]:
     """Indice completo dei TAC: per ogni TAC, TUTTE le risposte trovate.
 
@@ -426,8 +445,20 @@ def _build_index() -> dict[str, list[tuple[str, str, str]]]:
     global _status
     index: dict[str, list[tuple[str, str, str]]] = {}
 
-    def aggiungi(fonte: str, voci: dict[str, tuple[str, str]]) -> None:
+    scartati = 0
+
+    def aggiungi(fonte: str, voci: dict[str, tuple[str, str]],
+                 filtrabile: bool = True) -> None:
+        nonlocal scartati
+        taglia = filtrabile and C.TAC_SOLO_ERA_ANDROID
         for tac, (marca, specs) in voci.items():
+            # LE CORREZIONI UMANE NON SI FILTRANO MAI. Se qualcuno ha
+            # inserito un TAC a mano, o è stato verificato nel repository,
+            # quel dato è lì apposta: nessun criterio automatico può
+            # decidere che non serviva.
+            if taglia and tac not in index and not _dell_era_android(specs):
+                scartati += 1
+                continue
             index.setdefault(tac, []).append((fonte, marca, specs))
 
     # L'ordine delle chiamate È l'ordine di precedenza.
@@ -438,8 +469,8 @@ def _build_index() -> dict[str, list[tuple[str, str, str]]]:
     imeidb = _indice_imeidb()
     storica = _indice_fallback()
 
-    aggiungi(FONTE_UTENTE, inseriti)
-    aggiungi(FONTE_CURATA, curati)
+    aggiungi(FONTE_UTENTE, inseriti, filtrabile=False)
+    aggiungi(FONTE_CURATA, curati, filtrabile=False)
     aggiungi(FONTE_PRINCIPALE, principale)
     aggiungi(FONTE_IMEIDB, imeidb)
     aggiungi(FONTE_OSMOCOM, storica)
@@ -466,6 +497,9 @@ def _build_index() -> dict[str, list[tuple[str, str, str]]]:
             _status += f" · {len(curati)} verificati a mano"
         if inseriti:
             _status += f" · {len(inseriti)} inseriti da te"
+        if scartati:
+            _status += (f" · {scartati} scartati perché anteriori ad Android 8 "
+                        f"e senza codice modello")
     return index
 
 

@@ -31,6 +31,13 @@ CSV_OSMOCOM = (
 )
 CSV_IMEIDB = (
     "35913201,3GNET,G Series G528,,\n"
+    # Una voce che solo questa base dati conosce E che sopravvive al taglio
+    # dell'era Android: la riga 3GNET qui sopra non dichiara né anno né
+    # codice modello, quindi dal 17/08/2026 l'indice non la tiene più. Resta
+    # comunque nel CSV perché il test del PARSER deve continuare a leggerla:
+    # scartare una voce dall'indice e non saperla leggere sono due guasti
+    # diversi, e confonderli nasconderebbe il secondo.
+    "35913203,Realme,realme 12 RMX3871 2024,,\n"
     "35692411,Samsung,Galaxy A54 5G,,\n"
 )
 
@@ -98,9 +105,15 @@ class TestTerzaBaseDati(BaseImei):
         self.assertEqual(indice["35913201"], ("3GNET", "G Series G528"))
 
     def test_porta_codici_che_le_altre_non_hanno(self):
-        voci = imeicheck.confronto("359132010000000")["voci"]
+        voci = imeicheck.confronto("359132030000000")["voci"]
         self.assertTrue(voci)
         self.assertEqual(voci[0]["fonte"], imeicheck.FONTE_IMEIDB)
+
+    def test_una_voce_senza_anno_ne_codice_non_entra_nell_indice(self):
+        """Il rovescio dichiarato del taglio: `3GNET G Series G528` si
+        legge ancora (vedi il test del parser qui sopra) ma non finisce in
+        RAM. È il prezzo dei 114 MB risparmiati, e va scritto, non subìto."""
+        self.assertFalse(imeicheck.confronto("359132010000000")["voci"])
 
 
 class TestFormatoRiconosciutoDaiByte(BaseImei):
@@ -240,6 +253,48 @@ class TestLinkDiVerifica(unittest.TestCase):
     def test_quindici_cifre_con_luhn_errato_restano_un_imei(self):
         self.assertTrue(imeicheck.is_imei_like("356909222457120"))
         self.assertFalse(imeicheck.is_valid_imei("356909222457120"))
+
+
+class TestIndiceSoloEraAndroid(unittest.TestCase):
+    """L'indice TAC tiene l'era Android, non trent'anni di telefonia.
+
+    Chiesto dall'utente il 17/08/2026: «non possiamo eliminare i tac troppo
+    vecchi? voglio risolvere il fatto che la prima ricerca è sempre
+    lentissima», e poi «non m'interessano imei prima dell'avvento di
+    Android 8». Misurato: l'indice intero costa 114 MB su un piano da 512,
+    ed è la ragione per cui il preriscaldamento dei cataloghi era spento —
+    quindi la ragione per cui la prima ricerca faceva aspettare.
+    """
+
+    def test_un_telefono_datato_prima_di_android_8_non_entra(self):
+        self.assertFalse(imeicheck._dell_era_android("NOKIA 3310, 2000"))
+        self.assertFalse(imeicheck._dell_era_android("SAMSUNG SGH-E600, 2004"))
+
+    def test_un_telefono_recente_entra(self):
+        self.assertTrue(imeicheck._dell_era_android("XIAOMI REDMI NOTE 13, 2024"))
+
+    def test_il_codice_modello_vale_piu_dell_anno(self):
+        """L'84% delle voci non dichiara nessun anno: buttarle tutte
+        perderebbe anche telefoni recenti. Il codice le salva, ed è anche
+        ciò che rende possibile una scheda tecnica."""
+        self.assertTrue(imeicheck._dell_era_android(
+            "OPPO A6 PRO, Oppo Guangdong CPH2781"))
+        self.assertFalse(imeicheck._dell_era_android("Samsung"))
+
+    def test_le_correzioni_umane_non_si_filtrano_mai(self):
+        """Un TAC inserito a mano è lì apposta: nessun criterio
+        automatico può decidere che non serviva."""
+        vecchio = {"12345678": ("NOKIA", "NOKIA 3310, 2000")}
+        indice: dict = {}
+
+        def aggiungi(fonte, voci, filtrabile=True):
+            for tac, (marca, specs) in voci.items():
+                if filtrabile and not imeicheck._dell_era_android(specs):
+                    continue
+                indice.setdefault(tac, []).append((fonte, marca, specs))
+
+        aggiungi(imeicheck.FONTE_UTENTE, vecchio, filtrabile=False)
+        self.assertIn("12345678", indice)
 
 
 class TestRigaDellIdentita(unittest.TestCase):
