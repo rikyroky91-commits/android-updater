@@ -1565,3 +1565,58 @@ class TestCodiceScrittoConGliSpazi(unittest.TestCase):
         esito = _esito_ricerca("cph 2695", senza_rete=True)
         self.assertIn("A5 Pro", esito.get("nome") or "")
         self.assertTrue(esito["scheda"].get("trovata"))
+
+
+class TestIlCodiceBatteIlNomeSbagliatoDelTac(unittest.TestCase):
+    """Un nome che appartiene a un altro telefono non vince sul codice.
+
+    Segnalato dall'utente il 17/08/2026 con l'IMEI 865229072199770:
+
+        il TAC dice      «Realme C65 5G (RMX3997)»
+        ma RMX3997 è     realme 12x 5G
+        e C65 5G è       RMX3910, un telefono diverso
+
+    Due modelli mescolati in una riga sola. Serve il nome europeo perché è
+    quello sotto cui il telefono riceve gli aggiornamenti da testare, e il
+    codice è la parte esatta: è la chiave che le fonti ufficiali
+    accettano, ed è il motivo per cui questa applicazione cerca per codice
+    e non per nome.
+
+    Il freno non è la FORMA del nome ma la sua APPARTENENZA: una variante
+    regionale legittima dello stesso codice non si tocca.
+    """
+
+    def test_un_nome_di_un_altro_telefono_non_appartiene(self):
+        from web.main import _nome_appartiene_al_codice
+        from core import modelcodes
+
+        if not modelcodes.resolve("RMX3997"):
+            self.skipTest("catalogo dei codici non disponibile qui")
+        self.assertFalse(_nome_appartiene_al_codice("Realme C65 5G", "RMX3997"))
+
+    def test_una_variante_regionale_appartiene(self):
+        from web.main import _nome_appartiene_al_codice
+        from core import modelcodes
+
+        if not modelcodes.resolve("SM-A546B"):
+            self.skipTest("catalogo dei codici non disponibile qui")
+        self.assertTrue(_nome_appartiene_al_codice("Galaxy A54 5G", "SM-A546B"))
+
+    def test_un_codice_che_nessuno_conosce_non_smentisce_nessun_nome(self):
+        """Senza niente con cui smentirlo, un nome vale più del nulla."""
+        from web.main import _nome_appartiene_al_codice
+
+        self.assertTrue(_nome_appartiene_al_codice("Telefono Ignoto", "ZZZ9999"))
+
+    def test_la_pagina_mostra_il_nome_del_codice(self):
+        from core import modelcodes
+        from web import main as M
+
+        if not modelcodes.resolve("RMX3997"):
+            self.skipTest("catalogo dei codici non disponibile qui")
+        imei = {"riconosciuto": True, "marca": "REALME", "codice": "RMX3997",
+                "modello": "Realme C65 5G", "modello_cercato": "RMX3997"}
+        pagina = M._ancora_esito_imei(
+            M._esito_ricerca("RMX3997", senza_rete=True), imei)
+        self.assertIn("12", pagina.get("nome") or "")
+        self.assertNotIn("C65", pagina.get("nome") or "")

@@ -1425,6 +1425,35 @@ def _identita_da_mostrare(imei: dict, nome_pagina: str) -> dict:
     return annotato
 
 
+def _nome_appartiene_al_codice(nome: str, codice: str) -> bool:
+    """Se quel nome è uno dei nomi con cui quel codice viene venduto.
+
+    Serve a distinguere due cose che si somigliano soltanto: una variante
+    regionale dello stesso telefono («OnePlus 10R» e «一加 10R» per
+    CPH2423) e un nome che appartiene a un telefono diverso («realme C65
+    5G», che è RMX3910, appiccicato a RMX3997).
+
+    Il confronto è generoso su come è scritto — maiuscole, spazi e
+    trattini non contano, e un nome contenuto nell'altro basta, perché le
+    fonti aggiungono e tolgono la parola della marca a piacere.
+    """
+    if not nome or not codice:
+        return True
+    try:
+        noti = modelcodes.resolve(codice)
+    except Exception:
+        return True
+    if not noti:
+        # Nessuno conosce quel codice: non c'è niente con cui smentire il
+        # nome, e un nome vale più del nulla.
+        return True
+    piatto = _semplifica_nome(nome)
+    if not piatto:
+        return True
+    return any(piatto in _semplifica_nome(n) or _semplifica_nome(n) in piatto
+               for n in noti)
+
+
 def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
     """Il TAC stabilisce l'identità; il firmware può solo arricchirla.
 
@@ -1456,11 +1485,37 @@ def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
     # insieme specifiche e foto. È lo stesso guasto a cascata segnalato
     # dall'utente su CPH2781, per un'altra strada.
     #
-    # Non scavalca un nome VERO del TAC: `_nome_del_codice` si applica
-    # solo quando quello che il TAC ha dato è il codice stesso. Se il
-    # database dice «Galaxy A54 5G», resta «Galaxy A54 5G».
+    # QUANDO IL TAC DÀ UN NOME CHE NON APPARTIENE A QUEL CODICE, VINCE IL
+    # CODICE. Il primo freno guardava la FORMA del nome — si correggeva
+    # solo un nome a forma di codice — e lasciava passare il caso
+    # peggiore, che è un nome commerciale plausibile ma di un altro
+    # telefono. Segnalato dall'utente il 17/08/2026 con l'IMEI
+    # 865229072199770:
+    #
+    #     il TAC dice        «Realme C65 5G (RMX3997)»
+    #     ma RMX3997 è       realme 12x 5G
+    #     e C65 5G è         RMX3910, un telefono diverso
+    #
+    # Due modelli mescolati in una riga sola. Il codice è la parte
+    # esatta — è la chiave che le fonti ufficiali accettano, ed è il
+    # motivo per cui tutta questa applicazione cerca per codice e non per
+    # nome; il nome è la parte che i database alimentati dalla community
+    # sbagliano. Fra i due si crede al codice.
+    #
+    # Il freno buono non è la forma del nome ma la sua APPARTENENZA: se
+    # il nome del TAC è fra quelli noti per quel codice, è una variante
+    # regionale legittima e non si tocca — «Galaxy A54 5G» per SM-A546B
+    # resta «Galaxy A54 5G». Se non c'è, quel nome parla di un altro
+    # telefono.
+    #
+    # Restano DUE condizioni, non una: certi cataloghi elencano fra i nomi
+    # di un codice il codice stesso, quindi «POCO 25028pc03y» risulta
+    # appartenergli e il solo controllo di appartenenza lo lascerebbe
+    # passare. Un nome che contiene il codice non è mai un nome
+    # commerciale, qualunque catalogo lo elenchi.
     canonico = _nome_del_codice(codice) if codice else None
-    if canonico and _semplifica_nome(codice) in _semplifica_nome(modello):
+    if canonico and (not _nome_appartiene_al_codice(modello, codice)
+                     or _semplifica_nome(codice) in _semplifica_nome(modello)):
         modello = canonico
 
     ancorato["scheda"] = P.scheda_tecnica(
