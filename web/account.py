@@ -438,6 +438,16 @@ def pagina_password_dimenticata(request: Request, inviata: int = 0, errore: str 
     csrf = auth.nuovo_token_csrf()
     risposta = rendi(request, "password_dimenticata.html", contesto(
         request, attiva="", inviata=bool(inviata), csrf=csrf,
+        # SE L'INVIO NON E' ATTIVO VA DETTO, invece di rispondere
+        # «Controlla la posta» a chi aspettera' un messaggio che non e'
+        # mai partito. Segnalato dall'utente il 17/08/2026: «non arriva
+        # la mail di recupero».
+        #
+        # Non e' una fuga di informazioni: che questo sito sappia o no
+        # mandare email e' una proprieta' DEL SITO, uguale per tutti, e
+        # non dice niente su quale indirizzo abbia un account. La regola
+        # di non rivelarlo resta intatta.
+        email_attiva=bool(C.smtp_config()),
         errore_testo=("La pagina era aperta da troppo tempo: riprova."
                       if errore == "modulo_scaduto" else ""),
     ))

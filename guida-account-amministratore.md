@@ -158,24 +158,86 @@ la configurazione.
 In testata compare il tuo nome, con accanto **richieste** (solo per
 l'amministratore), **password** e **Esci**.
 
-### 5. Facoltativo: l'email delle richieste
+### 5. L'email, passo per passo
 
-Senza, tutto funziona: le richieste restano visibili su
-`/admin/richieste`. Se la vuoi davvero, aggiungi su Render:
+Senza questa parte il sito funziona: le richieste di accesso restano su
+`/admin/richieste` e i link di recupero password li generi tu da
+`/admin/utenti`. Serve solo se vuoi che quelle due cose arrivino da sole
+in una casella di posta.
+
+**Il punto che fa perdere più tempo, detto subito:** Gmail **rifiuta la
+password normale del tuo account**. Serve una «password per le app»,
+che è una cosa diversa e si genera a parte. Se metti quella normale
+ottieni un errore di autenticazione e sembra che il codice sia rotto.
+
+#### 5.1 — Attiva la verifica in due passaggi
+
+Le password per le app **non esistono** finché la verifica in due
+passaggi è spenta: la voce di menu non compare proprio, e si finisce a
+cercarla dove non c'è.
+
+Vai su [myaccount.google.com](https://myaccount.google.com) →
+**Sicurezza** → **Verifica in due passaggi**, e attivala se non lo è
+già.
+
+#### 5.2 — Genera la password per le app
+
+Sempre in **Sicurezza**, cerca **Password per le app** (se non la trovi
+nel menu, apri direttamente
+[myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)).
+
+Dai un nome che ti ricordi cos'è — per esempio `mobile update tracker` —
+e conferma. Google ti mostra **sedici lettere in quattro gruppi**, tipo
+`abcd efgh ijkl mnop`.
+
+Copiala subito: **non te la fa più rivedere**. Gli spazi puoi tenerli o
+toglierli, funziona in entrambi i modi.
+
+#### 5.3 — Mettila su Render
+
+[dashboard.render.com](https://dashboard.render.com) → il servizio →
+**Environment** → **Add Environment Variable**, due voci:
 
 | Nome | Valore |
 |---|---|
-| `SMTP_USERNAME` | un indirizzo Gmail |
-| `SMTP_PASSWORD` | una **password per le app** di quell'account |
+| `SMTP_USERNAME` | il tuo indirizzo Gmail per esteso, `qualcosa@gmail.com` |
+| `SMTP_PASSWORD` | le sedici lettere del passo 5.2, **non** la password del tuo account |
 
-La password per le app si genera su
-[myaccount.google.com](https://myaccount.google.com) → Sicurezza →
-Verifica in due passaggi → Password per le app. **Non** è la password
-normale dell'account Google, e Gmail rifiuta quella normale.
+Poi **Save Changes**. Render riavvia da solo, un paio di minuti.
 
-Questo pezzo non è mai stato provato contro un server SMTP vero (le
-sessioni che l'hanno scritto non avevano accesso di rete a Gmail): il
-primo test vero è qui.
+Non serve altro: host e porta hanno già i valori giusti per Gmail
+(`smtp.gmail.com`, porta `587`, con STARTTLS). Si cambiano solo se un
+giorno passi a un altro fornitore, con `SMTP_HOST` e `SMTP_PORT`.
+
+#### 5.4 — Controlla che sia arrivata
+
+Accedi e apri **Catalogo**: la riga **«Invio email (richieste account)»**
+deve dire
+
+> `attivo · da tuoindirizzo@gmail.com via smtp.gmail.com:587`
+
+Se dice ancora `non configurato`, le variabili non sono arrivate al
+servizio: ricontrolla di aver premuto Save Changes e che il deploy sia
+finito.
+
+#### 5.5 — Provala per davvero
+
+Da un altro browser (o in incognito) vai su `/registrati` e crea un
+account di prova. Entro pochi secondi deve arrivare un messaggio a
+`Riccardo.cucurullo91@gmail.com` — l'indirizzo si cambia con
+`ADMIN_APPROVAL_EMAIL` — con il link per approvare o rifiutare.
+
+Se non arriva, guarda nello **spam**: la prima email da un mittente
+nuovo ci finisce spesso.
+
+Poi prova anche il recupero: da `/password-dimenticata`, con l'indirizzo
+di quell'account di prova.
+
+**Nota onesta**: questo pezzo non è mai stato collaudato contro un
+server SMTP vero — le sessioni che l'hanno scritto non avevano accesso
+di rete a Gmail, e i test usano un finto invio. Il primo collaudo reale
+è il tuo, ed è per questo che conviene farlo con un account di prova
+invece di scoprirlo il giorno che serve.
 
 ### 6. Prova il giro completo
 

@@ -965,5 +965,53 @@ class TestVersioneInProduzione(_SitoConAccount):
                 os.environ.pop(chiave, None)
 
 
+class TestSenzaSmtpLoDiceSubito(_SitoConAccount):
+    """Segnalato dall'utente il 17/08/2026: «non arriva la mail di
+    recupero». Non arrivava perche' SMTP non e' configurato — previsto —
+    ma la pagina rispondeva «Controlla la posta» lo stesso, mandando ad
+    aspettare un messaggio mai partito.
+
+    Che questo sito sappia o no mandare email e' una proprieta' DEL SITO,
+    uguale per tutti: dichiararla non rivela quali indirizzi abbiano un
+    account, che e' la cosa da non rivelare.
+    """
+
+    def setUp(self):
+        super().setUp()
+        for chiave in ("SMTP_USERNAME", "SMTP_PASSWORD"):
+            os.environ.pop(chiave, None)
+
+    def _chiedi(self, email="qualcuno@example.com"):
+        self.client.get("/password-dimenticata")
+        csrf = self.client.cookies.get("csrf_token")
+        self.client.post("/password-dimenticata", data={"email": email, "csrf": csrf},
+                         follow_redirects=False)
+        return self.client.get("/password-dimenticata?inviata=1").text
+
+    def test_senza_smtp_non_dice_di_controllare_la_posta(self):
+        pagina = self._chiedi()
+        self.assertNotIn("Controlla la posta", pagina)
+        self.assertIn("le email non partono", pagina)
+        self.assertIn("link di recupero", pagina)
+
+    def test_con_smtp_torna_il_messaggio_normale(self):
+        os.environ["SMTP_USERNAME"] = "mittente@example.com"
+        os.environ["SMTP_PASSWORD"] = "una-password-per-le-app"
+        try:
+            with patch("web.account.mail.invia", return_value=(True, "")):
+                pagina = self._chiedi()
+            self.assertIn("Controlla la posta", pagina)
+        finally:
+            for chiave in ("SMTP_USERNAME", "SMTP_PASSWORD"):
+                os.environ.pop(chiave, None)
+
+    def test_non_rivela_comunque_se_lindirizzo_esiste(self):
+        """La regola che conta resta: la risposta e' la stessa per un
+        indirizzo noto e per uno inventato."""
+        noto = self._chiedi("riccardo@example.com")
+        ignoto = self._chiedi("nessuno-di-sicuro@example.com")
+        self.assertEqual(noto, ignoto)
+
+
 if __name__ == "__main__":
     unittest.main()
