@@ -279,6 +279,207 @@ class TestNormalizzazione(unittest.TestCase):
         self.assertTrue(item["is_relevant"])
 
 
+class TestLeCacheGlobaliReggonoIThread(unittest.TestCase):
+    """Azzerare una cache mentre qualcuno la legge non deve dare un 500.
+
+    Trovato con un ciclo di sforzo il 18/08/2026: thread paralleli sulla
+    ricerca mentre le cache venivano azzerate producevano venticinque
+    errori, tutti della stessa forma.
+
+        AttributeError: 'NoneType' object has no attribute 'get'
+
+    Lo schema era ovunque nel modulo: `if _memory_cache is None: costruisci`
+    e subito dopo `_memory_cache.get(...)`. Fra le due righe c'e' una
+    finestra, e chi ci passa in mezzo trova `None`.
+
+    NON E' SOLO TEORIA DA BANCO DI PROVA. `imeicheck.reset_cache()` viene
+    chiamata DA PRODUZIONE, da `aggiungi_tac` e `rimuovi_tac`, cioe' dalla
+    rotta `/tac/salva`: bastava che qualcuno salvasse un TAC dalla pagina
+    mentre un altro cercava un IMEI. La finestra e' stretta, ma con abbastanza
+    traffico una finestra stretta si attraversa: e' il difetto che compare
+    una volta ogni mille e non si riesce mai a riprodurre.
+
+    Il rimedio non e' un lucchetto: costruire l'indice due volte fa perdere
+    lavoro, non correttezza, mentre serializzare ogni lettura di un indice
+    usato da tutta l'applicazione costerebbe su ogni richiesta. Basta legare
+    il dizionario a un nome LOCALE prima di usarlo.
+
+    Il test e' probabilistico nel TROVARE una regressione, mai nel
+    segnalarla a vuoto: se il difetto torna fallisce quasi sempre, e se non
+    c'e' non puo' fallire.
+    """
+
+    def setUp(self):
+        """LA COSTRUZIONE DELL'INDICE SI SOSTITUISCE CON UNA FINTA.
+
+        Azzerando di continuo, ogni lettura ricostruirebbe un indice da
+        decine di migliaia di righe: il test impiegherebbe minuti e non
+        misurerebbe niente di piu'. La finestra che si vuole collaudare sta
+        FRA il controllo e l'uso, e non dipende da quanto costa costruire.
+        """
+        # I THREAD DEVONO ALTERNARSI SPESSISSIMO. La finestra da collaudare
+        # e' larga due bytecode: con l'intervallo di default (5 ms) un
+        # cambio di thread proprio li' in mezzo non capita quasi mai, e il
+        # test passava anche col difetto rimesso apposta -- cioe' non
+        # collaudava niente. Portando l'intervallo al minimo la finestra
+        # viene attraversata di continuo, e il difetto salta fuori subito.
+        import sys as _sys
+
+        self._intervallo = _sys.getswitchinterval()
+        _sys.setswitchinterval(1e-6)
+        self.addCleanup(lambda: _sys.setswitchinterval(self._intervallo))
+
+        self._mc = modelcodes._build_index
+        self._ic = imeicheck._build_index
+        modelcodes._build_index = lambda: {"SM-A546B": ["Galaxy A54 5G"],
+                                           "SM-A325F": ["Galaxy A32"],
+                                           "CPH2695": ["OPPO A5 Pro"]}
+        imeicheck._build_index = lambda: {"35328711": [("prova", "Marca", "Modello")]}
+        self.addCleanup(lambda: setattr(modelcodes, "_build_index", self._mc))
+        self.addCleanup(lambda: setattr(imeicheck, "_build_index", self._ic))
+        self.addCleanup(modelcodes.reset_cache)
+        self.addCleanup(imeicheck.reset_cache)
+
+    def _martella(self, letture, azzera, giri=400, fili=6):
+        import threading
+
+        errori = []
+        ferma = threading.Event()
+
+        def disturba():
+            while not ferma.is_set():
+                azzera()
+
+        def legge():
+            for _ in range(giri):
+                if ferma.is_set():
+                    return
+                for lettura in letture:
+                    try:
+                        lettura()
+                    except Exception as exc:
+                        errori.append(f"{type(exc).__name__}: {exc}")
+                        ferma.set()
+                        return
+
+        d = threading.Thread(target=disturba, daemon=True)
+        d.start()
+        squadra = [threading.Thread(target=legge) for _ in range(fili)]
+        for f in squadra:
+            f.start()
+        for f in squadra:
+            f.join()
+        ferma.set()
+        d.join(timeout=2)
+        return errori
+
+    def test_modelcodes_regge_l_azzeramento_durante_la_lettura(self):
+        errori = self._martella(
+            letture=[lambda: modelcodes.resolve("SM-A546B"),
+                     lambda: modelcodes.codes_for_name("Galaxy A54 5G"),
+                     lambda: modelcodes.codici_per_prefisso("SM-A325"),
+                     lambda: modelcodes.nome_canonico("CPH2695")],
+            azzera=modelcodes.reset_cache)
+        self.assertEqual(errori, [], "l'indice e' stato tolto di sotto a una lettura")
+
+    def test_imeicheck_regge_il_salvataggio_di_un_tac_durante_una_ricerca(self):
+        """Lo scenario vero: uno salva un TAC dalla pagina, un altro cerca."""
+        errori = self._martella(
+            letture=[lambda: imeicheck._voci_per_tac("35328711"),
+                     lambda: imeicheck.identify("353287110000000", solo_locale=True)],
+            azzera=imeicheck.reset_cache)
+        self.assertEqual(errori, [], "l'indice TAC e' stato tolto di sotto a una lettura")
+
+
+class TestUnFeedMagroNonChiudeLaRicerca(unittest.TestCase):
+    """Un feed con una voce sola non è una fonte: si prova il successivo.
+
+    Trovato il 18/08/2026 guardando la pagina Diagnostica, dove PiunikaWeb
+    dichiarava «1 voci nell'ultima scansione»: verde, senza errori, e
+    sbagliato. I suoi tre URL, in ordine di precisione:
+
+        /category/software-updates/feed/   HTTP 404
+        /tag/software-update/feed/         200,  1 voce   <- vinceva questo
+        /feed/                             200, 10 voci   <- mai provato
+
+    `fetch_feed` restituiva «il primo feed con ALMENO UNA voce», e un tag
+    quasi abbandonato batteva il feed del sito. Nessun controllo poteva
+    accorgersene: la fonte rispondeva davvero, e il rilevatore di degrado
+    confronta con la mediana dello storico — una fonte che ha SEMPRE reso
+    una voce sola non gli sembra degradata. È il punto cieco di quel
+    controllo, e si chiude all'origine.
+
+    L'ordine dell'elenco resta una preferenza e non cambia: il primo URL
+    è il più mirato, e prendere sempre il più ricco riempirebbe di rumore
+    le fonti dedicate (la categoria «firmware news» di SamMobile vale più
+    del feed generale, anche con meno voci). Cambia solo quando ci si
+    accontenta.
+    """
+
+    def setUp(self):
+        self._http = sources.http_get
+        self.addCleanup(lambda: setattr(sources, "http_get", self._http))
+        self.chiesti = []
+
+    def _feed(self, quante):
+        voci = "".join(
+            f"<item><title>Voce {i}</title><link>https://x.test/{i}</link></item>"
+            for i in range(quante))
+        return f"<rss version='2.0'><channel><title>P</title>{voci}</channel></rss>"
+
+    def _rispondi(self, mappa):
+        """`mappa`: url -> (stato, quante voci)."""
+        prova = self
+
+        def finto(url, timeout=None, headers=None):
+            prova.chiesti.append(url)
+            stato, quante = mappa.get(url, (404, 0))
+
+            class Risposta:
+                status_code = stato
+                content = prova._feed(quante).encode("utf-8")
+
+            return Risposta()
+
+        sources.http_get = finto
+
+    def test_si_prova_l_url_dopo_invece_di_accontentarsi_di_una_voce(self):
+        urls = ["https://x.test/categoria", "https://x.test/tag", "https://x.test/tutto"]
+        self._rispondi({urls[0]: (404, 0), urls[1]: (200, 1), urls[2]: (200, 10)})
+        parsed, errore = sources.fetch_feed(urls)
+        self.assertIsNone(errore)
+        self.assertEqual(len(parsed.entries), 10,
+                         "si è fermato al feed da una voce sola")
+        self.assertEqual(self.chiesti, urls, "non ha provato tutti gli URL")
+
+    def test_un_feed_pieno_vince_subito_senza_altre_richieste(self):
+        """L'ordine è una preferenza: il primo URL buono chiude la
+        ricerca, e le fonti che stanno bene non pagano richieste in più."""
+        urls = ["https://x.test/categoria", "https://x.test/tutto"]
+        self._rispondi({urls[0]: (200, 3), urls[1]: (200, 99)})
+        parsed, errore = sources.fetch_feed(urls)
+        self.assertIsNone(errore)
+        self.assertEqual(len(parsed.entries), 3,
+                         "ha preferito il feed più ricco a quello più mirato")
+        self.assertEqual(self.chiesti, [urls[0]], "ha chiesto URL che non servivano")
+
+    def test_se_c_e_solo_il_feed_magro_si_usa_quello(self):
+        """Meglio una voce che nessuna: il ripiego resta un ripiego, non
+        una condanna."""
+        urls = ["https://x.test/uno", "https://x.test/due"]
+        self._rispondi({urls[0]: (200, 1), urls[1]: (500, 0)})
+        parsed, errore = sources.fetch_feed(urls)
+        self.assertIsNone(errore)
+        self.assertEqual(len(parsed.entries), 1)
+
+    def test_nessun_feed_utile_resta_un_errore_leggibile(self):
+        urls = ["https://x.test/uno", "https://x.test/due"]
+        self._rispondi({urls[0]: (404, 0), urls[1]: (500, 0)})
+        parsed, errore = sources.fetch_feed(urls)
+        self.assertIsNone(parsed)
+        self.assertIn("500", errore or "")
+
+
 class TestStorage(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)

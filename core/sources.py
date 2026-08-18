@@ -250,17 +250,50 @@ def fetch_yaml(urls: list[str]) -> tuple[object | None, str | None]:
     return None, last_error
 
 
+#: Sotto questa soglia un feed non si considera "buono": si tiene da parte
+#: e si prova comunque il successivo dell'elenco. UNA VOCE SOLA NON È UNA
+#: FONTE, è quasi sempre un feed potato o rimasto indietro — vedi
+#: `fetch_feed`.
+_VOCI_MINIME_PER_ACCONTENTARSI = 2
+
+
 def fetch_feed(urls: list[str], timeout: int | None = None):
-    """Primo feed RSS/Atom che contiene almeno una voce.
+    """Il primo feed RSS/Atom dell'elenco che risponda in modo credibile.
 
     Il download passa da `requests` (già usato per le fonti JSON, con lo
     stesso timeout/header) invece che dal client HTTP interno di feedparser:
     su alcuni siti quest'ultimo fallisce la verifica TLS anche quando lo
     stesso URL scaricato con `requests` funziona senza problemi.
+
+    ## «Almeno una voce» era un'asticella troppo bassa
+
+    Prima si restituiva il primo feed con ALMENO UNA voce. Misurato su
+    PiunikaWeb il 18/08/2026, con i suoi tre URL in ordine di precisione:
+
+        /category/software-updates/feed/   HTTP 404
+        /tag/software-update/feed/         200,  1 voce   <- vinceva questo
+        /feed/                             200, 10 voci   <- mai provato
+
+    La pagina Diagnostica diceva «1 voci nell'ultima scansione», verde,
+    senza errori: la fonte RISPONDEVA, e nessun controllo poteva
+    accorgersene. Il rilevatore di degrado (`storage`) confronta con la
+    mediana dello storico, quindi una fonte che ha SEMPRE reso una voce
+    sola non gli sembra degradata: è il punto cieco di quel controllo, e
+    si chiude qui, all'origine.
+
+    L'ordine dell'elenco resta una PREFERENZA e non si tocca: il primo URL
+    è il più mirato (la categoria «firmware news» vale più del feed
+    generale del sito, anche con meno voci), e prendere sempre il più
+    ricco riempirebbe di rumore le fonti dedicate. Cambia solo quando ci
+    si accontenta: un feed magro non chiude più la ricerca, viene tenuto
+    da parte come ripiego mentre si prova il successivo, e si torna a lui
+    solo se non c'è di meglio. Nessuna richiesta in più quando il primo
+    URL sta bene, che è il caso di quasi tutte le fonti.
     """
     if feedparser is None:  # pragma: no cover
         return None, "la libreria 'feedparser' non è installata"
     last_error = "nessun URL candidato"
+    magro = None                 # il migliore fra quelli sotto la soglia
     for url in urls:
         try:
             response = http_get(url, timeout=timeout)
@@ -271,9 +304,17 @@ def fetch_feed(urls: list[str], timeout: int | None = None):
             last_error = f"{url} → HTTP {response.status_code}"
             continue
         parsed = feedparser.parse(response.content)
-        if getattr(parsed, "entries", None):
+        voci = getattr(parsed, "entries", None) or []
+        if len(voci) >= _VOCI_MINIME_PER_ACCONTENTARSI:
             return parsed, None
+        if voci:
+            if magro is None or len(voci) > len(magro.entries):
+                magro = parsed
+            last_error = f"{url} → solo {len(voci)} voce"
+            continue
         last_error = f"{url} → {getattr(parsed, 'bozo_exception', 'feed vuoto')}"
+    if magro is not None:
+        return magro, None
     return None, last_error
 
 
