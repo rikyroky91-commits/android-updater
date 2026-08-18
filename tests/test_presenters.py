@@ -114,7 +114,15 @@ class TestMarcaDaiNomiVeriQuandoLAerNonBasta(unittest.TestCase):
 
     def setUp(self):
         aer_catalog.reset_cache()  # nessuna voce AER per questo codice
-        modelcodes._memory_cache = modelcodes._memory_cache or {}
+        # `or {}` qui metteva un dizionario VUOTO quando l'indice non era
+        # ancora caricato, e da quel momento `resolve()` non lo ricostruiva
+        # più per nessuno: e' il difetto già corretto in
+        # `tests/test_nome_e_codice.py`, dove faceva saltare tre test con un
+        # messaggio falso. Si carica l'indice vero, e i codici finti si
+        # aggiungono a quello.
+        modelcodes.resolve("")
+        if modelcodes._memory_cache is None:   # nessun dataset raggiungibile
+            modelcodes._memory_cache = {}
         self._cerca_vera = specs.cerca
         self.chiamate_cerca = []
 

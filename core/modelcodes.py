@@ -353,9 +353,29 @@ def carica_indice(indice: dict[str, list[str]]) -> None:
     macchina senza rete — cosa che è puntualmente successa. Il progetto ha
     la regola che nessun test tocchi la rete, e senza un punto di innesto
     quella regola non è applicabile a questo modulo.
+
+    SOSTITUIRE L'INDICE VUOL DIRE BUTTARE VIA TUTTO QUELLO CHE NE DERIVA.
+    Qui si assegnava il solo `_memory_cache`, e gli indici costruiti a
+    partire da lui — quello inverso (nome → codici), le sue due varianti
+    e quello per cifre — restavano quelli di PRIMA. Chi chiamava
+    `codes_for_name` continuava quindi a ricevere risposte del catalogo
+    vecchio, mescolate a un `resolve` del catalogo nuovo: due cataloghi
+    diversi consultati nella stessa frase.
+
+    Il guasto misurato: `resolve_senza_ambiguita("SM-A325F")` tornava
+    vuota. Il nome «Galaxy A32» era corretto e presente nell'indice
+    appena caricato, ma l'indice inverso rimasto indietro lo dava a
+    quattro codici, quindi risultava ambiguo e veniva scartato — e
+    «SM-A325F» non arrivava più a «Galaxy A32». Restava nascosto perché
+    l'indice inverso vero non veniva quasi mai costruito prima.
     """
-    global _memory_cache
+    global _memory_cache, _reverse_cache, _reverse_senza_suffisso
+    global _reverse_compatto, _per_cifre
     _memory_cache = dict(indice)
+    _reverse_cache = None
+    _reverse_senza_suffisso = None
+    _reverse_compatto = None
+    _per_cifre = None
 
 
 def _build_index() -> dict[str, list[str]]:

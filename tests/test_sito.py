@@ -92,15 +92,30 @@ class _Sito(unittest.TestCase):
         # scheda tecnica, suggerimenti — resta quello vero, ed è quello
         # che si vuole collaudare.
         cls._search_vera = scan.search_model
+        # QUESTO FILE LEGGE LA PAGINA COME UN TUTT'UNO, quindi chiede
+        # che il server la scriva intera. Dal 17/08/2026 la ricerca
+        # risponde in due tempi e il firmware arriva da un secondo
+        # caricamento che un client HTTP non fa partire: senza questa
+        # riga dodici test qui sotto cercavano nella pagina un dato che
+        # ci arriva dopo. Passavano lo stesso, ma solo perché un altro
+        # file spegneva l'interruttore prima — cioè non collaudavano
+        # niente quando questo file veniva eseguito da solo.
+        from core import config as _C
+
+        cls._due_tempi_prima = _C.RICERCA_IN_DUE_TEMPI
+        _C.RICERCA_IN_DUE_TEMPI = False
         scan.search_model = lambda q, senza_rete=False: cls.RISPOSTA_RICERCA(q)
         cls.client = TestClient(app)
 
     @classmethod
     def tearDownClass(cls):
-        from core import scan, specs
+        from core import config as _C, scan, specs
 
         scan.search_model = cls._search_vera
         specs.reset_cache()
+        # E l'interruttore torna com'era: questo file lo spegne per sé,
+        # non per chi viene dopo.
+        _C.RICERCA_IN_DUE_TEMPI = cls._due_tempi_prima
 
     def setUp(self):
         """LA MEMORIA CORTA VA AZZERATA FRA UN TEST E L'ALTRO.

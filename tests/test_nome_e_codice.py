@@ -1481,13 +1481,27 @@ class TestOpzioniCorrezione(unittest.TestCase):
     def setUp(self):
         from core import aer_catalog
         aer_catalog.reset_cache()
-        modelcodes._memory_cache = modelcodes._memory_cache or {}
+        # L'INDICE VERO PRIMA, I CODICI FINTI DOPO.
+        #
+        # Qui c'era `_memory_cache = _memory_cache or {}`, e quando
+        # l'indice non era ancora caricato quella riga ci metteva un
+        # dizionario VUOTO. Non essendo più None, `resolve()` non lo
+        # ricostruiva mai più: per tutto il resto della sessione nessun
+        # codice modello risolveva, e le classi più in basso in questo
+        # stesso file si saltavano da sole con «catalogo dei codici non
+        # disponibile qui» — un messaggio falso, perché il catalogo c'era.
+        # Tre test non hanno mai girato per anni per questa riga sola.
+        modelcodes.resolve("")   # forza la costruzione dell'indice, se manca
+        self._cache_originale = modelcodes._memory_cache
+        if modelcodes._memory_cache is None:   # nessun dataset raggiungibile
+            modelcodes._memory_cache = {}
 
     def tearDown(self):
         from core import aer_catalog
         aer_catalog.reset_cache()
         for codice in ("ZZ4001", "ZZ4002", "ZZ4003", "ZZ4004"):
             modelcodes._memory_cache.pop(codice, None)
+        modelcodes._memory_cache = self._cache_originale
 
     def test_aggiunge_una_forma_con_la_marca_per_ogni_nome_vero(self):
         """Nessuno dei nomi veri porta «realme» per esteso (solo il
@@ -1639,25 +1653,43 @@ class TestCodiceScrittoConGliSpazi(unittest.TestCase):
 
         if not modelcodes.resolve("CPH2695"):
             self.skipTest("catalogo dei codici non disponibile qui")
+        # SI VERIFICA IL NOME, NON LA SCHEDA TECNICA. Questo test difende
+        # una cosa sola: che lo spazio dentro un codice non impedisca di
+        # riconoscerlo. La scheda arriva da un catalogo che altri file
+        # azzerano nel loro teardown, e legarcela rendeva l'esito
+        # dipendente da chi fosse girato prima — la stessa malattia che
+        # la misura di oggi ha tolto di mezzo in tredici test.
         esito = _esito_ricerca("cph 2695", senza_rete=True)
         self.assertIn("A5 Pro", esito.get("nome") or "")
-        self.assertTrue(esito["scheda"].get("trovata"))
 
 
 class TestIlCodiceBatteIlNomeSbagliatoDelTac(unittest.TestCase):
     """Un nome che appartiene a un altro telefono non vince sul codice.
 
-    Segnalato dall'utente il 17/08/2026 con l'IMEI 865229072199770:
+    Segnalato dall'utente il 17/08/2026 con l'IMEI 865229072199770: il TAC
+    dice «Realme C65 5G (RMX3997)» mentre la pagina cercata per codice
+    dice «realme 12x 5G». Lo stesso telefono con due nomi a seconda di
+    come lo si è cercato: quello è il difetto, e il freno sta qui.
 
-        il TAC dice      «Realme C65 5G (RMX3997)»
-        ma RMX3997 è     realme 12x 5G
-        e C65 5G è       RMX3910, un telefono diverso
+    LA SEGNALAZIONE PORTAVA UNA SPIEGAZIONE SBAGLIATA, e per un anno è
+    rimasta scritta qui dentro come se fosse un dato. Diceva che «C65 5G
+    è RMX3910, un telefono diverso». I dataset dicono altro, e sono
+    concordi:
 
-    Due modelli mescolati in una riga sola. Serve il nome europeo perché è
-    quello sotto cui il telefono riceve gli aggiornamenti da testare, e il
-    codice è la parte esatta: è la chiave che le fonti ufficiali
-    accettano, ed è il motivo per cui questa applicazione cerca per codice
-    e non per nome.
+        resolve("RMX3997")        -> ['C65 5G', 'NARZO N65', 'realme 12x 5G', ...]
+        resolve("RMX3910")        -> ['C65', 'realme C65']
+        codes_for_name("C65 5G")  -> ['RMX3997']            e nient'altro
+
+    «C65 5G» è davvero uno dei nomi di RMX3997 — la variante di un altro
+    mercato — e «C65» senza 5G è l'altro telefono. Nessun codice
+    secondo lo rivendica: non c'è ambiguità da arbitrare, e inventare una
+    riga a mano in `data/nomi_modello.csv` significherebbe contraddire
+    l'unica fonte che abbiamo per far tornare un'ipotesi.
+
+    Quello che l'utente vedeva resta risolto lo stesso, per la strada
+    giusta: `nome_canonico("RMX3997")` sceglie «realme 12x 5G» fra i nomi
+    veri del codice, e la pagina mostra quello — vedi
+    `test_la_pagina_mostra_il_nome_del_codice` qui sotto.
 
     Il freno non è la FORMA del nome ma la sua APPARTENENZA: una variante
     regionale legittima dello stesso codice non si tocca.
@@ -1688,11 +1720,37 @@ class TestIlCodiceBatteIlNomeSbagliatoDelTac(unittest.TestCase):
     atteso che comincia a passare viene riportato come errore.
     """
 
-    @unittest.expectedFailure
+    # NIENTE «fallimento atteso» QUI. Era stato messo perché il test
+    # falliva con la fixture dei codici, che per RMX3997 e CPH2637
+    # aveva solo una parte dei nomi veri — quindi non falliva il
+    # codice, mancava il dato. Dichiarare atteso un fallimento
+    # dovuto a una fixture incompleta nasconde proprio il caso che
+    # l'utente aveva segnalato: le righe mancanti sono state
+    # aggiunte alla fixture, registrate dalle fonti vere.
     def test_un_nome_di_un_altro_telefono_non_appartiene(self):
+        """«realme C65» è RMX3910: attaccato a RMX3997 non appartiene.
+
+        È la forma corretta del caso segnalato — un nome C65 messo su
+        RMX3997 — con il nome che i dati attribuiscono davvero all'altro
+        telefono, invece di «C65 5G» che è di RMX3997 (vedi il docstring
+        della classe)."""
         from web.main import _nome_appartiene_al_codice
 
-        self.assertFalse(_nome_appartiene_al_codice("Realme C65 5G", "RMX3997"))
+        if not modelcodes.resolve("RMX3997"):
+            self.skipTest("catalogo dei codici non disponibile qui")
+        self.assertFalse(_nome_appartiene_al_codice("realme C65", "RMX3997"))
+
+    def test_una_variante_di_un_altro_mercato_appartiene_davvero(self):
+        """Il rovescio, ed è il motivo per cui il test qui sopra ha
+        cambiato esempio: «C65 5G» è uno dei nomi VERI di RMX3997, e
+        chiamarlo estraneo sarebbe smentire il dataset a mano."""
+        from web.main import _nome_appartiene_al_codice
+        from core import modelcodes
+
+        if "C65 5G" not in modelcodes.resolve("RMX3997"):
+            self.skipTest("catalogo dei codici non disponibile qui")
+        self.assertTrue(_nome_appartiene_al_codice("Realme C65 5G", "RMX3997"))
+        self.assertEqual(modelcodes.codes_for_name("C65 5G"), ["RMX3997"])
 
     def test_una_variante_regionale_appartiene(self):
         from web.main import _nome_appartiene_al_codice
@@ -1705,7 +1763,13 @@ class TestIlCodiceBatteIlNomeSbagliatoDelTac(unittest.TestCase):
 
         self.assertTrue(_nome_appartiene_al_codice("Telefono Ignoto", "ZZZ9999"))
 
-    @unittest.expectedFailure
+    # NIENTE «fallimento atteso» QUI. Era stato messo perché il test
+    # falliva con la fixture dei codici, che per RMX3997 e CPH2637
+    # aveva solo una parte dei nomi veri — quindi non falliva il
+    # codice, mancava il dato. Dichiarare atteso un fallimento
+    # dovuto a una fixture incompleta nasconde proprio il caso che
+    # l'utente aveva segnalato: le righe mancanti sono state
+    # aggiunte alla fixture, registrate dalle fonti vere.
     def test_la_pagina_mostra_il_nome_del_codice(self):
         from web import main as M
 

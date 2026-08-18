@@ -24,6 +24,49 @@ with open(os.path.join(_FIXTURES, "aer_devices.json"), encoding="utf-8") as _f:
     AER_VOCI = json.load(_f)["items"]
 
 
+def _database_temporaneo(test):
+    """Un database vuoto per questo test, E IL RIPRISTINO DI `C.DB_PATH`.
+
+    Venticinque `setUp` di questo file scrivevano da sé le tre righe che
+    ci sono qui sotto, e nessuno rimetteva a posto `C.DB_PATH`: alla fine
+    del file il processo restava puntato sull'ultimo file temporaneo, che
+    il `tearDown` aveva appena cancellato. Chi girava dopo si ritrovava
+    quindi un database NUOVO E VUOTO, e non se ne accorgeva.
+
+    Non è un dettaglio di pulizia. In quel database ci stanno le copie
+    locali di tutto quello che l'applicazione scarica una volta sola — il
+    catalogo delle schede tecniche, i due CSV dei codici modello
+    (`storage.get_blob`). Svuotarlo significa che il primo test successivo
+    che azzera una cache di modulo la ricostruisce dal niente: con la rete
+    accesa non si vede (si riscarica), senza rete la scheda non si trova
+    più e la pagina resta sul codice digitato invece del nome.
+
+    È esattamente il modo in cui `TestCodiceScrittoConGliSpazi` (in
+    `tests/test_nome_e_codice.py`) falliva solo se questo file girava
+    prima: «CPH2695» invece di «OPPO A5 Pro». Il difetto non era lì, era
+    qui — e per questo azzerare le cache non lo guariva: le azzerava
+    contro un database vuoto, che è il peggioramento, non la cura.
+    """
+    percorso = tempfile.mktemp(suffix=".db")
+    db_di_prima = C.DB_PATH
+    env_di_prima = os.environ.get("TRACKER_DB")
+
+    def ripristina():
+        C.DB_PATH = db_di_prima
+        if env_di_prima is None:
+            os.environ.pop("TRACKER_DB", None)
+        else:
+            os.environ["TRACKER_DB"] = env_di_prima
+        storage.reset_state()
+
+    test.addCleanup(ripristina)
+    os.environ["TRACKER_DB"] = percorso
+    C.DB_PATH = percorso
+    storage.reset_state()
+    storage.init_db()
+    return percorso
+
+
 class TestBrandDetection(unittest.TestCase):
     def test_riconosce_i_brand_principali(self):
         casi = {
@@ -240,6 +283,9 @@ class TestStorage(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         self.tmp.close()
+        db_di_prima = C.DB_PATH
+        self.addCleanup(lambda: (setattr(C, "DB_PATH", db_di_prima),
+                                 storage.reset_state()))
         C.DB_PATH = self.tmp.name
         storage.reset_state()
         storage.init_db()
@@ -368,11 +414,7 @@ class TestScansioneCompleta(unittest.TestCase):
     """
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
 
     def tearDown(self):
         storage.reset_state()
@@ -509,11 +551,7 @@ class TestRisoluzioneCodiceModello(unittest.TestCase):
     )
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         modelcodes.reset_cache()
         self._original_download = modelcodes._download
         self._original_rss_items = sources.rss_items
@@ -632,11 +670,7 @@ class TestIdentificazioneIMEI(unittest.TestCase):
     database — solo usato in memoria per il calcolo del TAC."""
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         imeicheck.reset_cache()
         self._original_download = imeicheck._download
         # Le basi dati SUPPLEMENTARI vanno zittite, non solo la principale:
@@ -731,11 +765,7 @@ class TestImmagineDispositivo(unittest.TestCase):
     ritentare all'infinito un modello per cui Wikipedia non ha nulla."""
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         self._original_get = images._get
 
     def tearDown(self):
@@ -827,11 +857,7 @@ class TestCronologiaRicerche(unittest.TestCase):
     (modello + firmware) nella cronologia ricerche."""
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         self._original_rss_items = sources.rss_items
         # Isola dalla rete anche la risoluzione codici modello: senza questo,
         # "moto g14" può corrispondere per davvero a una voce del CSV
@@ -928,11 +954,7 @@ class TestRicercaLiveModelloQualunque(unittest.TestCase):
     o più vecchi che le fonti strutturate/curate non intercettano mai."""
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         self._original_rss_items = sources.rss_items
         self._original_lookup_order = sources._lookup_order
 
@@ -1328,11 +1350,7 @@ class TestRicercaMultiMarcaEndToEnd(unittest.TestCase):
     momento (quello lo si scopre solo con un test dal vivo sull'app)."""
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         modelcodes.reset_cache()
         self._original_rss_items = sources.rss_items
         self._original_download = modelcodes._download
@@ -1516,11 +1534,7 @@ class TestRicercaOnDemandFontiUfficiali(unittest.TestCase):
     SAMSUNG_XML = '<latest o="14">S928BXXU5CYA1/S928BOXM5CYA1/S928BXXU5CYA1</latest>'
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         modelcodes.reset_cache()
         self._orig_download = modelcodes._download
         self._orig_http_get = sources.http_get
@@ -1729,11 +1743,7 @@ class TestSupportoApple(unittest.TestCase):
     ]
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         appledevices.reset_cache()
         self._orig_http_get = sources.http_get
         self._orig_download = appledevices._download
@@ -1864,11 +1874,7 @@ class TestControlloPlausibilita(unittest.TestCase):
     mostrarlo: meglio "non lo so" di un'affermazione sbagliata."""
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         self._src = sources.Source("t", "Fonte di prova", C.TRUST_STRUCTURED, None, None, "")
 
     def tearDown(self):
@@ -1924,11 +1930,7 @@ class TestRicostruzioneArchivio(unittest.TestCase):
     archivio, perché nessuno lo aveva cancellato."""
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
 
     def tearDown(self):
         storage.reset_state()
@@ -2099,11 +2101,7 @@ class TestRealmeUfficiale(unittest.TestCase):
         # su Windows può trattenere il database temporaneo del test.
         self._orig_scalda_fonti = sources._scalda_fonti
         sources._scalda_fonti = lambda voci: None
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         self._orig_http_get = sources.http_get
         self._orig_rss = sources.rss_items
 
@@ -2184,11 +2182,7 @@ class TestFormattazioneRisultatiIMEI(unittest.TestCase):
     Chongqing RMX53132025)»."""
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         modelcodes.reset_cache()
         self._orig_download = modelcodes._download
         modelcodes._download = lambda url, key: (
@@ -2259,11 +2253,7 @@ class TestTettoDiTempoRicerca(unittest.TestCase):
     da indurre a ricaricarla, che è esattamente il sintomo segnalato."""
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         self._orig_rss = sources.rss_items
         self._orig_budget = C.SEARCH_BUDGET_SECONDS
 
@@ -2349,11 +2339,7 @@ class TestSuggerimentiRicerca(unittest.TestCase):
     l'app non conosce il dispositivo, quando in realtà ce l'ha."""
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         modelcodes.reset_cache()
         appledevices.reset_cache()
         suggest.reset_cache()
@@ -2466,11 +2452,7 @@ class TestRealmeNomiRegionali(unittest.TestCase):
     )
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         self._orig_http_get = sources.http_get
 
         class Resp:
@@ -2585,11 +2567,7 @@ class TestRealmeNomeCondivisoDaDueCodici(unittest.TestCase):
         # `test_honor_legge_una_pagina_html`.
         sources.reset_realme_aer_cache()
         self.addCleanup(sources.reset_realme_aer_cache)
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         self._orig_http_get = sources.http_get
 
         class Resp:
@@ -2644,11 +2622,7 @@ class TestOrdinamentoPerDataDiUscita(unittest.TestCase):
     di recente."""
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
 
     def tearDown(self):
         storage.reset_state()
@@ -2850,11 +2824,7 @@ class TestDiagnosticaFonteDistinta(unittest.TestCase):
         # `test_honor_legge_una_pagina_html`.
         sources.reset_realme_aer_cache()
         self.addCleanup(sources.reset_realme_aer_cache)
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         self._orig_http = sources.http_get
 
     def tearDown(self):
@@ -2991,11 +2961,7 @@ class TestMatriceRicerca(unittest.TestCase):
     }
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         modelcodes.reset_cache()
         appledevices.reset_cache()
         sources.azzera_cache_fonti()
@@ -3213,11 +3179,7 @@ class TestDiagnosiRicerca(unittest.TestCase):
     correzioni a vuoto. Questo sostituisce l'ipotesi con un fatto."""
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         modelcodes.reset_cache()
         self._orig = (sources.http_get, modelcodes._download)
         modelcodes._download = lambda url, key: (
@@ -3290,11 +3252,7 @@ class TestNomeModelloSenzaDecorazioni(unittest.TestCase):
     codice risolto correttamente, e la lista dispositivi vuota."""
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         storage.upsert_update({
             "id": "x", "brand": C.OPPO, "device_model": "OPPO A6x",
             "device_key": "oppo|a6x", "title": "OPPO A6x — AER",
@@ -3374,11 +3332,7 @@ class TestFonteUniversaleGSMArena(unittest.TestCase):
     )
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         self._orig = sources.http_get
 
         class Resp:
@@ -3460,11 +3414,7 @@ class TestSceltaRisultatoMigliore(unittest.TestCase):
     )
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
         modelcodes.reset_cache()
         self._orig = (sources.http_get, modelcodes._download)
         modelcodes._download = lambda url, key: (
@@ -3549,11 +3499,7 @@ class TestDegradoSilenziosoFonti(unittest.TestCase):
     test verifica proprio che NON si allarmi senza motivo."""
 
     def setUp(self):
-        self._db = tempfile.mktemp(suffix=".db")
-        os.environ["TRACKER_DB"] = self._db
-        C.DB_PATH = self._db
-        storage.reset_state()
-        storage.init_db()
+        self._db = _database_temporaneo(self)
 
     def tearDown(self):
         storage.reset_state()

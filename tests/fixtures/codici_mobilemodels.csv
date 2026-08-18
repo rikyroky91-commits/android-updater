@@ -521,3 +521,6 @@ ZTE A2017,mob,zte,中兴,,,中兴天机 7,,zte_cn
 Z999,mob,zte,中兴,,,中兴天机 Axon M,,zte_cn
 ZTE 9000N,mob,zte,中兴,,,中兴天机 Axon 11 SE 5G,,zte_cn
 ZTE 9000N,mob,zte,中兴,,,中兴 Blade V2020,,zte_cn
+CPH2637,mob,oppo,OPPO,,"omega, omega-s1",OPPO Reno12 F,5G,oppo_global_en
+CPH2637,mob,oppo,OPPO,,"omega, omega-s1",OPPO Reno12 FS,5G,oppo_global_en
+CPH2637,mob,oppo,OPPO,,,OPPO F27,5G,oppo_global_en

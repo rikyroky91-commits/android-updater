@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import unittest
 
-from core import config as C, extract, imeicheck, soc
+from core import config as C, extract, imeicheck, soc, storage
 
 
 class TestNomeCommercialeScrittoInPiuModi(unittest.TestCase):
@@ -321,10 +321,20 @@ class TestTabellaTacVerificata(unittest.TestCase):
         originale_download = imeicheck._download
         originale_url = imeicheck._scarica_url
         originale_curato = imeicheck._indice_curato
+        # La riga finta ha un codice e un anno, come i dati veri: dal
+        # 17/08/2026 l'indice tiene solo l'era Android, e una riga
+        # senza né l'uno né l'altro non ci entrerebbe nemmeno — il
+        # test fallirebbe per il dato assente, non per la precedenza.
         imeicheck._download = lambda: (
-            b"Brand,TAC,SPECS\nSCARICATO,35135531,\"MODELLO SCARICATO\"\n")
+            b"Brand,TAC,SPECS\nSCARICATO,35135531,\"MODELLO SCARICATO, Samsung SM-A546X, 2023\"\n")
         imeicheck._scarica_url = lambda url, minimo=10_000: None
         imeicheck._indice_curato = lambda: {"35135531": ("Samsung", "Galaxy A54 5G")}
+        # E SI FA SCADERE LA COPIA IN ARCHIVIO. `_cached_bytes` preferisce
+        # il file già scaricato alla funzione di download, quindi senza
+        # questa riga la sostituzione qui sopra non veniva mai chiamata:
+        # il test leggeva il database lasciato da un test precedente,
+        # e il suo esito dipendeva da cosa fosse girato prima.
+        storage.set_meta(imeicheck._META_FETCHED_KEY, "")
         imeicheck.reset_cache()
         try:
             self.assertEqual(imeicheck.identify("351355315430630"),

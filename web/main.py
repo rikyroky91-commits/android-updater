@@ -1447,8 +1447,14 @@ def _nome_appartiene_al_codice(nome: str, codice: str) -> bool:
 
     Serve a distinguere due cose che si somigliano soltanto: una variante
     regionale dello stesso telefono («OnePlus 10R» e «一加 10R» per
-    CPH2423) e un nome che appartiene a un telefono diverso («realme C65
-    5G», che è RMX3910, appiccicato a RMX3997).
+    CPH2423) e un nome che appartiene a un telefono diverso («realme C65»,
+    che è RMX3910, appiccicato a RMX3997).
+
+    L'ESEMPIO QUI SOPRA È STATO CORRETTO: diceva «realme C65 5G», e con il
+    5G è falso — quello è uno dei nomi VERI di RMX3997 (vedi il commento
+    lungo in `_ancora_esito_imei`, stesso sbaglio preso e già raddrizzato
+    lì). Senza il 5G il nome è di RMX3910, ed è il caso che questa
+    funzione deve fermare.
 
     Il confronto è generoso su come è scritto — maiuscole, spazi e
     trattini non contano, e un nome contenuto nell'altro basta, perché le

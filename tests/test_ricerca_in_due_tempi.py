@@ -43,6 +43,7 @@ class BaseDueTempi(unittest.TestCase):
         # tutta la suite, perché quarantadue test leggono la pagina come
         # farebbe un browser senza JavaScript. Questo file è il posto in
         # cui la modalità di produzione viene collaudata davvero.
+        cls._due_tempi_prima = C.RICERCA_IN_DUE_TEMPI
         C.RICERCA_IN_DUE_TEMPI = True
         storage.reset_state()
         storage.init_db()
@@ -77,7 +78,14 @@ class BaseDueTempi(unittest.TestCase):
 
         scan.sources.search_model_live = cls._live_originale
         scan._lookup_structured_for = cls._lookup_originale
-        C.RICERCA_IN_DUE_TEMPI = False      # come lo trova il resto della suite
+        # SI RIMETTE COM'ERA, non a un valore scelto da qui. Forzarlo a
+        # `False` significava lasciare in eredità uno stato agli altri
+        # file: dodici test di `test_sito.py` passavano SOLO perché
+        # questo file girava prima (ordine alfabetico) e spegneva
+        # l'interruttore per loro. Da soli misuravano il vuoto — e un
+        # test che passa grazie a un altro è peggio di un test rosso,
+        # perché non lo scopri mai.
+        C.RICERCA_IN_DUE_TEMPI = cls._due_tempi_prima
 
     def setUp(self):
         from web.main import RICERCHE
