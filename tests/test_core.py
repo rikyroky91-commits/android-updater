@@ -3686,6 +3686,101 @@ class TestSceltaRisultatoMigliore(unittest.TestCase):
         self.assertFalse(sources._ha_versione(senza))
 
 
+class TestUnaFonteNataStortaSiVede(unittest.TestCase):
+    """Il punto cieco del controllo sul degrado, chiuso.
+
+    `_valuta_degrado` confronta ogni fonte con la MEDIANA DI SE STESSA:
+    prende benissimo quelle che peggiorano, e per costruzione non può
+    vedere quelle nate storte. Una fonte che ha sempre reso una voce sola
+    ha mediana 1, quindi non è calata rispetto a niente — e sotto
+    `_MINIMO_SIGNIFICATIVO` quella funzione esce subito senza guardare.
+    Tutto l'intervallo dei numeri piccoli non era coperto da nessuno.
+
+    Non è teoria: PiunikaWeb ha dichiarato «1 voci nell'ultima
+    scansione» per settimane, verde e senza errori, mentre il feed giusto
+    ne aveva dieci. Se n'è accorto un occhio umano guardando la tabella,
+    non l'applicazione.
+
+    Il rischio opposto è lo stesso di sempre: un falso allarme fa perdere
+    fiducia in tutte le segnalazioni. Per questo la soglia sta sotto il
+    caso legittimo più magro che conosciamo (`realme — piano ufficiale
+    AER`, sei dispositivi veri) e il messaggio chiede una verifica invece
+    di affermare un guasto.
+    """
+
+    def setUp(self):
+        self._db = _database_temporaneo(self)
+        self.addCleanup(storage.reset_state)
+
+    def _scansione(self, fonte, voci, ok=True):
+        storage.record_source_status(
+            fonte, f"Fonte {fonte}", ok, voci, None if ok else "errore")
+        storage.record_source_history(fonte, voci, ok)
+
+    def _stato(self, fonte):
+        for stato in storage.get_source_status():
+            if stato["source"] == fonte:
+                return stato
+        return {}
+
+    def test_una_fonte_che_ha_sempre_reso_una_voce_viene_segnalata(self):
+        """Il caso PiunikaWeb: stabile, verde, e sbagliata da sempre."""
+        for _ in range(6):
+            self._scansione("piunika", 1)
+        sospetto = self._stato("piunika").get("sospetto")
+        self.assertIsNotNone(sospetto, "la fonte nata storta non è stata vista")
+        self.assertEqual(sospetto["mediana"], 1)
+        self.assertIn("mai stata più ricca", sospetto["messaggio"])
+
+    def test_il_controllo_sul_calo_da_solo_non_la_vedeva(self):
+        """La prova che il punto cieco esisteva davvero, e che questo
+        controllo è l'unico a coprirlo."""
+        for _ in range(6):
+            self._scansione("piunika", 1)
+        self.assertIsNone(self._stato("piunika").get("degrado"),
+                          "allora il punto cieco non c'era, e questo test non serve")
+
+    def test_una_fonte_legittimamente_piccola_non_viene_segnalata(self):
+        """`realme — piano ufficiale AER` rende sei voci perché realme ha
+        iscritto sei dispositivi: marcarla sospetta sarebbe un falso
+        allarme, e i falsi allarmi si pagano su TUTTE le segnalazioni."""
+        for voci in (6, 6, 5, 6, 6, 6):
+            self._scansione("realme_aer", voci)
+        self.assertIsNone(self._stato("realme_aer").get("sospetto"))
+
+    def test_una_giornata_storta_non_basta(self):
+        """Si guarda la mediana, non l'ultimo numero: una fonte ricca che
+        oggi ha rinviato una voce sola non è nata storta."""
+        for voci in (300, 310, 295, 305, 300):
+            self._scansione("ricca", voci)
+        self._scansione("ricca", 1)
+        self.assertIsNone(self._stato("ricca").get("sospetto"))
+
+    def test_senza_storico_non_si_accusa_nessuno(self):
+        """Una fonte appena aggiunta non ha ancora una storia: dire
+        «non è mai stata più ricca» dopo due scansioni sarebbe una frase
+        senza fondamento."""
+        self._scansione("nuova", 1)
+        self._scansione("nuova", 1)
+        self.assertIsNone(self._stato("nuova").get("sospetto"))
+
+    def test_una_fonte_in_errore_non_riceve_due_etichette(self):
+        for _ in range(5):
+            self._scansione("rotta", 0, ok=False)
+        self.assertIsNone(self._stato("rotta").get("sospetto"))
+
+    def test_la_tabella_la_chiama_da_controllare_non_impoverita(self):
+        """Due nomi diversi per due cose diverse: «impoverita» manda a
+        cercare un cambiamento recente, che qui non c'è."""
+        from web import presenters as P
+
+        for _ in range(6):
+            self._scansione("piunika", 1)
+        riga = P.riga_fonte(self._stato("piunika"))
+        self.assertEqual(riga["etichetta"], "Da controllare")
+        self.assertIn("mai stata più ricca", riga["dettaglio"])
+
+
 class TestDegradoSilenziosoFonti(unittest.TestCase):
     """Intercettare le fonti che rendono molto meno del solito.
 

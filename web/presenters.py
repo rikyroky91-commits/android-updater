@@ -191,14 +191,23 @@ def stato_backup() -> dict:
 
 def riga_fonte(stato: dict) -> dict:
     degrado = stato.get("degrado")
+    # «DA CONTROLLARE» È UN'ETICHETTA A SÉ, e non un sinonimo di
+    # «Impoverita». Sono due cose diverse: impoverita vuol dire che rendeva
+    # di più e adesso rende meno; questa vuol dire che non è mai stata più
+    # ricca di così, e quindi forse non ha mai funzionato. Chiamarle allo
+    # stesso modo manderebbe a cercare un cambiamento recente che non c'è.
+    sospetto = stato.get("sospetto")
     if not stato.get("ok"):
         classe, etichetta = "tag-outline", "Errore"
     elif degrado:
         classe, etichetta = "tag-neutral", "Impoverita"
+    elif sospetto:
+        classe, etichetta = "tag-neutral", "Da controllare"
     else:
         classe, etichetta = "tag-accent", "Attiva"
-    dettaglio = stato.get("last_error") or (degrado or {}).get("messaggio") or (
-        f"{stato.get('items_found', 0)} voci nell'ultima scansione")
+    dettaglio = (stato.get("last_error") or (degrado or {}).get("messaggio")
+                 or (sospetto or {}).get("messaggio")
+                 or f"{stato.get('items_found', 0)} voci nell'ultima scansione")
     return {
         "nome": stato.get("label", ""),
         "classe": classe,

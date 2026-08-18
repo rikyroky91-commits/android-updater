@@ -1298,6 +1298,7 @@ def get_source_status() -> list[dict]:
         conn.execute("SELECT * FROM source_status ORDER BY label").fetchall())
     for riga in righe:
         riga["degrado"] = _valuta_degrado(conn, riga)
+        riga["sospetto"] = _valuta_magrezza(conn, riga)
     return righe
 
 
@@ -1309,6 +1310,22 @@ _STORICO_CONFRONTO = 8
 # Sotto questo numero di voci le variazioni percentuali non dicono nulla:
 # una fonte che passa da 3 a 1 voce non è un guasto, è normale oscillazione.
 _MINIMO_SIGNIFICATIVO = 10
+# ...e proprio per questo sotto quella soglia non guardava PIÙ NIENTE: vedi
+# `_valuta_magrezza`, che copre l'intervallo lasciato scoperto.
+#
+# Una fonte che rende COSTANTEMENTE questo numero di voci o meno non è
+# credibile. La soglia è bassa apposta, ed è tarata su un caso vero per
+# lato: PiunikaWeb rendeva 1 voce da sempre ed era rotta (il primo dei suoi
+# tre feed rispondeva 404, il secondo ne aveva una sola e vinceva lui);
+# `realme — piano ufficiale AER` ne rende 6, ed è giusto così, perché
+# realme ha davvero sei dispositivi iscritti a quel programma. Fra 1 e 6
+# c'è spazio per una soglia che separa i due casi senza indovinare.
+_MINIMO_PLAUSIBILE = 2
+# Quante scansioni servono per dire "è sempre stata così" invece di "oggi
+# è andata male".
+_STORICO_MAGREZZA = 3
+# Su quante scansioni si calcola la mediana della magrezza.
+_STORICO_COMPLESSIVO_MAGREZZA = 8
 
 
 def _valuta_degrado(conn, stato: dict) -> dict | None:
@@ -1357,6 +1374,72 @@ def _valuta_degrado(conn, stato: dict) -> dict | None:
             f"{attuale} voci invece delle {mediana} abituali (−{calo}%): "
             "la fonte risponde ma restituisce molti meno dati del solito, "
             "probabile cambio di formato della pagina"
+        ),
+    }
+
+
+def _valuta_magrezza(conn, stato: dict) -> dict | None:
+    """Una fonte che non ha MAI reso abbastanza da essere credibile.
+
+    ## Il punto cieco che questa funzione copre
+
+    `_valuta_degrado` confronta ogni fonte con la MEDIANA DI SE STESSA:
+    prende benissimo quelle che peggiorano, e per costruzione non può
+    vedere quelle nate storte. Una fonte che ha sempre reso una voce sola
+    ha mediana 1, quindi non è "calata" rispetto a niente — e sotto
+    `_MINIMO_SIGNIFICATIVO` quella funzione esce subito senza guardare.
+    L'intero intervallo dei numeri piccoli non era coperto da nessuno.
+
+    Non è teoria: PiunikaWeb ha dichiarato «1 voci nell'ultima
+    scansione» per settimane, verde e senza errori, mentre il feed giusto
+    ne aveva dieci. La fonte RISPONDEVA, quindi nessun controllo sugli
+    errori poteva accorgersene, e il controllo sul degrado la ignorava per
+    progetto. Se ne è accorto un occhio umano guardando la tabella.
+
+    ## Perché non basta guardare l'ultimo numero
+
+    Si guarda la MEDIANA dello storico, come fa il degrado: una scansione
+    andata male — rete lenta, feed momentaneamente vuoto — non deve
+    produrre un avviso. Qui interessa il caso opposto e più insidioso:
+    quello STABILE, che proprio per la sua stabilità sembra normale.
+
+    ## E perché dice "da controllare" e non "guasta"
+
+    Una fonte può legittimamente rendere pochissimo: `realme — piano
+    ufficiale AER` ne dà sei perché realme ha iscritto sei dispositivi a
+    quel programma, e sarebbe sbagliato marcarla rotta. La soglia sta
+    sotto quel numero, e il messaggio chiede una verifica invece di
+    affermare un guasto: qui non si sa, si sospetta, e dirlo per quello
+    che è vale più di un allarme sicuro di sé e sbagliato.
+    """
+    if not stato.get("ok"):
+        return None      # già segnalata come errore: non serve altro
+
+    precedenti = [
+        riga["items_found"] for riga in conn.execute(
+            """SELECT items_found FROM source_history
+                WHERE source = ? AND ok = 1
+             ORDER BY id DESC LIMIT ?""",
+            (stato["source"], _STORICO_COMPLESSIVO_MAGREZZA),
+        ).fetchall()
+    ]
+    if len(precedenti) < _STORICO_MAGREZZA:
+        return None      # storico troppo breve: non si sa ancora se è "sempre"
+
+    ordinati = sorted(precedenti)
+    mediana = ordinati[len(ordinati) // 2]
+    if mediana > _MINIMO_PLAUSIBILE:
+        return None
+
+    return {
+        "mediana": mediana,
+        "scansioni": len(precedenti),
+        "messaggio": (
+            f"{mediana} voci di norma, su {len(precedenti)} scansioni: questa "
+            "fonte non è mai stata più ricca di così. Può essere giusto (un "
+            "catalogo con pochi dispositivi) oppure il segno che risponde "
+            "l'indirizzo sbagliato — il controllo sul calo non può vederlo, "
+            "perché confronta ogni fonte con il proprio passato"
         ),
     }
 
