@@ -437,6 +437,106 @@ class TestNotaCoperturaConChipTrovato(unittest.TestCase):
                          pagina)
 
 
+class TestIlServizioEsternoVieneInterrogatoDavvero(unittest.TestCase):
+    """Un IMEI che i database locali non conoscono deve finire a HiCellTek.
+
+    La ricerca in due tempi ha spostato quella chiamata dal primo
+    caricamento al secondo, ed è la cosa giusta — nel primo non si può
+    nemmeno avvisare che si sta aspettando, perché la pagina non è ancora
+    partita. Ma sposta anche il rischio: se il secondo tempo non
+    ripartisse, o ripartisse ancora in modalità locale, il servizio
+    esterno non verrebbe interrogato MAI PIÙ e nessuno se ne accorgerebbe
+    — la pagina direbbe semplicemente che il TAC non si conosce, come ha
+    sempre fatto prima che il servizio esistesse. Un abbonamento pagato e
+    mai usato non fa rumore.
+
+    `tests/test_confronto_imei.py` collauda già i due tempi su
+    `_esito_imei`, chiamandola con `solo_locale` scritto a mano. Qui si
+    collauda l'ANELLO CHE STA IN MEZZO: che sia la rotta a passare
+    `solo_locale=False` al secondo giro. È una riga sola
+    (`solo_locale=_in_due_tempi(completo)` in `web/main.py`), non era
+    coperta da nessuna parte, e cambiarla non farebbe fallire niente.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        _prepara()
+        from fastapi.testclient import TestClient
+
+        from web.main import app
+
+        cls.client = TestClient(app)
+
+    def setUp(self):
+        import os
+
+        from core import imeicheck
+        from web.main import RICERCHE
+
+        RICERCHE.svuota()
+        self._online = imeicheck.cerca_tac_online
+        self._chiave = os.environ.get("TAC_API_KEY")
+        os.environ["TAC_API_KEY"] = "finta-per-il-test"
+        self.chiamate = {"n": 0}
+
+        def finto(tac):
+            self.chiamate["n"] += 1
+            return ("ZTE", "Blade A75 5G")
+
+        imeicheck.cerca_tac_online = finto
+        # La risposta comprata viene messa da parte per non ricomprarla:
+        # senza questa pulizia il secondo test troverebbe l'acquisto del
+        # primo e non chiamerebbe nessuno.
+        self.addCleanup(self._rimetti_a_posto)
+
+    def _rimetti_a_posto(self):
+        import os
+
+        from core import imeicheck, storage
+
+        imeicheck.cerca_tac_online = self._online
+        if self._chiave is None:
+            os.environ.pop("TAC_API_KEY", None)
+        else:
+            os.environ["TAC_API_KEY"] = self._chiave
+        storage.set_meta("tac_esterni", "{}")
+        imeicheck.reset_cache()
+
+    #: Un TAC che nessun database locale conosce.
+    IMEI = "998877660000000"
+
+    def test_il_primo_caricamento_non_paga_e_lo_dichiara(self):
+        pagina = self.client.get("/", params={"q": self.IMEI})
+        self.assertEqual(pagina.status_code, 200)
+        self.assertEqual(self.chiamate["n"], 0,
+                         "il primo tempo ha interrogato il servizio esterno")
+        # `data-ricarica="1"` è il segnale preciso: il template lo scrive
+        # solo quando `imei.cerco_fuori` è vero, cioè quando il secondo
+        # tempo uscirà davvero. La sola classe `firmware-in-arrivo`
+        # comparirebbe anche nel foglio di stile e nello script.
+        self.assertIn('data-ricarica="1"', pagina.text,
+                      "la pagina non ha chiesto il secondo tempo: "
+                      "il servizio esterno non verrebbe mai interrogato")
+
+    def test_il_secondo_caricamento_interroga_e_mostra_la_risposta(self):
+        self.client.get("/", params={"q": self.IMEI})
+        pagina = self.client.get("/", params={"q": self.IMEI, "completo": 1})
+        self.assertEqual(pagina.status_code, 200)
+        self.assertEqual(self.chiamate["n"], 1,
+                         "il secondo tempo non ha interrogato HiCellTek")
+        self.assertIn("Blade A75", pagina.text,
+                      "la risposta comprata non è arrivata sulla pagina")
+
+    def test_senza_chiave_non_si_promette_un_secondo_tempo(self):
+        """Un avviso per un'attesa che non ci sarà è una bugia."""
+        import os
+
+        os.environ.pop("TAC_API_KEY", None)
+        pagina = self.client.get("/", params={"q": self.IMEI})
+        self.assertEqual(self.chiamate["n"], 0)
+        self.assertNotIn('data-ricarica="1"', pagina.text)
+
+
 class TestSchedaDispositivo(_Sito):
     def _chiave(self) -> str:
         from core import storage
