@@ -69,9 +69,16 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core import imeicheck, modelcodes, sources  # noqa: E402
+from core import config as C, imeicheck, modelcodes, sources  # noqa: E402
+from core import specs, storage  # noqa: E402
 
 FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+
+# L'archivio vero, fotografato prima che qualunque test lo sposti: il
+# conftest viene importato per primo, quindi qui `C.DB_PATH` è ancora
+# quello che l'applicazione userebbe davvero.
+_DB_ORIGINALE = C.DB_PATH
+_ENV_ORIGINALE = {nome: os.environ.get(nome) for nome in ("TRACKER_DB", "DB_PATH")}
 CON_RETE = os.environ.get("TEST_CON_RETE") == "1"
 
 # Chi il blocco ha visto passare, per il riepilogo di fine sessione. Non è
@@ -189,6 +196,52 @@ if not CON_RETE:
     modelcodes._download = _download_codici
     imeicheck._download = _download_tac
     imeicheck._scarica_url = lambda url, minimo=10_000: None
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _archivio_al_suo_posto():
+    """Un file di test che si prende un archivio suo lo riporta indietro.
+
+    Parecchi `setUp` puntano `C.DB_PATH` su un database temporaneo e lo
+    cancellano alla fine, ma nessuno rimette a posto il valore — misurato:
+    dopo `tests/test_account.py` la variabile resta su
+    `…/account-xxxx/test.db`, un file che non esiste più. Da lì in avanti
+    i file successivi si ritrovano un archivio NUOVO E VUOTO senza
+    accorgersene.
+
+    Non è pulizia formale. In quell'archivio ci stanno le copie locali di
+    quello che l'applicazione scarica una volta sola — il catalogo delle
+    schede tecniche, i due CSV dei codici. E `core/specs.py` ricorda anche
+    l'esito NEGATIVO: caricato contro un archivio vuoto, `_schede` diventa
+    `[]`, che non è `None`, quindi non riprova più. Da quel momento
+    nessuna scheda tecnica si trova per il resto della sessione.
+
+    Con la rete accesa la cosa si ricuciva da sé, riscaricando. È da quando
+    la suite non dipende più dalle fonti che diventerebbe un fallimento
+    vero — e sarebbe di quelli che mandano a cercare il difetto dove non
+    è, perché il test che cade non è quello che ha sporcato. Oggi la suite
+    è verde lo stesso: questa è la trappola disinnescata prima che scatti,
+    non una correzione di un rosso.
+
+    È A FINE FILE, NON A FINE TEST, di proposito. Parecchie classi si
+    creano l'archivio una volta in `setUpClass` e ci contano per tutti i
+    loro test (`tests/test_account.py`): rimetterlo a posto dopo ognuno
+    glielo toglierebbe di sotto a metà classe. Il file è il confine
+    giusto, perché è esattamente quello che la contaminazione attraversa.
+    """
+    yield
+    if C.DB_PATH == _DB_ORIGINALE:
+        return
+    C.DB_PATH = _DB_ORIGINALE
+    for nome, valore in _ENV_ORIGINALE.items():
+        if valore is None:
+            os.environ.pop(nome, None)
+        else:
+            os.environ[nome] = valore
+    storage.reset_state()
+    # ...e con l'archivio va buttato quello che è stato costruito leggendolo.
+    specs.reset_cache()
+    modelcodes.reset_cache()
 
 
 @pytest.fixture(autouse=True)

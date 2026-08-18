@@ -1,0 +1,456 @@
+# Le interrogazioni che la suite di test rivolge a `core/modelcodes.py`.
+#
+# NON è scritto a mano ed è meglio non ritoccarlo a mano: è ciò che i test
+# hanno davvero chiesto, raccolto avvolgendo le funzioni di interrogazione
+# del modulo (`resolve`, `codes_for_name`, `marca_dichiarata`,
+# `nome_canonico`) e facendo girare `pytest tests/` con la rete attiva.
+# `scripts/registra_fixture_cataloghi.py` lo legge per sapere quali righe dei
+# due dataset veri registrare in `codici_mobilemodels.csv` e
+# `codici_google_play.csv`; il suo docstring spiega come rigenerarlo.
+#
+# Ci sono dentro anche molte domande inventate dai test — «ZZ9999»,
+# «Modello Inesistente XYZ» — e ci restano di proposito: il registratore
+# le cerca nei dataset veri, non le trova, e nessuna riga inventata entra
+# nelle fixture. Toglierle a mano renderebbe l'elenco una scelta di
+# qualcuno invece della misura di cosa la suite chiede.
+#
+# Una domanda per riga: un codice modello oppure un nome commerciale.
+
+# ---- codici modello ----
+2201123C
+2201123G
+22101316UG
+23127PN0CC
+23127PN0CG
+23129RAA4G
+2312DRA50C
+25028PC03Y
+25028pc03y
+25028RN03A
+25028RN03G
+25028RN03I
+25028RN03L
+25028RN03Y
+25057PC09I
+25057RA09C
+25057RN09E
+25057RN09G
+25057RN09I
+25057RN09R
+25128RN17Y
+7
+9
+A235
+A2785
+A325
+A325F
+ABR-LX1
+ASUS_A001
+ASUS_I001DA
+ASUS_I001DB
+ASUS_L001
+AWM999
+BARPHONE
+BMOBILE_AX921
+BRP-NX1M
+C60
+C61
+c61
+C63
+c63
+C65S
+C65s
+C9
+CLT-L04
+codice-che-non-esiste
+codice-che-non-esiste-xyz
+CPH2197
+CPH2219
+CPH2223
+CPH2365
+CPH2411
+CPH2423
+CPH2581
+CPH2625
+CPH2637
+CPH2695
+CPH2737
+CPH2781
+CPH2785
+CPH2819
+cph2819
+CPH9999
+CUPID
+FINDX2
+FOOPHONE
+G020E
+GALAXYS24ULTRA
+GT-I9000
+HLTE124E
+HOUJI
+INT999G
+K165
+LAMUL
+LA_TAB_124_HD
+LA_TAB_124_HD_PLUS
+LG-X165G
+M12_4G
+M1910F4G
+M1910F4S
+M928Q
+MARCAINESISTENTE999
+MKDA
+MODELLODELTUTTOSCONOSCIUTO9999
+MODELLODIPROVA
+MODELLOINESISTENTEXYZ
+MODELLOLENTODIPROVA
+NARZON63
+OnePlus10R
+OnePlus12
+OP4F11L1
+OP5566L1
+OPPORENO14
+P3
+P999
+PCET00
+PJD110
+PJZ110
+PLT9999G
+PMT3997_W_D_RU
+PMT3997_W_RU
+QK001
+RE6024L1
+RE6054
+RE608EL1
+RMX3834
+RMX3871
+RMX3930
+RMX3933
+RMX3939
+rmx3939
+RMX3997
+RMX5070
+RMX5075
+RMX5079
+RMX5313
+RMX9999
+Samsung
+SCH-W999
+SGH-N075T
+SM-A057F
+SM-A057G
+SM-A057M
+SM-A075F
+SM-A075F/DS
+SM-A075M
+SM-A165F
+SM-A165M
+SM-A165N
+SM-A235
+SM-A235F
+SM-A325
+SM-A325F
+SM-A325M
+SM-A325N
+SM-A326B
+SM-A546B
+SM-A546E
+SM-A546U
+SM-A546V
+SM-A546W
+SM-A9000
+SM-C9000
+SM-E075F
+SM-F9000
+SM-M075F
+SM-S124DL
+SM-S546VL
+SM-S921B
+SM-S921N
+SM-S921Q
+SM-S921U
+SM-S921W
+SM-S928B
+SM-S928N
+SM-S928Q
+SM-S928U
+SM-S928W
+SM-S938B
+SM-S948B
+SM-Z999X
+SM-ZZ999X
+SMA075F
+TELEFONOIGNOTO7
+TELEFONOIGNOTO9
+TELEFONOQUALSIASI
+TMRV075G
+TUCANA
+TZ165
+V2283A
+WIKOVIEW5
+X300ULTRA
+Xiaomi14
+XT2323-1
+XT2341-3
+XT2347-1
+XT2523-3
+XT2553-1
+XYZ9000
+xyz999
+XYZ9999
+Z999
+ZZ-INESISTENTE
+ZZ4001
+ZZ4002
+ZZ4003
+ZZ4004
+ZZ4321
+ZZ5431
+ZZ5432
+ZZ5555
+ZZ6001
+ZZ6666
+ZZ7001
+ZZ7777
+ZZ8888
+ZZ9999
+ZZFAKE001
+ZZNONESISTE999
+ZZNUM1
+ZZNUM2
+ZZNUM3
+ZZOVR1
+ZZOVR2
+ZZTEST1
+ZZTEST2
+ZZZ9999
+
+# ---- nomi commerciali ----
+14 5G
+23129RAA 4G
+Aiwa AWM999
+Apple iPhone 16e
+Asus Zenfone 3 Ultra
+Asus ZenFone 3 Ultra (ZU680KL)
+Asus ZenFone Go (ZB690KG)
+Asus Zenfone Go 6.9
+Avaya Vantage
+BAR PHONE
+bar phone
+BMobile AX921
+c 63
+C65 5G
+CPH 2219
+CPH 2423
+CPH 2737
+CPH 2819
+cph 2819
+CPH 9999
+FIND X2
+Find X2
+find x2
+FOO PHONE
+foo phone
+Galaxy A02s
+Galaxy A05s
+Galaxy A07
+Galaxy A16
+Galaxy A23
+Galaxy A32
+Galaxy A32 5G
+Galaxy A54 5G
+Galaxy A55
+Galaxy A9 (2016)
+Galaxy C61
+Galaxy C63
+Galaxy C65S
+Galaxy C9 Pro
+Galaxy F07
+Galaxy Fold
+Galaxy M07
+Galaxy M15
+Galaxy S
+Galaxy S24
+Galaxy S24 5G
+GALAXY S24 ULTRA
+Galaxy S24 Ultra
+galaxy s24 ultra
+Galaxy S25 Ultra
+Hisense U54
+HONOR Magic7 Lite
+HONOR X8c
+Honor X8c
+honor x8c
+INTOUCH Smartboard
+iPhone Inesistente 99 Pro
+iPhone Inesistente99 Pro
+iPhone SE (3rd generation)
+iPhone SE (第 3 代)
+IPHONE16,1
+iPhone17,5
+Irbis TZ165
+LGE LG Bello II
+LGE LG Max
+LGE Optimus 2X
+Logicom La tab 124
+Logicom La_Tab_124_HD_Plus_EEA
+MARCA INESISTENTE 999
+Marca Inesistente 999
+MARCA INESISTENTE999
+Marca Inesistente999
+MEIZU 16T
+Mi Note 10
+MODELLO DEL TUTTO SCONOSCIUTO 9999
+Modello Del Tutto Sconosciuto 9999
+MODELLO DI PROVA
+Modello Di Prova
+MODELLO INESISTENTE XYZ
+Modello Inesistente XYZ
+MODELLO LENTO DI PROVA
+Modello Lento Di Prova
+Moto G05
+moto g14
+Motorola Razr 40
+motorola razr 60
+Multilaser M12_4G
+NARZO N63
+Nokia 3310
+Note 50
+Note Test
+OnePlus 10R
+OnePlus 10R 5G
+OnePlus 12
+OnePlus 13
+OPPO A5 Pro
+Oppo A5 Pro 5G
+OPPO A57s
+OPPO A6
+Oppo A6 5G
+OPPO A6x
+oppo a6x
+OPPO A74
+Oppo A74
+OPPO A96
+OPPO A9x
+Oppo CPH2219
+Oppo CPH2223
+Oppo CPH2365
+OPPO F19
+OPPO F27
+OPPO RENO 14
+OPPO Reno 14
+oppo reno 14
+OPPO Reno12 F
+Oppo Reno12 F 5G
+Oppo Reno12 F/FS 5G
+OPPO Reno12 FS
+OPPO RENO14
+OPPO Reno14
+Oppo Reno14
+oppo reno14
+Oppo ZZTEST2
+OS M50
+OS T20 Pro
+POCO C71
+POCO M7 Plus 5G
+Prestigio PMT3997_W_D_RU
+Prestigio SmartKids
+Proscan PLT9999G
+RE 608EL 1
+realme 14
+realme 14 5G
+realme c 61
+realme c 63
+realme C61
+realme C63
+realme c63
+realme Inesistente 99
+realme Inesistente99
+realme Nazro 63
+realme Note 50
+realme note 50
+realme Note 60
+realme P3 5G
+realme RMX3834
+realme RMX3933
+realme RMX3939
+realme14 5G
+Redmi 12 India
+REDMI 15 5G
+Redmi 15 5G
+REDMI A5
+Redmi A5
+REDMI A7 Pro
+Redmi C61
+Redmi C63
+Redmi C65S
+Redmi Note 13
+REDMI Note 15R
+Redmi Note13
+Redmi12 India
+reno 14
+RMX 3930
+RMX 3939
+rmx 3939
+RMX 5070
+ROG Phone II
+ROG 游戏手机 2
+Samsung Galaxy A02s
+Samsung Galaxy A05s
+Samsung Galaxy A07
+Samsung Galaxy A07 4G
+Samsung Galaxy A16
+Samsung Galaxy A54 5G
+Samsung Galaxy A55
+Samsung Galaxy A9(2016)
+Samsung Galaxy C9 Pro
+Samsung Galaxy F07
+Samsung Galaxy Fold
+Samsung Galaxy J
+Samsung Galaxy M07
+Samsung Galaxy S
+Samsung Galaxy S24
+Samsung Galaxy S24 Ultra
+samsung Galaxy S24 Ultra
+Samsung Galaxy-A9(2016)
+T-Mobile REVVL 7
+TELEFONO IGNOTO 7
+Telefono Ignoto 7
+TELEFONO IGNOTO 9
+Telefono Ignoto 9
+telefono inesistente 99
+Telefono Inesistente 999
+Telefono Inesistente999
+TELEFONO QUALSIASI
+Test Beta
+TestBrand Test Phone X9
+vivo X300 Ultra
+WIKO VIEW 5
+wiko view 5
+WIKO VIEW5
+wiko view5
+X300 ULTRA
+X300 Ultra
+x300 ultra
+Xiaomi 12
+Xiaomi 12T Pro
+Xiaomi 14
+Xiaomi Note 12 Pro 4G
+XYZ 9999
+ZTE 9000N
+ZTE Axon 11 SE 5G
+ZTE Z999
+ZZ Alternativo Lungo
+ZZ Corto
+一加 10R
+三星 GALAXY S24
+三星 Galaxy S24
+三星 W999
+三星GALAXYS24
+中兴 Blade V2020
+中兴天机 Axon 11 SE 5G
+中兴天机 Axon M
+小米 Note 10
+真我 14
+真我14
+魅族 16T
