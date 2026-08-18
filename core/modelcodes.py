@@ -429,10 +429,25 @@ def resolve(code: str) -> list[str]:
     database si sono anche solo caricati.
     """
     global _memory_cache
-    if _memory_cache is None:
-        _memory_cache = _build_index()
+    # L'INDICE SI LEGGE UNA VOLTA SOLA, IN UNA LOCALE.
+    #
+    # `if _memory_cache is None: ...` seguito da `_memory_cache.get(...)`
+    # lascia in mezzo una finestra: un altro thread può azzerare la cache
+    # fra il controllo e l'uso, e la riga dopo trova `None`. Non è teoria
+    # — un ciclo di sforzo con thread paralleli l'ha fatto scattare:
+    # «AttributeError: 'NoneType' object has no attribute 'get'», cioè un
+    # 500 sulla pagina di chi stava cercando.
+    #
+    # Il rimedio non è un lucchetto: costruire l'indice due volte non fa
+    # danno (si perde lavoro, non correttezza), mentre serializzare ogni
+    # lettura di un indice usato da tutta l'applicazione sì. Basta legare
+    # il dizionario a un nome LOCALE: da lì in poi nessuno può togliercelo
+    # di sotto.
+    indice = _memory_cache
+    if indice is None:
+        indice = _memory_cache = _build_index()
     codice = (code or "").strip().upper()
-    nomi = _memory_cache.get(codice, [])
+    nomi = indice.get(codice, [])
     # QUI NON SI NORMALIZZANO GLI SPAZI, DI PROPOSITO.
     #
     # Ci avevo messo un ripiego che risolveva anche «rmx 3939», e sembrava
@@ -807,11 +822,12 @@ def codici_con_le_stesse_cifre(testo: str, limite: int = 5) -> list[str]:
     if len(cifre) < 3:
         # Meno di tre cifre combaciano per caso con mezzo catalogo.
         return []
-    if _memory_cache is None:
-        _memory_cache = _build_index()
+    indice = _memory_cache
+    if indice is None:
+        indice = _memory_cache = _build_index()
     if _per_cifre is None:
         mappa: dict[str, list[str]] = {}
-        for codice in _memory_cache:
+        for codice in indice:
             solo_cifre = re.sub(r"[^0-9]", "", codice)
             if len(solo_cifre) >= 3:
                 mappa.setdefault(solo_cifre, []).append(codice)
@@ -836,12 +852,13 @@ def codici_per_prefisso(prefisso: str, limite: int = 12) -> list[str]:
     invece di migliorare.
     """
     global _memory_cache
-    if _memory_cache is None:
-        _memory_cache = _build_index()
+    indice = _memory_cache
+    if indice is None:
+        indice = _memory_cache = _build_index()
     chiave = (prefisso or "").strip().upper()
     if not _RE_PREFISSO_UTILE.match(chiave):
         return []
-    trovati = sorted(k for k in _memory_cache if k.startswith(chiave) and k != chiave)
+    trovati = sorted(k for k in indice if k.startswith(chiave) and k != chiave)
     return trovati[:limite]
 
 
@@ -929,8 +946,11 @@ def _prima_la_marca_giusta(nome_cercato: str, codici: list[str]) -> list[str]:
     if not marca or not codici:
         return codici
     combacia, resto = [], []
+    # Stessa cautela del resto del modulo: il globale si lega a una locale,
+    # così fra il controllo e la lettura nessuno può azzerarlo.
+    indice = _memory_cache or {}
     for codice in codici:
-        nomi = " ".join(_memory_cache.get(codice, [])).lower() if _memory_cache else ""
+        nomi = " ".join(indice.get(codice, [])).lower()
         (combacia if marca in nomi else resto).append(codice)
     return combacia + resto if combacia else codici
 
@@ -946,13 +966,14 @@ def codes_for_name(name: str) -> list[str]:
     una tabella scritta a mano.
     """
     global _reverse_cache, _reverse_senza_suffisso, _reverse_compatto, _memory_cache
-    if _memory_cache is None:
-        _memory_cache = _build_index()
+    indice = _memory_cache
+    if indice is None:
+        indice = _memory_cache = _build_index()
     if _reverse_cache is None:
         reverse: dict[str, list[str]] = {}
         senza: dict[str, list[str]] = {}
         compatto: dict[str, list[str]] = {}
-        for code, names in _memory_cache.items():
+        for code, names in indice.items():
             for candidate in names:
                 key = _normalize_name(candidate)
                 if not key:
@@ -974,8 +995,15 @@ def codes_for_name(name: str) -> list[str]:
         _reverse_senza_suffisso = senza
         _reverse_compatto = compatto
 
+    # I TRE INDICI INVERSI SI LEGGONO IN LOCALI, come l'indice diretto:
+    # da qui in giù se ne usano cinque volte, e ognuna era una finestra in
+    # cui un azzeramento poteva lasciare `None` sotto un `.get`.
+    diretto = _reverse_cache or {}
+    compatti = _reverse_compatto or {}
+    ridotti = _reverse_senza_suffisso or {}
+
     chiave = _normalize_name(name)
-    trovati = _reverse_cache.get(chiave)
+    trovati = diretto.get(chiave)
     if trovati:
         return _prima_la_marca_giusta(name, trovati)
 
@@ -994,7 +1022,7 @@ def codes_for_name(name: str) -> list[str]:
     # che oggi funziona cambia comportamento.
     stretta = _compatta(chiave)
     if stretta:
-        trovati = (_reverse_compatto or {}).get(stretta)
+        trovati = compatti.get(stretta)
         if trovati:
             return _prima_la_marca_giusta(name, trovati)
     # RIPIEGO SUI SUFFISSI COMMERCIALI. Il catalogo scrive «Galaxy A55 5G»,
@@ -1008,14 +1036,14 @@ def codes_for_name(name: str) -> list[str]:
     # produrrebbe il codice sbagliato, che è molto peggio di nessun codice.
     ridotta = _senza_suffissi(chiave)
     if ridotta and ridotta != chiave:
-        trovati = _reverse_cache.get(ridotta)
+        trovati = diretto.get(ridotta)
         if trovati:
             return _prima_la_marca_giusta(name, trovati)
-        trovati = (_reverse_compatto or {}).get(_compatta(ridotta))
+        trovati = compatti.get(_compatta(ridotta))
         if trovati:
             return _prima_la_marca_giusta(name, trovati)
     return _prima_la_marca_giusta(
-        name, (_reverse_senza_suffisso or {}).get(ridotta or chiave, []))
+        name, ridotti.get(ridotta or chiave, []))
 
 
 def _compatta(chiave: str) -> str:

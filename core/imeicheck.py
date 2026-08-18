@@ -954,7 +954,17 @@ def _voci_per_tac(tac: str) -> list[tuple[str, str, str]]:
             )
             return _ordina_per_affidabilita(locali)
         _memory_index = _build_index()
-    return list(_memory_index.get(tac) or [])
+    # L'INDICE SI LEGGE UNA VOLTA SOLA, IN UNA LOCALE. Fra il controllo
+    # `is None` qui sopra e la lettura qui sotto c'era una finestra, e
+    # questa cache viene azzerata DA PRODUZIONE: `aggiungi_tac` e
+    # `rimuovi_tac` chiamano `reset_cache()`, cioè la rotta `/tac/salva`.
+    # Bastava che qualcuno salvasse un TAC dalla pagina mentre un altro
+    # cercava un IMEI perché la seconda richiesta trovasse `None` e
+    # rispondesse 500. Lo stesso schema è stato corretto in
+    # `core/modelcodes.py`, dove un ciclo di sforzo con thread paralleli
+    # l'ha fatto scattare davvero.
+    indice = _memory_index
+    return list((indice or {}).get(tac) or [])
 
 
 def identify(imei: str, solo_locale: bool = False) -> tuple[str, str] | None:
