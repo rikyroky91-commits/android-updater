@@ -437,6 +437,98 @@ class TestNotaCoperturaConChipTrovato(unittest.TestCase):
                          pagina)
 
 
+class TestSiVedeDaFuoriSeIlServizioEsternoEAttivo(unittest.TestCase):
+    """Una configurazione che si verifica solo dall'interno non si verifica.
+
+    Sapere se `TAC_API_KEY` è stata letta richiedeva di entrare in
+    Diagnostica col login. Ma un errore di configurazione lì non si
+    manifesta subito: il servizio esterno si interroga SOLO per i TAC che
+    nessun database locale conosce, quindi possono passare settimane, e
+    quando il buco si vede sembra una lacuna dei dati, non una chiave
+    mancante.
+
+    Peggio: la pagina di un IMEI sconosciuto era IDENTICA nei due casi
+    opposti — servizio spento, e servizio acceso che risponde «non lo
+    conosco». Il primo si risolve mettendo una chiave, il secondo no, e
+    non c'era modo di distinguerli guardando il sito.
+
+    Due strade, nessuna delle quali mostra la chiave: un SÌ/NO su
+    `/health`, che è pubblica e non tocca l'archivio, e una riga sulla
+    pagina quando il TAC resta sconosciuto.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        _prepara()
+        from fastapi.testclient import TestClient
+
+        from web.main import app
+
+        cls.client = TestClient(app)
+
+    def setUp(self):
+        import os
+
+        from core import imeicheck
+        from web.main import RICERCHE
+
+        RICERCHE.svuota()
+        self._chiave = os.environ.get("TAC_API_KEY")
+        self.addCleanup(self._rimetti)
+        imeicheck.reset_cache()
+
+    def _rimetti(self):
+        import os
+
+        from core import imeicheck
+
+        if self._chiave is None:
+            os.environ.pop("TAC_API_KEY", None)
+        else:
+            os.environ["TAC_API_KEY"] = self._chiave
+        imeicheck.reset_cache()
+
+    IMEI_IGNOTO = "998877660000006"
+
+    def test_health_dichiara_il_servizio_senza_mostrare_la_chiave(self):
+        import os
+
+        os.environ["TAC_API_KEY"] = "una-chiave-che-non-deve-comparire"
+        dati = self.client.get("/health").json()
+        self.assertEqual(dati.get("tac_esterno"), "configurato")
+        self.assertNotIn("una-chiave-che-non-deve-comparire",
+                         self.client.get("/health").text,
+                         "la chiave è finita nella risposta pubblica")
+
+        os.environ.pop("TAC_API_KEY", None)
+        self.assertEqual(self.client.get("/health").json().get("tac_esterno"),
+                         "non configurato")
+
+    def test_health_resta_leggera_e_compatibile(self):
+        """La usa il servizio che tiene sveglio l'host: il campo nuovo si
+        aggiunge, non sostituisce niente, e la rotta non tocca l'archivio."""
+        dati = self.client.get("/health").json()
+        self.assertTrue(dati.get("ok"))
+        self.assertIn("app", dati)
+        self.assertEqual(self.client.head("/health").status_code, 200)
+
+    def test_la_pagina_dice_che_il_servizio_e_spento(self):
+        import os
+
+        os.environ.pop("TAC_API_KEY", None)
+        pagina = self.client.get("/", params={"q": self.IMEI_IGNOTO}).text
+        self.assertIn("TAC_API_KEY", pagina,
+                      "la pagina non distingue «spento» da «non lo conosce»")
+
+    def test_col_servizio_acceso_non_si_avvisa_di_niente(self):
+        import os
+
+        os.environ["TAC_API_KEY"] = "finta-per-il-test"
+        pagina = self.client.get("/", params={"q": self.IMEI_IGNOTO}).text
+        self.assertNotIn("TAC_API_KEY", pagina,
+                         "avvisato di una configurazione che c'è già")
+
+
 class TestIlServizioEsternoVieneInterrogatoDavvero(unittest.TestCase):
     """Un IMEI che i database locali non conoscono deve finire a HiCellTek.
 

@@ -1232,7 +1232,17 @@ def health():
     all'infinito, e ogni riavvio è un avvio a freddo da mezzo minuto.
     Da fuori non si vede nessun errore: si vede un sito lento.
     """
-    return {"ok": True, "app": C.APP_TITLE}
+    # IL SERVIZIO TAC ESTERNO, DICHIARATO QUI E NON SOLO IN DIAGNOSTICA.
+    #
+    # Sapere se la chiave è stata letta richiedeva di entrare col login, e
+    # una configurazione che si può verificare solo dall'interno è una
+    # configurazione che nessuno verifica: il difetto si manifesta molto
+    # dopo, come un buco nei dati, e non sembra affatto una chiave
+    # mancante. Qui c'è il solo SÌ/NO — mai la chiave, mai un pezzo di
+    # chiave — e non costa niente, perché è una variabile d'ambiente:
+    # questa rotta resta leggerissima come deve, senza toccare l'archivio.
+    return {"ok": True, "app": C.APP_TITLE,
+            "tac_esterno": "configurato" if imeicheck._chiave_api() else "non configurato"}
 
 
 # ======================================================================
@@ -1313,6 +1323,16 @@ def _esito_imei(imei: str, solo_locale: bool = False) -> dict:
         "discordi": bool(raffronto.get("discordi")),
         "stato_database": imeicheck.status(),
         "cerco_fuori": cerco_fuori,
+        # SE IL SERVIZIO ESTERNO NON È ATTIVO, VA DETTO DOVE SI VEDE.
+        #
+        # Un TAC che nessun database locale conosce viene chiesto fuori, ma
+        # solo se una chiave è configurata. Quando non lo è, la pagina
+        # diceva soltanto «modello sconosciuto»: identico a quello che
+        # direbbe con il servizio acceso e la risposta negativa. Due
+        # situazioni opposte — una si risolve mettendo una chiave, l'altra
+        # no — raccontate con la stessa frase, e chi gestisce il sito non
+        # aveva modo di distinguerle senza entrare in Diagnostica.
+        "servizio_esterno_attivo": bool(imeicheck._chiave_api()),
         "siti": list(imeicheck.link_verifica(imei)),
     }
 

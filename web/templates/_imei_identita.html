@@ -20,6 +20,20 @@
 {% else %}
 <p class="etichetta-imei etichetta-imei-incerta">IMEI a 15 cifre, modello sconosciuto
   · TAC <code>{{ imei.tac }}</code></p>
+{# DUE SILENZI DIVERSI NON DEVONO SUONARE UGUALI. Un TAC che i database
+   locali non hanno viene chiesto a un servizio esterno, ma solo se una
+   chiave è configurata. Senza questa riga la pagina era IDENTICA nei due
+   casi opposti — servizio spento, e servizio acceso che risponde «non lo
+   conosco» — e il primo si risolve mettendo una chiave, il secondo no.
+   Chi amministra il sito non aveva modo di distinguerli senza entrare in
+   Diagnostica col login, e un errore di configurazione lì non si vede
+   subito: si manifesta settimane dopo, e sembra un buco dei dati. #}
+{% if imei.servizio_esterno_attivo is defined and not imei.servizio_esterno_attivo %}
+<p class="nota lacuna">Su questo sito il riconoscimento tramite servizio
+  esterno non è attivo: i TAC che i database locali non hanno restano
+  sconosciuti. Chi amministra il sito può attivarlo indicando una chiave in
+  <code>TAC_API_KEY</code>.</p>
+{% endif %}
 {% endif %}
 
 {% if imei.luhn_valid is defined and not imei.luhn_valid %}
