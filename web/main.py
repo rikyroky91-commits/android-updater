@@ -1658,13 +1658,32 @@ def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
     # deve poter correggere la grafia del TAC — sono vincoli opposti che
     # solo una seconda lettura concilia.
     #
-    # Se per il nome giusto non esiste scheda, la pagina resta senza:
-    # dichiarare una lacuna e' il modo di questo progetto: una scheda
-    # sbagliata non si nota, una assente si'.
+    # E SE PER IL NOME GIUSTO NON C'E' SCHEDA, NON SI RESTA A MANI VUOTE.
+    # Si tiene quella che c'era e le si mette accanto l'avvertenza: sono
+    # le specifiche della variante che il TAC ha nominato, e le varianti
+    # di mercati diversi possono montare hardware diverso. Chiesto
+    # dall'utente il 18/08/2026, e ha ragione: chi ha il telefono in mano
+    # vuole un numero da confrontare con la scatola, e un dato dichiarato
+    # incerto e' utile, mentre un riquadro vuoto non serve a nessuno. La
+    # regola del progetto — non riempire le lacune in silenzio — resta
+    # intatta, perche' qui la lacuna viene DETTA.
     if _semplifica_nome(modello) != _semplifica_nome(nome_della_scheda):
-        ancorato["scheda"] = P.scheda_tecnica(
+        rifatta = P.scheda_tecnica(
             modello, codice=codice or identita,
             brand=marca or marca_della_scheda)
+        if rifatta.get("trovata") or not ancorato["scheda"].get("trovata"):
+            ancorato["scheda"] = rifatta
+        else:
+            ancorato["scheda"] = dict(ancorato["scheda"])
+            ancorato["scheda"]["nota_mercato"] = (
+                f"Attenzione: queste specifiche sono quelle di "
+                f"«{nome_della_scheda}», il nome con cui i database TAC "
+                f"conoscono questo codice. Per «{modello}» il catalogo "
+                f"tecnico non ha una scheda propria. Lo stesso codice viene "
+                f"venduto in mercati diversi con nomi diversi, e le varianti "
+                f"possono montare memoria, processore o batteria differenti: "
+                f"potrebbe non essere il modello europeo. Verifica sulla "
+                f"scatola o in Impostazioni prima di darle per certe.")
 
     ancorato["query"] = identita
     ancorato["nome"] = _modello_con_marca(marca, modello, codice) or modello

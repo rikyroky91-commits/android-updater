@@ -1862,6 +1862,94 @@ class TestLaSchedaEQuellaDelNomeCheSiMostra(unittest.TestCase):
                          f"scheda cercata più volte senza motivo: {self.chieste}")
 
 
+class TestUnRisultatoCeSempre(unittest.TestCase):
+    """Se la scheda del nome europeo non esiste, non si resta a mani vuote.
+
+    Chiesto dall'utente il 18/08/2026, subito dopo la correzione che fa
+    seguire la scheda al nome mostrato: «un risultato lo voglio sempre;
+    se non trovi il modello europeo evidenzia che il risultato potrebbe
+    essere un dispositivo non europeo».
+
+    Ha ragione, e non contraddice la regola per cui le lacune si
+    dichiarano invece di riempirle: qui la lacuna VIENE DETTA, accanto ai
+    numeri. Chi ha il telefono in mano vuole una cifra da confrontare con
+    la scatola, e un dato dichiarato incerto è utile; un riquadro vuoto
+    non serve a nessuno.
+
+    Il confine è questo: si tiene la scheda della variante SOLO quando
+    per il nome mostrato non ce n'è una. Se c'è, vince quella e
+    l'avvertenza non compare — altrimenti si avviserebbe di un rischio
+    che non si sta correndo, e un avviso che compare sempre smette di
+    essere letto.
+    """
+
+    def _pagina(self, schede: dict):
+        """`schede`: nome chiesto -> se il catalogo risponde o no."""
+        from web import main as M
+
+        chieste = []
+
+        def finta(nome, codice="", brand="", device=None):
+            chieste.append(nome)
+            trovata = schede.get(nome, False)
+            return {"trovata": trovata, "titolo": nome if trovata else nome,
+                    "marca": "", "chip": "Chip Di Prova" if trovata else None}
+
+        vera = M.P.scheda_tecnica
+        M.P.scheda_tecnica = finta
+        try:
+            imei = {"riconosciuto": True, "marca": "REALME",
+                    "codice": "RMX3997", "modello": "Realme C65 5G",
+                    "modello_cercato": "RMX3997"}
+            base = {"query": "RMX3997", "trovato": False, "nome": "RMX3997",
+                    "codice": "RMX3997", "riga": "", "fonte": "",
+                    "senza_firmware": True, "scheda": {"trovata": False},
+                    "notizie": [], "quante_notizie": 0, "forse": [],
+                    "gemelli": [], "storico": [], "chiave": "",
+                    "nota_fonte": None, "errore": None}
+            return M._ancora_esito_imei(base, imei), chieste
+        finally:
+            M.P.scheda_tecnica = vera
+
+    def test_senza_scheda_europea_si_tiene_quella_del_tac_e_si_avvisa(self):
+        from core import modelcodes
+
+        if not modelcodes.resolve("RMX3997"):
+            self.skipTest("catalogo dei codici non disponibile qui")
+        # Il catalogo conosce solo il nome del TAC, non quello europeo.
+        pagina, chieste = self._pagina({"Realme C65 5G": True})
+        scheda = pagina["scheda"]
+        self.assertTrue(scheda.get("trovata"),
+                        f"la pagina è rimasta senza scheda: chieste {chieste}")
+        nota = scheda.get("nota_mercato") or ""
+        self.assertIn("Realme C65 5G", nota,
+                      "l'avvertenza non dice di quale variante sono i dati")
+        self.assertIn("potrebbe non essere il modello europeo", nota.lower(),
+                      "l'avvertenza non dice che potrebbe non essere europeo")
+        self.assertIn("12x", nota, "non dice qual era il nome cercato")
+
+    def test_con_la_scheda_europea_non_si_avvisa_di_niente(self):
+        from core import modelcodes
+
+        if not modelcodes.resolve("RMX3997"):
+            self.skipTest("catalogo dei codici non disponibile qui")
+        pagina, _chieste = self._pagina({"Realme C65 5G": True,
+                                         "realme 12x 5G": True})
+        scheda = pagina["scheda"]
+        self.assertTrue(scheda.get("trovata"))
+        self.assertIsNone(scheda.get("nota_mercato"),
+                          "avvisato di un rischio che non si stava correndo")
+
+    def test_se_non_c_e_ne_una_ne_l_altra_non_si_inventa_un_avviso(self):
+        from core import modelcodes
+
+        if not modelcodes.resolve("RMX3997"):
+            self.skipTest("catalogo dei codici non disponibile qui")
+        pagina, _chieste = self._pagina({})
+        self.assertFalse(pagina["scheda"].get("trovata"))
+        self.assertIsNone(pagina["scheda"].get("nota_mercato"))
+
+
 class TestLaFamigliaPiuNumerosaVince(unittest.TestCase):
     """Fra i nomi di un codice, quello che i cataloghi ripetono di più.
 

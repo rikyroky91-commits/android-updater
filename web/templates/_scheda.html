@@ -62,6 +62,14 @@
       {%- if scheda.patch_cadenza %} · cadenza {{ scheda.patch_cadenza }}{% endif %}</p>
     {% endif %}
 
+    {# L'AVVERTENZA STA ACCANTO AI NUMERI, non in fondo alla pagina: chi
+       legge «Dimensity 6300» deve vedere lì che quel numero riguarda una
+       variante di un altro mercato. Spostata altrove sarebbe una nota a
+       pie' di pagina che nessuno collega al dato che sta guardando. #}
+    {% if scheda.nota_mercato %}
+    <p class="nota lacuna">{{ scheda.nota_mercato }}</p>
+    {% endif %}
+
     {% if scheda.nota_copertura %}
     <p class="nota lacuna">{{ scheda.nota_copertura }}</p>
     {% endif %}
