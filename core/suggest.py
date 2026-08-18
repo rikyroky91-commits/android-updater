@@ -29,7 +29,7 @@ _CACHE_TTL_SECONDS = 300  # il catalogo cambia solo quando arrivano nuovi dati
 _cache: list[str] | None = None
 _cache_at = 0.0
 # Il catalogo con le forme già normalizzate — vedi `_catalogo_indicizzato`.
-_indice_normalizzato: list[tuple[str, str, str]] | None = None
+_indice_normalizzato: list[tuple[str, str, str, str]] | None = None
 _mappa_normalizzata: dict[str, str] | None = None
 
 
@@ -141,7 +141,7 @@ def catalog(force_refresh: bool = False) -> list[str]:
     return _cache
 
 
-def _catalogo_indicizzato() -> list[tuple[str, str, str]]:
+def _catalogo_indicizzato() -> list[tuple[str, str, str, str]]:
     """Ogni nome con la sua forma normalizzata, già pronta.
 
     ## Perché esiste
@@ -175,7 +175,8 @@ def _catalogo_indicizzato() -> list[tuple[str, str, str]]:
             # spazio, e « gal» dentro « galaxy s24» dice esattamente quello
             # che diceva `any(p.startswith("gal") for p in parole)` — ma lo
             # decide il C invece di un ciclo Python per ogni nome.
-            indice.append((nome, normalizzato, " " + normalizzato))
+            indice.append((nome, normalizzato, " " + normalizzato,
+                           normalizzato.replace(" ", "")))
         _indice_normalizzato = indice
     return indice
 
@@ -191,18 +192,46 @@ def suggest(query: str, limit: int = 8) -> list[str]:
     if len(bersaglio) < 2:
         return []
 
-    inizia, parola, contiene = [], [], []
+    inizia, parola, contiene, compatti = [], [], [], []
     a_inizio_parola = " " + bersaglio
-    for nome, normalizzato, spaziato in _catalogo_indicizzato():
+    # LO SPAZIO FRA LA GAMMA E IL NUMERO NON DISTINGUE NIENTE, e qui non
+    # veniva perdonato. Il catalogo scrive «OPPO Reno14» e «Mi 11», le
+    # persone scrivono «oppo reno 14» e «mi11»: comunque sia scritto il
+    # nome, l'altro modo non completava. Misurato: 9.620 nomi su 44.333
+    # — il 22% del catalogo — sono esposti a questa ambiguità, in una
+    # direzione o nell'altra, e fra loro ci sono Reno, Mi, Nord, Zenfone,
+    # Galaxy, Find e moto.
+    #
+    # È lo stesso ripiego che `modelcodes.codes_for_name` applica già da
+    # tempo, aggiunto proprio dopo una segnalazione su «oppo reno 14»: la
+    # RICERCA quelle forme le trovava tutte, il COMPLETAMENTO no. Le due
+    # metà dello stesso campo si comportavano al contrario, e il danno
+    # peggiore non era il suggerimento mancato: mentre si digita non
+    # compare niente, e si smette di scrivere prima di premere invio,
+    # convinti che il modello non ci sia.
+    #
+    # STA IN FONDO, DOPO GLI ALTRI TRE, ed è la ragione per cui è sicuro:
+    # attaccare le parole perde i confini fra loro, quindi è un confronto
+    # più grossolano degli altri. Finché resta l'ultimo, nessun
+    # suggerimento che oggi funziona cambia posto, e queste proposte
+    # compaiono solo dove prima non c'era nulla.
+    compattato = bersaglio.replace(" ", "")
+    for nome, normalizzato, spaziato, senza_spazi in _catalogo_indicizzato():
         if normalizzato.startswith(bersaglio):
             inizia.append(nome)
         elif a_inizio_parola in spaziato:
             parola.append(nome)
         elif bersaglio in normalizzato:
             contiene.append(nome)
+        elif compattato != bersaglio or " " in normalizzato:
+            # si prova la forma attaccata solo se cambia qualcosa: o la
+            # domanda aveva spazi, o ce li ha il nome.
+            if compattato and compattato in senza_spazi:
+                compatti.append(nome)
 
     ordina = lambda gruppo: sorted(gruppo, key=lambda n: (len(n), n))  # noqa: E731
-    risultato = ordina(inizia) + ordina(parola) + ordina(contiene)
+    risultato = (ordina(inizia) + ordina(parola) + ordina(contiene)
+                 + ordina(compatti))
     return risultato[:limit]
 
 
@@ -314,7 +343,7 @@ def _mappa_normalizzati() -> dict[str, str]:
     indice = _catalogo_indicizzato()      # può azzerare quello che deriva da lui
     mappa = _mappa_normalizzata
     if mappa is None:
-        mappa = {normalizzato: nome for nome, normalizzato, _sp in indice}
+        mappa = {normalizzato: nome for nome, normalizzato, _sp, _co in indice}
         _mappa_normalizzata = mappa
     return mappa
 

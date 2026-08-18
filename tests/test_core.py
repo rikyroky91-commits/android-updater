@@ -2589,6 +2589,41 @@ class TestIlCatalogoDeiSuggerimentiSiNormalizzaUnaVoltaSola(unittest.TestCase):
         self.assertEqual(suggest.suggest("galaxy"), [])
         self.assertIn("Pixel 9 Pro", suggest.suggest("pixel"))
 
+    def test_lo_spazio_fra_la_gamma_e_il_numero_non_nasconde_il_modello(self):
+        """Comunque il catalogo scriva un nome, l'altro modo di scriverlo
+        deve completare.
+
+        Misurato sul catalogo vero: 9.620 nomi su 44.333 — il 22% — sono
+        esposti a questa ambiguità. Il catalogo scrive «OPPO Reno14» e
+        «Mi 11», le persone scrivono «oppo reno 14» e «mi11», e prima
+        nessuna delle due forme opposte proponeva niente.
+
+        La RICERCA quelle forme le trovava già tutte (`codes_for_name` ha
+        lo stesso ripiego da tempo): erano le due metà dello stesso campo
+        a comportarsi al contrario. Il danno peggiore non è il
+        suggerimento mancato — è che mentre si digita non compare nulla,
+        e si smette di scrivere prima di premere invio, convinti che il
+        modello non ci sia."""
+        self._nomi = ["OPPO Reno14", "Mi 11", "Galaxy S24", "Zenfone 10"]
+        suggest.reset_cache()
+        self.assertIn("OPPO Reno14", suggest.suggest("reno 14"))
+        self.assertIn("OPPO Reno14", suggest.suggest("reno14"))
+        self.assertIn("Mi 11", suggest.suggest("mi11"))
+        self.assertIn("Mi 11", suggest.suggest("mi 11"))
+        self.assertIn("Galaxy S24", suggest.suggest("galaxy s 24"))
+        self.assertIn("Zenfone 10", suggest.suggest("zenfone10"))
+
+    def test_la_forma_attaccata_resta_l_ultimo_ripiego(self):
+        """È la ragione per cui il ripiego è sicuro: attaccare le parole
+        perde i confini fra loro, quindi è un confronto più grossolano
+        degli altri tre. Finché resta in fondo, nessun suggerimento che
+        già funziona cambia posto."""
+        self._nomi = ["Galaxy S24", "Nota S24 Speciale", "GalaxyS24Cover"]
+        suggest.reset_cache()
+        proposte = suggest.suggest("galaxy s24")
+        self.assertEqual(proposte[0], "Galaxy S24",
+                         f"il ripiego ha scavalcato la corrispondenza esatta: {proposte}")
+
     def test_il_catalogo_si_normalizza_una_volta_sola(self):
         """La prova che il lavoro non si rifà a ogni tasto: si conta
         quante volte viene chiamata la normalizzazione."""
