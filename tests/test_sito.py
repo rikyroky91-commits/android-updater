@@ -1365,7 +1365,8 @@ class TestCorrezioneNomeScrittaAMano(_Sito):
     """Il testo libero, ultima via d'uscita per chi non riconosce il
     proprio telefono in NESSUNA delle forme proposte — segnalato
     dall'utente, che chiedeva la stessa cosa già disponibile per un TAC
-    sconosciuto (vedi `_imei.html` e `imeicheck.aggiungi_tac`). Stesso
+    sconosciuto (vedi `_imei_confronto.html` e `imeicheck.aggiungi_tac`).
+    Stesso
     campo `nome` del menu a tendina, solo un widget diverso: il backend
     (`POST /modello/correggi`) non ha bisogno di sapere da quale dei due
     è arrivato.

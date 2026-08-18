@@ -1825,7 +1825,7 @@ anche quando «C61» è il nome vero più corto).
 ## Nome commerciale scritto a mano, quando nessuna forma proposta va bene (2026-08-12)
 
 Richiesta esplicita dell'utente: la stessa via d'uscita già disponibile
-per un TAC sconosciuto (`_imei.html`, campo di testo libero — vedi
+per un TAC sconosciuto (`_imei_confronto.html`, campo di testo libero — vedi
 `imeicheck.aggiungi_tac`) mancava per il nome di un modello. Il menu di
 correzione offriva SOLO una scelta fra forme verificate o costruite
 dalla marca nota: se nessuna di quelle corrispondeva a quello che
