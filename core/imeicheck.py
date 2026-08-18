@@ -957,8 +957,15 @@ def _voci_per_tac(tac: str) -> list[tuple[str, str, str]]:
     return list(_memory_index.get(tac) or [])
 
 
-def identify(imei: str) -> tuple[str, str] | None:
+def identify(imei: str, solo_locale: bool = False) -> tuple[str, str] | None:
     """(brand, specs) dal TAC di un IMEI, o None se non identificabile.
+
+    Con `solo_locale=True` non si esce mai in rete: si risponde con i
+    database che stanno qui. Serve alla prima risposta della pagina, che
+    deve arrivare subito — interrogare il servizio esterno lì significa
+    far aspettare senza nemmeno poter dire perché, visto che la pagina
+    non è ancora stata mandata. La chiamata esterna si fa nel secondo
+    tempo, con la sua nota a schermo.
 
     L'IMEI passato qui non viene salvato né loggato: si usano solo i primi
     8 caratteri (il TAC) per la ricerca nell'indice.
@@ -971,6 +978,12 @@ def identify(imei: str) -> tuple[str, str] | None:
     tac = tac_di(imei)
     if not tac:
         return None
+    if solo_locale:
+        voci = _voci_per_tac(tac)
+        if not voci:
+            return None
+        _fonte, marca, specs = voci[0]
+        return (marca, specs)
 
     voci = _voci_per_tac(tac)
     if voci:

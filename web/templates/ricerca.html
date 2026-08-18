@@ -64,7 +64,7 @@
      un altro telefono (l'IMEI 861206074094914 dà «Note 50», che cercato
      per nome diventa «realme C60»). Il secondo tempo deve rifare la
      STESSA domanda che ha fatto la persona. #}
-  <div class="firmware-in-arrivo" data-firmware-per="{{ risultato.domanda_originale or risultato.query }}">
+  <div class="firmware-in-arrivo" data-firmware-per="{{ risultato.domanda_originale or risultato.query }}"{% if imei and imei.cerco_fuori %} data-ricarica="1"{% endif %}>
     {# IL NOME C'È SUBITO ANCHE MENTRE SI ASPETTA. Spostando il titolo
        dentro il frammento — perché quando il primo tempo non risolve
        deve poter essere corretto dal secondo — era sparito del tutto
@@ -76,6 +76,23 @@
     {% if risultato.nome and risultato.nome != risultato.query %}
     <h2>{{ risultato.nome }}</h2>
     {% endif %}
+    {# DUE ATTESE DIVERSE, DETTE IN MODO DIVERSO. Cercare il firmware di un
+       telefono già riconosciuto è la normalità; interrogare un archivio
+       esterno perché nessun database locale conosce quel TAC è un'altra
+       cosa, dura di più, e chi guarda ha diritto di sapere PERCHÉ sta
+       aspettando invece di vedere una rotellina muta. #}
+    {% if imei and imei.cerco_fuori %}
+    <p class="riga-esito attesa">
+      <span class="rotella" aria-hidden="true"></span>
+      <span>Questo TAC non è in nessuno dei database locali: lo sto
+        chiedendo a un archivio esterno…</span>
+    </p>
+    <p class="nota attesa-nota">Ci vuole qualche secondo in più perché la
+      richiesta esce da qui. Del tuo IMEI partono solo le prime 8 cifre,
+      quelle che identificano il modello: le altre sette non escono. La
+      risposta viene poi conservata, quindi la prossima volta è
+      immediata.</p>
+    {% else %}
     <p class="riga-esito attesa">
       <span class="rotella" aria-hidden="true"></span>
       <span>Cerco il firmware più recente…</span>
@@ -83,6 +100,7 @@
     <p class="nota attesa-nota">Le fonti ufficiali e le notizie rispondono
       in qualche secondo. Il modello e la scheda tecnica qui sotto sono
       già definitivi.</p>
+    {% endif %}
     <noscript>
       <p class="nota"><a href="/?q={{ (risultato.domanda_originale or risultato.query) | urlencode }}&amp;completo=1">Carica
         anche il firmware →</a></p>

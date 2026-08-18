@@ -1,0 +1,523 @@
+﻿model,dtype,brand,brand_title,code,code_alias,model_name,ver_name,source_file
+QK001,mob,360,360,,,OS M50,5G,360shouji
+QK001,mob,360,360,,,OS T20 Pro,5G,360shouji
+ASUS_I001DA,mob,asus,华硕,,ZS660KL,ROG 游戏手机 2,,asus_cn
+ASUS_I001DB,mob,asus,华硕,,ZS660KL,ROG 游戏手机 2,,asus_cn
+ASUS_Z00VD,mob,asus,Asus,,ZC500TG,Asus Zenfone Go,ZC500TG,asus_en
+ASUS_A001,mob,asus,Asus,,ZU680KL,Asus Zenfone 3 Ultra,ZU680KL,asus_en
+ASUS_X009D,mob,asus,Asus,,ZB450KL,Asus Zenfone Go,ZB450KL,asus_en
+ASUS_X00AD,mob,asus,Asus,,ZB500KL,Asus Zenfone Go,ZB500KL,asus_en
+ASUS_X007D,mob,asus,Asus,,ZB552KL,Asus Zenfone Go,ZB552KL,asus_en
+ASUS_X00BD,mob,asus,Asus,,ZB500KG,Asus Zenfone Go,ZB500KG,asus_en
+ASUS_L001,mob,asus,Asus,,ZB690KG,Asus Zenfone Go 6.9,ZB690KG,asus_en
+ASUS_I001DA,mob,asus,Asus,,ZS660KL,ROG Phone II,2,asus_en
+ASUS_I001DB,mob,asus,Asus,,ZS660KL,ROG Phone II,2,asus_en
+1872-A0,mob,coolpad,酷派,,,酷派酷玩 7,,coolpad
+CP3AT5,mob,coolpad,酷派,,,酷派大观 C60,5G,coolpad
+G020E,mob,google,Google,,sargo,Pixel 3a,Verizon,google
+G020F,mob,google,Google,,sargo,Pixel 3a,"UK, Europe, and APAC",google
+G020G,mob,google,Google,,sargo,Pixel 3a,North America,google
+G020H,mob,google,Google,,sargo,Pixel 3a,Japan,google
+PLK-AL10,mob,honor,荣耀,,Plank,荣耀 7,全网通高配版,honor_cn
+PLK-TL01H,mob,honor,荣耀,,Plank,荣耀 7,移动渠道版,honor_cn
+PLK-TL00,mob,honor,荣耀,,Plank,荣耀 7,移动定制版,honor_cn
+PLK-TL11H,mob,honor,荣耀,,Plank,荣耀 7,移动增强版,honor_cn
+PLK-UL00,mob,honor,荣耀,,Plank,荣耀 7,双 4G 版,honor_cn
+PLK-CL00,mob,honor,荣耀,,Plank,荣耀 7,电信版,honor_cn
+STF-AL00,mob,honor,荣耀,,Stanford,荣耀 9,全网通标配版,honor_cn
+STF-AL10,mob,honor,荣耀,,Stanford,荣耀 9,全网通高配/尊享版,honor_cn
+STF-TL10,mob,honor,荣耀,,Stanford,荣耀 9,移动 4G+ 版,honor_cn
+LLD-AL00,mob,honor,荣耀,,Leland,荣耀 9 青春版,全网通版,honor_cn
+LLD-AL10,mob,honor,荣耀,,Leland,荣耀 9 青春版,全网通版,honor_cn
+LLD-TL10,mob,honor,荣耀,,Leland,荣耀 9 青春版,移动 4G+ 版,honor_cn
+AUM-AL00,mob,honor,荣耀,,Atomu,荣耀畅玩 7A,全网通标配版,honor_cn
+AUM-AL20,mob,honor,荣耀,,Atomu,荣耀畅玩 7A,全网通高配版,honor_cn
+AUM-TL00,mob,honor,荣耀,,Atomu,荣耀畅玩 7A,移动 4G+ 标配版,honor_cn
+AUM-TL20,mob,honor,荣耀,,Atomu,荣耀畅玩 7A,移动 4G+ 高配版,honor_cn
+DUA-AL00,mob,honor,荣耀,,Dura,荣耀畅玩 7,全网通版,honor_cn
+DUA-TL00,mob,honor,荣耀,,Dura,荣耀畅玩 7,移动 4G+ 版,honor_cn
+AGM3-W09HN,pad,honor,荣耀,,Agassi3M,荣耀平板 7,10.1 英寸 Wi-Fi 版,honor_cn
+AGM3-AL09HN,pad,honor,荣耀,,Agassi3M,荣耀平板 7,10.1 英寸 LTE 版,honor_cn
+HEY2-W09,pad,honor,荣耀,,Hendry2,荣耀平板 9,12.1 英寸 Wi-Fi 版,honor_cn
+HEY2-W19,pad,honor,荣耀,,Hendry2,荣耀平板 9,柔光版 12.1 英寸 Wi-Fi 版,honor_cn
+AGM3-W09HN,pad,honor,荣耀,,Agassi3M,荣耀平板 X8,10.1 英寸 Wi-Fi 版,honor_cn
+AGM3-W09HN,pad,honor,荣耀,,Agassi3M,荣耀平板 Z5,10.1 英寸 Wi-Fi 版,honor_cn
+AGM3-AL09HN,pad,honor,荣耀,,Agassi3M,荣耀平板 Z5,10.1 英寸 LTE 版,honor_cn
+FLA-B19,band,honor,荣耀,,,荣耀手环 7,标准版,honor_cn
+FLA-B39,band,honor,荣耀,,,荣耀手环 7,NFC 版,honor_cn
+RHE-B19,band,honor,荣耀,,,荣耀手环 9,标准版,honor_cn
+RHE-B39,band,honor,荣耀,,,荣耀手环 9,NFC 版,honor_cn
+PLK-L01,mob,honor,HONOR,,Plank,HONOR 7,,honor_global_en
+AUM-L29,mob,honor,HONOR,,Atomu,HONOR 7A,,honor_global_en
+AUM-L33,mob,honor,HONOR,,Atomu,HONOR 7A,,honor_global_en
+AUM-AL20,mob,honor,HONOR,,Atomu,HONOR 7A,,honor_global_en
+DRA-LX5,mob,honor,HONOR,,Dura,HONOR 7S,,honor_global_en
+DUA-L22,mob,honor,HONOR,,Dura,HONOR 7S,,honor_global_en
+DUA-LX3,mob,honor,HONOR,,Dura,HONOR 7S,,honor_global_en
+STF-L09,mob,honor,HONOR,,Stanford,HONOR 9,,honor_global_en
+LLD-L31,mob,honor,HONOR,,Leland,HONOR 9 Lite,,honor_global_en
+LLD-AL10,mob,honor,HONOR,,Leland,HONOR 9 Lite,,honor_global_en
+BRP-NX1M,mob,honor,HONOR,,BruceP,HONOR Magic7 Lite,,honor_global_en
+BRP-NX3,mob,honor,HONOR,,BruceP,HONOR Magic7 Lite,,honor_global_en
+TFY-LX1,mob,honor,HONOR,,Tiffany,HONOR X8,,honor_global_en
+TFY-LX2,mob,honor,HONOR,,Tiffany,HONOR X8,,honor_global_en
+TFY-LX3,mob,honor,HONOR,,Tiffany,HONOR X8,,honor_global_en
+ABR-LX1,mob,honor,HONOR,,Amber,HONOR X8c,,honor_global_en
+ABR-LX2,mob,honor,HONOR,,Amber,HONOR X8c,,honor_global_en
+ABR-LX3,mob,honor,HONOR,,Amber,HONOR X8c,,honor_global_en
+BRP-NX1,mob,honor,HONOR,,BruceP,HONOR X9c,,honor_global_en
+HEY2-W09,pad,honor,HONOR,,Hendry2,HONOR Pad 9,Wi-Fi,honor_global_en
+HEY2-N09,pad,honor,HONOR,,Hendry2,HONOR Pad 9,5G,honor_global_en
+AGM3-W09HN,pad,honor,HONOR,,Agassi3M,HONOR Pad X8,Wi-Fi,honor_global_en
+AGM3-AL09HN,pad,honor,HONOR,,Agassi3M,HONOR Pad X8,LTE,honor_global_en
+CLT-AL00,mob,huawei,华为,,Charlotte,HUAWEI P20 Pro,全网通版,huawei_cn
+CLT-AL01,mob,huawei,华为,,Charlotte,HUAWEI P20 Pro,全网通版 (6GB+64GB),huawei_cn
+CLT-AL00l,mob,huawei,华为,,Charlotte,HUAWEI P20 Pro,真皮限量版 全网通版,huawei_cn
+CLT-TL00,mob,huawei,华为,,Charlotte,HUAWEI P20 Pro,移动 4G+ 版,huawei_cn
+CLT-TL01,mob,huawei,华为,,Charlotte,HUAWEI P20 Pro,移动 4G+ 版 (6GB+64GB),huawei_cn
+SNE-AL00,mob,huawei,华为,,SydneyM,HUAWEI 麦芒 7,,huawei_cn
+TNN-AN00,mob,huawei,华为,,Tianshan,华为麦芒 9,5G,huawei_cn
+SLA-AL00,mob,huawei,华为,,Selina,华为畅享 7,全网通版,huawei_cn
+SLA-TL10,mob,huawei,华为,,Selina,华为畅享 7,移动 4G+ 版,huawei_cn
+DUB-AL00,mob,huawei,华为,,Dubai,华为畅享 9,全网通标配/高配版,huawei_cn
+DUB-AL20,mob,huawei,华为,,Dubai,华为畅享 9,全网通标配/高配版,huawei_cn
+DUB-AL00a,mob,huawei,华为,,Dubai,华为畅享 9,全网通顶配版,huawei_cn
+DUB-TL00,mob,huawei,华为,,Dubai,华为畅享 9,移动 4G+ 标配/高配版,huawei_cn
+DUB-TL00a,mob,huawei,华为,,Dubai,华为畅享 9,移动 4G+ 顶配版,huawei_cn
+PCE-W30,pad,huawei,华为,,Poincare,HUAWEI MatePad Pro 13.2 英寸,Wi-Fi 版,huawei_cn
+PCE-W40,pad,huawei,华为,,Poincare,HUAWEI MatePad Pro 13.2 英寸,Wi-Fi 版 (16GB+1TB),huawei_cn
+PCE-AL30,pad,huawei,华为,,Poincare,HUAWEI MatePad Pro 13.2 英寸,SIM 卡版,huawei_cn
+PCE-AL40,pad,huawei,华为,,Poincare,HUAWEI MatePad Pro 13.2 英寸,典藏版 SIM 卡版,huawei_cn
+WEB-W00,pad,huawei,华为,,Weber,HUAWEI MatePad Pro 13.2 英寸,2025 Wi-Fi 版,huawei_cn
+WEB-W10,pad,huawei,华为,,Weber,HUAWEI MatePad Pro 13.2 英寸,2025 Wi-Fi 版 (16GB+1TB),huawei_cn
+WEB-AL00,pad,huawei,华为,,Weber,HUAWEI MatePad Pro 13.2 英寸,2025 典藏版 SIM 卡版,huawei_cn
+WEB-AL10,pad,huawei,华为,,Weber,HUAWEI MatePad Pro 13.2 英寸,2025 SIM 卡版,huawei_cn
+WEB-W00,pad,huawei,华为,,Weber,华为擎云 C9,13.2 英寸 Wi-Fi 版,huawei_cn
+LEA-B19,band,huawei,华为,,,华为手环 7,标准版,huawei_cn
+LEA-B29,band,huawei,华为,,,华为手环 7,NFC 版,huawei_cn
+KIM-B19,band,huawei,华为,,Kimi,华为手环 9,标准版,huawei_cn
+KIM-B29,band,huawei,华为,,Kimi,华为手环 9,NFC 版,huawei_cn
+CLT-L04,mob,huawei,HUAWEI,,Charlotte,HUAWEI P20 Pro,Single SIM,huawei_global_en
+CLT-L09,mob,huawei,HUAWEI,,Charlotte,HUAWEI P20 Pro,Single SIM,huawei_global_en
+CLT-L29,mob,huawei,HUAWEI,,Charlotte,HUAWEI P20 Pro,Dual SIM,huawei_global_en
+DUB-LX1,mob,huawei,HUAWEI,,Dubai,HUAWEI Y7 2019,Single SIM,huawei_global_en
+DUB-LX3,mob,huawei,HUAWEI,,Dubai,HUAWEI Y7 2019,Single SIM,huawei_global_en
+DUB-LX1,mob,huawei,HUAWEI,,Dubai,HUAWEI Y7 2019,Dual SIM,huawei_global_en
+DUB-LX3,mob,huawei,HUAWEI,,Dubai,HUAWEI Y7 2019,Dual SIM,huawei_global_en
+PCE-W29,pad,huawei,HUAWEI,,Poincare,HUAWEI MatePad Pro 13.2,Wi-Fi,huawei_global_en
+Lenovo L78011,mob,lenovo,联想,,jd2018,联想 Z5,,lenovo_cn
+Lenovo L78012,mob,lenovo,联想,,jd2018,联想 Z5,,lenovo_cn
+M928Q,mob,meizu,魅族,,m1928,魅族 16T,公开版,meizu
+M852Q,mob,meizu,魅族,,m1852,魅族 X8,公开版,meizu
+M852H,mob,meizu,魅族,,m1852,魅族 X8,国际版,meizu
+M818H,mob,meizu,魅族,,m1818,魅族 C9,国际版,meizu
+M928Q,mob,meizu,MEIZU,,m1928,MEIZU 16T,,meizu_en
+M852H,mob,meizu,MEIZU,,m1852,MEIZU X8,Global,meizu_en
+M852Q,mob,meizu,MEIZU,,m1852,MEIZU X8,China,meizu_en
+M818H,mob,meizu,MEIZU,,m1818,MEIZU C9,Global,meizu_en
+XT2251-1,mob,motorola,Motorola,,oneli,moto razr 2022,,motorola_cn
+XT2323-3,mob,motorola,Motorola,,lynkco,moto razr 40,,motorola_cn
+XT2453-2,mob,motorola,Motorola,,aito,moto razr 50,,motorola_cn
+XT2603-1,mob,motorola,Motorola,,vantage,moto X70 Air Pro,,motorola_cn
+NX501,mob,nubia,努比亚,,,Z5,,nubia
+Z2356,mob,nubia,努比亚,,,V60,,nubia
+NX679J,mob,nubia,努比亚,,,红魔 7,,nubia
+GM1900,mob,oneplus,一加,,guacamoleb,一加 7,国行版,oneplus
+GM1901,mob,oneplus,一加,,guacamoleb,一加 7,印度版,oneplus
+GM1903,mob,oneplus,一加,,guacamoleb,一加 7,欧洲版,oneplus
+GM1905,mob,oneplus,一加,,guacamoleb,一加 7,北美版 / 国际版,oneplus
+LE2110,mob,oneplus,一加,,lemonade,一加 9,国行版,oneplus
+LE2111,mob,oneplus,一加,,lemonade,一加 9,印度版,oneplus
+LE2113,mob,oneplus,一加,,lemonade,一加 9,欧洲版,oneplus
+LE2115,mob,oneplus,一加,,lemonade,一加 9,北美版 / 国际版,oneplus
+LE2117,mob,oneplus,一加,,lemonadet,一加 9,T-Mobile 版,oneplus
+LE2119,mob,oneplus,一加,,lemonadev,一加 9,Verzion 版,oneplus
+CPH2423,mob,oneplus,一加,,pickle,一加 10R,印度版,oneplus
+CPH2411,mob,oneplus,一加,,pickle,一加 10R,长寿版 印度版,oneplus
+PJD110,mob,oneplus,一加,,waffle,一加 12,国行版,oneplus
+CPH2573,mob,oneplus,一加,,waffle,一加 12,印度版,oneplus
+CPH2581,mob,oneplus,一加,,waffle,一加 12,欧洲版 / 国际版,oneplus
+CPH2583,mob,oneplus,一加,,waffle,一加 12,北美版,oneplus
+PJZ110,mob,oneplus,一加,,dodge,一加 13,国行版,oneplus
+CPH2649,mob,oneplus,一加,,dodge,一加 13,印度版,oneplus
+CPH2653,mob,oneplus,一加,,dodge,一加 13,欧洲版 / 国际版,oneplus
+CPH2655,mob,oneplus,一加,,dodge,一加 13,北美版,oneplus
+GM1900,mob,oneplus,OnePlus,,guacamoleb,OnePlus 7,China,oneplus_en
+GM1901,mob,oneplus,OnePlus,,guacamoleb,OnePlus 7,India,oneplus_en
+GM1903,mob,oneplus,OnePlus,,guacamoleb,OnePlus 7,Europe,oneplus_en
+GM1905,mob,oneplus,OnePlus,,guacamoleb,OnePlus 7,North America / Global,oneplus_en
+LE2110,mob,oneplus,OnePlus,,lemonade,OnePlus 9,China,oneplus_en
+LE2111,mob,oneplus,OnePlus,,lemonade,OnePlus 9,India,oneplus_en
+LE2113,mob,oneplus,OnePlus,,lemonade,OnePlus 9,Europe,oneplus_en
+LE2115,mob,oneplus,OnePlus,,lemonade,OnePlus 9,North America / Global,oneplus_en
+LE2117,mob,oneplus,OnePlus,,lemonadet,OnePlus 9,T-Mobile,oneplus_en
+LE2119,mob,oneplus,OnePlus,,lemonadev,OnePlus 9,Verzion,oneplus_en
+CPH2423,mob,oneplus,OnePlus,,pickle,OnePlus 10R,India,oneplus_en
+CPH2411,mob,oneplus,OnePlus,,pickle,OnePlus 10R,Endurance India,oneplus_en
+PJD110,mob,oneplus,OnePlus,,waffle,OnePlus 12,China,oneplus_en
+CPH2573,mob,oneplus,OnePlus,,waffle,OnePlus 12,India,oneplus_en
+CPH2581,mob,oneplus,OnePlus,,waffle,OnePlus 12,Europe / Global,oneplus_en
+CPH2583,mob,oneplus,OnePlus,,waffle,OnePlus 12,North America,oneplus_en
+PJZ110,mob,oneplus,OnePlus,,dodge,OnePlus 13,China,oneplus_en
+CPH2649,mob,oneplus,OnePlus,,dodge,OnePlus 13,India,oneplus_en
+CPH2653,mob,oneplus,OnePlus,,dodge,OnePlus 13,Europe / Global,oneplus_en
+CPH2655,mob,oneplus,OnePlus,,dodge,OnePlus 13,North America,oneplus_en
+PDEM10,mob,oppo,OPPO,,,OPPO Find X2,全网通版,oppo_cn
+PDET10,mob,oppo,OPPO,,,OPPO Find X2,移动版,oppo_cn
+PJV110,mob,oppo,OPPO,,"omega, omega-c2",OPPO Reno12,,oppo_cn
+PLA110,mob,oppo,OPPO,,"zhuque, zhuque-c2",OPPO Reno14,,oppo_cn
+PCEM00,mob,oppo,OPPO,,,OPPO A9x,全网通版,oppo_cn
+PCET00,mob,oppo,OPPO,,,OPPO A9x,移动版,oppo_cn
+PELM00,mob,oppo,OPPO,,,OPPO A95,,oppo_cn
+PFUM10,mob,oppo,OPPO,,mulan,OPPO A96,,oppo_cn
+PHA120,mob,oppo,OPPO,,mulan-a,OPPO A96,,oppo_cn
+PKP110,mob,oppo,OPPO,,"alpha, alpha-h",OPPO A5 Pro,,oppo_cn
+PLS120,mob,oppo,OPPO,,baikal-l5,OPPO A6,,oppo_cn
+PLN110,mob,oppo,OPPO,,baikal-m,OPPO A6 Pro,,oppo_cn
+PLT120,mob,oppo,OPPO,,baikal-b5,OPPO A6s,,oppo_cn
+PLT120,mob,oppo,OPPO,,baikal-b5,OPPO A6i+,,oppo_cn
+PLT120,mob,oppo,OPPO,,baikal-b5,OPPO A6k,,oppo_cn
+PLT140,mob,oppo,OPPO,,baikal-b5,OPPO A6x,,oppo_cn
+PLT140,mob,oppo,OPPO,,baikal-b5,OPPO A6m,,oppo_cn
+CPH2023,mob,oppo,OPPO,,,OPPO Find X2,,oppo_global_en
+CPH2365,mob,oppo,OPPO,,,OPPO Reno6 Lite,,oppo_global_en
+CPH2625,mob,oppo,OPPO,,"omega, omega-s3",OPPO Reno12,5G,oppo_global_en
+CPH2737,mob,oppo,OPPO,,"zhuque, zhuque-s2",OPPO Reno14,5G,oppo_global_en
+CPH2197,mob,oppo,OPPO,,,OPPO F19,,oppo_global_en
+CPH2219,mob,oppo,OPPO,,,OPPO F19,,oppo_global_en
+CPH2223,mob,oppo,OPPO,,,OPPO F19s,,oppo_global_en
+CPH2781,mob,oppo,OPPO,,,OPPO F31,5G,oppo_global_en
+CPH2711,mob,oppo,OPPO,,,OPPO A5 Pro,,oppo_global_en
+CPH2695,mob,oppo,OPPO,,,OPPO A5 Pro,5G,oppo_global_en
+CPH2817,mob,oppo,OPPO,,,OPPO A6,,oppo_global_en
+CPH2831,mob,oppo,OPPO,,,OPPO A6,5G Global,oppo_global_en
+CPH2785,mob,oppo,OPPO,,,OPPO A6,5G India,oppo_global_en
+CPH2799,mob,oppo,OPPO,,,OPPO A6 Pro,,oppo_global_en
+CPH2781,mob,oppo,OPPO,,,OPPO A6 Pro,5G Global,oppo_global_en
+CPH2827,mob,oppo,OPPO,,,OPPO A6 Pro,5G India,oppo_global_en
+CPH2815,mob,oppo,OPPO,,,OPPO A6s,,oppo_global_en
+CPH2789,mob,oppo,OPPO,,,OPPO A6s,5G Global,oppo_global_en
+CPH2889,mob,oppo,OPPO,,,OPPO A6s,5G India,oppo_global_en
+CPH2819,mob,oppo,OPPO,,,OPPO A6x,,oppo_global_en
+CPH2783,mob,oppo,OPPO,,,OPPO A6x,5G Global,oppo_global_en
+CPH2823,mob,oppo,OPPO,,,OPPO A6x,5G India,oppo_global_en
+CPH2847,mob,oppo,OPPO,,,OPPO A6t,,oppo_global_en
+CPH2853,mob,oppo,OPPO,,,OPPO A6t,5G,oppo_global_en
+CPH2849,mob,oppo,OPPO,,,OPPO A6t Pro,,oppo_global_en
+CPH2851,mob,oppo,OPPO,,,OPPO A6t Pro,5G,oppo_global_en
+CPH2195,mob,oppo,OPPO,,,OPPO A54,5G,oppo_global_en
+CPH2303,mob,oppo,OPPO,,,OPPO A54,5G,oppo_global_en
+OPG02,mob,oppo,OPPO,,,OPPO A54,5G (KDDI),oppo_global_en
+CPH2385,mob,oppo,OPPO,,,OPPO A57s,,oppo_global_en
+CPH2219,mob,oppo,OPPO,,,OPPO A74,,oppo_global_en
+CPH2197,mob,oppo,OPPO,,,OPPO A74,5G,oppo_global_en
+CPH2263,mob,oppo,OPPO,,,OPPO A74,5G,oppo_global_en
+CPH2385,mob,oppo,OPPO,,,OPPO A77,,oppo_global_en
+CPH2339,mob,oppo,OPPO,,,OPPO A77,5G,oppo_global_en
+CPH2365,mob,oppo,OPPO,,,OPPO A95,,oppo_global_en
+CPH2333,mob,oppo,OPPO,,,OPPO A96,,oppo_global_en
+RMX5071,mob,realme,realme,,dongfeng,真我 Neo7x,,realme_cn
+RMX3992,mob,realme,realme,,,真我 12,,realme_cn
+RMX3993,mob,realme,realme,,,真我 12x,,realme_cn
+RMX3952,mob,realme,realme,,barley-x,真我 13,,realme_cn
+RMX5075,mob,realme,realme,,dongfeng,真我 14,,realme_cn
+RMX3995,mob,realme,realme,,barley-d,真我 V60,,realme_cn
+RMX3996,mob,realme,realme,,barley-d,真我 V60s,,realme_cn
+RMX2151,mob,realme,realme,,salaa,7,India,realme_global_en
+RMX2155,mob,realme,realme,,salaa,7,Global,realme_global_en
+RMX3521,mob,realme,realme,,messi,9,,realme_global_en
+RMX3388,mob,realme,realme,,,9 5G,India,realme_global_en
+RMX3474,mob,realme,realme,,oscar,9 5G,EU,realme_global_en
+RMX3871,mob,realme,realme,,tacoo-f,12,4G,realme_global_en
+RMX3998,mob,realme,realme,,,12x 5G,,realme_global_en
+RMX3871,mob,realme,realme,,tacoo-f,13,4G,realme_global_en
+RMX5070,mob,realme,realme,,dongfeng,14 5G,Global,realme_global_en
+RMX3834,mob,realme,realme,,hulk-k,C60,,realme_global_en
+RMX3930,mob,realme,realme,,latte,C61,Global,realme_global_en
+RMX3939,mob,realme,realme,,latte-h,C61,Global,realme_global_en
+RMX3933,mob,realme,realme,,latte-a,C61,India,realme_global_en
+RMX3939,mob,realme,realme,,latte-b,C63,,realme_global_en
+RMX3997,mob,realme,realme,,barley-e,C65 5G,,realme_global_en
+RMX3939,mob,realme,realme,,latte-b,C65s,,realme_global_en
+RMX3834,mob,realme,realme,,hulk-k,Note 50,,realme_global_en
+RMX3933,mob,realme,realme,,latte-a,Note 60,,realme_global_en
+RMX3933,mob,realme,realme,,latte-a,Note 60s,,realme_global_en
+RMX5313,mob,realme,realme,,latte-t,Note 70,,realme_global_en
+RMX5313,mob,realme,realme,,latte-t,Note 70T,,realme_global_en
+RMX5313,mob,realme,realme,,latte-t,Note 70s,,realme_global_en
+RMX5388,mob,realme,realme,,latte-m,Note 80,,realme_global_en
+RMX5388,mob,realme,realme,,latte-m,Note 80s,,realme_global_en
+RMX5070,mob,realme,realme,,dongfeng,P3,5G,realme_global_en
+RMX5079,mob,realme,realme,,dongfeng,P3,5G,realme_global_en
+RMX5313,mob,realme,realme,,latte-t,P4 Lite,,realme_global_en
+RMX3933,mob,realme,realme,,latte-a,NARZO N61,,realme_global_en
+RMX3939,mob,realme,realme,,latte-c,NARZO N63,,realme_global_en
+RMX3997,mob,realme,realme,,barley-e,NARZO N65,5G,realme_global_en
+RMX3998,mob,realme,realme,,,NARZO 70x,5G,realme_global_en
+RMX5313,mob,realme,realme,,latte-t,NARZO 80 Lite,,realme_global_en
+GT-I9000,mob,samsung,三星,,,Galaxy S,公开版,samsung_cn
+GT-I9008,mob,samsung,三星,,,Galaxy S,移动定制版,samsung_cn
+GT-I9008L,mob,samsung,三星,,,Galaxy S,移动定制版,samsung_cn
+GT-I9018,mob,samsung,三星,,,Galaxy S,移动定制版,samsung_cn
+SCH-i909,mob,samsung,三星,,,Galaxy S,电信定制版,samsung_cn
+SCH-I919,mob,samsung,三星,,,Galaxy S Duos,电信定制版,samsung_cn
+SM-G8750,mob,samsung,三星,,dreamliteqltechn,Galaxy S 轻奢版,,samsung_cn
+SM-S9210,mob,samsung,三星,,e1q,Galaxy S24,,samsung_cn
+SM-S9280,mob,samsung,三星,,e3q,Galaxy S24 Ultra,,samsung_cn
+SM-S9380,mob,samsung,三星,,pa3q,Galaxy S25 Ultra,,samsung_cn
+SM-S9480,mob,samsung,三星,,m3q,Galaxy S26 Ultra,,samsung_cn
+SM-F9000,mob,samsung,三星,,winner,Galaxy Fold,,samsung_cn
+SM-A9000,mob,samsung,三星,,a9xltechn,Galaxy A9 (2016),,samsung_cn
+SM-A9100,mob,samsung,三星,,a9xproltechn,Galaxy A9 高配版 (2016),,samsung_cn
+SM-A5460,mob,samsung,三星,,a54x,Galaxy A54 5G,,samsung_cn
+SM-A5560,mob,samsung,三星,,a55x,Galaxy A55 5G,,samsung_cn
+SM-C9000,mob,samsung,三星,,c9ltechn,Galaxy C9 Pro,全网通版,samsung_cn
+SM-C9008,mob,samsung,三星,,c9ltechn,Galaxy C9 Pro,4G+,samsung_cn
+SCH-W899,mob,samsung,三星,,,三星 W899,,samsung_cn
+SCH-W999,mob,samsung,三星,,,三星 W999,,samsung_cn
+SCH-W2013,mob,samsung,三星,,m0grandectc,三星 W2013,,samsung_cn
+SM-S921B,mob,samsung,Samsung,,e1s,Galaxy S24,Global,samsung_global_en
+SM-S921N,mob,samsung,Samsung,,e1s,Galaxy S24,South Korea,samsung_global_en
+SM-S921U,mob,samsung,Samsung,,e1q,Galaxy S24,US Carrier,samsung_global_en
+SM-S921U1,mob,samsung,Samsung,,e1q,Galaxy S24,US Unlocked,samsung_global_en
+SM-S921W,mob,samsung,Samsung,,e1q,Galaxy S24,Canada,samsung_global_en
+SM-S9210,mob,samsung,Samsung,,e1q,Galaxy S24,China,samsung_global_en
+SM-S921Q,mob,samsung,Samsung,,e1q,Galaxy S24,Japan (SIM Free),samsung_global_en
+SCG25,mob,samsung,Samsung,,e1q,Galaxy S24,Japan (au),samsung_global_en
+SC-51E,mob,samsung,Samsung,,e1q,Galaxy S24,Japan (NTT Docomo),samsung_global_en
+SM-S928B,mob,samsung,Samsung,,e3q,Galaxy S24 Ultra,Global,samsung_global_en
+SM-S928U,mob,samsung,Samsung,,e3q,Galaxy S24 Ultra,US Carrier,samsung_global_en
+SM-S928U1,mob,samsung,Samsung,,e3q,Galaxy S24 Ultra,US Unlocked,samsung_global_en
+SM-S928W,mob,samsung,Samsung,,e3q,Galaxy S24 Ultra,Canada,samsung_global_en
+SM-S9280,mob,samsung,Samsung,,e3q,Galaxy S24 Ultra,China,samsung_global_en
+SM-S928N,mob,samsung,Samsung,,e3q,Galaxy S24 Ultra,South Korea,samsung_global_en
+SM-S928Q,mob,samsung,Samsung,,e3q,Galaxy S24 Ultra,Japan (SIM Free),samsung_global_en
+SCG26,mob,samsung,Samsung,,e3q,Galaxy S24 Ultra,Japan (au),samsung_global_en
+SC-52E,mob,samsung,Samsung,,e3q,Galaxy S24 Ultra,Japan (NTT Docomo),samsung_global_en
+SM-S938B,mob,samsung,Samsung,,pa3q,Galaxy S25 Ultra,Global,samsung_global_en
+SM-S938U,mob,samsung,Samsung,,pa3q,Galaxy S25 Ultra,US Carrier,samsung_global_en
+SM-S938U1,mob,samsung,Samsung,,pa3q,Galaxy S25 Ultra,US Unlocked,samsung_global_en
+SM-S938W,mob,samsung,Samsung,,pa3q,Galaxy S25 Ultra,Canada,samsung_global_en
+SM-S9380,mob,samsung,Samsung,,pa3q,Galaxy S25 Ultra,China,samsung_global_en
+SM-S938N,mob,samsung,Samsung,,pa3q,Galaxy S25 Ultra,South Korea,samsung_global_en
+SM-S938Q,mob,samsung,Samsung,,pa3q,Galaxy S25 Ultra,Japan (SIM Free),samsung_global_en
+SM-S938Z,mob,samsung,Samsung,,pa3q,Galaxy S25 Ultra,Japan (SoftBank),samsung_global_en
+SCG32,mob,samsung,Samsung,,pa3q,Galaxy S25 Ultra,Japan (au),samsung_global_en
+SC-52F,mob,samsung,Samsung,,pa3q,Galaxy S25 Ultra,Japan (NTT Docomo),samsung_global_en
+SM-S948B,mob,samsung,Samsung,,m3q,Galaxy S26 Ultra,Global,samsung_global_en
+SM-S948U,mob,samsung,Samsung,,m3q,Galaxy S26 Ultra,US Carrier,samsung_global_en
+SM-S948U1,mob,samsung,Samsung,,m3q,Galaxy S26 Ultra,US Unlocked,samsung_global_en
+SM-S948W,mob,samsung,Samsung,,m3q,Galaxy S26 Ultra,Canada,samsung_global_en
+SM-S9480,mob,samsung,Samsung,,m3q,Galaxy S26 Ultra,China,samsung_global_en
+SM-S948N,mob,samsung,Samsung,,m3q,Galaxy S26 Ultra,South Korea,samsung_global_en
+SM-S948Q,mob,samsung,Samsung,,m3q,Galaxy S26 Ultra,Japan (SIM Free),samsung_global_en
+SM-S948Z,mob,samsung,Samsung,,m3q,Galaxy S26 Ultra,Japan (SoftBank),samsung_global_en
+SM-S948C,mob,samsung,Samsung,,m3q,Galaxy S26 Ultra,Japan (Rakuten Mobile),samsung_global_en
+SCG37,mob,samsung,Samsung,,m3q,Galaxy S26 Ultra,Japan (au),samsung_global_en
+SC-53G,mob,samsung,Samsung,,m3q,Galaxy S26 Ultra,Japan (NTT Docomo),samsung_global_en
+SM-F900F,mob,samsung,Samsung,,winner,Galaxy Fold,Global,samsung_global_en
+SM-F900U,mob,samsung,Samsung,,winner,Galaxy Fold,US Carrier,samsung_global_en
+SM-F900U1,mob,samsung,Samsung,,winner,Galaxy Fold,US Unlocked,samsung_global_en
+SM-F900W,mob,samsung,Samsung,,winner,Galaxy Fold,Canada,samsung_global_en
+SM-F9000,mob,samsung,Samsung,,winner,Galaxy Fold,China,samsung_global_en
+SCV44,mob,samsung,Samsung,,winner,Galaxy Fold,Japan (au),samsung_global_en
+SM-F907B,mob,samsung,Samsung,,winner,Galaxy Fold,5G Global,samsung_global_en
+SM-F907N,mob,samsung,Samsung,,winner,Galaxy Fold,5G South Korea,samsung_global_en
+SM-A025F,mob,samsung,Samsung,,a02q,Galaxy A02s,Global,samsung_global_en
+SM-A025G,mob,samsung,Samsung,,a02q,Galaxy A02s,EU,samsung_global_en
+SM-A025U,mob,samsung,Samsung,,a02q,Galaxy A02s,US Carrier,samsung_global_en
+SM-A025U1,mob,samsung,Samsung,,a02q,Galaxy A02s,US Unlocked,samsung_global_en
+SM-A025A,mob,samsung,Samsung,,a02q,Galaxy A02s,AT&T,samsung_global_en
+SM-A025AZ,mob,samsung,Samsung,,a02q,Galaxy A02s,Cricket,samsung_global_en
+SM-A025V,mob,samsung,Samsung,,a02q,Galaxy A02s,Verizon,samsung_global_en
+SM-S124DL,mob,samsung,Samsung,,a02q,Galaxy A02s,TracFone,samsung_global_en
+SM-A025M,mob,samsung,Samsung,,a02q,Galaxy A02s,Latin America,samsung_global_en
+SM-A057F,mob,samsung,Samsung,,a05s,Galaxy A05s,Global,samsung_global_en
+SM-A057G,mob,samsung,Samsung,,a05s,Galaxy A05s,EU,samsung_global_en
+SM-A057M,mob,samsung,Samsung,,a05s,Galaxy A05s,Latin America,samsung_global_en
+SM-A075F,mob,samsung,Samsung,,a07,Galaxy A07,Global,samsung_global_en
+SM-A075M,mob,samsung,Samsung,,a07,Galaxy A07,Latin America,samsung_global_en
+SM-A165F,mob,samsung,Samsung,,a16,Galaxy A16,Global,samsung_global_en
+SM-A165M,mob,samsung,Samsung,,a16,Galaxy A16,Latin America,samsung_global_en
+SM-A165N,mob,samsung,Samsung,,a16,Galaxy A16,South Korea,samsung_global_en
+SM-A235F,mob,samsung,Samsung,,a23,Galaxy A23,Global,samsung_global_en
+SM-A235M,mob,samsung,Samsung,,a23,Galaxy A23,Latin America,samsung_global_en
+SM-A235N,mob,samsung,Samsung,,a23,Galaxy A23,South Korea,samsung_global_en
+SM-A325F,mob,samsung,Samsung,,a32,Galaxy A32,Global,samsung_global_en
+SM-A325M,mob,samsung,Samsung,,a32,Galaxy A32,Latin America,samsung_global_en
+SM-A325N,mob,samsung,Samsung,,a32,Galaxy A32,South Korea,samsung_global_en
+SM-A326B,mob,samsung,Samsung,,a32x,Galaxy A32 5G,Global,samsung_global_en
+SM-A326BR,mob,samsung,Samsung,,a32x,Galaxy A32 5G,Global,samsung_global_en
+SM-A326U,mob,samsung,Samsung,,a32x,Galaxy A32 5G,US Carrier,samsung_global_en
+SM-A326U1,mob,samsung,Samsung,,a32x,Galaxy A32 5G,US Unlocked,samsung_global_en
+SM-S326DL,mob,samsung,Samsung,,a32x,Galaxy A32 5G,TracFone,samsung_global_en
+SM-A326W,mob,samsung,Samsung,,a32x,Galaxy A32 5G,Canada,samsung_global_en
+SCG08,mob,samsung,Samsung,,a32x,Galaxy A32 5G,Japan (au),samsung_global_en
+SM-A546E,mob,samsung,Samsung,,a54x,Galaxy A54 5G,Global,samsung_global_en
+SM-A546B,mob,samsung,Samsung,,a54x,Galaxy A54 5G,EU,samsung_global_en
+SM-A546U,mob,samsung,Samsung,,a54x,Galaxy A54 5G,US Carrier,samsung_global_en
+SM-A546U1,mob,samsung,Samsung,,a54x,Galaxy A54 5G,US Unlocked,samsung_global_en
+SM-A546V,mob,samsung,Samsung,,a54x,Galaxy A54 5G,Verizon,samsung_global_en
+SM-S546VL,mob,samsung,Samsung,,a54x,Galaxy A54 5G,TracFone,samsung_global_en
+SM-A546W,mob,samsung,Samsung,,a54x,Galaxy A54 5G,Canada,samsung_global_en
+SM-A5460,mob,samsung,Samsung,,a54x,Galaxy A54 5G,China,samsung_global_en
+SCG21,mob,samsung,Samsung,,a54x,Galaxy A54 5G,Japan (au),samsung_global_en
+SC-53D,mob,samsung,Samsung,,a54x,Galaxy A54 5G,Japan (NTT Docomo),samsung_global_en
+SM-A546S,mob,samsung,Samsung,,a54x,Galaxy A54 5G,Quantum4 South Korea,samsung_global_en
+SM-A556E,mob,samsung,Samsung,,a55x,Galaxy A55 5G,Global,samsung_global_en
+SM-A556B,mob,samsung,Samsung,,a55x,Galaxy A55 5G,EU,samsung_global_en
+SM-A5560,mob,samsung,Samsung,,a55x,Galaxy A55 5G,China,samsung_global_en
+SCG27,mob,samsung,Samsung,,a55x,Galaxy A55 5G,Japan (au),samsung_global_en
+SC-53E,mob,samsung,Samsung,,a55x,Galaxy A55 5G,Japan (NTT Docomo),samsung_global_en
+SM-A556S,mob,samsung,Samsung,,a55x,Galaxy A55 5G,Quantum5 South Korea,samsung_global_en
+SM-M025F,mob,samsung,Samsung,,a02q,Galaxy M02s,,samsung_global_en
+SM-M075F,mob,samsung,Samsung,,a07,Galaxy M07,,samsung_global_en
+SM-M145F,mob,samsung,Samsung,,a05s,Galaxy M14,,samsung_global_en
+SM-M156B,mob,samsung,Samsung,,m15x,Galaxy M15 5G,,samsung_global_en
+SM-M326B,mob,samsung,Samsung,,a32x,Galaxy M32 5G,,samsung_global_en
+SM-E025F,mob,samsung,Samsung,,a02q,Galaxy F02s,,samsung_global_en
+SM-E075F,mob,samsung,Samsung,,a07,Galaxy F07,,samsung_global_en
+SM-E145F,mob,samsung,Samsung,,a05s,Galaxy F14,,samsung_global_en
+SM-E156B,mob,samsung,Samsung,,m15x,Galaxy F15 5G,,samsung_global_en
+V2547A,mob,vivo,vivo,,PD2547,X300 Ultra,,vivo_cn
+V2547DA,mob,vivo,vivo,,PD2547,X300 Ultra,卫星通信版,vivo_cn
+V2283A,mob,vivo,vivo,,PD2283,S17,,vivo_cn
+V1913A,mob,vivo,vivo,,PD1913,Y7s,全网通版,vivo_cn
+V1913T,mob,vivo,vivo,,PD1913,Y7s,移动全网通版,vivo_cn
+V1921A,mob,vivo,vivo,,PD1921,Z5,全网通版,vivo_cn
+V1921T,mob,vivo,vivo,,PD1921,Z5,移动全网通版,vivo_cn
+V2562,mob,vivo,vivo,,PD2547F,X300 Ultra,,vivo_global_en
+V2511,mob,vivo,vivo,,PD2503F,V60,,vivo_global_en
+V2512,mob,vivo,vivo,,PD2503F,V60,,vivo_global_en
+M2129B1,band,xiaomi,小米,L66,,小米手环 7,,xiaomi-wear
+M2130B1,band,xiaomi,小米,L66,,小米手环 7,NFC 版,xiaomi-wear
+M2345B1,band,xiaomi,小米,N66,,小米手环 9,,xiaomi-wear
+M2346B1,band,xiaomi,小米,N66,,小米手环 9,NFC 版 / 陶瓷特别版,xiaomi-wear
+M1902F1A,mob,xiaomi,小米,F1,cepheus,小米 9,全网通版,xiaomi
+M1902F1T,mob,xiaomi,小米,F1,cepheus,小米 9,移动 4G+ 版,xiaomi
+M1902F1C,mob,xiaomi,小米,F1,cepheus,小米 9,联通电信定制版,xiaomi
+M1902F1G,mob,xiaomi,小米,F1,cepheus,小米 9,国际版,xiaomi
+M1904F3BG,mob,xiaomi,小米,F3B,pyxis,小米 9 Lite,国际版,xiaomi
+M2102K1C,mob,xiaomi,小米,K1,star,小米 11 Ultra,国行版,xiaomi
+M2102K1G,mob,xiaomi,小米,K1,star,小米 11 Ultra,国际版,xiaomi
+2201123C,mob,xiaomi,小米,L3,cupid,Xiaomi 12,国行版,xiaomi
+2201123G,mob,xiaomi,小米,L3,cupid,Xiaomi 12,国际版,xiaomi
+2112123AC,mob,xiaomi,小米,L3A,psyche,Xiaomi 12X,国行版,xiaomi
+2112123AG,mob,xiaomi,小米,L3A,psyche,Xiaomi 12X,国际版,xiaomi
+22081212UG,mob,xiaomi,小米,L12U,diting,Xiaomi 12T Pro,国际版,xiaomi
+22081212R,mob,xiaomi,小米,L12U,diting,Xiaomi 12T Pro,日本版 (无锁),xiaomi
+22200414R,mob,xiaomi,小米,L12U,diting,Xiaomi 12T Pro,日本版 (无锁),xiaomi
+A201XM,mob,xiaomi,小米,L12U,diting,Xiaomi 12T Pro,日本版 (SoftBank),xiaomi
+2211133C,mob,xiaomi,小米,M3,fuxi,Xiaomi 13,国行版,xiaomi
+2211133G,mob,xiaomi,小米,M3,fuxi,Xiaomi 13,国际版,xiaomi
+23127PN0CC,mob,xiaomi,小米,N3,houji,Xiaomi 14,国行版,xiaomi
+23127PN0CG,mob,xiaomi,小米,N3,houji,Xiaomi 14,国际版,xiaomi
+M1910F4G,mob,xiaomi,小米,F4,tucana,小米 Note 10,国际版,xiaomi
+M1910F4S,mob,xiaomi,小米,F4,tucana,小米 Note 10,Pro 国际版,xiaomi
+M1910F4E,mob,xiaomi,小米,F4,tucana,小米 CC9 Pro,,xiaomi
+25057RN09G,mob,xiaomi,小米,O19,spring,REDMI 15 5G,国际版,xiaomi
+25057RN09E,mob,xiaomi,小米,O19,spring,REDMI 15 5G,欧洲版,xiaomi
+25057RN09I,mob,xiaomi,小米,O19,spring,REDMI 15 5G,印度版,xiaomi
+25057RN09R,mob,xiaomi,小米,O19,spring,REDMI 15 5G,日本版 (无锁),xiaomi
+A501XM,mob,xiaomi,小米,O19,spring,REDMI 15 5G,日本版 (SoftBank),xiaomi
+22101316UCP,mob,xiaomi,小米,M16U,"ruby, rubypro",Redmi Note 12 Pro+,国行版,xiaomi
+22101316UG,mob,xiaomi,小米,M16U,"ruby, rubypro",Redmi Note 12 Pro+,5G 国际版,xiaomi
+22101316UP,mob,xiaomi,小米,M16U,"ruby, rubypro",Redmi Note 12 Pro+,5G 印度版,xiaomi
+23129RAA4G,mob,xiaomi,小米,N7,sapphire,Redmi Note 13,国际版,xiaomi
+23129RA5FL,mob,xiaomi,小米,N7L,sapphire,Redmi Note 13,拉美版,xiaomi
+23124RA7EO,mob,xiaomi,小米,N7N,sapphiren,Redmi Note 13,国际版 (NFC),xiaomi
+23117RA68G,mob,xiaomi,小米,N6,emerald,Redmi Note 13 Pro,国际版,xiaomi
+2312DRA50C,mob,xiaomi,小米,N16,garnet,Redmi Note 13 Pro,国行版 (LPDDR4x + UFS 2.2),xiaomi
+2312DRA50G,mob,xiaomi,小米,N16,garnet,Redmi Note 13 Pro,5G 国际版,xiaomi
+2312DRA50I,mob,xiaomi,小米,N16,garnet,Redmi Note 13 Pro,5G 印度版,xiaomi
+XIG05,mob,xiaomi,小米,N16,garnet,Redmi Note 13 Pro,5G 日本版 (KDDI),xiaomi
+2312CRAD3C,mob,xiaomi,小米,N16S,garnet,Redmi Note 13 Pro,国行版 (LPDDR5 + UFS 3.1),xiaomi
+22041211AC,mob,xiaomi,小米,L11A,rubens,Redmi K50,,xiaomi
+21121210C,mob,xiaomi,小米,L10,ingres,Redmi K50 电竞版,,xiaomi
+22081212C,mob,xiaomi,小米,L12,diting,Redmi K50 至尊版,,xiaomi
+25128RN17A,mob,xiaomi,小米,P25A,arctic,REDMI A7 Pro,国际版,xiaomi
+25128RN17Y,mob,xiaomi,小米,P25A,arctic,REDMI A7 Pro,国际版,xiaomi
+25128RN17I,mob,xiaomi,小米,P25A,arctic,REDMI A7 Pro,印度版,xiaomi
+25128RN17L,mob,xiaomi,小米,P25A,arctic,REDMI A7 Pro,拉美版,xiaomi
+25028PC03G,mob,xiaomi,小米,C3Z,serenity,POCO C71,国际版,xiaomi
+25028PC03Y,mob,xiaomi,小米,C3Z,serenity,POCO C71,国际版,xiaomi
+25028PC03I,mob,xiaomi,小米,C3Z,serenity,POCO C71,印度版,xiaomi
+25028PC03L,mob,xiaomi,小米,C3Z,serenity,POCO C71,拉美版,xiaomi
+25128PC17G,mob,xiaomi,小米,P25A,arctic,POCO C81 Pro,国际版,xiaomi
+25128PC17Y,mob,xiaomi,小米,P25A,arctic,POCO C81 Pro,国际版,xiaomi
+25128PC17L,mob,xiaomi,小米,P25A,arctic,POCO C81 Pro,拉美版,xiaomi
+25128PC17I,mob,xiaomi,小米,P25A,arctic,POCO C81,印度版,xiaomi
+M1902F1A,mob,xiaomi,小米,F1,cepheus,小米 9,全网通版,xiaomi_cn
+M1902F1T,mob,xiaomi,小米,F1,cepheus,小米 9,移动 4G+ 版,xiaomi_cn
+M1902F1C,mob,xiaomi,小米,F1,cepheus,小米 9,联通电信定制版,xiaomi_cn
+M2102K1C,mob,xiaomi,小米,K1,star,小米 11 Ultra,,xiaomi_cn
+2201123C,mob,xiaomi,小米,L3,cupid,Xiaomi 12,,xiaomi_cn
+2112123AC,mob,xiaomi,小米,L3A,psyche,Xiaomi 12X,,xiaomi_cn
+2211133C,mob,xiaomi,小米,M3,fuxi,Xiaomi 13,,xiaomi_cn
+23127PN0CC,mob,xiaomi,小米,N3,houji,Xiaomi 14,,xiaomi_cn
+M1910F4E,mob,xiaomi,小米,F4,tucana,小米 CC9 Pro,,xiaomi_cn
+22101316UCP,mob,xiaomi,小米,M16U,"ruby, rubypro",Redmi Note 12 Pro+,,xiaomi_cn
+2312DRA50C,mob,xiaomi,小米,N16,garnet,Redmi Note 13 Pro,LPDDR4x + UFS 2.2,xiaomi_cn
+2312CRAD3C,mob,xiaomi,小米,N16S,garnet,Redmi Note 13 Pro,LPDDR5 + UFS 3.1,xiaomi_cn
+22041211AC,mob,xiaomi,小米,L11A,rubens,Redmi K50,,xiaomi_cn
+21121210C,mob,xiaomi,小米,L10,ingres,Redmi K50 电竞版,,xiaomi_cn
+22081212C,mob,xiaomi,小米,L12,diting,Redmi K50 至尊版,,xiaomi_cn
+M1902F1G,mob,xiaomi,Xiaomi,F1,cepheus,Mi 9,Global,xiaomi_en
+M1902F1A,mob,xiaomi,Xiaomi,F1,cepheus,Mi 9,China,xiaomi_en
+M1902F1T,mob,xiaomi,Xiaomi,F1,cepheus,Mi 9,China Mobile,xiaomi_en
+M1902F1C,mob,xiaomi,Xiaomi,F1,cepheus,Mi 9,China Unicom & China Telecom,xiaomi_en
+M1904F3BG,mob,xiaomi,Xiaomi,F3B,pyxis,Mi 9 Lite,Global,xiaomi_en
+M2102K1G,mob,xiaomi,Xiaomi,K1,star,Mi 11 Ultra,Global,xiaomi_en
+M2102K1C,mob,xiaomi,Xiaomi,K1,star,Mi 11 Ultra,China,xiaomi_en
+2201123G,mob,xiaomi,Xiaomi,L3,cupid,Xiaomi 12,Global,xiaomi_en
+2201123C,mob,xiaomi,Xiaomi,L3,cupid,Xiaomi 12,China,xiaomi_en
+2112123AG,mob,xiaomi,Xiaomi,L3A,psyche,Xiaomi 12X,Global,xiaomi_en
+2112123AC,mob,xiaomi,Xiaomi,L3A,psyche,Xiaomi 12X,China,xiaomi_en
+22081212UG,mob,xiaomi,Xiaomi,L12U,diting,Xiaomi 12T Pro,Global,xiaomi_en
+22081212R,mob,xiaomi,Xiaomi,L12U,diting,Xiaomi 12T Pro,Japan (SIM Free),xiaomi_en
+22200414R,mob,xiaomi,Xiaomi,L12U,diting,Xiaomi 12T Pro,Japan (SIM Free),xiaomi_en
+A201XM,mob,xiaomi,Xiaomi,L12U,diting,Xiaomi 12T Pro,Japan (SoftBank),xiaomi_en
+2211133G,mob,xiaomi,Xiaomi,M3,fuxi,Xiaomi 13,Global,xiaomi_en
+2211133C,mob,xiaomi,Xiaomi,M3,fuxi,Xiaomi 13,China,xiaomi_en
+23127PN0CG,mob,xiaomi,Xiaomi,N3,houji,Xiaomi 14,Global,xiaomi_en
+23127PN0CC,mob,xiaomi,Xiaomi,N3,houji,Xiaomi 14,China,xiaomi_en
+M1910F4G,mob,xiaomi,Xiaomi,F4,tucana,Mi Note 10,Global,xiaomi_en
+M1910F4S,mob,xiaomi,Xiaomi,F4,tucana,Mi Note 10,Pro Global,xiaomi_en
+M1910F4E,mob,xiaomi,Xiaomi,F4,tucana,Mi CC 9 Pro,China,xiaomi_en
+25057RN09G,mob,xiaomi,Xiaomi,O19,spring,REDMI 15 5G,Global,xiaomi_en
+25057RN09E,mob,xiaomi,Xiaomi,O19,spring,REDMI 15 5G,Europe,xiaomi_en
+25057RN09I,mob,xiaomi,Xiaomi,O19,spring,REDMI 15 5G,India,xiaomi_en
+25057RN09R,mob,xiaomi,Xiaomi,O19,spring,REDMI 15 5G,Japan (SIM Free),xiaomi_en
+A501XM,mob,xiaomi,Xiaomi,O19,spring,REDMI 15 5G,Japan (SoftBank),xiaomi_en
+22101316UG,mob,xiaomi,Xiaomi,M16U,"ruby, rubypro",Redmi Note 12 Pro+ 5G,Global,xiaomi_en
+22101316UP,mob,xiaomi,Xiaomi,M16U,"ruby, rubypro",Redmi Note 12 Pro+ 5G,India,xiaomi_en
+22101316UCP,mob,xiaomi,Xiaomi,M16U,"ruby, rubypro",Redmi Note 12 Pro+ 5G,China,xiaomi_en
+23129RAA4G,mob,xiaomi,Xiaomi,N7,sapphire,Redmi Note 13,Global,xiaomi_en
+23129RA5FL,mob,xiaomi,Xiaomi,N7L,sapphire,Redmi Note 13,Latin America,xiaomi_en
+23124RA7EO,mob,xiaomi,Xiaomi,N7N,sapphiren,Redmi Note 13,Global (NFC),xiaomi_en
+23117RA68G,mob,xiaomi,Xiaomi,N6,emerald,Redmi Note 13 Pro,Global,xiaomi_en
+2312DRA50G,mob,xiaomi,Xiaomi,N16,garnet,Redmi Note 13 Pro 5G,Global,xiaomi_en
+2312DRA50I,mob,xiaomi,Xiaomi,N16,garnet,Redmi Note 13 Pro 5G,India,xiaomi_en
+2312DRA50C,mob,xiaomi,Xiaomi,N16,garnet,Redmi Note 13 Pro 5G,China (LPDDR4x + UFS 2.2),xiaomi_en
+XIG05,mob,xiaomi,Xiaomi,N16,garnet,Redmi Note 13 Pro 5G,Japan (KDDI),xiaomi_en
+2312CRAD3C,mob,xiaomi,Xiaomi,N16S,garnet,Redmi Note 13 Pro 5G,China (LPDDR5 + UFS 3.1),xiaomi_en
+22041211AC,mob,xiaomi,Xiaomi,L11A,rubens,Redmi K50,China,xiaomi_en
+21121210C,mob,xiaomi,Xiaomi,L10,ingres,Redmi K50G,China,xiaomi_en
+22081212C,mob,xiaomi,Xiaomi,L12,diting,Redmi K50 Ultra,China,xiaomi_en
+25128RN17A,mob,xiaomi,Xiaomi,P25A,arctic,REDMI A7 Pro,Global,xiaomi_en
+25128RN17Y,mob,xiaomi,Xiaomi,P25A,arctic,REDMI A7 Pro,Global,xiaomi_en
+25128RN17I,mob,xiaomi,Xiaomi,P25A,arctic,REDMI A7 Pro,India,xiaomi_en
+25128RN17L,mob,xiaomi,Xiaomi,P25A,arctic,REDMI A7 Pro,Latin America,xiaomi_en
+25028PC03G,mob,xiaomi,Xiaomi,C3Z,serenity,POCO C71,Global,xiaomi_en
+25028PC03Y,mob,xiaomi,Xiaomi,C3Z,serenity,POCO C71,Global,xiaomi_en
+25028PC03I,mob,xiaomi,Xiaomi,C3Z,serenity,POCO C71,India,xiaomi_en
+25028PC03L,mob,xiaomi,Xiaomi,C3Z,serenity,POCO C71,Latin America,xiaomi_en
+25128PC17G,mob,xiaomi,Xiaomi,P25A,arctic,POCO C81 Pro,Global,xiaomi_en
+25128PC17Y,mob,xiaomi,Xiaomi,P25A,arctic,POCO C81 Pro,Global,xiaomi_en
+25128PC17L,mob,xiaomi,Xiaomi,P25A,arctic,POCO C81 Pro,Latin America,xiaomi_en
+25128PC17I,mob,xiaomi,Xiaomi,P25A,arctic,POCO C81,India,xiaomi_en
+TYH601M,mob,zhixuan,华为智选,,,麦芒 9,5G,zhixuan
+ZTE A2017,mob,zte,中兴,,,中兴天机 7,,zte_cn
+Z999,mob,zte,中兴,,,中兴天机 Axon M,,zte_cn
+ZTE 9000N,mob,zte,中兴,,,中兴天机 Axon 11 SE 5G,,zte_cn
+ZTE 9000N,mob,zte,中兴,,,中兴 Blade V2020,,zte_cn

@@ -12,6 +12,16 @@ Il rimedio non è ricordarsene. Qui si **blocca il socket** e si guarda cosa
 succede: se un percorso di ricerca prova a uscire, il test lo dice, con
 l'indirizzo che stava per contattare. Un elenco a mano dei punti di accesso
 alla rete invecchierebbe alla prima fonte aggiunta; questo no.
+
+Dal 17/08/2026 il blocco non è più solo qui dentro: `tests/conftest.py` lo
+tiene acceso per l'INTERA suite, e i due cataloghi anagrafici — codici
+modello e TAC — arrivano da fixture registrate dalle fonti vere. Questo
+file resta il posto dove si verifica che il meccanismo funzioni davvero,
+invece di limitarsi a esistere: `TestLaSuiteGiraSenzaRete` qui sotto è la
+prova che il blocco è attivo e che le fixture rispondono. Senza quella
+prova le due cose potrebbero rompersi insieme senza che nulla diventi
+rosso — i test che dipendono dai cataloghi si limiterebbero a saltarsi da
+soli, che è il modo più silenzioso di smettere di collaudare.
 """
 import json
 import os
@@ -282,6 +292,63 @@ class TestGuastoDiReteNonPropagaEccezioni(unittest.TestCase):
         finally:
             aer_catalog.reset_cache()
             sources.azzera_cache_fonti()
+
+
+class TestLaSuiteGiraSenzaRete(unittest.TestCase):
+    """Il blocco di `tests/conftest.py` è acceso, e le fixture rispondono.
+
+    Sono due affermazioni che il resto della suite dà per scontate senza
+    mai verificarle, ed è una combinazione pericolosa: se il blocco si
+    spegnesse, i test tornerebbero a dipendere dalla connessione senza che
+    nulla cambi colore; se le fixture smettessero di caricarsi, decine di
+    test guardati da un `if not resolve(...)` si salterebbero da soli
+    dichiarando «catalogo non disponibile». In tutti e due i casi la suite
+    resterebbe verde raccontando una cosa falsa. Qui invece diventa rossa.
+    """
+
+    def test_la_rete_e_davvero_staccata(self):
+        import socket as _socket
+
+        if os.environ.get("TEST_CON_RETE") == "1":
+            self.skipTest("TEST_CON_RETE=1: il blocco è disattivato apposta")
+        with self.assertRaises(OSError) as errore:
+            _socket.create_connection(("example.invalid", 443), timeout=1)
+        self.assertIn("ha provato a scaricare", str(errore.exception),
+                      "la connessione è fallita, ma non per il blocco dei "
+                      "test: potrebbe essere solo la macchina senza rete, e "
+                      "domani su una macchina connessa non fallirebbe più")
+
+    def test_il_catalogo_dei_codici_risponde_dalla_fixture(self):
+        """Una forma per ciascuno dei due file, non una qualsiasi.
+
+        `SM-A546B` risolve a due nomi che vengono da fonti diverse:
+        «Galaxy A54 5G» è la grafia di MobileModels, «Samsung Galaxy A54
+        5G» quella costruita dalle due colonne della lista Google Play.
+        Pretenderle entrambe significa che i due file si sono caricati E
+        sono stati letti con la codifica giusta — il CSV col BOM e quello
+        in UTF-16 — che è esattamente il punto in cui questo modulo ha già
+        fallito in silenzio due volte.
+        """
+        modelcodes.reset_cache()
+        nomi = modelcodes.resolve("SM-A546B")
+        self.assertIn("Galaxy A54 5G", nomi, "manca la grafia MobileModels")
+        self.assertIn("Samsung Galaxy A54 5G", nomi,
+                      "manca la grafia Google Play: il CSV in UTF-16 non si è "
+                      "caricato, o è stato letto con la codifica sbagliata")
+        self.assertEqual(modelcodes.marca_dichiarata("SM-A546B"), "Samsung")
+
+    def test_il_database_tac_risponde_dalla_fixture(self):
+        """Il TAC della segnalazione del 17/08/2026, quella che ha fatto
+        scoprire il problema: con la fonte a `HTTP 429` non veniva più
+        riconosciuto, e tre test del sito diventavano rossi."""
+        from core import imeicheck
+
+        imeicheck.reset_cache()
+        identita = imeicheck.identify("867051060315467")
+        self.assertIsNotNone(identita, "TAC 86705106 non riconosciuto: la "
+                                       "fixture dei TAC non si è caricata")
+        marca, _specs = identita
+        self.assertEqual(marca.upper(), "XIAOMI")
 
 
 if __name__ == "__main__":  # pragma: no cover

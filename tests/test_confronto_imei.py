@@ -423,3 +423,75 @@ class TestUnaRispostaCompratraSiPagaUnaVoltaSola(BaseImei):
         imeicheck.identify("998877660000000")
         self.assertIn("99887766", imeicheck.tac_esterni())
         self.assertNotIn("99887766", imeicheck.tac_inseriti())
+
+
+class TestLAttesaDelServizioEsternoSiVede(BaseImei):
+    """Chi aspetta deve sapere PERCHÉ, e non deve aspettare nel primo tempo.
+
+    Chiesto dall'utente il 17/08/2026, a servizio attivo: «quando non
+    trovi l'IMEI avverti con un messaggio a schermo che stai impiegando
+    di più perché stai usando una ricerca su archivio esterno, e fai sì
+    che non sia troppo lento».
+
+    Le due cose sono la stessa: la chiamata stava nel PRIMO tempo, quello
+    che deve uscire subito, e da lì non si può nemmeno avvisare — la
+    pagina non è ancora partita. Spostata nel secondo, l'attesa si può
+    dichiarare mentre accade.
+    """
+
+    def setUp(self):
+        super().setUp()
+        import os
+
+        self._online = imeicheck.cerca_tac_online
+        self._chiave = os.environ.get("TAC_API_KEY")
+        os.environ["TAC_API_KEY"] = "finta-per-il-test"
+        self.chiamate = {"n": 0}
+
+        def finto(tac):
+            self.chiamate["n"] += 1
+            return ("ZTE", "Blade A75 5G")
+
+        imeicheck.cerca_tac_online = finto
+
+    def tearDown(self):
+        import os
+
+        imeicheck.cerca_tac_online = self._online
+        if self._chiave is None:
+            os.environ.pop("TAC_API_KEY", None)
+        else:
+            os.environ["TAC_API_KEY"] = self._chiave
+        super().tearDown()
+
+    def test_il_primo_tempo_non_esce_mai_in_rete(self):
+        from web.main import _esito_imei
+
+        esito = _esito_imei("998877660000000", solo_locale=True)
+        self.assertEqual(self.chiamate["n"], 0)
+        self.assertFalse(esito["riconosciuto"])
+        self.assertTrue(esito["cerco_fuori"], "la pagina non sa di dover avvisare")
+
+    def test_il_secondo_tempo_chiede_davvero(self):
+        from web.main import _esito_imei
+
+        esito = _esito_imei("998877660000000")
+        self.assertEqual(self.chiamate["n"], 1)
+        self.assertTrue(esito["riconosciuto"])
+
+    def test_niente_avviso_se_il_servizio_non_e_configurato(self):
+        """Un avviso per un'attesa che non ci sarà è una bugia: senza
+        chiave nessuno interroga niente, e il TAC resta sconosciuto."""
+        import os
+
+        os.environ.pop("TAC_API_KEY", None)
+        from web.main import _esito_imei
+
+        self.assertFalse(_esito_imei("998877660000000", solo_locale=True)["cerco_fuori"])
+
+    def test_niente_avviso_per_un_tac_gia_noto(self):
+        from web.main import _esito_imei
+
+        esito = _esito_imei("356924110000000", solo_locale=True)   # è nel CSV di prova
+        self.assertTrue(esito["riconosciuto"])
+        self.assertFalse(esito["cerco_fuori"])

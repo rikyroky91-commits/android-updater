@@ -2859,6 +2859,16 @@ class TestDiagnosticaFonteDistinta(unittest.TestCase):
 
     def tearDown(self):
         sources.http_get = self._orig_http
+        # PRIMA I THREAD, POI IL FILE. `lookup_model_structured` avvia il
+        # preriscaldamento delle fonti a basso costo e non lo aspetta (vedi
+        # `sources._scalda_fonti`): ognuno di quei thread apre la propria
+        # connessione SQLite e la chiude quando ha finito. Finché le fonti
+        # erano lente il test arrivava qui buon ultimo e non se ne accorgeva;
+        # con la rete staccata finisce prima dei thread, e su Windows il
+        # database temporaneo resta in mano a un altro processo — il test
+        # falliva in `tearDown`, per un motivo che non c'entrava niente con
+        # quello che verifica.
+        sources.attendi_riscaldamenti()
         storage.reset_state()
         if os.path.exists(self._db):
             os.remove(self._db)

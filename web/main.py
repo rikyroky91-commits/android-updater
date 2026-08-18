@@ -302,7 +302,8 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
     # modello; solo allora si cerca il firmware.
     imei = None
     if imeicheck.is_imei_like(domanda):
-        imei = _esito_imei_salvato(domanda) if saved else _esito_imei(domanda)
+        imei = (_esito_imei_salvato(domanda) if saved
+                else _esito_imei(domanda, solo_locale=_in_due_tempi(completo)))
         if imei["modello_cercato"]:
             # Un IMEI ha già risolto un'identità precisa dal TAC. La ricerca
             # firmware è informazione aggiuntiva e non può rinominare il
@@ -317,6 +318,11 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
             imei = _identita_da_mostrare(imei, risultato.get("nome") or "")
         else:
             risultato = _esito_vuoto(domanda)
+            # Il TAC non è nei database locali e il servizio esterno è
+            # configurato: la pagina esce subito dicendo che la ricerca
+            # continua fuori, invece di far aspettare in silenzio.
+            if imei.get("cerco_fuori"):
+                risultato["firmware_in_arrivo"] = True
     else:
         risultato = _esito_ricerca(domanda, senza_rete=_in_due_tempi(completo))
 
@@ -1232,7 +1238,7 @@ def health():
 # ======================================================================
 # IMEI
 # ======================================================================
-def _esito_imei(imei: str) -> dict:
+def _esito_imei(imei: str, solo_locale: bool = False) -> dict:
     """Da quindici cifre a un modello, dicendo da dove arriva la risposta.
 
     **Il confronto fra le fonti si mostra sempre, anche quando l'IMEI è
@@ -1242,8 +1248,17 @@ def _esito_imei(imei: str) -> dict:
     una risposta sola come se fosse LA risposta è il modo più efficace di
     far preparare un test sul telefono sbagliato.
     """
-    trovato = imeicheck.identify(imei)
+    trovato = imeicheck.identify(imei, solo_locale=solo_locale)
     raffronto = imeicheck.confronto(imei)
+
+    # QUANDO NON LO CONOSCE NESSUNO, QUI, E FUORI C'È DA CHIEDERE.
+    # La prima risposta della pagina non esce mai in rete: chiederlo qui
+    # significherebbe far aspettare senza poterlo nemmeno dire, perché la
+    # pagina non è ancora partita. Si dichiara che la ricerca continua
+    # fuori, e ci pensa il secondo tempo.
+    cerco_fuori = bool(solo_locale and not trovato
+                       and imeicheck.tac_di(imei)
+                       and imeicheck._chiave_api())
 
     modello_cercato = ""
     descrizione = ""
@@ -1297,6 +1312,7 @@ def _esito_imei(imei: str) -> dict:
         "voci": raffronto.get("voci") or [],
         "discordi": bool(raffronto.get("discordi")),
         "stato_database": imeicheck.status(),
+        "cerco_fuori": cerco_fuori,
         "siti": list(imeicheck.link_verifica(imei)),
     }
 

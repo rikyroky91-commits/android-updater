@@ -1,0 +1,1210 @@
+- android: '13.0'
+  branch: Stable Beta
+  codename: cupid
+  date: 2023-10-30
+  link: https://bigota.d.miui.com/V14.0.8.0.TLCCNXM/miui_CUPID_V14.0.8.0.TLCCNXM_3d64b282e7_13.0.zip
+  md5: 3d64b282e766789f556cc0bc46845236
+  method: Recovery
+  name: Xiaomi 12 China
+  size: 5.6 GB
+  version: V14.0.8.0.TLCCNXM
+- android: '15.0'
+  branch: Stable
+  codename: cupid
+  date: 2026-05-15
+  link: https://bigota.d.miui.com/OS3.0.3.0.VLCCNXM/cupid-ota_full-OS3.0.3.0.VLCCNXM-user-15.0-1786889676.zip
+  md5: 1786889676f038fcce124d33a20f6311
+  method: Recovery
+  name: Xiaomi 12 China
+  size: 6.2 GB
+  version: OS3.0.3.0.VLCCNXM
+- android: '15.0'
+  branch: Stable
+  codename: cupid
+  date: 2026-05-06
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.3.0.VLCCNXM/cupid_images_OS3.0.3.0.VLCCNXM_20260506.0000.00_15.0_cn_4cfca91ed0.tgz
+  md5: 4cfca91ed0f4132374462e5f6b211745
+  method: Fastboot
+  name: Xiaomi 12 China
+  size: 7.7 GB
+  version: OS3.0.3.0.VLCCNXM
+- android: '14.0'
+  branch: Public Beta
+  codename: cupid
+  date: 2024-01-12
+  link: https://bigota.d.miui.com/OS1.0.24.1.8.DEV/miui_CUPID_OS1.0.24.1.8.DEV_baa020cda6_14.0.zip
+  md5: null
+  method: Recovery
+  name: Xiaomi 12 China
+  size: 5.7 GB
+  version: OS1.0.24.1.8.DEV
+- android: '13.0'
+  branch: Public Beta
+  codename: cupid
+  date: 2022-12-05
+  link: https://bigota.d.miui.com/V14.0.22.12.5.DEV/cupid_images_V14.0.22.12.5.DEV_20221205.0000.00_13.0_cn_chinatelecom_6d748647ec.tgz
+  md5: 6d748647ec7fd9f25d9810b0595c1f0f
+  method: Fastboot
+  name: Xiaomi 12 China
+  size: 7.5 GB
+  version: V14.0.22.12.5.DEV
+- android: '13.0'
+  branch: Stable Beta
+  codename: cupid_eea_global
+  date: 2023-10-23
+  link: https://bigota.d.miui.com/V14.0.13.0.TLCEUXM/miui_CUPIDEEAGlobal_V14.0.13.0.TLCEUXM_109f5ed1e2_13.0.zip
+  md5: 109f5ed1e27c74e2beff300b0f548aba
+  method: Recovery
+  name: Xiaomi 12 EEA
+  size: 4.9 GB
+  version: V14.0.13.0.TLCEUXM
+- android: '15.0'
+  branch: Stable
+  codename: cupid_eea_global
+  date: 2026-05-28
+  link: https://bigota.d.miui.com/OS3.0.3.0.VLCEUXM/cupid_eea_global-ota_full-OS3.0.3.0.VLCEUXM-user-15.0-9e6dd424fb.zip
+  md5: 9e6dd424fb4d91996b535e14dd1fea6c
+  method: Recovery
+  name: Xiaomi 12 EEA
+  size: 5.8 GB
+  version: OS3.0.3.0.VLCEUXM
+- android: '15.0'
+  branch: Stable
+  codename: cupid_eea_global
+  date: 2026-05-20
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.3.0.VLCEUXM/cupid_eea_global_images_OS3.0.3.0.VLCEUXM_20260520.0000.00_15.0_eea_53090c2ad3.tgz
+  md5: 53090c2ad36cddad476477c22a536f28
+  method: Fastboot
+  name: Xiaomi 12 EEA
+  size: 6.9 GB
+  version: OS3.0.3.0.VLCEUXM
+- android: '13.0'
+  branch: Stable Beta
+  codename: cupid_global
+  date: 2022-08-15
+  link: https://bigota.d.miui.com/V13.0.4.0.TLCMIXM/miui_CUPIDGlobal_V13.0.4.0.TLCMIXM_271430c4dc_13.0.zip
+  md5: 271430c4dc8ea8b1e1648e56cb2c86b0
+  method: Recovery
+  name: Xiaomi 12 Global
+  size: 4.5 GB
+  version: V13.0.4.0.TLCMIXM
+- android: '15.0'
+  branch: Stable
+  codename: cupid_global
+  date: 2026-05-15
+  link: https://bigota.d.miui.com/OS3.0.4.0.VLCMIXM/cupid_global-ota_full-OS3.0.4.0.VLCMIXM-user-15.0-f0c58ba08f.zip
+  md5: f0c58ba08f9f1c182789f60632b84339
+  method: Recovery
+  name: Xiaomi 12 Global
+  size: 5.7 GB
+  version: OS3.0.4.0.VLCMIXM
+- android: '15.0'
+  branch: Stable
+  codename: cupid_global
+  date: 2026-05-06
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.4.0.VLCMIXM/cupid_global_images_OS3.0.4.0.VLCMIXM_20260506.0000.00_15.0_global_d56d6da8ee.tgz
+  md5: d56d6da8ee2969b6a24827d0c2a37f79
+  method: Fastboot
+  name: Xiaomi 12 Global
+  size: 6.9 GB
+  version: OS3.0.4.0.VLCMIXM
+- android: '15.0'
+  branch: Stable
+  codename: cupid_id_global
+  date: 2026-05-26
+  link: https://bigota.d.miui.com/OS3.0.3.0.VLCIDXM/cupid_id_global-ota_full-OS3.0.3.0.VLCIDXM-user-15.0-15634ed6a5.zip
+  md5: 15634ed6a595a9a27e5526647795405e
+  method: Recovery
+  name: Xiaomi 12 Indonesia
+  size: 5.6 GB
+  version: OS3.0.3.0.VLCIDXM
+- android: '15.0'
+  branch: Stable
+  codename: cupid_id_global
+  date: 2026-05-13
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.3.0.VLCIDXM/cupid_id_global_images_OS3.0.3.0.VLCIDXM_20260513.0000.00_15.0_id_f46fca8ede.tgz
+  md5: f46fca8ede915e03ecd09541b122aa1f
+  method: Fastboot
+  name: Xiaomi 12 Indonesia
+  size: 6.8 GB
+  version: OS3.0.3.0.VLCIDXM
+- android: '15.0'
+  branch: Stable Beta
+  codename: cupid_ru_global
+  date: 2026-03-02
+  link: https://bigota.d.miui.com/OS3.0.2.0.VLCRUXM/cupid_ru_global-ota_full-OS3.0.2.0.VLCRUXM-user-15.0-e313ff907d.zip
+  md5: e313ff907dee24741b565e2af10847ab
+  method: Recovery
+  name: Xiaomi 12 Russia
+  size: 5.7 GB
+  version: OS3.0.2.0.VLCRUXM
+- android: '15.0'
+  branch: Stable
+  codename: cupid_ru_global
+  date: 2026-05-26
+  link: https://bigota.d.miui.com/OS3.0.4.0.VLCRUXM/cupid_ru_global-ota_full-OS3.0.4.0.VLCRUXM-user-15.0-1f44bf1a8d.zip
+  md5: 1f44bf1a8d4dd8a455c2fb94e470f791
+  method: Recovery
+  name: Xiaomi 12 Russia
+  size: 5.7 GB
+  version: OS3.0.4.0.VLCRUXM
+- android: '15.0'
+  branch: Stable
+  codename: cupid_ru_global
+  date: 2026-05-13
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.4.0.VLCRUXM/cupid_ru_global_images_OS3.0.4.0.VLCRUXM_20260513.0000.00_15.0_ru_38d25a5744.tgz
+  md5: 38d25a574490d2d5f271b572823f6929
+  method: Fastboot
+  name: Xiaomi 12 Russia
+  size: 6.6 GB
+  version: OS3.0.4.0.VLCRUXM
+- android: '15.0'
+  branch: Stable
+  codename: cupid_tr_global
+  date: 2026-05-26
+  link: https://bigota.d.miui.com/OS3.0.3.0.VLCTRXM/cupid_tr_global-ota_full-OS3.0.3.0.VLCTRXM-user-15.0-f9ce558b8f.zip
+  md5: f9ce558b8f278d8c62c02ec3a72daf51
+  method: Recovery
+  name: Xiaomi 12 Turkey
+  size: 5.7 GB
+  version: OS3.0.3.0.VLCTRXM
+- android: '15.0'
+  branch: Stable
+  codename: cupid_tr_global
+  date: 2026-05-14
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.3.0.VLCTRXM/cupid_tr_global_images_OS3.0.3.0.VLCTRXM_20260514.0000.00_15.0_tr_eeb056e7c2.tgz
+  md5: eeb056e7c25276bb4ab3dc3535988365
+  method: Fastboot
+  name: Xiaomi 12 Turkey
+  size: 6.6 GB
+  version: OS3.0.3.0.VLCTRXM
+- android: '15.0'
+  branch: Stable
+  codename: cupid_tw_global
+  date: 2026-05-26
+  link: https://bigota.d.miui.com/OS3.0.3.0.VLCTWXM/cupid_tw_global-ota_full-OS3.0.3.0.VLCTWXM-user-15.0-dc95f78605.zip
+  md5: dc95f7860521d33bed7f83cf0aea77ef
+  method: Recovery
+  name: Xiaomi 12 Taiwan
+  size: 5.5 GB
+  version: OS3.0.3.0.VLCTWXM
+- android: '15.0'
+  branch: Stable
+  codename: cupid_tw_global
+  date: 2026-05-13
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.3.0.VLCTWXM/cupid_tw_global_images_OS3.0.3.0.VLCTWXM_20260513.0000.00_15.0_tw_83e6be3938.tgz
+  md5: 83e6be3938934e97006f6d4a5a69e30a
+  method: Fastboot
+  name: Xiaomi 12 Taiwan
+  size: 6.2 GB
+  version: OS3.0.3.0.VLCTWXM
+- android: '12.0'
+  branch: Stable Beta
+  codename: daumier
+  date: 2022-08-03
+  link: https://bigota.d.miui.com/V13.0.13.0.SLGCNXM/miui_DAUMIER_V13.0.13.0.SLGCNXM_1f66e033c0_12.0.zip
+  md5: 1f66e033c0dcc9de54bc02cf0824ddcf
+  method: Recovery
+  name: Xiaomi 12 Pro Dimensity China
+  size: 5.5 GB
+  version: V13.0.13.0.SLGCNXM
+- android: '14.0'
+  branch: Stable
+  codename: daumier
+  date: 2025-06-26
+  link: https://bigota.d.miui.com/OS2.0.6.0.ULGCNXM/daumier-ota_full-OS2.0.6.0.ULGCNXM-user-14.0-507b0b4906.zip
+  md5: 507b0b4906bf3966a5dd3044a1e2268e
+  method: Recovery
+  name: Xiaomi 12 Pro Dimensity China
+  size: 6.2 GB
+  version: OS2.0.6.0.ULGCNXM
+- android: '14.0'
+  branch: Stable
+  codename: daumier
+  date: 2025-06-17
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS2.0.6.0.ULGCNXM/daumier_images_OS2.0.6.0.ULGCNXM_20250617.0000.00_14.0_cn_f4b2ee1623.tgz
+  md5: f4b2ee1623cf9e3748fa0109fc6ef297
+  method: Fastboot
+  name: Xiaomi 12 Pro Dimensity China
+  size: 7.4 GB
+  version: OS2.0.6.0.ULGCNXM
+- android: '14.0'
+  branch: Public Beta
+  codename: daumier
+  date: 2024-01-12
+  link: https://bigota.d.miui.com/OS1.0.24.1.8.DEV/miui_DAUMIER_OS1.0.24.1.8.DEV_9ad9ca3a1f_14.0.zip
+  md5: null
+  method: Recovery
+  name: Xiaomi 12 Pro Dimensity China
+  size: 6.1 GB
+  version: OS1.0.24.1.8.DEV
+- android: '13.0'
+  branch: Public Beta
+  codename: daumier
+  date: 2022-12-05
+  link: https://bigota.d.miui.com/V14.0.22.12.5.DEV/daumier_images_V14.0.22.12.5.DEV_20221205.0000.00_13.0_cn_chinatelecom_ec1e522d78.tgz
+  md5: ec1e522d78024a12829d098787d4c94b
+  method: Fastboot
+  name: Xiaomi 12 Pro Dimensity China
+  size: 7.9 GB
+  version: V14.0.22.12.5.DEV
+- android: '13.0'
+  branch: Stable Beta
+  codename: diting_eea_global
+  date: 2023-10-16
+  link: https://bigota.d.miui.com/V14.0.17.0.TLFEUXM/miui_DITINGEEAGlobal_V14.0.17.0.TLFEUXM_330c94a0e1_13.0.zip
+  md5: 330c94a0e11103e3035d538da64041f6
+  method: Recovery
+  name: Xiaomi 12T Pro EEA
+  size: 4.9 GB
+  version: V14.0.17.0.TLFEUXM
+- android: '15.0'
+  branch: Stable
+  codename: diting_eea_global
+  date: 2026-07-23
+  link: https://bigota.d.miui.com/OS3.0.4.0.VLFEUXM/diting_eea_global-ota_full-OS3.0.4.0.VLFEUXM-user-15.0-3caff174c4.zip
+  md5: 3caff174c41c9f003735902c89059e5a
+  method: Recovery
+  name: Xiaomi 12T Pro EEA
+  size: 5.9 GB
+  version: OS3.0.4.0.VLFEUXM
+- android: '15.0'
+  branch: Stable
+  codename: diting_eea_global
+  date: 2026-07-15
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.4.0.VLFEUXM/diting_eea_global_images_OS3.0.4.0.VLFEUXM_20260715.0000.00_15.0_eea_1a4d8f57e3.tgz
+  md5: 1a4d8f57e3fa5dc4924365cdb8d90a41
+  method: Fastboot
+  name: Xiaomi 12T Pro EEA
+  size: 7.0 GB
+  version: OS3.0.4.0.VLFEUXM
+- android: '15.0'
+  branch: Stable Beta
+  codename: diting_global
+  date: 2026-02-06
+  link: https://bigota.d.miui.com/OS3.0.1.0.VLFMIXM/diting_global-ota_full-OS3.0.1.0.VLFMIXM-user-15.0-292fb8d56d.zip
+  md5: 292fb8d56d31c43bd2e1ec161972ff30
+  method: Recovery
+  name: Xiaomi 12T Pro Global
+  size: 5.8 GB
+  version: OS3.0.1.0.VLFMIXM
+- android: '15.0'
+  branch: Stable
+  codename: diting_global
+  date: 2026-07-23
+  link: https://bigota.d.miui.com/OS3.0.5.0.VLFMIXM/diting_global-ota_full-OS3.0.5.0.VLFMIXM-user-15.0-9bd12abf78.zip
+  md5: 9bd12abf78fbfafce6275cf4b5ab53fe
+  method: Recovery
+  name: Xiaomi 12T Pro Global
+  size: 5.8 GB
+  version: OS3.0.5.0.VLFMIXM
+- android: '15.0'
+  branch: Stable
+  codename: diting_global
+  date: 2026-07-16
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.5.0.VLFMIXM/diting_global_images_OS3.0.5.0.VLFMIXM_20260716.0000.00_15.0_global_8d83a37e1a.tgz
+  md5: 8d83a37e1a89e7adf963841a2297c69a
+  method: Fastboot
+  name: Xiaomi 12T Pro Global
+  size: 7.0 GB
+  version: OS3.0.5.0.VLFMIXM
+- android: '14.0'
+  branch: Stable
+  codename: diting_jp_global
+  date: 2026-08-05
+  link: https://bigota.d.miui.com/OS1.0.27.0.ULFJPXM/miui_DITINGJPGlobal_OS1.0.27.0.ULFJPXM_f5dd9497a0_14.0.zip
+  md5: f5dd9497a0a59c15e406ca6ed7bbae83
+  method: Recovery
+  name: Xiaomi 12T Pro Japan
+  size: 5.2 GB
+  version: OS1.0.27.0.ULFJPXM
+- android: '14.0'
+  branch: Stable
+  codename: diting_jp_global
+  date: 2026-07-20
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS1.0.27.0.ULFJPXM/diting_jp_global_images_OS1.0.27.0.ULFJPXM_20260720.0000.00_14.0_jp_5254a80952.tgz
+  md5: 5254a80952e6099530b8f0d262f621ce
+  method: Fastboot
+  name: Xiaomi 12T Pro Japan
+  size: 6.2 GB
+  version: OS1.0.27.0.ULFJPXM
+- android: '15.0'
+  branch: Stable
+  codename: diting_ru_global
+  date: 2026-07-29
+  link: https://bigota.d.miui.com/OS3.0.4.0.VLFRUXM/diting_ru_global-ota_full-OS3.0.4.0.VLFRUXM-user-15.0-89856c20a4.zip
+  md5: 89856c20a421c118dc5724ff2049c610
+  method: Recovery
+  name: Xiaomi 12T Pro Russia
+  size: 5.8 GB
+  version: OS3.0.4.0.VLFRUXM
+- android: '15.0'
+  branch: Stable
+  codename: diting_ru_global
+  date: 2026-07-17
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.4.0.VLFRUXM/diting_ru_global_images_OS3.0.4.0.VLFRUXM_20260717.0000.00_15.0_ru_418b2ebd63.tgz
+  md5: 418b2ebd63ec90b0e91c7f4e07afdbb9
+  method: Fastboot
+  name: Xiaomi 12T Pro Russia
+  size: 6.9 GB
+  version: OS3.0.4.0.VLFRUXM
+- android: '13.0'
+  branch: Stable Beta
+  codename: diting_tr_global
+  date: 2023-07-19
+  link: https://bigota.d.miui.com/V14.0.3.0.TLFTRXM/miui_DITINGTRGlobal_V14.0.3.0.TLFTRXM_60ad700e65_13.0.zip
+  md5: 60ad700e657c68f00d46f814f07a1e79
+  method: Recovery
+  name: Xiaomi 12T Pro Turkey
+  size: 4.8 GB
+  version: V14.0.3.0.TLFTRXM
+- android: '15.0'
+  branch: Stable
+  codename: diting_tr_global
+  date: 2026-07-29
+  link: https://bigota.d.miui.com/OS3.0.4.0.VLFTRXM/diting_tr_global-ota_full-OS3.0.4.0.VLFTRXM-user-15.0-0e4da2b8fc.zip
+  md5: 0e4da2b8fc875ef2d91ca72d4124ecd5
+  method: Recovery
+  name: Xiaomi 12T Pro Turkey
+  size: 5.8 GB
+  version: OS3.0.4.0.VLFTRXM
+- android: '15.0'
+  branch: Stable
+  codename: diting_tr_global
+  date: 2026-07-17
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.4.0.VLFTRXM/diting_tr_global_images_OS3.0.4.0.VLFTRXM_20260717.0000.00_15.0_tr_0d6ff8ea34.tgz
+  md5: 0d6ff8ea34fa2b49d4dc3b09a408c1ac
+  method: Fastboot
+  name: Xiaomi 12T Pro Turkey
+  size: 6.7 GB
+  version: OS3.0.4.0.VLFTRXM
+- android: '15.0'
+  branch: Stable
+  codename: diting_tw_global
+  date: 2026-08-05
+  link: https://bigota.d.miui.com/OS3.0.4.0.VLFTWXM/diting_tw_global-ota_full-OS3.0.4.0.VLFTWXM-user-15.0-2717293c7a.zip
+  md5: 2717293c7a7a9f1ef3a95dbb0986eba7
+  method: Recovery
+  name: Xiaomi 12T Pro Taiwan
+  size: 5.7 GB
+  version: OS3.0.4.0.VLFTWXM
+- android: '15.0'
+  branch: Stable
+  codename: diting_tw_global
+  date: 2026-07-17
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.4.0.VLFTWXM/diting_tw_global_images_OS3.0.4.0.VLFTWXM_20260717.0000.00_15.0_tw_5a0a366531.tgz
+  md5: 5a0a3665312231a4ac4c4798f4fbe55d
+  method: Fastboot
+  name: Xiaomi 12T Pro Taiwan
+  size: 6.6 GB
+  version: OS3.0.4.0.VLFTWXM
+- android: '13.0'
+  branch: Stable Beta
+  codename: mayfly
+  date: 2022-12-28
+  link: https://bigota.d.miui.com/V14.0.4.0.TLTCNXM/miui_MAYFLY_V14.0.4.0.TLTCNXM_53f81d8553_13.0.zip
+  md5: 53f81d855337680a635e490a6c306b48
+  method: Recovery
+  name: Xiaomi 12S China
+  size: 5.9 GB
+  version: V14.0.4.0.TLTCNXM
+- android: '15.0'
+  branch: Stable
+  codename: mayfly
+  date: 2026-03-23
+  link: https://bigota.d.miui.com/OS3.0.3.0.VLTCNXM/mayfly-ota_full-OS3.0.3.0.VLTCNXM-user-15.0-16f6dcd338.zip
+  md5: 16f6dcd3383d20ccae404262cdd14340
+  method: Recovery
+  name: Xiaomi 12S China
+  size: 6.3 GB
+  version: OS3.0.3.0.VLTCNXM
+- android: '15.0'
+  branch: Stable
+  codename: mayfly
+  date: 2026-03-12
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.3.0.VLTCNXM/mayfly_images_OS3.0.3.0.VLTCNXM_20260312.0000.00_15.0_cn_ab4953c424.tgz
+  md5: ab4953c4247f747e9168ea13d065d0e7
+  method: Fastboot
+  name: Xiaomi 12S China
+  size: 7.6 GB
+  version: OS3.0.3.0.VLTCNXM
+- android: '14.0'
+  branch: Public Beta
+  codename: mayfly
+  date: 2024-01-12
+  link: https://bigota.d.miui.com/OS1.0.24.1.8.DEV/miui_MAYFLY_OS1.0.24.1.8.DEV_cbd113e9da_14.0.zip
+  md5: null
+  method: Recovery
+  name: Xiaomi 12S China
+  size: 5.8 GB
+  version: OS1.0.24.1.8.DEV
+- android: '13.0'
+  branch: Public Beta
+  codename: mayfly
+  date: 2022-12-05
+  link: https://bigota.d.miui.com/V14.0.22.12.5.DEV/mayfly_images_V14.0.22.12.5.DEV_20221205.0000.00_13.0_cn_chinatelecom_085cddb1a5.tgz
+  md5: 085cddb1a5ad832961c787b76059ad5d
+  method: Fastboot
+  name: Xiaomi 12S China
+  size: 7.6 GB
+  version: V14.0.22.12.5.DEV
+- android: '13.0'
+  branch: Stable Beta
+  codename: plato_eea_global
+  date: 2023-05-22
+  link: https://bigota.d.miui.com/V14.0.10.0.TLQEUXM/miui_PLATOEEAGlobal_V14.0.10.0.TLQEUXM_01518d0fd6_13.0.zip
+  md5: 01518d0fd6a6bf288ce6f9aeae6d382b
+  method: Recovery
+  name: Xiaomi 12T EEA
+  size: 5.2 GB
+  version: V14.0.10.0.TLQEUXM
+- android: '15.0'
+  branch: Stable
+  codename: plato_eea_global
+  date: 2026-06-26
+  link: https://bigota.d.miui.com/OS2.0.216.0.VLQEUXM/plato_eea_global-ota_full-OS2.0.216.0.VLQEUXM-user-15.0-eafb9d6c27.zip
+  md5: eafb9d6c27ac6bfb2f07e77643ed1798
+  method: Recovery
+  name: Xiaomi 12T EEA
+  size: 6.0 GB
+  version: OS2.0.216.0.VLQEUXM
+- android: '15.0'
+  branch: Stable
+  codename: plato_eea_global
+  date: 2026-06-17
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS2.0.216.0.VLQEUXM/plato_eea_global_images_OS2.0.216.0.VLQEUXM_20260617.0000.00_15.0_eea_a11167dea0.tgz
+  md5: a11167dea091cb77ec9515ec050d2dd2
+  method: Fastboot
+  name: Xiaomi 12T EEA
+  size: 7.1 GB
+  version: OS2.0.216.0.VLQEUXM
+- android: '14.0'
+  branch: Stable Beta
+  codename: plato_global
+  date: 2023-09-28
+  link: https://bigota.d.miui.com/V14.0.6.0.ULQMIXM/miui_PLATOGlobal_V14.0.6.0.ULQMIXM_25260a1c54_14.0.zip
+  md5: 25260a1c5479d0546f3b779c3a769c84
+  method: Recovery
+  name: Xiaomi 12T Global
+  size: 5.3 GB
+  version: V14.0.6.0.ULQMIXM
+- android: '15.0'
+  branch: Stable
+  codename: plato_global
+  date: 2026-06-26
+  link: https://bigota.d.miui.com/OS2.0.215.0.VLQMIXM/plato_global-ota_full-OS2.0.215.0.VLQMIXM-user-15.0-d2454ad827.zip
+  md5: d2454ad827fd68a9b10842748193569c
+  method: Recovery
+  name: Xiaomi 12T Global
+  size: 5.9 GB
+  version: OS2.0.215.0.VLQMIXM
+- android: '15.0'
+  branch: Stable
+  codename: plato_global
+  date: 2026-06-15
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS2.0.215.0.VLQMIXM/plato_global_images_OS2.0.215.0.VLQMIXM_20260615.0000.00_15.0_global_5176828870.tgz
+  md5: 5176828870097a20d39b892d327a24ce
+  method: Fastboot
+  name: Xiaomi 12T Global
+  size: 7.1 GB
+  version: OS2.0.215.0.VLQMIXM
+- android: '14.0'
+  branch: Public Beta
+  codename: plato_global
+  date: 2023-05-06
+  link: https://bigota.d.miui.com/23.5.6/plato_pre_dpp_global_images_23.5.6_20230506.0000.00_14.0_global_189c41d4ac.tgz
+  md5: null
+  method: Fastboot
+  name: Xiaomi 12T Global
+  size: 6.8 GB
+  version: 23.5.6
+- android: '15.0'
+  branch: Stable
+  codename: plato_id_global
+  date: 2026-06-26
+  link: https://bigota.d.miui.com/OS2.0.210.0.VLQIDXM/plato_id_global-ota_full-OS2.0.210.0.VLQIDXM-user-15.0-d06124ecaf.zip
+  md5: d06124ecaf1d30a5779abb056320383d
+  method: Recovery
+  name: Xiaomi 12T Indonesia
+  size: 5.8 GB
+  version: OS2.0.210.0.VLQIDXM
+- android: '15.0'
+  branch: Stable
+  codename: plato_id_global
+  date: 2026-06-17
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS2.0.210.0.VLQIDXM/plato_id_global_images_OS2.0.210.0.VLQIDXM_20260617.0000.00_15.0_id_3225895bfc.tgz
+  md5: 3225895bfc9c7d773e2192912686c0a7
+  method: Fastboot
+  name: Xiaomi 12T Indonesia
+  size: 6.8 GB
+  version: OS2.0.210.0.VLQIDXM
+- android: '15.0'
+  branch: Stable
+  codename: plato_ru_global
+  date: 2026-07-07
+  link: https://bigota.d.miui.com/OS2.0.210.0.VLQRUXM/plato_ru_global-ota_full-OS2.0.210.0.VLQRUXM-user-15.0-133cdf6db9.zip
+  md5: 133cdf6db94d02c1564a831f16083f0b
+  method: Recovery
+  name: Xiaomi 12T Russia
+  size: 5.8 GB
+  version: OS2.0.210.0.VLQRUXM
+- android: '15.0'
+  branch: Stable
+  codename: plato_ru_global
+  date: 2026-06-22
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS2.0.210.0.VLQRUXM/plato_ru_global_images_OS2.0.210.0.VLQRUXM_20260622.0000.00_15.0_ru_d0c0b7035f.tgz
+  md5: d0c0b7035fe11cf0ff6587a1741afc81
+  method: Fastboot
+  name: Xiaomi 12T Russia
+  size: 6.9 GB
+  version: OS2.0.210.0.VLQRUXM
+- android: '13.0'
+  branch: Stable Beta
+  codename: plato_tr_global
+  date: 2023-08-15
+  link: https://bigota.d.miui.com/V14.0.4.0.TLQTRXM/miui_PLATOTRGlobal_V14.0.4.0.TLQTRXM_842f81f8a2_13.0.zip
+  md5: 842f81f8a2b07f819b1abc74c7db0c9d
+  method: Recovery
+  name: Xiaomi 12T Turkey
+  size: 4.9 GB
+  version: V14.0.4.0.TLQTRXM
+- android: '15.0'
+  branch: Stable
+  codename: plato_tr_global
+  date: 2026-07-07
+  link: https://bigota.d.miui.com/OS2.0.210.0.VLQTRXM/plato_tr_global-ota_full-OS2.0.210.0.VLQTRXM-user-15.0-34d771d527.zip
+  md5: 34d771d527c7ed201fa6a4f896a12265
+  method: Recovery
+  name: Xiaomi 12T Turkey
+  size: 5.8 GB
+  version: OS2.0.210.0.VLQTRXM
+- android: '15.0'
+  branch: Stable
+  codename: plato_tr_global
+  date: 2026-06-17
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS2.0.210.0.VLQTRXM/plato_tr_global_images_OS2.0.210.0.VLQTRXM_20260617.0000.00_15.0_tr_0a828f1567.tgz
+  md5: 0a828f156709c69df1a576e8180f7899
+  method: Fastboot
+  name: Xiaomi 12T Turkey
+  size: 6.8 GB
+  version: OS2.0.210.0.VLQTRXM
+- android: '15.0'
+  branch: Stable
+  codename: plato_tw_global
+  date: 2026-07-07
+  link: https://bigota.d.miui.com/OS2.0.210.0.VLQTWXM/plato_tw_global-ota_full-OS2.0.210.0.VLQTWXM-user-15.0-9585288bd7.zip
+  md5: 9585288bd75a02185522ab23e8d3733d
+  method: Recovery
+  name: Xiaomi 12T Taiwan
+  size: 5.7 GB
+  version: OS2.0.210.0.VLQTWXM
+- android: '15.0'
+  branch: Stable
+  codename: plato_tw_global
+  date: 2026-06-18
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS2.0.210.0.VLQTWXM/plato_tw_global_images_OS2.0.210.0.VLQTWXM_20260618.0000.00_15.0_tw_561b1a3d0e.tgz
+  md5: 561b1a3d0e1babc1eea10415303dc43c
+  method: Fastboot
+  name: Xiaomi 12T Taiwan
+  size: 6.7 GB
+  version: OS2.0.210.0.VLQTWXM
+- android: '13.0'
+  branch: Stable
+  codename: psyche
+  date: 2026-03-21
+  link: https://bigota.d.miui.com/OS1.0.15.0.TLDCNXM/miui_PSYCHE_OS1.0.15.0.TLDCNXM_15effa03fa_13.0.zip
+  md5: 15effa03fab8f8f90acc27b2a6ce4afd
+  method: Recovery
+  name: Xiaomi 12X China
+  size: 4.1 GB
+  version: OS1.0.15.0.TLDCNXM
+- android: '13.0'
+  branch: Stable
+  codename: psyche
+  date: 2026-03-14
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS1.0.15.0.TLDCNXM/psyche_images_OS1.0.15.0.TLDCNXM_20260314.0000.00_13.0_cn_1a422adee1.tgz
+  md5: 1a422adee15b0efb9ddc2a3625edb8b5
+  method: Fastboot
+  name: Xiaomi 12X China
+  size: 5.9 GB
+  version: OS1.0.15.0.TLDCNXM
+- android: '12.0'
+  branch: Weekly
+  codename: psyche
+  date: 2022-03-24
+  link: https://bigota.d.miui.com/22.3.24/miui_PSYCHEPRE_22.3.24_e31cc10d3b_12.0.zip
+  md5: e31cc10d3b423100607538b45050ea37
+  method: Recovery
+  name: Xiaomi 12X China
+  size: 4.3 GB
+  version: 22.3.24
+- android: '12.0'
+  branch: Weekly
+  codename: psyche
+  date: 2022-02-28
+  link: https://bigota.d.miui.com/22.2.28/psyche_pre_images_22.2.28_20220228.0000.00_12.0_cn_c322686d86.tgz
+  md5: c322686d861c594c6b07d02881c06568
+  method: Fastboot
+  name: Xiaomi 12X China
+  size: 6.3 GB
+  version: 22.2.28
+- android: '13.0'
+  branch: Public Beta
+  codename: psyche
+  date: 2023-08-04
+  link: https://bigota.d.miui.com/V14.0.23.7.31.DEV/miui_PSYCHE_V14.0.23.7.31.DEV_8d51d818cd_13.0.zip
+  md5: 8d51d818cd1d3b1f28aed22e0fbb510c
+  method: Recovery
+  name: Xiaomi 12X China
+  size: 4.0 GB
+  version: V14.0.23.7.31.DEV
+- android: '13.0'
+  branch: Public Beta
+  codename: psyche
+  date: 2022-12-05
+  link: https://bigota.d.miui.com/V14.0.22.12.5.DEV/psyche_images_V14.0.22.12.5.DEV_20221205.0000.00_13.0_cn_chinatelecom_8382cc8f9e.tgz
+  md5: 8382cc8f9e8eb5f70ddbc34aec863134
+  method: Fastboot
+  name: Xiaomi 12X China
+  size: 5.7 GB
+  version: V14.0.22.12.5.DEV
+- android: '13.0'
+  branch: Stable
+  codename: psyche_eea_global
+  date: 2024-12-11
+  link: https://bigota.d.miui.com/OS1.0.8.0.TLDEUXM/miui_PSYCHEEEAGlobal_OS1.0.8.0.TLDEUXM_70eef7e1f1_13.0.zip
+  md5: 70eef7e1f17eda042c7edc52866b0b3f
+  method: Recovery
+  name: Xiaomi 12X EEA
+  size: 3.9 GB
+  version: OS1.0.8.0.TLDEUXM
+- android: '13.0'
+  branch: Stable
+  codename: psyche_eea_global
+  date: 2024-11-25
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS1.0.8.0.TLDEUXM/psyche_eea_global_images_OS1.0.8.0.TLDEUXM_20241125.0000.00_13.0_eea_8a7873c96f.tgz
+  md5: 8a7873c96f3d895e60a21c55e1a13765
+  method: Fastboot
+  name: Xiaomi 12X EEA
+  size: 5.6 GB
+  version: OS1.0.8.0.TLDEUXM
+- android: '13.0'
+  branch: Stable
+  codename: psyche_global
+  date: 2024-12-10
+  link: https://bigota.d.miui.com/OS1.0.8.0.TLDMIXM/miui_PSYCHEGlobal_OS1.0.8.0.TLDMIXM_73cbb5a32b_13.0.zip
+  md5: 73cbb5a32b2b510b9ef0e30cd7b27e3f
+  method: Recovery
+  name: Xiaomi 12X Global
+  size: 3.9 GB
+  version: OS1.0.8.0.TLDMIXM
+- android: '13.0'
+  branch: Stable
+  codename: psyche_global
+  date: 2024-11-26
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS1.0.8.0.TLDMIXM/psyche_global_images_OS1.0.8.0.TLDMIXM_20241126.0000.00_13.0_global_c976dda5a4.tgz
+  md5: c976dda5a4e6f057d6a2d3ba9c20d5c4
+  method: Fastboot
+  name: Xiaomi 12X Global
+  size: 5.8 GB
+  version: OS1.0.8.0.TLDMIXM
+- android: '13.0'
+  branch: Stable
+  codename: psyche_ru_global
+  date: 2024-12-10
+  link: https://bigota.d.miui.com/OS1.0.7.0.TLDRUXM/miui_PSYCHERUGlobal_OS1.0.7.0.TLDRUXM_a4e144fcda_13.0.zip
+  md5: a4e144fcdadc46f3825a5f833fc756c2
+  method: Recovery
+  name: Xiaomi 12X Russia
+  size: 4.0 GB
+  version: OS1.0.7.0.TLDRUXM
+- android: '13.0'
+  branch: Stable
+  codename: psyche_ru_global
+  date: 2024-11-25
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS1.0.7.0.TLDRUXM/psyche_ru_global_images_OS1.0.7.0.TLDRUXM_20241125.0000.00_13.0_ru_4ce0e9af0e.tgz
+  md5: 4ce0e9af0ed8a349a0e6853ce0685210
+  method: Fastboot
+  name: Xiaomi 12X Russia
+  size: 5.6 GB
+  version: OS1.0.7.0.TLDRUXM
+- android: '13.0'
+  branch: Stable
+  codename: psyche_tw_global
+  date: 2024-12-11
+  link: https://bigota.d.miui.com/OS1.0.6.0.TLDTWXM/miui_PSYCHETWGlobal_OS1.0.6.0.TLDTWXM_ab32c7ddf4_13.0.zip
+  md5: ab32c7ddf4837a7d52073a7dee21873a
+  method: Recovery
+  name: Xiaomi 12X Taiwan
+  size: 3.9 GB
+  version: OS1.0.6.0.TLDTWXM
+- android: '13.0'
+  branch: Stable
+  codename: psyche_tw_global
+  date: 2024-11-26
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS1.0.6.0.TLDTWXM/psyche_tw_global_images_OS1.0.6.0.TLDTWXM_20241126.0000.00_13.0_tw_a5b6202a75.tgz
+  md5: a5b6202a75da31d50c8ee9bf428fe9af
+  method: Fastboot
+  name: Xiaomi 12X Taiwan
+  size: 5.1 GB
+  version: OS1.0.6.0.TLDTWXM
+- android: '13.0'
+  branch: Stable Beta
+  codename: taoyao_eea_global
+  date: 2023-10-25
+  link: https://bigota.d.miui.com/V14.0.21.0.TLIEUXM/miui_TAOYAOEEAGlobal_V14.0.21.0.TLIEUXM_76aac7323a_13.0.zip
+  md5: 76aac7323ac207a1cf309ba483b1b55e
+  method: Recovery
+  name: Xiaomi 12 Lite EEA
+  size: 4.9 GB
+  version: V14.0.21.0.TLIEUXM
+- android: '14.0'
+  branch: Stable
+  codename: taoyao_eea_global
+  date: 2026-06-09
+  link: https://bigota.d.miui.com/OS1.0.39.0.ULIEUXM/miui_TAOYAOEEAGlobal_OS1.0.39.0.ULIEUXM_23371ecf31_14.0.zip
+  md5: 23371ecf3196cb678d927a12a79df633
+  method: Recovery
+  name: Xiaomi 12 Lite EEA
+  size: 5.4 GB
+  version: OS1.0.39.0.ULIEUXM
+- android: '14.0'
+  branch: Stable
+  codename: taoyao_eea_global
+  date: 2026-05-26
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS1.0.39.0.ULIEUXM/taoyao_eea_global_images_OS1.0.39.0.ULIEUXM_20260526.0000.00_14.0_eea_8d834d7f4f.tgz
+  md5: 8d834d7f4f34dafb1d8db85f8cdb3a93
+  method: Fastboot
+  name: Xiaomi 12 Lite EEA
+  size: 6.8 GB
+  version: OS1.0.39.0.ULIEUXM
+- android: '12.0'
+  branch: Stable Beta
+  codename: taoyao_global
+  date: 2022-07-11
+  link: https://bigota.d.miui.com/V13.0.1.0.SLIMIXM/miui_TAOYAOGlobal_V13.0.1.0.SLIMIXM_73650864a7_12.0.zip
+  md5: 73650864a73cee0f52110cefba68c73d
+  method: Recovery
+  name: Xiaomi 12 Lite Global
+  size: 4.2 GB
+  version: V13.0.1.0.SLIMIXM
+- android: '14.0'
+  branch: Stable
+  codename: taoyao_global
+  date: 2026-06-09
+  link: https://bigota.d.miui.com/OS1.0.34.0.ULIMIXM/miui_TAOYAOGlobal_OS1.0.34.0.ULIMIXM_6f4b2481b8_14.0.zip
+  md5: 6f4b2481b897db6c38f9318ddc8c3bc2
+  method: Recovery
+  name: Xiaomi 12 Lite Global
+  size: 5.3 GB
+  version: OS1.0.34.0.ULIMIXM
+- android: '14.0'
+  branch: Stable
+  codename: taoyao_global
+  date: 2026-05-25
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS1.0.34.0.ULIMIXM/taoyao_global_images_OS1.0.34.0.ULIMIXM_20260525.0000.00_14.0_global_e8602e568a.tgz
+  md5: e8602e568a7b82cabc34b7f3aeb43b72
+  method: Fastboot
+  name: Xiaomi 12 Lite Global
+  size: 6.9 GB
+  version: OS1.0.34.0.ULIMIXM
+- android: '14.0'
+  branch: Stable
+  codename: taoyao_id_global
+  date: 2026-06-09
+  link: https://bigota.d.miui.com/OS1.0.29.0.ULIIDXM/miui_TAOYAOIDGlobal_OS1.0.29.0.ULIIDXM_fd0220001a_14.0.zip
+  md5: fd0220001aaead036d47568a2c4911f2
+  method: Recovery
+  name: Xiaomi 12 Lite Indonesia
+  size: 5.2 GB
+  version: OS1.0.29.0.ULIIDXM
+- android: '14.0'
+  branch: Stable
+  codename: taoyao_id_global
+  date: 2026-05-27
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS1.0.29.0.ULIIDXM/taoyao_id_global_images_OS1.0.29.0.ULIIDXM_20260527.0000.00_14.0_id_6b0a07baf5.tgz
+  md5: 6b0a07baf5ce6f392cba765caf9fa678
+  method: Fastboot
+  name: Xiaomi 12 Lite Indonesia
+  size: 6.6 GB
+  version: OS1.0.29.0.ULIIDXM
+- android: '14.0'
+  branch: Stable
+  codename: taoyao_ru_global
+  date: 2026-06-09
+  link: https://bigota.d.miui.com/OS1.0.28.0.ULIRUXM/miui_TAOYAORUGlobal_OS1.0.28.0.ULIRUXM_8f76df6e08_14.0.zip
+  md5: 8f76df6e084678b72321fe1cac6c20fa
+  method: Recovery
+  name: Xiaomi 12 Lite Russia
+  size: 5.2 GB
+  version: OS1.0.28.0.ULIRUXM
+- android: '14.0'
+  branch: Stable
+  codename: taoyao_ru_global
+  date: 2026-05-27
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS1.0.28.0.ULIRUXM/taoyao_ru_global_images_OS1.0.28.0.ULIRUXM_20260527.0000.00_14.0_ru_7e54e522f8.tgz
+  md5: 7e54e522f8b5ac9ee52ae293804b90f2
+  method: Fastboot
+  name: Xiaomi 12 Lite Russia
+  size: 6.4 GB
+  version: OS1.0.28.0.ULIRUXM
+- android: '14.0'
+  branch: Stable
+  codename: taoyao_tr_global
+  date: 2026-06-09
+  link: https://bigota.d.miui.com/OS1.0.28.0.ULITRXM/miui_TAOYAOTRGlobal_OS1.0.28.0.ULITRXM_8bdca99618_14.0.zip
+  md5: 8bdca99618ae11d25a1e689b320f7533
+  method: Recovery
+  name: Xiaomi 12 Lite Turkey
+  size: 5.2 GB
+  version: OS1.0.28.0.ULITRXM
+- android: '14.0'
+  branch: Stable
+  codename: taoyao_tr_global
+  date: 2026-05-27
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS1.0.28.0.ULITRXM/taoyao_tr_global_images_OS1.0.28.0.ULITRXM_20260527.0000.00_14.0_tr_64e659208f.tgz
+  md5: 64e659208f4aab9b35bfb405ee8b8915
+  method: Fastboot
+  name: Xiaomi 12 Lite Turkey
+  size: 6.5 GB
+  version: OS1.0.28.0.ULITRXM
+- android: '14.0'
+  branch: Stable
+  codename: taoyao_tw_global
+  date: 2026-06-09
+  link: https://bigota.d.miui.com/OS1.0.28.0.ULITWXM/miui_TAOYAOTWGlobal_OS1.0.28.0.ULITWXM_4513f40952_14.0.zip
+  md5: 4513f4095271e181a1203fc30e46c098
+  method: Recovery
+  name: Xiaomi 12 Lite Taiwan
+  size: 5.0 GB
+  version: OS1.0.28.0.ULITWXM
+- android: '14.0'
+  branch: Stable
+  codename: taoyao_tw_global
+  date: 2026-05-27
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS1.0.28.0.ULITWXM/taoyao_tw_global_images_OS1.0.28.0.ULITWXM_20260527.0000.00_14.0_tw_e09e8675bd.tgz
+  md5: e09e8675bd5be5deb7e1b34edfa1e4be
+  method: Fastboot
+  name: Xiaomi 12 Lite Taiwan
+  size: 6.3 GB
+  version: OS1.0.28.0.ULITWXM
+- android: '15.0'
+  branch: Stable Beta
+  codename: thor
+  date: 2025-01-24
+  link: https://bigota.d.miui.com/OS2.0.1.0.VLACNXM/thor-ota_full-OS2.0.1.0.VLACNXM-user-15.0-8ebdc506ad.zip
+  md5: 8ebdc506ad1c208712b9701d803f35a5
+  method: Recovery
+  name: Xiaomi 12S Ultra China
+  size: 6.3 GB
+  version: OS2.0.1.0.VLACNXM
+- android: '15.0'
+  branch: Stable
+  codename: thor
+  date: 2026-05-26
+  link: https://bigota.d.miui.com/OS3.0.6.0.VLACNXM/thor-ota_full-OS3.0.6.0.VLACNXM-user-15.0-3d1fc60ad4.zip
+  md5: 3d1fc60ad4c31c1d5f2f1bd28fdd70f4
+  method: Recovery
+  name: Xiaomi 12S Ultra China
+  size: 6.5 GB
+  version: OS3.0.6.0.VLACNXM
+- android: '15.0'
+  branch: Stable
+  codename: thor
+  date: 2026-05-20
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.6.0.VLACNXM/thor_images_OS3.0.6.0.VLACNXM_20260520.0000.00_15.0_cn_1ca7c6c2d7.tgz
+  md5: 1ca7c6c2d78603ac957e52ef389fbcb7
+  method: Fastboot
+  name: Xiaomi 12S Ultra China
+  size: 8.0 GB
+  version: OS3.0.6.0.VLACNXM
+- android: '14.0'
+  branch: Public Beta
+  codename: thor
+  date: 2024-01-12
+  link: https://bigota.d.miui.com/OS1.0.24.1.8.DEV/miui_THOR_OS1.0.24.1.8.DEV_76f137abd5_14.0.zip
+  md5: null
+  method: Recovery
+  name: Xiaomi 12S Ultra China
+  size: 6.0 GB
+  version: OS1.0.24.1.8.DEV
+- android: '13.0'
+  branch: Public Beta
+  codename: thor
+  date: 2022-12-05
+  link: https://bigota.d.miui.com/V14.0.22.12.5.DEV/thor_images_V14.0.22.12.5.DEV_20221205.0000.00_13.0_cn_chinatelecom_0457ff82b1.tgz
+  md5: 0457ff82b1a6fe0954fc4fcec9ffe182
+  method: Fastboot
+  name: Xiaomi 12S Ultra China
+  size: 7.9 GB
+  version: V14.0.22.12.5.DEV
+- android: '15.0'
+  branch: Stable Beta
+  codename: unicorn
+  date: 2025-02-19
+  link: https://bigota.d.miui.com/OS2.0.3.0.VLECNXM/unicorn-ota_full-OS2.0.3.0.VLECNXM-user-15.0-1692fbbf05.zip
+  md5: 1692fbbf059783ec94be86e44eed2741
+  method: Recovery
+  name: Xiaomi 12S Pro China
+  size: 6.2 GB
+  version: OS2.0.3.0.VLECNXM
+- android: '15.0'
+  branch: Stable
+  codename: unicorn
+  date: 2026-06-25
+  link: https://bigota.d.miui.com/OS3.0.4.0.VLECNXM/unicorn-ota_full-OS3.0.4.0.VLECNXM-user-15.0-9be4b80759.zip
+  md5: 9be4b807591b30510d6c577baa06b5a5
+  method: Recovery
+  name: Xiaomi 12S Pro China
+  size: 6.4 GB
+  version: OS3.0.4.0.VLECNXM
+- android: '15.0'
+  branch: Stable
+  codename: unicorn
+  date: 2026-06-03
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.4.0.VLECNXM/unicorn_images_OS3.0.4.0.VLECNXM_20260603.0000.00_15.0_cn_17629c3b9c.tgz
+  md5: 17629c3b9c1287f511d2666419849bbb
+  method: Fastboot
+  name: Xiaomi 12S Pro China
+  size: 8.0 GB
+  version: OS3.0.4.0.VLECNXM
+- android: '14.0'
+  branch: Public Beta
+  codename: unicorn
+  date: 2024-01-12
+  link: https://bigota.d.miui.com/OS1.0.24.1.8.DEV/miui_UNICORN_OS1.0.24.1.8.DEV_aaec3a46ce_14.0.zip
+  md5: null
+  method: Recovery
+  name: Xiaomi 12S Pro China
+  size: 5.9 GB
+  version: OS1.0.24.1.8.DEV
+- android: '13.0'
+  branch: Public Beta
+  codename: unicorn
+  date: 2022-12-05
+  link: https://bigota.d.miui.com/V14.0.22.12.5.DEV/unicorn_images_V14.0.22.12.5.DEV_20221205.0000.00_13.0_cn_chinatelecom_492d87e2cd.tgz
+  md5: 492d87e2cde86c66168b08da02b76042
+  method: Fastboot
+  name: Xiaomi 12S Pro China
+  size: 7.7 GB
+  version: V14.0.22.12.5.DEV
+- android: '13.0'
+  branch: Stable Beta
+  codename: zeus
+  date: 2023-10-30
+  link: https://bigota.d.miui.com/V14.0.15.0.TLBCNXM/miui_ZEUS_V14.0.15.0.TLBCNXM_f6a22db295_13.0.zip
+  md5: f6a22db2959b2ee342d55e71f90b25b1
+  method: Recovery
+  name: Xiaomi 12 Pro China
+  size: 5.7 GB
+  version: V14.0.15.0.TLBCNXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus
+  date: 2026-06-01
+  link: https://bigota.d.miui.com/OS3.0.3.0.VLBCNXM/zeus-ota_full-OS3.0.3.0.VLBCNXM-user-15.0-b4852ba809.zip
+  md5: b4852ba809f80f27d94f3d43a6e4ba44
+  method: Recovery
+  name: Xiaomi 12 Pro China
+  size: 6.3 GB
+  version: OS3.0.3.0.VLBCNXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus
+  date: 2026-05-14
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.3.0.VLBCNXM/zeus_images_OS3.0.3.0.VLBCNXM_20260514.0000.00_15.0_cn_9a47bf5510.tgz
+  md5: 9a47bf5510fe1b306a2aaa858714ec31
+  method: Fastboot
+  name: Xiaomi 12 Pro China
+  size: 8.0 GB
+  version: OS3.0.3.0.VLBCNXM
+- android: '14.0'
+  branch: Public Beta
+  codename: zeus
+  date: 2024-01-12
+  link: https://bigota.d.miui.com/OS1.0.24.1.8.DEV/miui_ZEUS_OS1.0.24.1.8.DEV_38df6f0458_14.0.zip
+  md5: null
+  method: Recovery
+  name: Xiaomi 12 Pro China
+  size: 5.7 GB
+  version: OS1.0.24.1.8.DEV
+- android: '13.0'
+  branch: Public Beta
+  codename: zeus
+  date: 2022-12-05
+  link: https://bigota.d.miui.com/V14.0.22.12.5.DEV/zeus_images_V14.0.22.12.5.DEV_20221205.0000.00_13.0_cn_chinatelecom_9e94bd9f24.tgz
+  md5: 9e94bd9f24616637de7079ecf373c2a6
+  method: Fastboot
+  name: Xiaomi 12 Pro China
+  size: 7.6 GB
+  version: V14.0.22.12.5.DEV
+- android: '13.0'
+  branch: Stable Beta
+  codename: zeus_eea_global
+  date: 2023-10-23
+  link: https://bigota.d.miui.com/V14.0.17.0.TLBEUXM/miui_ZEUSEEAGlobal_V14.0.17.0.TLBEUXM_6521ddb7a8_13.0.zip
+  md5: 6521ddb7a86ab500188891bdba4d748b
+  method: Recovery
+  name: Xiaomi 12 Pro EEA
+  size: 5.0 GB
+  version: V14.0.17.0.TLBEUXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus_eea_global
+  date: 2026-06-10
+  link: https://bigota.d.miui.com/OS3.0.3.0.VLBEUXM/zeus_eea_global-ota_full-OS3.0.3.0.VLBEUXM-user-15.0-08b1c16424.zip
+  md5: 08b1c16424dbe21f29b2c3607da10b71
+  method: Recovery
+  name: Xiaomi 12 Pro EEA
+  size: 5.9 GB
+  version: OS3.0.3.0.VLBEUXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus_eea_global
+  date: 2026-05-21
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.3.0.VLBEUXM/zeus_eea_global_images_OS3.0.3.0.VLBEUXM_20260521.0000.00_15.0_eea_57f69ce00b.tgz
+  md5: 57f69ce00bc303c04ce4c7b3ae1cbe16
+  method: Fastboot
+  name: Xiaomi 12 Pro EEA
+  size: 7.0 GB
+  version: OS3.0.3.0.VLBEUXM
+- android: '15.0'
+  branch: Stable Beta
+  codename: zeus_global
+  date: 2026-03-02
+  link: https://bigota.d.miui.com/OS3.0.2.0.VLBMIXM/zeus_global-ota_full-OS3.0.2.0.VLBMIXM-user-15.0-7aa0ba9d88.zip
+  md5: 7aa0ba9d88601175ef0f28abb52e0b63
+  method: Recovery
+  name: Xiaomi 12 Pro Global
+  size: 5.8 GB
+  version: OS3.0.2.0.VLBMIXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus_global
+  date: 2026-06-09
+  link: https://bigota.d.miui.com/OS3.0.4.0.VLBMIXM/zeus_global-ota_full-OS3.0.4.0.VLBMIXM-user-15.0-18ce810dc8.zip
+  md5: 18ce810dc8328fbc281cf67ed602f43c
+  method: Recovery
+  name: Xiaomi 12 Pro Global
+  size: 5.8 GB
+  version: OS3.0.4.0.VLBMIXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus_global
+  date: 2026-06-01
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.4.0.VLBMIXM/zeus_global_images_OS3.0.4.0.VLBMIXM_20260601.0000.00_15.0_global_70c95a776f.tgz
+  md5: 70c95a776f991cefcf76a37b85bf8c24
+  method: Fastboot
+  name: Xiaomi 12 Pro Global
+  size: 6.9 GB
+  version: OS3.0.4.0.VLBMIXM
+- android: '15.0'
+  branch: Stable Beta
+  codename: zeus_id_global
+  date: 2026-03-02
+  link: https://bigota.d.miui.com/OS3.0.2.0.VLBIDXM/zeus_id_global-ota_full-OS3.0.2.0.VLBIDXM-user-15.0-db8d0067a2.zip
+  md5: db8d0067a2a7873cd236718c000600dd
+  method: Recovery
+  name: Xiaomi 12 Pro Indonesia
+  size: 5.7 GB
+  version: OS3.0.2.0.VLBIDXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus_id_global
+  date: 2026-06-09
+  link: https://bigota.d.miui.com/OS3.0.4.0.VLBIDXM/zeus_id_global-ota_full-OS3.0.4.0.VLBIDXM-user-15.0-147c16570d.zip
+  md5: 147c16570ddbc4057740077152d3ada6
+  method: Recovery
+  name: Xiaomi 12 Pro Indonesia
+  size: 5.7 GB
+  version: OS3.0.4.0.VLBIDXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus_id_global
+  date: 2026-06-01
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.4.0.VLBIDXM/zeus_id_global_images_OS3.0.4.0.VLBIDXM_20260601.0000.00_15.0_id_da29cb7ee0.tgz
+  md5: da29cb7ee04f25ca45e13aa43cd88eaa
+  method: Fastboot
+  name: Xiaomi 12 Pro Indonesia
+  size: 6.9 GB
+  version: OS3.0.4.0.VLBIDXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus_in_global
+  date: 2026-06-09
+  link: https://bigota.d.miui.com/OS3.0.3.0.VLBINXM/zeus_in_global-ota_full-OS3.0.3.0.VLBINXM-user-15.0-8cf0d65535.zip
+  md5: 8cf0d655351d93447d3acae04f55f24d
+  method: Recovery
+  name: Xiaomi 12 Pro India
+  size: 5.7 GB
+  version: OS3.0.3.0.VLBINXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus_in_global
+  date: 2026-06-02
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.3.0.VLBINXM/zeus_in_global_images_OS3.0.3.0.VLBINXM_20260602.0000.00_15.0_in_a38f6dbfc2.tgz
+  md5: a38f6dbfc20d6edfc47c390af4858fec
+  method: Fastboot
+  name: Xiaomi 12 Pro India
+  size: 6.3 GB
+  version: OS3.0.3.0.VLBINXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus_ru_global
+  date: 2026-06-09
+  link: https://bigota.d.miui.com/OS3.0.3.0.VLBRUXM/zeus_ru_global-ota_full-OS3.0.3.0.VLBRUXM-user-15.0-d5f3b2f6ce.zip
+  md5: d5f3b2f6ce932616f3807d89dd9470b2
+  method: Recovery
+  name: Xiaomi 12 Pro Russia
+  size: 5.7 GB
+  version: OS3.0.3.0.VLBRUXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus_ru_global
+  date: 2026-06-02
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.3.0.VLBRUXM/zeus_ru_global_images_OS3.0.3.0.VLBRUXM_20260602.0000.00_15.0_ru_82cd8f1811.tgz
+  md5: 82cd8f1811f0303bffe43d6bb751afb8
+  method: Fastboot
+  name: Xiaomi 12 Pro Russia
+  size: 6.6 GB
+  version: OS3.0.3.0.VLBRUXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus_tr_global
+  date: 2026-06-09
+  link: https://bigota.d.miui.com/OS3.0.3.0.VLBTRXM/zeus_tr_global-ota_full-OS3.0.3.0.VLBTRXM-user-15.0-171590578e.zip
+  md5: 171590578e29de6695e35ec302d3e15f
+  method: Recovery
+  name: Xiaomi 12 Pro Turkey
+  size: 5.8 GB
+  version: OS3.0.3.0.VLBTRXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus_tr_global
+  date: 2026-06-02
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.3.0.VLBTRXM/zeus_tr_global_images_OS3.0.3.0.VLBTRXM_20260602.0000.00_15.0_tr_156d478fa3.tgz
+  md5: 156d478fa3b657307733d2e49a8f3e0f
+  method: Fastboot
+  name: Xiaomi 12 Pro Turkey
+  size: 6.6 GB
+  version: OS3.0.3.0.VLBTRXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus_tw_global
+  date: 2026-06-09
+  link: https://bigota.d.miui.com/OS3.0.3.0.VLBTWXM/zeus_tw_global-ota_full-OS3.0.3.0.VLBTWXM-user-15.0-8f67c243c0.zip
+  md5: 8f67c243c0ad0a5e317baf8acf3b2af1
+  method: Recovery
+  name: Xiaomi 12 Pro Taiwan
+  size: 5.6 GB
+  version: OS3.0.3.0.VLBTWXM
+- android: '15.0'
+  branch: Stable
+  codename: zeus_tw_global
+  date: 2026-06-02
+  link: https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.3.0.VLBTWXM/zeus_tw_global_images_OS3.0.3.0.VLBTWXM_20260602.0000.00_15.0_tw_e02d4dc3d6.tgz
+  md5: e02d4dc3d622b7913e715fbd099b7aa6
+  method: Fastboot
+  name: Xiaomi 12 Pro Taiwan
+  size: 6.3 GB
+  version: OS3.0.3.0.VLBTWXM

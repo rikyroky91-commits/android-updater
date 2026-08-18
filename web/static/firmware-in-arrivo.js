@@ -56,6 +56,17 @@
     .then(function (html) {
       if (scaduto) return;
       clearTimeout(timer);
+      // QUANDO IL MODELLO ARRIVA DA FUORI SI RICARICA LA PAGINA INTERA.
+      // In quel caso il primo tempo non sapeva ancora CHE TELEFONO è —
+      // il TAC non era in nessun database locale — quindi non c'è solo
+      // la riga del firmware da mettere: mancano l'identità, la scheda
+      // tecnica e la foto, che stanno fuori da questo blocco. La
+      // risposta esterna intanto è stata conservata, quindi la seconda
+      // visita è immediata e non ricompra niente.
+      if (blocco.getAttribute("data-ricarica") === "1") {
+        window.location.reload();
+        return;
+      }
       blocco.innerHTML = html;
       blocco.classList.remove("firmware-in-arrivo");
       blocco.classList.add("firmware-arrivato");

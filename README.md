@@ -146,14 +146,41 @@ core/
   telegram_tracker.py  lettura del canale rollout OxygenOS/ColorOS
                    (parser puro, zero rete: scarica sources.py)
   backup.py        persistenza del database fra i riavvii (Gist/URL)
-tests/             721 test, nessuno tocca la rete — verificato, non promesso:
-                   test_niente_rete.py blocca il socket e fallisce se un
-                   percorso di ricerca prova a uscire
+tests/             1300+ test, nessuno tocca la rete — verificato, non
+                   promesso: `conftest.py` blocca il socket per l'INTERA
+                   suite, e i due cataloghi anagrafici (codici modello e
+                   TAC) arrivano da fixture registrate dalle fonti vere
 ```
 
 Il core non sa che il sito esiste: gli stessi moduli girano nel sito, nel
 worker e nei test. La dashboard Streamlit (`app.py`) è stata tolta il
 2026-08-10, quando il sito è andato in produzione.
+
+### I test non toccano la rete, e non è una promessa
+
+`tests/conftest.py` stacca il socket per tutta la suite: un tentativo di
+uscire dice «un test ha provato a scaricare da …» e a fine esecuzione
+compare l'elenco di chi ha bussato. Serve a togliere di mezzo un difetto
+che si è già presentato: il 17/08/2026 il database TAC ha risposto `HTTP
+429` e sono diventati rossi dei test che nessuno aveva toccato. Un test
+che cambia esito perché un server di terzi ha avuto una brutta giornata
+non misura questo codice, misura la connessione.
+
+Le fonti firmware, senza rete, degradano a «non raggiungibile» ed è
+esattamente lo stato che i test vogliono. Due cataloghi però non sono
+fonti ma **anagrafiche** — i codici modello e i TAC — e senza di loro metà
+della suite smette di collaudare quello che dice: quei due arrivano da
+fixture con righe VERE, registrate dalle fonti vere da
+`scripts/registra_fixture_cataloghi.py`, nel loro formato originale.
+Nessun dato di prova è inventato: un parser collaudato su dati inventati
+collauda l'immaginazione di chi ha scritto il test.
+
+    pytest tests/ -q                  # come gira normalmente
+    TEST_CON_RETE=1 pytest tests/ -q  # con le fonti vive, per confronto
+
+Il secondo serve a registrare le fixture e a vedere quanto la fotografia
+si è allontanata dalla realtà. Se un test passa solo così, è quel test a
+essere da sistemare.
 
 ### Le ricerche si ricordano per un quarto d'ora
 
