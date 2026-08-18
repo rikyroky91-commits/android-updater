@@ -1415,6 +1415,23 @@ def _valuta_magrezza(conn, stato: dict) -> dict | None:
     if not stato.get("ok"):
         return None      # già segnalata come errore: non serve altro
 
+    # UNA FONTE APPENA GUARITA NON È PIÙ SOSPETTA, e dirlo lo stesso
+    # sarebbe peggio che tacere.
+    #
+    # Visto in produzione il 19/08/2026, il giorno dopo aver acceso questo
+    # controllo: PiunikaWeb mostrava «Da controllare — 1 voci di norma,
+    # non è mai stata più ricca di così» con accanto, nella colonna delle
+    # voci, il numero 10. La riga contraddiceva se stessa nella stessa
+    # schermata, e aveva torto proprio sul dato appena corretto.
+    #
+    # La mediana dello storico ci mette parecchie scansioni a risalire, e
+    # nel frattempo racconta il passato come se fosse il presente. Il
+    # numero di ADESSO ha l'ultima parola: se la fonte sta rendendo
+    # abbastanza, ha appena dimostrato di poterlo fare, e non c'è niente
+    # da far verificare a nessuno.
+    if (stato.get("items_found") or 0) > _MINIMO_PLAUSIBILE:
+        return None
+
     precedenti = [
         riga["items_found"] for riga in conn.execute(
             """SELECT items_found FROM source_history

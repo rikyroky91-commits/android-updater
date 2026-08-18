@@ -3769,6 +3769,27 @@ class TestUnaFonteNataStortaSiVede(unittest.TestCase):
             self._scansione("rotta", 0, ok=False)
         self.assertIsNone(self._stato("rotta").get("sospetto"))
 
+    def test_una_fonte_appena_guarita_smette_subito_di_essere_sospetta(self):
+        """Visto in produzione il giorno dopo aver acceso il controllo:
+        PiunikaWeb diceva «1 voci di norma, non è mai stata più ricca di
+        così» con accanto, nella colonna delle voci, il numero 10 — la
+        riga contraddiceva se stessa, e aveva torto proprio sul dato
+        appena corretto. La mediana ci mette scansioni a risalire; il
+        numero di ADESSO ha l'ultima parola."""
+        for _ in range(7):
+            self._scansione("piunika", 1)
+        self._scansione("piunika", 10)          # la correzione ha fatto effetto
+        self.assertIsNone(self._stato("piunika").get("sospetto"),
+                          "continua a dirla sospetta mentre rende dieci voci")
+
+    def test_ma_una_guarigione_appena_sopra_la_soglia_non_basta(self):
+        """Passare da 1 a 3 non è guarire, è oscillare: la soglia separa
+        i due casi, e sotto di essa il sospetto resta."""
+        for _ in range(7):
+            self._scansione("incerta", 1)
+        self._scansione("incerta", 2)
+        self.assertIsNotNone(self._stato("incerta").get("sospetto"))
+
     def test_la_tabella_la_chiama_da_controllare_non_impoverita(self):
         """Due nomi diversi per due cose diverse: «impoverita» manda a
         cercare un cambiamento recente, che qui non c'è."""
