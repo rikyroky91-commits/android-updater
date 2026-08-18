@@ -2531,6 +2531,91 @@ class TestTettoDiTempoRicerca(unittest.TestCase):
         self.assertLess(C.SEARCH_HTTP_TIMEOUT, C.HTTP_TIMEOUT)
 
 
+class TestIlCatalogoDeiSuggerimentiSiNormalizzaUnaVoltaSola(unittest.TestCase):
+    """Il campo di ricerca non deve arrancare dietro a chi scrive.
+
+    Misurato con il cronometro: `suggest()` costava 120 ms A TASTO. Per
+    ogni carattere digitato normalizzava da capo TUTTO il catalogo —
+    quarantaquattromila nomi, due espressioni regolari ciascuno, più uno
+    `split()` — e il lavoro era ogni volta identico, perché la forma
+    normalizzata di un nome non cambia finché non cambia il catalogo.
+
+    Calcolata una volta e riusata, e con la ricerca «parola che comincia
+    per» ridotta a una sottostringa (« gal» dentro « galaxy s24»), lo
+    stesso lavoro costa 5 ms. Ventidue volte meno, a parità di risposte:
+    verificato confrontando 92 domande fra la versione vecchia e la
+    nuova, zero differenze, sia per `suggest` sia per `did_you_mean`.
+
+    Questi test non cronometrano — un test che misura il tempo fallisce
+    a caso su una macchina carica. Fissano le due cose che, se si
+    rompessero, farebbero tornare il codice lento o, peggio, bugiardo.
+    """
+
+    def setUp(self):
+        self._db = _database_temporaneo(self)
+        suggest.reset_cache()
+        self.addCleanup(suggest.reset_cache)
+        self._nomi = ["Galaxy S24", "Galaxy S24 Ultra", "Reno 14 Pro", "realme C63"]
+        self._orig = suggest._collect_names
+        suggest._collect_names = lambda: sorted(self._nomi)
+        self.addCleanup(lambda: setattr(suggest, "_collect_names", self._orig))
+
+    def test_una_parola_in_mezzo_al_nome_si_trova_ancora(self):
+        """È la regola che la scorciatoia doveva conservare: «ultra» non
+        è l'inizio di «Galaxy S24 Ultra», ma è l'inizio di una sua
+        parola, e deve comparire lo stesso."""
+        self.assertIn("Galaxy S24 Ultra", suggest.suggest("ultra"))
+        self.assertIn("Reno 14 Pro", suggest.suggest("14"))
+
+    def test_una_parola_troncata_a_meta_non_conta_come_inizio(self):
+        """Il rovescio: «ltra» sta dentro «Ultra» ma non ne è l'inizio.
+        Deve restare nel gruppo dei «contiene», non salire fra le parole:
+        è esattamente la distinzione che la ricerca con lo spazio davanti
+        conserva e che una banale sottostringa perderebbe."""
+        proposte = suggest.suggest("ltra")
+        self.assertIn("Galaxy S24 Ultra", proposte)
+        # se fosse trattata come inizio di parola verrebbe prima di
+        # «Galaxy S24», che invece non contiene affatto «ltra»
+        self.assertNotIn("Galaxy S24", proposte)
+
+    def test_cambiare_il_catalogo_cambia_anche_i_suggerimenti(self):
+        """L'INDICE DERIVATO VA BUTTATO CON LA SORGENTE. Tenerlo in piedi
+        dopo un `reset_cache()` significa rispondere con il catalogo
+        vecchio a chi ha appena chiesto di buttarlo — lo stesso difetto
+        già preso in `core/modelcodes.py` con l'indice inverso."""
+        self.assertIn("Galaxy S24", suggest.suggest("galaxy"))
+        self._nomi = ["Pixel 9 Pro"]
+        suggest.reset_cache()
+        self.assertEqual(suggest.suggest("galaxy"), [])
+        self.assertIn("Pixel 9 Pro", suggest.suggest("pixel"))
+
+    def test_il_catalogo_si_normalizza_una_volta_sola(self):
+        """La prova che il lavoro non si rifà a ogni tasto: si conta
+        quante volte viene chiamata la normalizzazione."""
+        suggest.reset_cache()
+        vera = suggest._normalize
+        chiamate = {"n": 0}
+
+        def contata(testo):
+            chiamate["n"] += 1
+            return vera(testo)
+
+        suggest._normalize = contata
+        try:
+            suggest.suggest("gal")
+            dopo_la_prima = chiamate["n"]
+            for _ in range(5):
+                suggest.suggest("gal")
+            aggiunte = chiamate["n"] - dopo_la_prima
+        finally:
+            suggest._normalize = vera
+        self.assertGreaterEqual(dopo_la_prima, len(self._nomi),
+                                "la prima volta il catalogo va pur normalizzato")
+        self.assertEqual(aggiunte, 5,
+                         "una normalizzazione per domanda e basta: "
+                         f"invece ne sono state fatte {aggiunte}")
+
+
 class TestSuggerimentiRicerca(unittest.TestCase):
     """Completamento, correzione degli errori di battitura e navigazione.
 

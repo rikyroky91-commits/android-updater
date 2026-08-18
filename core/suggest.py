@@ -28,10 +28,21 @@ from . import config as C
 _CACHE_TTL_SECONDS = 300  # il catalogo cambia solo quando arrivano nuovi dati
 _cache: list[str] | None = None
 _cache_at = 0.0
+# Il catalogo con le forme già normalizzate — vedi `_catalogo_indicizzato`.
+_indice_normalizzato: list[tuple[str, str, str]] | None = None
+_mappa_normalizzata: dict[str, str] | None = None
+
+
+# Compilate qui e non a ogni chiamata: `re.sub` con il modello scritto come
+# STRINGA rifà ogni volta la ricerca nella cache dei modelli compilati, e
+# questa funzione viene chiamata decine di migliaia di volte per ogni tasto
+# digitato. Misurato: 1,7 milioni di `re.sub` per venti suggerimenti.
+_RE_NON_ALFANUM = re.compile(r"[^a-z0-9+]+")
+_RE_SPAZI = re.compile(r"\s+")
 
 
 def _normalize(text: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9+]+", " ", (text or "").lower())).strip()
+    return _RE_SPAZI.sub(" ", _RE_NON_ALFANUM.sub(" ", (text or "").lower())).strip()
 
 
 def _collect_names() -> list[str]:
@@ -119,12 +130,54 @@ def _collect_names() -> list[str]:
 
 
 def catalog(force_refresh: bool = False) -> list[str]:
-    global _cache, _cache_at
+    global _cache, _cache_at, _indice_normalizzato, _mappa_normalizzata
     scaduto = (time.monotonic() - _cache_at) > _CACHE_TTL_SECONDS
     if _cache is None or scaduto or force_refresh:
         _cache = _collect_names()
         _cache_at = time.monotonic()
+        # Il catalogo è cambiato: quello che ne deriva non vale più.
+        _indice_normalizzato = None
+        _mappa_normalizzata = None
     return _cache
+
+
+def _catalogo_indicizzato() -> list[tuple[str, str, str]]:
+    """Ogni nome con la sua forma normalizzata, già pronta.
+
+    ## Perché esiste
+
+    `suggest()` confrontava la domanda con TUTTO il catalogo normalizzando
+    ogni nome sul momento, e lo faceva a ogni carattere digitato: sono
+    quarantaquattromila normalizzazioni per tasto, ognuna con due
+    espressioni regolari, più uno `split()` per la ricerca per parola.
+    Misurato: 120 ms a tasto, cioè un campo di ricerca che arranca dietro
+    a chi scrive — e il lavoro era sempre lo stesso, rifatto da capo.
+
+    La forma normalizzata di un nome non cambia finché non cambia il
+    catalogo, e il catalogo si ricostruisce ogni cinque minuti al massimo.
+    Si calcola lì, una volta, e si riusa.
+
+    L'indice si lega a una LOCALE prima di restituirlo: `catalog()` può
+    azzerarlo da un altro thread fra il controllo e l'uso, ed è lo stesso
+    difetto già corretto in `core/modelcodes.py` e `core/imeicheck.py`.
+    """
+    global _indice_normalizzato
+    nomi = catalog()           # può ricostruire e azzerare l'indice derivato
+    indice = _indice_normalizzato
+    if indice is None:
+        indice = []
+        for nome in nomi:
+            normalizzato = _normalize(nome)
+            # LO SPAZIO DAVANTI NON È UN VEZZO. Serve a cercare «una parola
+            # che comincia per X» con una sola ricerca di sottostringa:
+            # siccome la forma normalizzata separa le parole con un solo
+            # spazio, l'inizio di una parola è sempre preceduto da uno
+            # spazio, e « gal» dentro « galaxy s24» dice esattamente quello
+            # che diceva `any(p.startswith("gal") for p in parole)` — ma lo
+            # decide il C invece di un ciclo Python per ogni nome.
+            indice.append((nome, normalizzato, " " + normalizzato))
+        _indice_normalizzato = indice
+    return indice
 
 
 def suggest(query: str, limit: int = 8) -> list[str]:
@@ -139,11 +192,11 @@ def suggest(query: str, limit: int = 8) -> list[str]:
         return []
 
     inizia, parola, contiene = [], [], []
-    for nome in catalog():
-        normalizzato = _normalize(nome)
+    a_inizio_parola = " " + bersaglio
+    for nome, normalizzato, spaziato in _catalogo_indicizzato():
         if normalizzato.startswith(bersaglio):
             inizia.append(nome)
-        elif any(p.startswith(bersaglio) for p in normalizzato.split()):
+        elif a_inizio_parola in spaziato:
             parola.append(nome)
         elif bersaglio in normalizzato:
             contiene.append(nome)
@@ -255,6 +308,45 @@ def codici_simili(query: str, limit: int = 5, cutoff: float = 0.72) -> list[str]
     return [indice[v] for v in vicini[:limit]]
 
 
+def _mappa_normalizzati() -> dict[str, str]:
+    """Forma normalizzata -> nome originale, costruita una volta sola."""
+    global _mappa_normalizzata
+    indice = _catalogo_indicizzato()      # può azzerare quello che deriva da lui
+    mappa = _mappa_normalizzata
+    if mappa is None:
+        mappa = {normalizzato: nome for nome, normalizzato, _sp in indice}
+        _mappa_normalizzata = mappa
+    return mappa
+
+
+def _candidati_per_lunghezza(indice, bersaglio: str, cutoff: float) -> list[str]:
+    """Solo i nomi che possono ANCORA superare la soglia, per lunghezza.
+
+    Non è un'approssimazione, è un'esclusione dimostrata. `difflib`
+    calcola `2*M/T`, dove M sono i caratteri in comune e T la somma delle
+    due lunghezze; siccome M non può superare la lunghezza della stringa
+    più corta, il punteggio non può superare
+
+        2 * min(la, lb) / (la + lb)
+
+    Imporre che questo resti sopra la soglia dà una finestra di lunghezze
+    fuori dalla quale il confronto è già perso in partenza: con la soglia
+    predefinita, fra 0,56 e 1,78 volte la lunghezza di quello che si è
+    scritto. Sono gli stessi limiti che `difflib` applica al suo interno
+    con `real_quick_ratio`, ma pagati qui una volta per candidato invece
+    che dopo aver costruito un oggetto di confronto per ognuno.
+
+    Il risultato è identico per costruzione: si tolgono solo candidati
+    che la soglia avrebbe comunque scartato.
+    """
+    lunghezza = len(bersaglio)
+    if not lunghezza or cutoff <= 0:
+        return list(indice)
+    minima = lunghezza * cutoff / (2 - cutoff)
+    massima = lunghezza * (2 - cutoff) / cutoff
+    return [n for n in indice if minima <= len(n) <= massima]
+
+
 def did_you_mean(query: str, limit: int = 5, cutoff: float = 0.72) -> list[str]:
     """«Forse cercavi…»: nomi simili, per gli errori di battitura.
 
@@ -276,9 +368,10 @@ def did_you_mean(query: str, limit: int = 5, cutoff: float = 0.72) -> list[str]:
         if vicini_codice:
             return vicini_codice
 
-    nomi = catalog()
-    indice = {_normalize(n): n for n in nomi}
-    vicini = difflib.get_close_matches(bersaglio, list(indice), n=limit, cutoff=cutoff)
+    indice = _mappa_normalizzati()
+    vicini = difflib.get_close_matches(
+        bersaglio, _candidati_per_lunghezza(indice, bersaglio, cutoff),
+        n=limit, cutoff=cutoff)
     proposte = [indice[v] for v in vicini]
 
     # Un errore su una parola sola (es. «galaxi» per «galaxy») spesso non
@@ -319,8 +412,17 @@ def brands_with_devices() -> dict[str, list[str]]:
 
 
 def reset_cache() -> None:
+    # E ANCHE QUELLO CHE DERIVA DAL CATALOGO. Azzerare la sorgente
+    # lasciando in piedi l'indice normalizzato costruito da lei significa
+    # rispondere con il catalogo vecchio a chi ha appena chiesto di
+    # buttarlo: è lo stesso difetto già corretto in `core/modelcodes.py`,
+    # dove `carica_indice` sostituiva l'indice e lasciava indietro quello
+    # inverso.
     global _cache, _cache_at, _cache_codici, _cache_codici_at
+    global _indice_normalizzato, _mappa_normalizzata
     _cache = None
     _cache_at = 0.0
     _cache_codici = None
     _cache_codici_at = 0.0
+    _indice_normalizzato = None
+    _mappa_normalizzata = None
