@@ -1565,6 +1565,8 @@ def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
                      or _semplifica_nome(codice) in _semplifica_nome(modello)):
         modello = canonico
 
+    nome_della_scheda = modello
+    marca_della_scheda = marca
     ancorato["scheda"] = P.scheda_tecnica(
         modello, codice=codice or identita, brand=marca)
     # Il catalogo tecnico curato conserva la grafia commerciale completa
@@ -1582,6 +1584,13 @@ def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
     if ancorato["scheda"].get("trovata") and titolo_scheda:
         modello = titolo_scheda
         marca = ancorato["scheda"].get("marca") or marca
+        # Il nome è cambiato perché l'ha dettato LA SCHEDA STESSA: quella
+        # che c'è già è sua, e la seconda lettura in fondo alla funzione
+        # non deve scattare. Senza questa riga «Galaxy A54 5G» faceva
+        # ricercare la scheda sotto il proprio titolo «Samsung Galaxy
+        # A54»: un giro in più per riottenere quello che si aveva, con il
+        # rischio di non ritrovarlo.
+        nome_della_scheda = modello
 
     # ULTIMA PAROLA ALLA RIGA SCRITTA A MANO, e solo quando cambia
     # davvero telefono.
@@ -1617,6 +1626,45 @@ def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
     if corretto_a_mano:
         modello = corretto_a_mano
         marca = ""                # la correzione è già completa di marca
+
+    # LA SCHEDA DEVE ESSERE QUELLA DEL NOME CHE SI MOSTRA.
+    #
+    # Difetto misurato in produzione il 18/08/2026 su RMX3997: la stessa
+    # ricerca dava DUE SCHEDE DIVERSE a seconda della strada.
+    #
+    #     cercando il codice   Dimensity 6100 Plus, 8 GB
+    #     partendo dall'IMEI   Dimensity 6300,      6 GB
+    #
+    # con lo stesso titolo, «realme 12x 5G», sopra tutte e due. Non e' un
+    # dettaglio: chi ha il telefono in mano legge le specifiche di un
+    # altro telefono, e non ha modo di accorgersene.
+    #
+    # La causa e' l'ORDINE di questa funzione, non il contenuto dei
+    # cataloghi. La scheda si cerca qui sopra, con il nome che il TAC ha
+    # dato («Realme C65 5G»); il nome definitivo viene deciso DOPO, dalla
+    # riga curata di `data/nomi_modello.csv` che sceglie il nome europeo.
+    # Restava appesa alla pagina la scheda di una variante di un altro
+    # mercato, che monta un chip diverso.
+    #
+    # Il codice da solo non basta a evitarlo: `specs.cerca("RMX3997")` non
+    # risponde — quel catalogo indicizza per nome molto piu' spesso che
+    # per codice — quindi e' il nome a decidere, ed e' il nome che deve
+    # essere quello giusto.
+    #
+    # SI RIFA' SOLO SE IL NOME E' CAMBIATO DAVVERO, e nel caso normale
+    # (nome del TAC gia' corretto) non costa niente. La riscrittura
+    # dell'ordine intero e' stata scartata: le due correzioni a mano in
+    # fondo devono restare le ultime a parlare, e il titolo della scheda
+    # deve poter correggere la grafia del TAC — sono vincoli opposti che
+    # solo una seconda lettura concilia.
+    #
+    # Se per il nome giusto non esiste scheda, la pagina resta senza:
+    # dichiarare una lacuna e' il modo di questo progetto: una scheda
+    # sbagliata non si nota, una assente si'.
+    if _semplifica_nome(modello) != _semplifica_nome(nome_della_scheda):
+        ancorato["scheda"] = P.scheda_tecnica(
+            modello, codice=codice or identita,
+            brand=marca or marca_della_scheda)
 
     ancorato["query"] = identita
     ancorato["nome"] = _modello_con_marca(marca, modello, codice) or modello

@@ -1781,6 +1781,87 @@ class TestIlCodiceBatteIlNomeSbagliatoDelTac(unittest.TestCase):
         self.assertNotIn("C65", pagina.get("nome") or "")
 
 
+class TestLaSchedaEQuellaDelNomeCheSiMostra(unittest.TestCase):
+    """Sotto un nome ci devono stare le specifiche DI QUEL nome.
+
+    Misurato in produzione il 18/08/2026 su RMX3997: la stessa ricerca
+    dava due schede diverse a seconda della strada percorsa.
+
+        cercando il codice   Dimensity 6100 Plus, 8 GB
+        partendo dall'IMEI   Dimensity 6300,      6 GB
+
+    con lo stesso titolo, «realme 12x 5G», sopra tutte e due. Chi ha il
+    telefono in mano legge le specifiche di un altro telefono e non ha
+    modo di accorgersene: il titolo è giusto, e proprio per questo il
+    numero sbagliato sotto sembra verificato.
+
+    La causa era l'ORDINE dentro `_ancora_esito_imei`, non un dato
+    sbagliato in un catalogo: la scheda si cercava con il nome dato dal
+    TAC, e il nome definitivo veniva scelto DOPO, dalla riga curata che
+    preferisce il nome europeo. Restava appesa la scheda di una variante
+    di un altro mercato.
+
+    Questo test non guarda il CONTENUTO della scheda — dipenderebbe da
+    cosa il catalogo contiene oggi, e domani direbbe un'altra cosa senza
+    che nessuno abbia toccato niente. Guarda l'invariante: con quale nome
+    la scheda è stata chiesta, l'ultima volta. Deve essere quello che la
+    pagina scrive in cima.
+    """
+
+    def setUp(self):
+        from web import main as M
+
+        self.chieste = []
+        self._vera = M.P.scheda_tecnica
+
+        def spia(nome, codice="", brand="", device=None):
+            self.chieste.append(nome)
+            return self._vera(nome, codice=codice, brand=brand, device=device)
+
+        M.P.scheda_tecnica = spia
+        self.addCleanup(lambda: setattr(M.P, "scheda_tecnica", self._vera))
+
+    def _pagina(self, codice, dice_il_tac, marca):
+        from web import main as M
+
+        imei = {"riconosciuto": True, "marca": marca, "modello": dice_il_tac,
+                "codice": codice, "modello_cercato": codice}
+        return M._ancora_esito_imei(M._esito_ricerca(codice, senza_rete=True), imei)
+
+    def test_il_nome_del_tac_non_lascia_dietro_la_sua_scheda(self):
+        """Il caso segnalato: il TAC dice «C65 5G», la pagina mostra
+        «realme 12x 5G», e la scheda deve seguire il secondo."""
+        from core import modelcodes
+        from web.main import _semplifica_nome
+
+        if not modelcodes.resolve("RMX3997"):
+            self.skipTest("catalogo dei codici non disponibile qui")
+        pagina = self._pagina("RMX3997", "Realme C65 5G", "REALME")
+        mostrato = pagina.get("nome") or ""
+        self.assertIn("12x", mostrato, "la pagina non mostra il nome europeo")
+        self.assertEqual(_semplifica_nome(self.chieste[-1]),
+                         _semplifica_nome("realme 12x 5G"),
+                         "l'ultima scheda chiesta non è quella del nome mostrato: "
+                         f"chieste {self.chieste}")
+
+    def test_quando_il_nome_del_tac_va_gia_bene_non_si_ricerca_due_volte(self):
+        """La seconda lettura costa, e non deve scattare nel caso normale:
+        «Galaxy A54 5G» è già il nome buono per SM-A546B."""
+        from core import modelcodes
+
+        if not modelcodes.resolve("SM-A546B"):
+            self.skipTest("catalogo dei codici non disponibile qui")
+        from web import main as M
+
+        base = M._esito_ricerca("SM-A546B", senza_rete=True)
+        self.chieste.clear()          # si contano solo le letture dell'ancoraggio
+        M._ancora_esito_imei(base, {
+            "riconosciuto": True, "marca": "SAMSUNG", "codice": "SM-A546B",
+            "modello": "Galaxy A54 5G", "modello_cercato": "SM-A546B"})
+        self.assertEqual(len(self.chieste), 1,
+                         f"scheda cercata più volte senza motivo: {self.chieste}")
+
+
 class TestLaFamigliaPiuNumerosaVince(unittest.TestCase):
     """Fra i nomi di un codice, quello che i cataloghi ripetono di più.
 
