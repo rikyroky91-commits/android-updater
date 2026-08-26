@@ -49,20 +49,12 @@
   {# I 4 link ai siti di verifica non stanno più qui: sono sempre visibili
      in `_imei_identita.html`, subito sotto il riquadro del risultato — non
      dentro questo `<details>` che si apre solo a bisogno. #}
-  <p class="nota">Correggi o salva tu il modello per questo TAC. Vale
-    subito per il TAC <code>{{ imei.tac }}</code>, cioè per tutti gli IMEI
-    di quel modello. Ha la precedenza su ogni database scaricato: se lo
-    hai verificato tu, hai ragione tu.</p>
-  <form method="post" action="/tac/salva" class="modulo">
-    <input type="hidden" name="tac" value="{{ imei.tac }}">
-    <input type="hidden" name="imei" value="{{ imei.imei }}">
-    <input type="text" name="marca" placeholder="Marca — es. Samsung">
-    <input type="text" name="modello" placeholder="Modello — es. Galaxy A54 5G">
-    <button type="submit" class="secondario">Salva questo modello</button>
-  </form>
-  {# Il salvataggio vive nell'archivio, quindi sopravvive ai riavvii ma non
-     a un archivio ricostruito da zero. La riga nel file del progetto è la
-     forma definitiva: le due strade non si escludono, si completano. #}
-  <p class="nota">Per renderlo permanente, aggiungi la riga corrispondente a
-    <code>data/tac_modelli.csv</code>.</p>
+  {# LA COPIA IN CHIARO STA SOTTO IL RISULTATO, non qui, quando il TAC è
+     sconosciuto: vedi `_imei_salva_modello.html`. Qui resta il caso in
+     cui una risposta c'è già e va corretta. #}
+  {% if imei.riconosciuto %}
+  {% with introduzione = "Correggi tu il modello per questo TAC." %}
+  {% include "_imei_salva_modello.html" %}
+  {% endwith %}
+  {% endif %}
 </details>

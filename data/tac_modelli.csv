@@ -46,3 +46,12 @@ tac,marca,modello,nota
 # TAC 35185179: stesso caso. I marchi minori sono il buco piu' grande dei
 # database TAC alimentati dalla community, e Unihertz e' fra i piu' piccoli.
 35185179,Unihertz,"Jelly 2E",identificato dall'utente sul dispositivo, assente da tutte le basi dati pubbliche
+
+# TAC 35286149: assente da tutte le basi dati gratuite consultate
+# dall'app — verificato il 26/08/2026 scaricando e cercando dentro
+# tac_full.csv (MoazEb, 11,8 MB) e imeidb.csv (VTSTech), oltre al
+# sottoinsieme curato del progetto. Identificato su imei.info, che ha una
+# copertura piu' ampia e a pagamento, come Samsung A16; variante 4G
+# confermata dall'utente. Stesso modello del TAC 35135531 qui sopra: e'
+# normale, un modello ha molti TAC.
+35286149,Samsung,"Galaxy A16 4G, Samsung SM-A165F",identificato su imei.info, assente dalle basi dati gratuite

@@ -566,16 +566,16 @@ class TestIlServizioEsternoVieneInterrogatoDavvero(unittest.TestCase):
         from web.main import RICERCHE
 
         RICERCHE.svuota()
-        self._online = imeicheck.cerca_tac_online
+        self._online = imeicheck.cerca_tac_online_esito
         self._chiave = os.environ.get("TAC_API_KEY")
         os.environ["TAC_API_KEY"] = "finta-per-il-test"
         self.chiamate = {"n": 0}
 
         def finto(tac):
             self.chiamate["n"] += 1
-            return ("ZTE", "Blade A75 5G")
+            return ("trovato", ("ZTE", "Blade A75 5G"))
 
-        imeicheck.cerca_tac_online = finto
+        imeicheck.cerca_tac_online_esito = finto
         # La risposta comprata viene messa da parte per non ricomprarla:
         # senza questa pulizia il secondo test troverebbe l'acquisto del
         # primo e non chiamerebbe nessuno.
@@ -586,12 +586,18 @@ class TestIlServizioEsternoVieneInterrogatoDavvero(unittest.TestCase):
 
         from core import imeicheck, storage
 
-        imeicheck.cerca_tac_online = self._online
+        imeicheck.cerca_tac_online_esito = self._online
         if self._chiave is None:
             os.environ.pop("TAC_API_KEY", None)
         else:
             os.environ["TAC_API_KEY"] = self._chiave
-        storage.set_meta("tac_esterni", "{}")
+        # LA CHIAVE VERA E' `imei_tac_esterni`. Con il nome sbagliato
+        # questa pulizia non puliva niente: la risposta comprata dal
+        # primo test restava in archivio e i test successivi la
+        # trovavano gia' pronta, credendo di aver interrogato il
+        # servizio quando invece nessuno l'aveva chiamato.
+        storage.set_meta("imei_tac_esterni", "{}")
+        storage.set_meta("imei_tac_assenti", "{}")
         imeicheck.reset_cache()
 
     #: Un TAC che nessun database locale conosce.
@@ -627,6 +633,38 @@ class TestIlServizioEsternoVieneInterrogatoDavvero(unittest.TestCase):
         pagina = self.client.get("/", params={"q": self.IMEI})
         self.assertEqual(self.chiamate["n"], 0)
         self.assertNotIn('data-ricarica="1"', pagina.text)
+
+    def test_quando_fuori_non_lo_sanno_il_frammento_ferma_la_ricarica(self):
+        """La rotellina che non si fermava mai.
+
+        Segnalato dall'utente il 26/08/2026 (TAC `35286149`). Il secondo
+        tempo ricarica la pagina quando il modello arriva da fuori; se da
+        fuori non arriva niente, la pagina ricaricata e' identica a
+        quella di partenza — stessa rotellina, stessa chiamata, stessa
+        ricarica — e ogni giro spende un'interrogazione del piano
+        gratuito. Il marcatore nel frammento e' cio' che rompe il ciclo.
+        """
+        from core import imeicheck
+
+        def nessuno(tac):
+            self.chiamate["n"] += 1
+            return ("assente", None)
+
+        imeicheck.cerca_tac_online_esito = nessuno
+
+        frammento = self.client.get("/ricerca/firmware", params={"q": self.IMEI})
+        self.assertEqual(frammento.status_code, 200)
+        self.assertIn('data-identita="ignota"', frammento.text,
+                      "il frammento non dice al browser di non ricaricare")
+        self.assertIn("99887766", frammento.text,
+                      "il frammento non dice nemmeno di che TAC si parla")
+
+        # E la pagina ricaricata a mano non ripropone l'attesa.
+        pagina = self.client.get("/", params={"q": self.IMEI})
+        self.assertNotIn('data-ricarica="1"', pagina.text,
+                         "la pagina promette di nuovo un'attesa gia' conclusa")
+        self.assertEqual(self.chiamate["n"], 1,
+                         "il «non lo conosco» e' stato ricomprato")
 
 
 class TestSchedaDispositivo(_Sito):
@@ -1617,6 +1655,38 @@ class TestRicercaPerImei(_Sito):
         self.assertIn("86705106", pagina)          # il TAC
         self.assertNotIn("Nessun firmware per «867051060315467»", pagina)
 
+    def test_per_un_tac_ignoto_il_campo_per_insegnarlo_e_in_chiaro(self):
+        """La risposta era a un clic, il modo di riportarla dentro l'app no.
+
+        Segnalato dall'utente il 26/08/2026: il TAC `35286149` non e' in
+        nessun database gratuito, ma imei.info lo dà come Samsung A16 —
+        cioè bastava aprire uno dei link che la pagina già offre. Il
+        campo per scrivere quel nome dentro l'app però stava chiuso nel
+        `<details>` «Confronto fra le fonti IMEI», che nessuno apre: la
+        via d'uscita esisteva nel codice e non si vedeva, che per chi la
+        userebbe è la stessa cosa di non esserci.
+        """
+        # Non l'IMEI reale segnalato: quel TAC ora sta nella tabella
+        # curata e viene riconosciuto, quindi non esercita piu' questo
+        # ramo. La storia resta nel docstring, il test usa un TAC che
+        # nessuna fonte di prova conosce.
+        pagina = self.client.get("/", params={"q": "998877660000000"}).text
+        self.assertIn("modello sconosciuto", pagina)
+        prima_del_details = pagina.split("<details")[0]
+        self.assertIn('action="/tac/salva"', prima_del_details,
+                      "il campo per insegnare il TAC e' ancora sepolto "
+                      "dentro il riquadro del confronto")
+
+    def test_per_un_tac_noto_la_correzione_resta_dove_stava(self):
+        """Su una risposta che c'è, riscrivere il modello è una
+        correzione: un'azione rara, che non deve competere con il
+        risultato per l'attenzione di chi guarda."""
+        pagina = self.client.get("/", params={"q": "867051060315467"}).text
+        self.assertIn("IMEI riconosciuto", pagina)
+        prima_del_details = pagina.split("<details")[0]
+        self.assertNotIn('action="/tac/salva"', prima_del_details)
+        self.assertIn('action="/tac/salva"', pagina)
+
     def test_il_confronto_fra_le_fonti_si_mostra_sempre(self):
         """Anche quando l'IMEI è stato riconosciuto: i database TAC si
         contraddicono, e mostrare una risposta sola come se fosse LA
@@ -1757,7 +1827,10 @@ class TestRicercaPerImei(_Sito):
         self.assertIsNotNone(candidato, "nessun IMEI di prova costruibile")
         pagina = self.client.get("/", params={"q": candidato}).text
         self.assertIn("modello sconosciuto", pagina)
-        self.assertIn("Correggi o salva tu il modello", pagina)
+        # La frase di invito e' cambiata quando il modulo e' uscito dal
+        # `<details>`: quello che il test difende non e' il testo, e' che
+        # una via per insegnare il TAC all'app ci sia.
+        self.assertIn('action="/tac/salva"', pagina)
 
 
 class TestInterpreteAI(_Sito):

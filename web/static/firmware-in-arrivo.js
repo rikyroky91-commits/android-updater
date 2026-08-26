@@ -63,7 +63,15 @@
       // tecnica e la foto, che stanno fuori da questo blocco. La
       // risposta esterna intanto è stata conservata, quindi la seconda
       // visita è immediata e non ricompra niente.
-      if (blocco.getAttribute("data-ricarica") === "1") {
+      // ...MA SOLO SE DA FUORI E' ARRIVATO DAVVERO QUALCOSA. Se il TAC
+      // non lo conosce nemmeno l'archivio esterno, la pagina ricaricata
+      // e' identica a questa: stessa rotellina, stessa fetch, stessa
+      // ricarica. Un ciclo infinito, e ogni giro spende
+      // un'interrogazione del piano gratuito. Il server lo dichiara nel
+      // frammento; qui si ricarica solo quando c'e' un'identita' nuova
+      // da mostrare.
+      if (blocco.getAttribute("data-ricarica") === "1" &&
+          html.indexOf("data-identita=\"ignota\"") === -1) {
         window.location.reload();
         return;
       }

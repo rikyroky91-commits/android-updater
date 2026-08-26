@@ -1,0 +1,30 @@
+{# IL MODO DI INSEGNARE UN TAC ALL'APP, in un file solo perché va mostrato
+   in due posti diversi a seconda di cosa è successo:
+
+   * quando il TAC è SCONOSCIUTO sta in chiaro, sotto il risultato, dove
+     chi ha appena letto «non lo so» lo vede senza cercarlo;
+   * quando il TAC è già riconosciuto resta dentro il `<details>` del
+     confronto fra le fonti, perché lì è una correzione — un'azione rara,
+     da chi ha motivo di credere che la risposta mostrata sia sbagliata.
+
+   Prima esisteva solo la seconda copia. Segnalato indirettamente
+   dall'utente il 26/08/2026: il TAC 35286149 è sconosciuto ai database
+   gratuiti ma imei.info lo dà come Samsung A16 — cioè la risposta era a
+   un clic di distanza, e il modo di riportarla dentro l'app era chiuso
+   in un riquadro che nessuno apre. #}
+<p class="nota">{{ introduzione }} Vale subito per il TAC
+  <code>{{ imei.tac }}</code>, cioè per tutti gli IMEI di quel modello. Ha
+  la precedenza su ogni database scaricato: se lo hai verificato tu, hai
+  ragione tu.</p>
+<form method="post" action="/tac/salva" class="modulo">
+  <input type="hidden" name="tac" value="{{ imei.tac }}">
+  <input type="hidden" name="imei" value="{{ imei.imei }}">
+  <input type="text" name="marca" placeholder="Marca — es. Samsung">
+  <input type="text" name="modello" placeholder="Modello — es. Galaxy A54 5G">
+  <button type="submit" class="secondario">Salva questo modello</button>
+</form>
+{# Il salvataggio vive nell'archivio, quindi sopravvive ai riavvii ma non
+   a un archivio ricostruito da zero. La riga nel file del progetto è la
+   forma definitiva: le due strade non si escludono, si completano. #}
+<p class="nota">Per renderlo permanente, aggiungi la riga corrispondente a
+  <code>data/tac_modelli.csv</code>.</p>

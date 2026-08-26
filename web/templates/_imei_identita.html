@@ -28,6 +28,20 @@
    Chi amministra il sito non aveva modo di distinguerli senza entrare in
    Diagnostica col login, e un errore di configurazione lì non si vede
    subito: si manifesta settimane dopo, e sembra un buco dei dati. #}
+{# TERZO SILENZIO, IL PIU' DEFINITIVO: chiesto fuori, e fuori non lo
+   sanno. Prima questa pagina era identica a quella di un TAC mai
+   chiesto a nessuno, e dava l'impressione che l'app non ci avesse
+   nemmeno provato. Dirlo cambia anche cosa conviene fare dopo: non
+   ricaricare sperando in una risposta diversa, ma scrivere il modello a
+   mano qui sotto se lo si conosce. #}
+{% if imei.chiesto_invano %}
+<p class="nota">Questo TAC l'ho già chiesto anche all'archivio esterno, e
+  non lo conosce nemmeno lui: non è un'attesa ancora in corso, è la
+  risposta. Succede con i modelli molto nuovi, con le varianti destinate a
+  un solo operatore e con i telefoni non venduti in Europa. Se sai che
+  telefono è, scrivilo nel riquadro qui sotto: resta salvato e da quel
+  momento l'IMEI lo riconosce subito. Altrimenti riprovo fra un mese.</p>
+{% endif %}
 {% if imei.servizio_esterno_attivo is defined and not imei.servizio_esterno_attivo %}
 <p class="nota lacuna">Su questo sito il riconoscimento tramite servizio
   esterno non è attivo: i TAC che i database locali non hanno restano
@@ -66,4 +80,16 @@
 <p class="nota">Su <strong>imei.info</strong> il numero viene passato gia'
   compilato. Sugli altri servizi il clic lo copia negli appunti prima di aprire
   la pagina: basta incollarlo nel loro campo di verifica.</p>
+{% endif %}
+
+{# LA VIA D'USCITA STA DOPO I LINK, NON PRIMA. L'ordine è la sequenza
+   reale di chi si trova davanti a un TAC sconosciuto: leggi che l'app non
+   lo sa, apri uno dei siti di verifica, torni qui con un nome in mano.
+   Il campo per scriverlo deve trovarsi dove finisce quel percorso — non
+   chiuso dentro il `<details>` del confronto fra le fonti, che è dove
+   stava e dove nessuno lo apriva. #}
+{% if not imei.riconosciuto and imei.tac %}
+{% with introduzione = "Se sai che telefono è — anche solo perché l'hai appena letto su uno di questi siti — scrivilo qui e l'app lo impara." %}
+{% include "_imei_salva_modello.html" %}
+{% endwith %}
 {% endif %}

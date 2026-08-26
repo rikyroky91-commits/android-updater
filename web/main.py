@@ -34,6 +34,7 @@ il motivo per cui il salvataggio su Gist esiste già.
 """
 from __future__ import annotations
 
+import html as _html
 import os
 import re
 import shutil
@@ -383,8 +384,30 @@ def frammento_firmware(request: Request, q: str = Query(default="")):
         return HTMLResponse("")
     if imeicheck.is_imei_like(domanda):
         imei = _esito_imei(domanda)
-        risultato = (_ancora_esito_imei(_esito_ricerca(imei["modello_cercato"]), imei)
-                     if imei.get("modello_cercato") else _esito_vuoto(domanda))
+        if not imei.get("modello_cercato"):
+            # NIENTE IDENTITA' NEMMENO DOPO AVER CHIESTO FUORI.
+            #
+            # Qui il frammento non puo' essere quello generico: la pagina
+            # che lo aspetta ha una rotellina che dice «lo sto chiedendo a
+            # un archivio esterno», e la sua istruzione e' di ricaricare
+            # appena il modello arriva. Se non arriva, ricaricare rimette
+            # in piedi la stessa pagina con la stessa rotellina — un ciclo
+            # che non finisce e che a ogni giro spende un'interrogazione
+            # del piano gratuito. Il marcatore `data-identita="ignota"`
+            # e' il segnale che ferma quella ricarica; il testo e' la
+            # risposta onesta al posto dell'attesa.
+            tac = _html.escape(imei.get("tac") or "")
+            return HTMLResponse(
+                "<span data-identita=\"ignota\" hidden></span>"
+                f"<h2>TAC {tac}: modello sconosciuto</h2>"
+                "<p class=\"riga-esito\">Nessun database conosce questo TAC: "
+                "ne\u2019 quelli locali, ne\u2019 l\u2019archivio esterno, "
+                "a cui l\u2019ho appena chiesto.</p>"
+                "<p class=\"nota\">Non \u00e8 un errore dell\u2019IMEI "
+                "ne\u2019 un\u2019attesa ancora in corso. Se sai che "
+                "telefono \u00e8, scrivilo nel riquadro qui sotto: resta "
+                "salvato e da quel momento viene riconosciuto subito.</p>")
+        risultato = _ancora_esito_imei(_esito_ricerca(imei["modello_cercato"]), imei)
     else:
         risultato = _esito_ricerca(domanda)
     return _rendi(request, "_esito_firmware.html", {"risultato": risultato})
@@ -1092,6 +1115,13 @@ def tac_salva(tac: str = Form(...), marca: str = Form(""),
     quello digitato.
     """
     imeicheck.aggiungi_tac(tac, marca, modello)
+    # E ANCHE IL «NO» DELL'ARCHIVIO ESTERNO va tolto: era vero finche'
+    # nessuno sapeva che telefono fosse, adesso lo sappiamo. Lasciarlo
+    # non cambierebbe la risposta — la tabella scritta a mano ha la
+    # precedenza su tutto — ma terrebbe in archivio un dato che dice il
+    # contrario di quello mostrato, ed e' il genere di incoerenza che
+    # confonde chi legge la Diagnostica sei mesi dopo.
+    imeicheck.dimentica_tac_assente(tac)
     # LA MEMORIA CORTA VA DIMENTICATA QUI. Hai appena corretto a mano il
     # modello di quel TAC: se la ricerca rispondesse dalla cache, ti
     # rimanderebbe indietro la risposta sbagliata che sei venuto a
@@ -1266,9 +1296,22 @@ def _esito_imei(imei: str, solo_locale: bool = False) -> dict:
     # significherebbe far aspettare senza poterlo nemmeno dire, perché la
     # pagina non è ancora partita. Si dichiara che la ricerca continua
     # fuori, e ci pensa il secondo tempo.
+    #
+    # ...MA UNA VOLTA SOLA. Se il servizio esterno ha gia' risposto «non
+    # lo conosco» per questo TAC, non c'e' niente da aspettare: la
+    # pagina che promette «lo sto chiedendo fuori» manderebbe il secondo
+    # tempo a ricomprare lo stesso no, e — visto che il secondo tempo
+    # ricarica la pagina quando il modello arriva da fuori — la pagina
+    # ricaricata ripartirebbe da capo con la stessa rotellina. Un ciclo
+    # infinito che consuma il piano gratuito a ogni giro. Segnalato
+    # dall'utente il 26/08/2026 con il TAC 35286149.
+    tac_imei = imeicheck.tac_di(imei)
+    chiesto_invano = bool(tac_imei
+                          and imeicheck.tac_gia_chiesto_invano(tac_imei))
     cerco_fuori = bool(solo_locale and not trovato
-                       and imeicheck.tac_di(imei)
-                       and imeicheck._chiave_api())
+                       and tac_imei
+                       and imeicheck._chiave_api()
+                       and not chiesto_invano)
 
     modello_cercato = ""
     descrizione = ""
@@ -1323,6 +1366,10 @@ def _esito_imei(imei: str, solo_locale: bool = False) -> dict:
         "discordi": bool(raffronto.get("discordi")),
         "stato_database": imeicheck.status(),
         "cerco_fuori": cerco_fuori,
+        # Gia' chiesto fuori, e fuori non lo sanno: e' un esito, non
+        # un'attesa, e va detto con parole sue invece di lasciare la
+        # stessa pagina di un TAC mai chiesto a nessuno.
+        "chiesto_invano": chiesto_invano,
         # SE IL SERVIZIO ESTERNO NON È ATTIVO, VA DETTO DOVE SI VEDE.
         #
         # Un TAC che nessun database locale conosce viene chiesto fuori, ma

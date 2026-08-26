@@ -389,17 +389,17 @@ class TestUnaRispostaCompratraSiPagaUnaVoltaSola(BaseImei):
 
     def setUp(self):
         super().setUp()
-        self._online = imeicheck.cerca_tac_online
+        self._online = imeicheck.cerca_tac_online_esito
         self.chiamate = {"n": 0}
 
         def finto(tac):
             self.chiamate["n"] += 1
-            return ("ZTE", "Blade A75 5G")
+            return ("trovato", ("ZTE", "Blade A75 5G"))
 
-        imeicheck.cerca_tac_online = finto
+        imeicheck.cerca_tac_online_esito = finto
 
     def tearDown(self):
-        imeicheck.cerca_tac_online = self._online
+        imeicheck.cerca_tac_online_esito = self._online
         super().tearDown()
 
     def test_si_chiede_una_volta_e_poi_si_ricorda(self):
@@ -443,21 +443,21 @@ class TestLAttesaDelServizioEsternoSiVede(BaseImei):
         super().setUp()
         import os
 
-        self._online = imeicheck.cerca_tac_online
+        self._online = imeicheck.cerca_tac_online_esito
         self._chiave = os.environ.get("TAC_API_KEY")
         os.environ["TAC_API_KEY"] = "finta-per-il-test"
         self.chiamate = {"n": 0}
 
         def finto(tac):
             self.chiamate["n"] += 1
-            return ("ZTE", "Blade A75 5G")
+            return ("trovato", ("ZTE", "Blade A75 5G"))
 
-        imeicheck.cerca_tac_online = finto
+        imeicheck.cerca_tac_online_esito = finto
 
     def tearDown(self):
         import os
 
-        imeicheck.cerca_tac_online = self._online
+        imeicheck.cerca_tac_online_esito = self._online
         if self._chiave is None:
             os.environ.pop("TAC_API_KEY", None)
         else:
@@ -495,3 +495,109 @@ class TestLAttesaDelServizioEsternoSiVede(BaseImei):
         esito = _esito_imei("356924110000000", solo_locale=True)   # è nel CSV di prova
         self.assertTrue(esito["riconosciuto"])
         self.assertFalse(esito["cerco_fuori"])
+
+
+class TestUnNoDelServizioEsternoSiRicorda(BaseImei):
+    """Il ciclo infinito della rotellina, e il conto che lo pagava.
+
+    Segnalato dall'utente il 26/08/2026 con l'IMEI del TAC `35286149`,
+    che nessun database conosce — nemmeno i servizi esterni consigliati
+    dalla pagina. Quello che si vedeva era una rotellina che non si
+    fermava mai. Sotto c'erano due cose, non una:
+
+    * la risposta negativa non veniva conservata, quindi ogni visita la
+      ricomprava — su cento interrogazioni gratuite al mese, un
+      ricaricamento continuo le brucia in minuti;
+    * la pagina decide di aspettare guardando se la risposta e' in casa,
+      e una risposta negativa mai conservata non e' mai in casa: il
+      secondo tempo ricaricava la pagina, la pagina ripartiva ad
+      aspettare, e cosi' via.
+    """
+
+    #: Un TAC che nessun database di prova conosce. NON e' il numero
+    #: reale segnalato: quello, da quando e' stato identificato su
+    #: imei.info, sta in `data/tac_modelli.csv` e viene riconosciuto
+    #: subito — userebbe la tabella curata invece del servizio esterno,
+    #: cioe' proprio il percorso che questi test devono esercitare.
+    IGNOTO = "998877660000000"
+
+    def setUp(self):
+        super().setUp()
+        import os
+
+        self._esito = imeicheck.cerca_tac_online_esito
+        self._chiave = os.environ.get("TAC_API_KEY")
+        os.environ["TAC_API_KEY"] = "finta-per-il-test"
+        self.chiamate = {"n": 0}
+        self.risposta = ("assente", None)
+
+        def finto(tac):
+            self.chiamate["n"] += 1
+            return self.risposta
+
+        imeicheck.cerca_tac_online_esito = finto
+
+    def tearDown(self):
+        import os
+
+        imeicheck.cerca_tac_online_esito = self._esito
+        if self._chiave is None:
+            os.environ.pop("TAC_API_KEY", None)
+        else:
+            os.environ["TAC_API_KEY"] = self._chiave
+        super().tearDown()
+
+    def test_un_no_non_si_ricompra(self):
+        self.assertIsNone(imeicheck.identify(self.IGNOTO))
+        self.assertEqual(self.chiamate["n"], 1)
+
+        imeicheck.reset_cache()                      # come un riavvio
+        self.assertIsNone(imeicheck.identify(self.IGNOTO))
+        self.assertEqual(self.chiamate["n"], 1,
+                         "il «non lo conosco» e' stato ricomprato")
+
+    def test_un_guasto_di_rete_non_e_un_no(self):
+        """Silenzio e diniego si somigliano qui e sono opposti fuori.
+
+        Conservare un timeout come «non esiste» renderebbe ignoto per un
+        mese un telefono che il servizio conosce benissimo.
+        """
+        self.risposta = ("errore", None)
+        self.assertIsNone(imeicheck.identify(self.IGNOTO))
+        self.assertIsNone(imeicheck.identify(self.IGNOTO))
+        self.assertEqual(self.chiamate["n"], 2)
+        self.assertNotIn("99887766", imeicheck.tac_assenti())
+
+    def test_niente_rotellina_quando_la_risposta_e_gia_no(self):
+        """La condizione che generava il ciclo, presa dove nasce."""
+        from web.main import _esito_imei
+
+        primo = _esito_imei(self.IGNOTO, solo_locale=True)
+        self.assertTrue(primo["cerco_fuori"], "il primo giro deve chiedere fuori")
+
+        imeicheck.identify(self.IGNOTO)              # il secondo tempo chiede
+        secondo = _esito_imei(self.IGNOTO, solo_locale=True)
+        self.assertFalse(secondo["cerco_fuori"],
+                         "la pagina promette un'attesa che non avverra' mai")
+        self.assertTrue(secondo["chiesto_invano"],
+                        "la pagina non sa di poterlo dire")
+
+    def test_il_no_scade_e_i_modelli_nuovi_non_restano_ignoti(self):
+        from datetime import datetime, timedelta, timezone
+        import json
+
+        imeicheck.identify(self.IGNOTO)
+        vecchio = (datetime.now(timezone.utc)
+                   - timedelta(days=imeicheck.GIORNI_VALIDITA_TAC_ASSENTE + 1))
+        storage.set_meta("imei_tac_assenti",
+                         json.dumps({"99887766": vecchio.isoformat()}))
+        self.assertFalse(imeicheck.tac_gia_chiesto_invano("99887766"))
+
+        self.risposta = ("trovato", ("ZTE", "Blade A75 5G"))
+        self.assertEqual(imeicheck.identify(self.IGNOTO), ("ZTE", "Blade A75 5G"))
+
+    def test_il_modello_scritto_a_mano_cancella_il_no(self):
+        imeicheck.identify(self.IGNOTO)
+        self.assertIn("99887766", imeicheck.tac_assenti())
+        imeicheck.dimentica_tac_assente("99887766")
+        self.assertNotIn("99887766", imeicheck.tac_assenti())

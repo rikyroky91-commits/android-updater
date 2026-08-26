@@ -227,6 +227,26 @@ _META_TAC_UTENTE = "imei_tac_inseriti"
 #: una persona, e mescolarle farebbe sparire la differenza proprio nella
 #: tabella che il sito mostra per dire da dove viene una risposta.
 _META_TAC_ESTERNI = "imei_tac_esterni"
+#: I TAC che il servizio esterno ha dichiarato di NON conoscere.
+#:
+#: Serve a due cose diverse, e nessuna delle due è un dettaglio.
+#: La prima e' il denaro: senza questa memoria un TAC ignoto veniva
+#: richiesto — e pagato — a ogni singola visita, e il piano gratuito e'
+#: di cento interrogazioni al mese. La seconda e' la rotellina: la pagina
+#: decide di aspettare («cerco fuori») guardando se la risposta e' gia'
+#: in casa, e una risposta negativa che non viene conservata non e' mai
+#: in casa — quindi la pagina aspettava, ricaricava, aspettava di nuovo,
+#: all'infinito. Segnalato dall'utente il 26/08/2026 con l'IMEI del TAC
+#: 35286149, che nessun database — locale o esterno — conosce.
+#:
+#: A differenza di una risposta positiva, questa SCADE: un TAC assente
+#: oggi puo' essere aggiunto al database del fornitore fra un mese
+#: (succede di continuo con i modelli appena usciti). Un no per sempre
+#: renderebbe l'app cieca proprio sui telefoni nuovi, che sono quelli
+#: che interessano.
+_META_TAC_ASSENTI = "imei_tac_assenti"
+#: Per quanto tempo si crede a un «non lo conosco» prima di richiederlo.
+GIORNI_VALIDITA_TAC_ASSENTE = 30
 
 # I siti dove verificare un TAC a mano. Nessuno di questi viene
 # interrogato dall'app: bloccano l'accesso automatico o lo vietano nei
@@ -312,6 +332,78 @@ def _ricorda_tac_esterno(tac: str, marca: str, modello: str) -> None:
     try:
         storage.set_meta(_META_TAC_ESTERNI, json.dumps(voci, ensure_ascii=False))
     except Exception:      # un archivio non scrivibile non deve far fallire una ricerca
+        pass
+
+
+def tac_assenti() -> dict[str, str]:
+    """I TAC gia' chiesti fuori che il servizio ha dichiarato di non avere.
+
+    Chiave il TAC, valore la data ISO della domanda: serve a sapere
+    quando quel «no» diventa vecchio abbastanza da valere la pena
+    richiederlo.
+    """
+    grezzo = storage.get_meta(_META_TAC_ASSENTI)
+    if not grezzo:
+        return {}
+    try:
+        dati = json.loads(grezzo) if isinstance(grezzo, str) else grezzo
+    except Exception:
+        return {}
+    if not isinstance(dati, dict):
+        return {}
+    return {str(t): str(v) for t, v in dati.items() if v}
+
+
+def _ricorda_tac_assente(tac: str) -> None:
+    """Segna che questo TAC e' stato chiesto fuori e la risposta e' stata no.
+
+    Si scrive SOLO su un no esplicito del servizio. Una chiamata fallita
+    — rete giu', chiave scaduta, risposta illeggibile — non e' un no: e'
+    un non-lo-so, e conservarlo come no significherebbe rendere ignoto
+    per un mese un telefono che il servizio conosce benissimo.
+    """
+    tac = "".join(c for c in (tac or "") if c.isdigit())[:8]
+    if len(tac) != 8:
+        return
+    voci = tac_assenti()
+    voci[tac] = datetime.now(timezone.utc).isoformat()
+    try:
+        storage.set_meta(_META_TAC_ASSENTI, json.dumps(voci, ensure_ascii=False))
+    except Exception:      # un archivio non scrivibile non deve far fallire una ricerca
+        pass
+
+
+def tac_gia_chiesto_invano(tac: str) -> bool:
+    """True se il servizio esterno ha gia' detto di non conoscere questo TAC,
+    abbastanza di recente da non valere la pena richiederlo."""
+    tac = "".join(c for c in (tac or "") if c.isdigit())[:8]
+    quando = tac_assenti().get(tac)
+    if not quando:
+        return False
+    try:
+        chiesto = datetime.fromisoformat(quando)
+    except Exception:
+        return False
+    if chiesto.tzinfo is None:
+        chiesto = chiesto.replace(tzinfo=timezone.utc)
+    eta = (datetime.now(timezone.utc) - chiesto).days
+    return eta < GIORNI_VALIDITA_TAC_ASSENTE
+
+
+def dimentica_tac_assente(tac: str) -> None:
+    """Toglie il «no» conservato, cosi' la prossima ricerca richiede davvero.
+
+    La usa la pagina quando qualcuno chiede esplicitamente di riprovare:
+    un mese e' la scadenza giusta per l'automatismo, ma chi ha appena
+    letto altrove che telefono e' non deve aspettarlo.
+    """
+    tac = "".join(c for c in (tac or "") if c.isdigit())[:8]
+    voci = tac_assenti()
+    if voci.pop(tac, None) is None:
+        return
+    try:
+        storage.set_meta(_META_TAC_ASSENTI, json.dumps(voci, ensure_ascii=False))
+    except Exception:
         pass
 
 
@@ -802,13 +894,33 @@ def cerca_tac_online(tac: str) -> tuple[str, str] | None:
     Ritorna None in ogni caso incerto: chiave assente, servizio non
     raggiungibile, risposta inattesa, TAC sconosciuto. Un servizio a
     pagamento che non risponde non deve mai diventare un dato inventato.
+
+    Chi ha bisogno di sapere PERCHE' e' None — «non lo conosce» e «non ha
+    risposto» si somigliano qui e sono opposti fuori — usa
+    `cerca_tac_online_esito`.
+    """
+    return cerca_tac_online_esito(tac)[1]
+
+
+def cerca_tac_online_esito(tac: str) -> tuple[str, tuple[str, str] | None]:
+    """Come `cerca_tac_online`, ma dice anche com'e' andata.
+
+    Ritorna `("trovato", (marca, modello))`, `("assente", None)` quando il
+    servizio ha risposto ed e' un no, oppure `("errore", None)` quando la
+    domanda non e' nemmeno arrivata a destinazione o la risposta e'
+    illeggibile.
+
+    LA DIFFERENZA FRA «ASSENTE» E «ERRORE» E' TUTTO IL PUNTO. Solo il
+    primo si puo' conservare: e' una risposta. Il secondo e' silenzio, e
+    ricordare il silenzio come un no rende ignoto per un mese un
+    telefono che il servizio conosce.
     """
     chiave = _chiave_api()
     if not chiave or requests is None:
-        return None
+        return ("errore", None)
     tac = "".join(c for c in (tac or "") if c.isdigit())[:8]
     if len(tac) != 8:
-        return None
+        return ("errore", None)
 
     try:
         risposta = requests.post(
@@ -818,15 +930,21 @@ def cerca_tac_online(tac: str) -> tuple[str, str] | None:
             timeout=C.HTTP_TIMEOUT,
         )
     except Exception:
-        return None
-    if getattr(risposta, "status_code", 0) != 200:
-        return None
+        return ("errore", None)
+    stato = getattr(risposta, "status_code", 0)
+    # 404 E' UNA RISPOSTA, NON UN GUASTO. Alcuni fornitori dicono «non ce
+    # l'ho» con il codice HTTP invece che nel corpo: trattarlo come un
+    # errore di rete significherebbe richiederlo — e pagarlo — per sempre.
+    if stato == 404:
+        return ("assente", None)
+    if stato != 200:
+        return ("errore", None)
     try:
         dati = risposta.json()
     except Exception:
-        return None
+        return ("errore", None)
     if not isinstance(dati, dict):
-        return None
+        return ("errore", None)
 
     corpo = dati.get("data") if isinstance(dati.get("data"), dict) else dati
 
@@ -834,12 +952,14 @@ def cerca_tac_online(tac: str) -> tuple[str, str] | None:
     # va creduto. Un `found: false` con i campi vuoti non è una risposta
     # da interpretare, è un no.
     if corpo.get("found") is False:
-        return None
+        return ("assente", None)
 
     marca = _testo_o_nome(corpo.get("brand") or corpo.get("manufacturer"))
     modello = _testo_o_nome(corpo.get("model"))
     if not marca and not modello:
-        return None
+        # Il servizio ha risposto 200 senza dire che telefono e': per
+        # questo TAC non ha niente. E' un no, non un guasto.
+        return ("assente", None)
 
     # Il chipset arriva solo con i piani a pagamento, ma se c'è si prende:
     # è esattamente il dato che manca altrove, e viene da chi identifica il
@@ -848,7 +968,7 @@ def cerca_tac_online(tac: str) -> tuple[str, str] | None:
     if chipset:
         modello = f"{modello}, {chipset}".strip(", ")
 
-    return (marca or "Sconosciuto", modello)
+    return ("trovato", (marca or "Sconosciuto", modello))
 
 
 def _testo_o_nome(valore) -> str:
@@ -1008,13 +1128,24 @@ def identify(imei: str, solo_locale: bool = False) -> tuple[str, str] | None:
     if gia_pagato:
         return gia_pagato
 
-    esterno = cerca_tac_online(tac)
-    if esterno:
+    # E NEMMENO SI RICOMPRA UN NO. Un TAC che il servizio ha gia'
+    # dichiarato di non conoscere non va richiesto a ogni visita: costa
+    # un'interrogazione del piano gratuito e la risposta e' la stessa.
+    # Il «no» scade da solo dopo un mese (vedi `tac_gia_chiesto_invano`),
+    # perche' i modelli nuovi vengono aggiunti di continuo.
+    if tac_gia_chiesto_invano(tac):
+        return None
+
+    esito, esterno = cerca_tac_online_esito(tac)
+    if esito == "trovato" and esterno:
         if _memory_index is not None:
             _memory_index.setdefault(tac, []).append(
                 (FONTE_ESTERNA, esterno[0], esterno[1]))
         _ricorda_tac_esterno(tac, esterno[0], esterno[1])
-    return esterno
+        return esterno
+    if esito == "assente":
+        _ricorda_tac_assente(tac)
+    return None
 
 
 def confronto(imei: str) -> dict:
