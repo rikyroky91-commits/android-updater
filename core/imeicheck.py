@@ -31,10 +31,21 @@ try:
 except ImportError:  # pragma: no cover
     requests = None
 
-try:
-    import openpyxl
-except ImportError:  # pragma: no cover
-    openpyxl = None
+# `openpyxl` SI IMPORTA SOLO SE SERVE DAVVERO, e non serve quasi mai.
+#
+# Misurato il 31/08/2026 su questa immagine: importarlo costa **26 MB di
+# RAM**, il 5% dei 512 MB del servizio, spesi a ogni avvio per una libreria
+# che serve in un ramo di ripiego — il foglio di calcolo, che si legge
+# soltanto se il CSV della base dati sparisse. Un caso mai capitato,
+# pagato a ogni avvio.
+def _openpyxl():
+    """La libreria del foglio di calcolo, importata al primo uso."""
+    try:
+        import openpyxl
+    except ImportError:  # pragma: no cover
+        return None
+    return openpyxl
+
 
 from . import config as C
 from . import storage
@@ -101,7 +112,17 @@ FONTE_ESTERNA = "servizio esterno"
 # stesso IMEI dà un modello su un sito e un altro modello su un altro» è
 # la ragione per cui esiste il confronto. Conservare l'elenco costa memoria
 # solo per i TAC che più fonti conoscono.
-_memory_index: dict[str, list[tuple[str, str, str]]] | None = None
+#
+# In archivio ogni TAC tiene le sue risposte in UNA stringa sola: le tre
+# parti di una risposta separate da `_CAMPO`, le risposte fra loro da
+# `_VOCE`. Sono i due caratteri di controllo che ASCII dedica esattamente a
+# questo (0x1F «unit separator», 0x1E «record separator») e non compaiono
+# in nessun catalogo di telefoni. Il perché sta nel commento sopra
+# `_flusso_di_testo`: la forma «dizionario di liste di tuple» costava 45
+# volte il testo che conteneva.
+_CAMPO = "\x1f"
+_VOCE = "\x1e"
+_memory_index: dict[str, str] | None = None
 _status = "non ancora caricato"
 
 
@@ -476,38 +497,73 @@ def _leggi_workbook(workbook, index: dict) -> None:
                 index[tac] = (brand, specs)
 
 
-def _indice_principale() -> dict[str, tuple[str, str]]:
-    """La base dati principale, qualunque formato arrivi."""
+def _voci_principali():
+    """La base dati principale in flusso, senza dizionario intermedio.
+
+    Stesso ordine di ripieghi di sempre — CSV, foglio di calcolo, copia
+    nel repository — e stessi messaggi di stato: questa funzione ha preso
+    il posto di `_indice_principale`, che faceva le stesse tre prove per
+    consegnare un dizionario. Tenerle tutte e due avrebbe voluto dire due
+    copie della stessa catena di ripieghi, che prima o poi smettono di
+    somigliarsi.
+
+    La differenza è che il caso normale — il CSV — non costruisce mai un
+    dizionario di 248.000 voci per poi ricopiarlo nell'indice.
+    """
     global _status
-    indice = _leggi_base_principale(_cached_bytes())
-    if indice:
-        return indice
-
-    # RIPIEGO SUL FOGLIO DI CALCOLO. Stesso dato, stesso repository: serve
-    # solo se il CSV sparisse o cambiasse forma.
-    grezzo = _cached_bytes_url(TAC_DB_XLSX_URL, _META_XLSX_BYTES, _META_XLSX_FETCHED)
+    grezzo = _cached_bytes()
+    if grezzo and grezzo[:4] != _MAGIA_XLSX:
+        flusso = _flusso_di_testo(grezzo)
+        vuoto = True
+        try:
+            for voce in _righe_principali(flusso):
+                vuoto = False
+                yield voce
+        except csv.Error:
+            pass
+        if not vuoto:
+            return
+    # Da qui in giù sono i ripieghi rari: lì il dizionario intermedio non
+    # è un problema, perché o il file è piccolo (l'istantanea) o la
+    # libreria del foglio di calcolo lo costruisce comunque.
     indice = _leggi_base_principale(grezzo)
-    if indice:
-        _status += " (dal foglio di calcolo, il CSV non era disponibile)"
-        return indice
+    if not indice:
+        indice = _leggi_base_principale(
+            _cached_bytes_url(TAC_DB_XLSX_URL, _META_XLSX_BYTES, _META_XLSX_FETCHED))
+        if indice:
+            _status += " (dal foglio di calcolo, il CSV non era disponibile)"
+    if not indice:
+        indice = _istantanea_locale()
+        if indice:
+            _status += (f" — nessuna fonte in rete disponibile, si usa la copia "
+                        f"nel repository ({len(indice)} TAC)")
+    for tac, (marca, specs) in indice.items():
+        yield tac, marca, specs
 
-    # ULTIMA SPIAGGIA: LA COPIA CHE VIAGGIA NEL REPOSITORY.
-    #
-    # Fin qui ogni strada passava dalla rete. Il 17/08/2026 quella fonte
-    # ha risposto `HTTP 429` e il risultato è stato che nessun IMEI veniva
-    # più riconosciuto: un dato che esiste solo in rete è un dato che si
-    # può perdere, e questo qui cambia raramente — sono codici assegnati
-    # ai modelli, non notizie.
-    #
-    # La copia contiene la sola era Android (mezzo megabyte compresso, la
-    # genera `scripts/aggiorna_istantanea_tac.py`) e resta l'ULTIMA delle
-    # scelte: quando la rete risponde si usa il dato fresco, che conosce
-    # anche i modelli usciti dopo l'ultima istantanea.
-    indice = _istantanea_locale()
-    if indice:
-        _status += (f" — nessuna fonte in rete disponibile, si usa la copia "
-                    f"nel repository ({len(indice)} TAC)")
-    return indice
+
+def _voci_imeidb():
+    """La terza base dati in flusso.
+
+    Misurata prima di essere adottata: 27.827 TAC, di cui 626 assenti
+    dalla base principale. Poco — ma sono 626 telefoni che prima non si
+    riconoscevano, per 1,1 MB.
+    """
+    grezzo = _cached_bytes_url(TAC_DB_IMEIDB_URL, _META_IMEIDB_BYTES,
+                               _META_IMEIDB_FETCHED, minimo=100_000)
+    flusso = _flusso_di_testo(grezzo)
+    if flusso is None:
+        return
+    yield from _righe_imeidb(flusso)
+
+
+def _voci_storiche():
+    """La base dati storica in flusso (vedi `_indice_fallback`)."""
+    grezzo = _cached_bytes_url(TAC_DB_FALLBACK_URL, _META_FALLBACK_BYTES,
+                               _META_FALLBACK_FETCHED)
+    flusso = _flusso_di_testo(grezzo)
+    if flusso is None:
+        return
+    yield from _righe_osmocom(flusso)
 
 
 def _istantanea_locale() -> dict[str, tuple[str, str]]:
@@ -539,11 +595,12 @@ def _leggi_base_principale(grezzo: bytes | None) -> dict[str, tuple[str, str]]:
     if not grezzo:
         return {}
     if grezzo[:4] == _MAGIA_XLSX:
-        if openpyxl is None:  # pragma: no cover
+        modulo = _openpyxl()
+        if modulo is None:  # pragma: no cover
             return {}
         try:
-            workbook = openpyxl.load_workbook(io.BytesIO(grezzo), read_only=True,
-                                              data_only=True)
+            workbook = modulo.load_workbook(io.BytesIO(grezzo), read_only=True,
+                                            data_only=True)
         except Exception as exc:
             globals()["_status"] = f"file scaricato ma non interpretabile: {exc}"
             return {}
@@ -556,17 +613,98 @@ def _leggi_base_principale(grezzo: bytes | None) -> dict[str, tuple[str, str]]:
 
 def _leggi_csv_tac(testo: str) -> dict[str, tuple[str, str]]:
     """`Brand,TAC,SPECS` — la forma del CSV della base dati principale."""
-    indice: dict[str, tuple[str, str]] = {}
     try:
-        for riga in csv.DictReader(io.StringIO(testo or "")):
-            tac = (riga.get("TAC") or riga.get("tac") or "").strip()
-            marca = (riga.get("Brand") or riga.get("brand") or "").strip()
-            specs = (riga.get("SPECS") or riga.get("specs") or "").strip()
-            if len(tac) == 8 and tac.isdigit() and marca:
-                indice[tac] = (marca, specs)
+        return {tac: (marca, specs)
+                for tac, marca, specs in _righe_principali(io.StringIO(testo or ""))}
     except csv.Error:
         return {}
-    return indice
+
+
+# ======================================================================
+# I CSV SI LEGGONO UNA RIGA ALLA VOLTA, NON TUTTI INSIEME
+# ======================================================================
+# Segnalato dall'utente il 31/08/2026: «il sito continua a crashare
+# continuamente per saturamento della memoria». Misurato qui, sul
+# database vero:
+#
+#     lettura dei byte dall'archivio      +19 MB
+#     `.decode()` del testo intero        +11 MB
+#     dizionario delle 248.359 righe      +50 MB, con un PICCO di +106
+#     indice finale (liste di tuple)      +47 MB
+#     ---------------------------------------------------------------
+#     in tutto                            165 MB stabili, 217 di picco
+#
+# Su un servizio da 512 MB, con gli altri cataloghi e il thread di
+# scansione nello stesso processo, quel picco è la morte per OOM — e si
+# ripete a ogni avvio, perché l'indice si ricostruisce da capo.
+#
+# E il dato utile, misurato, sono **3,6 MB**: tutto il resto è la forma in
+# cui lo si teneva. Un dizionario di liste di tuple di stringhe paga
+# quattro oggetti Python per ogni risposta di ogni fonte, e ognuno costa
+# più del testo che contiene.
+#
+# Da qui in poi: le righe si leggono in flusso (mai il testo intero in
+# memoria, mai il dizionario intermedio) e finiscono in una stringa sola
+# per TAC, che si srotola al momento della lettura — cioè per il singolo
+# TAC cercato, non per i 77.000 che non interessano a nessuno.
+def _flusso_di_testo(grezzo: bytes | None):
+    """I byte scaricati letti come testo, senza copiarli tutti in memoria."""
+    if not grezzo:
+        return None
+    return io.TextIOWrapper(io.BytesIO(grezzo), encoding="utf-8",
+                            errors="replace", newline="")
+
+
+def _righe_principali(flusso):
+    """`Brand,TAC,SPECS`, una riga alla volta: (tac, marca, specs)."""
+    lettore = csv.reader(flusso)
+    intestazione = next(lettore, None)
+    if not intestazione:
+        return
+    posti = {str(nome or "").strip().lower(): i
+             for i, nome in enumerate(intestazione)}
+    i_tac, i_marca, i_specs = posti.get("tac"), posti.get("brand"), posti.get("specs")
+    if i_tac is None or i_marca is None:
+        return
+    ultimo = max(i_tac, i_marca, i_specs if i_specs is not None else 0)
+    for riga in lettore:
+        if len(riga) <= ultimo:
+            continue
+        tac = (riga[i_tac] or "").strip()
+        marca = (riga[i_marca] or "").strip()
+        if len(tac) == 8 and tac.isdigit() and marca:
+            specs = (riga[i_specs] or "").strip() if i_specs is not None else ""
+            yield tac, marca, specs
+
+
+def _righe_imeidb(flusso):
+    """`TAC,marca,modello,…` senza intestazione: colonne per posizione."""
+    for riga in csv.reader(flusso):
+        if len(riga) < 3:
+            continue
+        tac = str(riga[0] or "").strip()
+        marca = str(riga[1] or "").strip()
+        if len(tac) == 8 and tac.isdigit() and marca:
+            yield tac, marca, str(riga[2] or "").strip()
+
+
+def _righe_osmocom(flusso):
+    """Come `_righe_imeidb`, ma saltando la riga di copyright iniziale.
+
+    L'intestazione vera è la SECONDA riga del file (vedi
+    `carica_tac_osmocom`): la si cerca fra le prime dieci e si legge da lì
+    in avanti. Il flusso resta posizionato dopo l'intestazione, quindi non
+    serve saltarla di nuovo.
+    """
+    for _ in range(10):
+        riga = flusso.readline()
+        if not riga:
+            return
+        if riga.lower().replace(" ", "").startswith("tac,"):
+            break
+    else:
+        return
+    yield from _righe_imeidb(flusso)
 
 
 def _dell_era_android(specs: str) -> bool:
@@ -607,63 +745,88 @@ def _build_index() -> dict[str, list[tuple[str, str, str]]]:
     e un altro modello su un altro» è la situazione normale, non
     l'eccezione. L'ordine di questo elenco resta la precedenza: chi è primo
     è la risposta dell'app, gli altri sono il confronto.
+
+    IL VALORE È UNA STRINGA SOLA, NON UNA LISTA DI TUPLE. Le risposte di un
+    TAC stanno una dietro l'altra separate da caratteri di controllo, e si
+    srotolano in `_voci_per_tac` — cioè per il TAC che qualcuno ha cercato,
+    non per i 77.000 che nessuno cercherà. Vedi il commento lungo sopra
+    `_flusso_di_testo` per i numeri: è la differenza fra 165 MB e 89.
+
+    ANCHE L'ORDINAMENTO PER AFFIDABILITÀ È RIMANDATO ALLA LETTURA. Il
+    punteggio di una risposta dipende SOLO dalle altre risposte dello
+    stesso TAC (vedi `_punteggio_affidabilita`), quindi calcolarlo per
+    tutti all'avvio dava lo stesso risultato di calcolarlo per quello
+    cercato — pagando all'avvio, ogni avvio, 77.000 ordinamenti e altrettanti
+    insiemi di parole che nessuno guardava.
     """
     global _status
-    index: dict[str, list[tuple[str, str, str]]] = {}
+    index: dict[str, str] = {}
 
     scartati = 0
+    conteggi: dict[str, int] = {}
+    nuovi: dict[str, int] = {}
 
-    def aggiungi(fonte: str, voci: dict[str, tuple[str, str]],
-                 filtrabile: bool = True) -> None:
+    def aggiungi(fonte: str, voci, filtrabile: bool = True) -> None:
         nonlocal scartati
         taglia = filtrabile and C.TAC_SOLO_ERA_ANDROID
-        for tac, (marca, specs) in voci.items():
+        quante = 0
+        inediti = 0
+        for tac, marca, specs in voci:
             # LE CORREZIONI UMANE NON SI FILTRANO MAI. Se qualcuno ha
             # inserito un TAC a mano, o è stato verificato nel repository,
             # quel dato è lì apposta: nessun criterio automatico può
             # decidere che non serviva.
-            if taglia and tac not in index and not _dell_era_android(specs):
+            gia_noto = tac in index
+            if taglia and not gia_noto and not _dell_era_android(specs):
                 scartati += 1
                 continue
-            index.setdefault(tac, []).append((fonte, marca, specs))
+            quante += 1
+            if not gia_noto:
+                inediti += 1
+            voce = fonte + _CAMPO + marca + _CAMPO + specs
+            precedente = index.get(tac)
+            index[tac] = precedente + _VOCE + voce if precedente else voce
+        conteggi[fonte] = quante
+        nuovi[fonte] = inediti
+
+    def coppie(dizionario) -> list[tuple[str, str, str]]:
+        return [(tac, marca, specs)
+                for tac, (marca, specs) in dizionario.items()]
 
     # L'ordine delle chiamate È l'ordine di precedenza.
     inseriti = tac_inseriti()
     curati = _indice_curato()
 
-    principale = _indice_principale()
-    imeidb = _indice_imeidb()
-    storica = _indice_fallback()
-
-    aggiungi(FONTE_UTENTE, inseriti, filtrabile=False)
-    aggiungi(FONTE_CURATA, curati, filtrabile=False)
+    aggiungi(FONTE_UTENTE, coppie(inseriti), filtrabile=False)
+    aggiungi(FONTE_CURATA, coppie(curati), filtrabile=False)
     # Le risposte comprate al servizio esterno stanno sotto le verifiche
     # umane e sopra i database scaricati: sono puntuali e recenti, ma
     # restano di una fonte automatica. Non si filtrano per età — si sono
     # pagate proprio perché nessun altro conosceva quel TAC.
-    aggiungi(FONTE_ESTERNA, tac_esterni(), filtrabile=False)
-    aggiungi(FONTE_PRINCIPALE, principale)
-    aggiungi(FONTE_IMEIDB, imeidb)
-    aggiungi(FONTE_OSMOCOM, storica)
-
-    # L'ordine di caricamento non è più una sentenza sul modello giusto.
-    # Le correzioni umane restano assolute; fra le fonti pubbliche, invece,
-    # si applica un punteggio riproducibile che premia riscontri indipendenti
-    # e indicazioni esplicite di disponibilità europea.
-    for tac, voci in index.items():
-        index[tac] = _ordina_per_affidabilita(voci)
+    aggiungi(FONTE_ESTERNA, coppie(tac_esterni()), filtrabile=False)
+    # LE TRE BASI DATI SI LEGGONO UNA ALLA VOLTA, IN FLUSSO. Prima si
+    # costruivano tutti e tre i dizionari e poi si copiavano nell'indice:
+    # per un attimo la stessa informazione stava in memoria due volte, ed è
+    # quell'attimo che faceva toccare i 217 MB di picco.
+    aggiungi(FONTE_PRINCIPALE, _voci_principali())
+    aggiungi(FONTE_IMEIDB, _voci_imeidb())
+    aggiungi(FONTE_OSMOCOM, _voci_storiche())
 
     if not index:
         _status = "file interpretato ma nessuna riga valida trovata (formato cambiato?)"
     else:
-        nuovi_imeidb = len(set(imeidb) - set(principale))
-        nuovi_storica = len(set(storica) - set(principale) - set(imeidb))
         _status += f" — {len(index)} codici TAC indicizzati"
-        _status += f" · base principale {len(principale)}"
-        if imeidb:
-            _status += f" · IMEIDB {len(imeidb)} (+{nuovi_imeidb} nuovi)"
-        if storica:
-            _status += f" · storica {len(storica)} (+{nuovi_storica} nuovi)"
+        # I conteggi sono ora le righe DAVVERO indicizzate, non la
+        # dimensione del file: prima si dichiarava «base principale
+        # 248359» e poi se ne tenevano 76737, e i due numeri sulla stessa
+        # pagina non tornavano.
+        _status += f" · base principale {conteggi.get(FONTE_PRINCIPALE, 0)}"
+        if conteggi.get(FONTE_IMEIDB):
+            _status += (f" · IMEIDB {conteggi[FONTE_IMEIDB]}"
+                        f" (+{nuovi.get(FONTE_IMEIDB, 0)} nuovi)")
+        if conteggi.get(FONTE_OSMOCOM):
+            _status += (f" · storica {conteggi[FONTE_OSMOCOM]}"
+                        f" (+{nuovi.get(FONTE_OSMOCOM, 0)} nuovi)")
         if curati:
             _status += f" · {len(curati)} verificati a mano"
         if inseriti:
@@ -751,22 +914,18 @@ def _ordina_per_affidabilita(
 
 
 def _indice_fallback() -> dict[str, tuple[str, str]]:
-    """TAC dalla base dati storica, in formato CSV.
+    """TAC dalla base dati storica, in forma di dizionario.
+
+    L'indice vero la legge in flusso (`_voci_storiche`); questa resta la
+    forma comoda per chi vuole guardarla tutta insieme — i test e chi
+    misura la copertura. Poggia sullo stesso lettore, così non esistono
+    due modi di interpretare lo stesso file.
 
     Fallisce in silenzio di proposito: è un supplemento, e se non è
     raggiungibile l'app deve continuare a funzionare con la prima base
     dati invece di non identificare più niente.
     """
-    raw = _cached_bytes_url(TAC_DB_FALLBACK_URL, _META_FALLBACK_BYTES,
-                            _META_FALLBACK_FETCHED)
-    if not raw:
-        return {}
-    try:
-        testo = raw.decode("utf-8", "replace")
-    except Exception:
-        return {}
-
-    return carica_tac_osmocom(testo)
+    return {tac: (marca, modello) for tac, marca, modello in _voci_storiche()}
 
 
 def carica_tac_osmocom(testo: str) -> dict[str, tuple[str, str]]:
@@ -785,55 +944,14 @@ def carica_tac_osmocom(testo: str) -> dict[str, tuple[str, str]]:
     darebbe due volte la stessa, quindi qui le colonne si prendono per
     posizione, che è l'unica cosa che le distingue.
     """
-    indice: dict[str, tuple[str, str]] = {}
-    righe = (testo or "").splitlines()
-    inizio = None
-    for i, riga in enumerate(righe[:10]):
-        if riga.lower().replace(" ", "").startswith("tac,"):
-            inizio = i
-            break
-    if inizio is None:
-        return {}
-
-    lettore = csv.reader(io.StringIO("\n".join(righe[inizio:])))
-    next(lettore, None)      # l'intestazione, già individuata
-    for riga in lettore:
-        if len(riga) < 3:
-            continue
-        tac = str(riga[0] or "").strip()
-        marca = str(riga[1] or "").strip()
-        modello = str(riga[2] or "").strip()
-        if len(tac) == 8 and tac.isdigit() and marca:
-            indice[tac] = (marca, modello)
-    return indice
-
-
-def _indice_imeidb() -> dict[str, tuple[str, str]]:
-    """Terza base dati TAC. Stesso spirito della seconda: buchi diversi.
-
-    Misurata prima di essere adottata: 27 827 TAC, di cui 626 assenti dalla
-    base principale. Poco — ma sono 626 telefoni che prima non si
-    riconoscevano, per 1,1 MB.
-    """
-    raw = _cached_bytes_url(TAC_DB_IMEIDB_URL, _META_IMEIDB_BYTES,
-                            _META_IMEIDB_FETCHED, minimo=100_000)
-    if not raw:
-        return {}
-    return carica_tac_imeidb(raw.decode("utf-8", "replace"))
+    return {tac: (marca, modello)
+            for tac, marca, modello in _righe_osmocom(io.StringIO(testo or ""))}
 
 
 def carica_tac_imeidb(testo: str) -> dict[str, tuple[str, str]]:
     """`TAC,marca,modello,…` senza intestazione."""
-    indice: dict[str, tuple[str, str]] = {}
-    for riga in csv.reader(io.StringIO(testo or "")):
-        if len(riga) < 3:
-            continue
-        tac = str(riga[0] or "").strip()
-        marca = str(riga[1] or "").strip()
-        modello = str(riga[2] or "").strip()
-        if len(tac) == 8 and tac.isdigit() and marca:
-            indice[tac] = (marca, modello)
-    return indice
+    return {tac: (marca, modello)
+            for tac, marca, modello in _righe_imeidb(io.StringIO(testo or ""))}
 
 
 # ======================================================================
@@ -1084,7 +1202,36 @@ def _voci_per_tac(tac: str) -> list[tuple[str, str, str]]:
     # `core/modelcodes.py`, dove un ciclo di sforzo con thread paralleli
     # l'ha fatto scattare davvero.
     indice = _memory_index
-    return list((indice or {}).get(tac) or [])
+    return _voci_dalla_cella((indice or {}).get(tac))
+
+
+def _voci_dalla_cella(cella) -> list[tuple[str, str, str]]:
+    """Le risposte di un TAC, srotolate e messe in ordine di affidabilità.
+
+    Accetta sia la stringa compatta dell'indice sia una lista di tuple:
+    così un `_build_index` sostituito da una prova (`tests/test_core.py`)
+    continua a funzionare senza sapere niente di come l'indice è fatto
+    dentro.
+
+    UNA FONTE PARLA UNA VOLTA SOLA, E VALE L'ULTIMA COSA CHE HA DETTO.
+    Prima del flusso, ogni base dati veniva prima ridotta a dizionario, e
+    lì una riga ripetuta sovrascriveva la precedente. Ora le righe arrivano
+    tutte, quindi il duplicato si scarta qui — stesso esito, senza il
+    dizionario intermedio. Sono 14 TAC su 248.359 nella base principale,
+    ma la regola non cambia con la loro quantità.
+    """
+    if not cella:
+        return []
+    if isinstance(cella, str):
+        grezze = [tuple(voce.split(_CAMPO)) for voce in cella.split(_VOCE)]
+    else:
+        grezze = [tuple(voce) for voce in cella]
+    per_fonte: dict[str, tuple[str, str, str]] = {}
+    for voce in grezze:
+        if len(voce) != 3:
+            continue
+        per_fonte[voce[0]] = voce
+    return _ordina_per_affidabilita(list(per_fonte.values()))
 
 
 def identify(imei: str, solo_locale: bool = False) -> tuple[str, str] | None:
@@ -1139,8 +1286,10 @@ def identify(imei: str, solo_locale: bool = False) -> tuple[str, str] | None:
     esito, esterno = cerca_tac_online_esito(tac)
     if esito == "trovato" and esterno:
         if _memory_index is not None:
-            _memory_index.setdefault(tac, []).append(
-                (FONTE_ESTERNA, esterno[0], esterno[1]))
+            voce = FONTE_ESTERNA + _CAMPO + esterno[0] + _CAMPO + esterno[1]
+            precedente = _memory_index.get(tac)
+            _memory_index[tac] = (precedente + _VOCE + voce if precedente
+                                  else voce)
         _ricorda_tac_esterno(tac, esterno[0], esterno[1])
         return esterno
     if esito == "assente":

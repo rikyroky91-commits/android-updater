@@ -50,7 +50,7 @@ from fastapi.staticfiles import StaticFiles
 from core import aer_catalog, aiquery, allegati, appledevices, cifratura, config as C
 from core import extract, imeicheck, mail, modelcodes, retest, scan, soc, sources, specs
 from core import storage, suggest, versus
-from core.util import fmt_date
+from core.util import fmt_date, memoria_mb, memoria_picco_mb
 
 from . import account, auth_web, presenters as P
 from .cache import CacheATempo
@@ -735,6 +735,22 @@ def diagnostica_spostata():
     return RedirectResponse("/catalogo", status_code=301)
 
 
+def _riga_memoria() -> str:
+    """«148,2 MB adesso · 210,4 MB di picco · limite del piano 512 MB»."""
+    adesso = memoria_mb()
+    picco = memoria_picco_mb()
+    if adesso is None:
+        return "non misurabile su questo sistema"
+    pezzi = [f"{adesso} MB adesso"]
+    if picco is not None:
+        pezzi.append(f"{picco} MB di picco dall'avvio")
+    # Il limite non si legge da nessuna parte dentro il contenitore: è una
+    # proprietà del piano, quindi si dichiara qui e si dice che è
+    # dichiarato, invece di far credere che sia misurato.
+    pezzi.append("il piano gratuito di Render ne concede 512")
+    return " · ".join(pezzi)
+
+
 def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
     """Il corpo comune della pagina Diagnostica — estratto perché le
     rotte del backup (sotto) devono ririsegnare la STESSA pagina con in
@@ -755,6 +771,15 @@ def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
             ("Specifiche hardware", specs.status()),
             ("Servizio TAC esterno", imeicheck.stato_servizio_esterno()),
             ("Interprete AI della ricerca", aiquery.status()),
+            # LA MEMORIA, ACCANTO AI CATALOGHI CHE LA CONSUMANO.
+            #
+            # È la riga da leggere quando il servizio riparte da solo: su
+            # Render un riavvio per memoria esaurita non lascia altro
+            # segno che un avvio nel registro. Il picco conta più del
+            # valore corrente, perché a far riavviare il contenitore è
+            # l'istante peggiore, non la media — e un picco già passato si
+            # vede solo qui.
+            ("Memoria del processo", _riga_memoria()),
             # Non uno "stato" interrogato al volo come gli altri sopra: è
             # quello che l'avvio ha scritto in STATO_AVVIO una volta sola
             # (vedi avvio()). Serve a rispondere da qui, senza dover
@@ -1271,8 +1296,23 @@ def health():
     # mancante. Qui c'è il solo SÌ/NO — mai la chiave, mai un pezzo di
     # chiave — e non costa niente, perché è una variabile d'ambiente:
     # questa rotta resta leggerissima come deve, senza toccare l'archivio.
+    # E LA MEMORIA, per lo stesso motivo.
+    #
+    # Il 31/08/2026 l'utente ha segnalato che il servizio «crasha
+    # continuamente per saturamento della memoria». Su Render un riavvio
+    # per OOM non lascia nessun messaggio leggibile: il registro mostra un
+    # avvio, non una causa, e da fuori si vede solo un sito che ogni tanto
+    # riparte. Questi due numeri — quanto sta usando adesso e il massimo
+    # toccato dall'avvio — si leggono senza login e senza toccare
+    # l'archivio, e trasformano «ogni tanto va giù» in un numero da
+    # confrontare con i 512 MB del piano.
+    #
+    # Non sono un dato sensibile: dicono quanta RAM usa un processo, non
+    # cosa contiene.
     return {"ok": True, "app": C.APP_TITLE,
-            "tac_esterno": "configurato" if imeicheck._chiave_api() else "non configurato"}
+            "tac_esterno": "configurato" if imeicheck._chiave_api() else "non configurato",
+            "memoria_mb": memoria_mb(),
+            "memoria_picco_mb": memoria_picco_mb()}
 
 
 # ======================================================================
@@ -1544,6 +1584,20 @@ def _nome_appartiene_al_codice(nome: str, codice: str) -> bool:
                for n in noti)
 
 
+def _con_rete(scheda: dict | None, nome: str, grezzo: str = "") -> dict | None:
+    """Calcola 4G/5G una volta sola e lo lascia anche dentro la scheda.
+
+    Due punti della stessa pagina lo mostrano — la pastiglia accanto al
+    nome e la scheda tecnica — e in questo progetto due punti che
+    calcolano lo stesso dato per conto loro sono due punti che prima o poi
+    dicono cose diverse (è già successo con il processore).
+    """
+    rete = P.rete_mobile(scheda, nome, grezzo)
+    if isinstance(scheda, dict):
+        scheda["rete"] = rete
+    return rete
+
+
 def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
     """Il TAC stabilisce l'identità; il firmware può solo arricchirla.
 
@@ -1647,8 +1701,35 @@ def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
     # RMX3997), e lasciarlo vincere rimetteva la pagina dell'IMEI in
     # disaccordo con la stessa ricerca fatta per codice: lo stesso
     # telefono con due nomi a seconda di come lo si è cercato.
+    #
+    # E QUESTA REGOLA, SCRITTA QUI SOPRA, NON ERA IMPLEMENTATA. Il commento
+    # diceva «non sopra il nome canonico del codice», il codice invece
+    # assegnava il titolo della scheda senza guardare niente. Segnalato
+    # dall'utente il 31/08/2026 con l'IMEI 866068054131131: il database TAC
+    # risponde «OPPO A74, Oppo CPH2219» — il nome giusto, quello europeo —
+    # e la pagina mostrava «Oppo F19», che è il nome indiano dello stesso
+    # telefono, perché è così che il catalogo GSMArena indicizza CPH2219.
+    # L'app aveva la risposta esatta in mano e la buttava all'ultimo passo.
+    #
+    # La distinzione che serviva è fra CORREGGERE UNA GRAFIA e CAMBIARE
+    # TELEFONO:
+    #
+    #     «Galaxy A16»  → «Galaxy A16 4G»   la scheda completa la grafia, e
+    #                                        deve vincere (è il caso che ha
+    #                                        motivato la regola originale)
+    #     «OPPO A74»    → «Oppo F19»         la scheda cambia nome di
+    #                                        mercato, e non è affare suo
+    #
+    # `modelcodes.stesso_telefono` è la stessa regola di famiglia che
+    # `nome_canonico` usa già per scegliere fra i nomi di un codice: se i
+    # due nomi sono della stessa famiglia il titolo della scheda passa,
+    # altrimenti resta il nome canonico del codice — che è l'unico posto
+    # dove le righe verificate di `data/nomi_modello.csv` hanno voce.
     titolo_scheda = (ancorato["scheda"].get("titolo") or "").strip()
-    if ancorato["scheda"].get("trovata") and titolo_scheda:
+    scheda_rinomina = bool(
+        canonico and titolo_scheda
+        and not modelcodes.stesso_telefono(titolo_scheda, canonico))
+    if ancorato["scheda"].get("trovata") and titolo_scheda and not scheda_rinomina:
         modello = titolo_scheda
         marca = ancorato["scheda"].get("marca") or marca
         # Il nome è cambiato perché l'ha dettato LA SCHEDA STESSA: quella
@@ -1674,10 +1755,20 @@ def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
     # grafia, e così «Redmi A7 Pro» del catalogo tecnico diventava
     # «REDMI A7 Pro»: una regola nata per dare il nome giusto che
     # peggiorava quello che era già giusto.
+    #
+    # «CAMBIA DAVVERO TELEFONO» SI CHIEDE ALLA FAMIGLIA DEL NOME, non al
+    # confronto fra due stringhe. Con il confronto secco, la riga curata
+    # `CPH2219 → OPPO A74` accorciava «OPPO A74 4G» — la grafia completa
+    # che il catalogo tecnico conserva — in «OPPO A74»: un nome più
+    # preciso non è un nome diverso, ed è esattamente la regressione che
+    # questa condizione era nata per evitare (il «REDMI A7 Pro» del
+    # commento qui sopra), ricomparsa da un'altra porta appena una riga
+    # curata ha coperto un codice che il catalogo descrive più in
+    # dettaglio del dataset dei nomi.
     scritto_a_mano = modelcodes.nome_scelto_a_mano(codice) if codice else None
     if (scritto_a_mano and canonico
             and _semplifica_nome(scritto_a_mano) == _semplifica_nome(canonico)
-            and _semplifica_nome(modello) != _semplifica_nome(canonico)):
+            and not modelcodes.stesso_telefono(modello, canonico)):
         modello = canonico
         marca = ""       # il nome curato è già completo di marca
 
@@ -1752,11 +1843,39 @@ def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
                 f"potrebbe non essere il modello europeo. Verifica sulla "
                 f"scatola o in Impostazioni prima di darle per certe.")
 
+    # E IL TITOLO DELLA SCHEDA SEGUE IL NOME MOSTRATO, quando parlano
+    # dello stesso telefono con due nomi di mercato diversi.
+    #
+    # Il catalogo tecnico indicizza `CPH2219` come «Oppo F19»: è la stessa
+    # scheda, lo stesso hardware, un altro nome commerciale. Poco sopra si
+    # è deciso che il nome è «OPPO A74» — quello europeo — ma la scheda
+    # restava intestata all'altro, e la pagina del dispositivo in archivio
+    # (che mostra l'intestazione della scheda) sarebbe tornata a dire
+    # «Oppo F19» sotto un titolo «OPPO A74». Due nomi per lo stesso
+    # telefono nella stessa pagina è il difetto che questa funzione esiste
+    # per chiudere.
+    #
+    # NON tocca il caso della `nota_mercato` qui sopra: là la scheda è
+    # davvero di un'altra variante, la differenza è dichiarata a parole, e
+    # cambiarle il titolo cancellerebbe proprio l'avvertenza.
+    titolo_finale = (ancorato["scheda"].get("titolo") or "").strip()
+    if (ancorato["scheda"].get("trovata") and titolo_finale and modello
+            and not ancorato["scheda"].get("nota_mercato")
+            and not modelcodes.stesso_telefono(titolo_finale, modello)):
+        ancorato["scheda"] = dict(ancorato["scheda"], titolo=modello)
+
     ancorato["query"] = identita
     ancorato["nome"] = _modello_con_marca(marca, modello, codice) or modello
     ancorato["codice"] = codice
     ancorato["codice_per_correzione"] = codice
     ancorato["trovato"] = True
+    # 4G o 5G. Qui si passa anche la riga GREZZA del database TAC («SAMSUNG
+    # GALAXY A54 5G, SM-A546B»): è il TAC ad aver identificato l'esemplare
+    # che qualcuno ha in mano, e a volte la sigla della variante sopravvive
+    # lì mentre il nome canonico del codice l'ha già persa.
+    ancorato["rete"] = _con_rete(
+        ancorato.get("scheda"), ancorato["nome"],
+        imei.get("descrizione") or imei.get("modello") or "")
 
     # Se nessuna fonte OTA è interrogabile, la versione Android della scheda
     # è comunque un dato tecnico utile. Viene etichettata come versione di
@@ -2613,6 +2732,13 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
         "senza_firmware": bool(identita) and not bool(pezzi),
         "tipo_versione": tipo_versione,
         "scheda": scheda,
+        # 4G o 5G: due varianti dello stesso nome sono due telefoni da
+        # provare separatamente (vedi `P.rete_mobile`). Si calcola qui, sul
+        # nome DEFINITIVO, perché è il nome a portare il dato quando il
+        # produttore ha battezzato le due varianti — e si scrive anche
+        # dentro la scheda, così il riquadro in cima e la scheda tecnica
+        # non possono dire due cose diverse sullo stesso telefono.
+        "rete": _con_rete(scheda, nome),
         "notizie": [P.riga_aggiornamento(n) for n in notizie[:6]],
         "quante_notizie": len(notizie),
         # IL «FORSE CERCAVI» ANCHE QUANDO LA RICERCA RIESCE.

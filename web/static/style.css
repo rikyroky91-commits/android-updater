@@ -543,6 +543,17 @@ code {
 }
 .tag-accent  { background: rgba(236, 48, 19, .10); color: var(--accent-scuro); }
 .tag-neutral { background: var(--superficie); color: var(--neutral); }
+/* La pastiglia 4G/5G accanto al nome del modello. Piu' piccola del titolo
+   e in maiuscoletto: e' una qualifica del nome, non un secondo titolo che
+   se lo contende. Bordo invece di fondo pieno perche' in questa pagina il
+   fondo pieno significa gia' un'altra cosa (lo stato di aggiornamento). */
+.pastiglia-rete {
+  display: inline-block; vertical-align: middle;
+  border: 1px solid var(--filo); border-radius: 999px;
+  padding: .05rem .5rem; margin-left: .45rem;
+  font-size: .62em; font-weight: 700; letter-spacing: .06em;
+  color: var(--neutral); white-space: nowrap;
+}
 .tag-outline { border-color: var(--filo); color: var(--neutral); }
 /* Le severità portano il proprio colore: uniformarle alle tre pastiglie
    toglierebbe l'unica informazione che quel colore trasmette. */

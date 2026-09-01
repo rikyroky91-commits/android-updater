@@ -74,7 +74,12 @@
        si scrive MAI «Nessun firmware»: la ricerca è ancora in corso, e
        dichiarare un esito che non c'è ancora è peggio del silenzio. #}
     {% if risultato.nome and risultato.nome != risultato.query %}
-    <h2>{{ risultato.nome }}</h2>
+    {# La pastiglia 4G/5G compare già in questo primo tempo: il modello e la
+       scheda tecnica sono definitivi, è il firmware che si sta ancora
+       cercando. Vedi la nota in `_esito_firmware.html`. #}
+    <h2>{{ risultato.nome }}
+      {%- if risultato.rete %} <span class="pastiglia-rete" title="Rete {{ risultato.rete.sigla }} · {{ risultato.rete.fonte }}{% if risultato.rete.dettaglio %} — {{ risultato.rete.dettaglio }}{% endif %}">{{ risultato.rete.sigla }}</span>{% endif %}</h2>
+    {% if risultato.rete %}<p class="nota">Rete mobile: <strong>{{ risultato.rete.sigla }}</strong> · {{ risultato.rete.fonte }}</p>{% endif %}
     {% endif %}
     {# DUE ATTESE DIVERSE, DETTE IN MODO DIVERSO. Cercare il firmware di un
        telefono già riconosciuto è la normalità; interrogare un archivio

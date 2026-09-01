@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import html
+import os
 import re
 import unicodedata
 from datetime import datetime, timezone
@@ -175,3 +176,44 @@ def clean_text(text: str) -> str:
 def truncate(text: str, limit: int = 120) -> str:
     text = str(text or "")
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
+def memoria_mb() -> float | None:
+    """Quanta RAM sta usando questo processo, adesso, in MB.
+
+    ESISTE PERCHÉ IL DIFETTO ERA INVISIBILE. Il 31/08/2026 l'utente ha
+    segnalato che il sito «crasha continuamente per saturamento della
+    memoria», e non c'era un solo numero da guardare per capirlo: Render
+    riavvia il contenitore e nel registro resta un avvio, non una causa.
+    Un contatore che si legge da fuori trasforma «ogni tanto va giù» in
+    «alle 14:32 era a 480 MB su 512».
+
+    Si legge da `/proc/self/statm` (seconda colonna: pagine residenti),
+    che è la stessa cosa che misura il limite di Render, senza dipendenze
+    esterne. Fuori da Linux non esiste, e allora si risponde `None`: un
+    numero mancante è meglio di un numero inventato.
+    """
+    try:
+        with open("/proc/self/statm", encoding="ascii") as f:
+            pagine = int(f.read().split()[1])
+    except Exception:
+        return None
+    return round(pagine * os.sysconf("SC_PAGE_SIZE") / (1024 * 1024), 1)
+
+
+def memoria_picco_mb() -> float | None:
+    """Il massimo di RAM toccato da questo processo dall'avvio.
+
+    Il picco conta più del valore corrente: un OOM lo provoca l'istante
+    peggiore, non la media. `VmHWM` è il numero che il kernel tiene per
+    questo — «high water mark» — e non si può azzerare, il che è
+    esattamente quello che serve per accorgersi di un picco già passato.
+    """
+    try:
+        with open("/proc/self/status", encoding="ascii") as f:
+            for riga in f:
+                if riga.startswith("VmHWM:"):
+                    return round(int(riga.split()[1]) / 1024, 1)
+    except Exception:
+        return None
+    return None

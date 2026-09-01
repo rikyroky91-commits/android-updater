@@ -343,8 +343,17 @@ class TestTabellaTacVerificata(unittest.TestCase):
             # di TAC solo per un valore già verificato. Quando l'indice
             # completo viene richiesto, il dato pubblico resta comunque
             # disponibile accanto alla correzione manuale.
+            # SI LEGGE CON L'ACCESSORE, NON A MANO. Dal 31/08/2026 l'indice
+            # tiene le risposte di un TAC in una stringa sola invece che in
+            # una lista di tuple — è la forma che ha tolto 112 MB di RAM al
+            # servizio (vedi il commento sopra `_flusso_di_testo` in
+            # `core/imeicheck.py`). Srotolarle è il mestiere di
+            # `_voci_dalla_cella`, che è anche la strada percorsa dalla
+            # pagina vera: un test che rifà quel lavoro per conto suo
+            # collauda la propria copia, non il codice.
             indice = imeicheck._build_index()
-            fonti = [fonte for fonte, _marca, _specs in indice["35135531"]]
+            fonti = [fonte for fonte, _marca, _specs
+                     in imeicheck._voci_dalla_cella(indice["35135531"])]
             self.assertIn(imeicheck.FONTE_CURATA, fonti)
             self.assertIn(imeicheck.FONTE_PRINCIPALE, fonti)
             self.assertLess(fonti.index(imeicheck.FONTE_CURATA),

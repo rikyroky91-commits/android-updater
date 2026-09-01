@@ -1757,7 +1757,11 @@ class TestRicercaPerImei(_Sito):
             # titolo, che è ciò che questo test difende, sta nel primo.
             pagina = self.client.get(
                 "/", params={"q": "351355315430630", "completo": 1}).text
-            self.assertIn("<h2>Samsung Galaxy A16 4G</h2>", pagina)
+            # Dal 31/08/2026 il titolo porta anche la pastiglia 4G/5G
+            # (chiesta dall'utente), quindi non finisce piu' subito dopo
+            # il nome. Il nome resta quello che questo test difende.
+            self.assertIn("<h2>Samsung Galaxy A16 4G", pagina)
+            self.assertIn('<span class="pastiglia-rete"', pagina)
             self.assertIn("Versione Android verificata: Android 14", pagina)
             self.assertNotIn("<h2>SM-A165F</h2>", pagina)
         finally:

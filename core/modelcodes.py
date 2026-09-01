@@ -605,6 +605,29 @@ def _radice_famiglia(nome: str) -> str:
     return "".join(utili or parole)
 
 
+def stesso_telefono(uno: str, altro: str) -> bool:
+    """Se due nomi sono lo stesso telefono scritto in due modi.
+
+    «Galaxy A16» e «Galaxy A16 4G» sì: uno è l'altro con il suffisso di
+    variante, e chi sceglie fra i due sceglie una GRAFIA. «OPPO A74» e
+    «OPPO F19» no: sono due nomi commerciali distinti dello stesso
+    hardware, e scegliere fra loro significa scegliere un MERCATO — una
+    decisione che va presa da chi sa dove il telefono viene venduto, non
+    dall'ordine in cui i cataloghi rispondono.
+
+    È la stessa regola di famiglia che `nome_canonico` applica già fra i
+    nomi di un codice, qui esposta perché serve anche fuori da questo
+    modulo: la pagina dell'IMEI deve poter distinguere «il catalogo ha
+    corretto la grafia» da «il catalogo ha cambiato telefono». Vedi
+    `web/main._ancora_esito_imei`.
+    """
+    a = _radice_famiglia(uno)
+    b = _radice_famiglia(altro)
+    if not a or not b:
+        return False
+    return a.startswith(b) or b.startswith(a)
+
+
 def nome_canonico(codice: str) -> str | None:
     """UN nome solo per un codice, scelto sempre allo stesso modo.
 

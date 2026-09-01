@@ -252,6 +252,16 @@ def salva() -> tuple[bool, str]:
             return False, messaggio
 
         compresso = gzip.compress(grezzo, compresslevel=6)
+        # E IL DATABASE IN CHIARO SI LASCIA ANDARE SUBITO.
+        #
+        # Da qui in poi serve solo `compresso`, ma `grezzo` — il database
+        # intero, decine di megabyte — restava in memoria per tutta la
+        # durata del caricamento, mentre accanto crescevano la copia
+        # base64 e il corpo JSON della richiesta. Tre copie dello stesso
+        # archivio nello stesso momento, ogni mezz'ora, su un servizio da
+        # 512 MB: è uno dei picchi che portavano al riavvio per memoria
+        # esaurita segnalato il 31/08/2026.
+        del grezzo
 
         # SI CIFRA DOPO AVER COMPRESSO, mai prima: il testo cifrato non ha
         # ridondanza da comprimere, quindi l'ordine inverso gonfierebbe il

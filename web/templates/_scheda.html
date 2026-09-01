@@ -44,6 +44,15 @@
       <div><span class="etichetta">RAM</span><strong>{{ scheda.ram or "—" }}</strong></div>
       <div><span class="etichetta">Archiviazione</span><strong>{{ scheda.storage or "—" }}</strong></div>
       <div><span class="etichetta">Batteria</span><strong>{{ scheda.batteria or "—" }}</strong></div>
+      {# RETE ANCHE QUI, e non è la stessa scritta ripetuta: questa scheda
+         si mostra anche dalla pagina di un dispositivo in archivio, dove
+         il riquadro del risultato con la sua pastiglia non c'è. Il valore
+         è lo stesso oggetto calcolato una volta sola (vedi
+         `web/main._con_rete`), quindi le due scritte non possono
+         discordare. «non dichiarato» quando nessuna fonte lo dice: è una
+         lacuna detta, non un buco muto. #}
+      <div><span class="etichetta">Rete</span>
+        <strong{% if scheda.rete and scheda.rete.dettaglio %} title="{{ scheda.rete.dettaglio }}"{% endif %}>{{ scheda.rete.sigla if scheda.rete else "non dichiarato" }}</strong></div>
     </div>
 
     {% if scheda.voci %}

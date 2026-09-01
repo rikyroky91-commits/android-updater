@@ -311,6 +311,61 @@ def _domanda_per_la_foto(marca: str, titolo: str) -> str:
     return f"{marca} {titolo}".strip()
 
 
+# ======================================================================
+# 4G o 5G
+# ======================================================================
+# Chiesto dall'utente il 31/08/2026: «ho bisogno di sapere nei risultati se
+# è 4g o 5g». Per chi fa QA non è un dettaglio da scheda tecnica — è
+# un'altra variante di prodotto: A54 4G e A54 5G montano chip diversi,
+# ricevono build diverse e si aggiornano in date diverse, quindi provare
+# l'una non dice niente sull'altra.
+#
+# IL DATO NON SI INDOVINA MAI. Due sole fonti, in quest'ordine:
+#
+#   1. il NOME del modello, quando la variante ce l'ha scritta dentro
+#      («Galaxy A16 4G», «realme 12x 5G»), o la riga grezza del database
+#      TAC, che spesso la conserva anche quando il nome canonico l'ha
+#      persa. È il segnale più forte perché viene dal codice esatto del
+#      telefono, che è quello che il TAC identifica;
+#   2. la riga «Network → Technology» della scheda tecnica (GSMArena),
+#      che elenca le tecnologie del modello: «GSM / HSPA / LTE / 5G».
+#
+# Se nessuna delle due parla, la risposta è «non dichiarato», scritto così.
+# Dedurlo dal processore sarebbe la scorciatoia sbagliata: quasi tutti i
+# SoC recenti hanno un modem 5G che il produttore può lasciare spento, ed è
+# proprio il caso in cui esiste una variante 4G.
+_RE_5G = re.compile(r"(?<![0-9A-Za-z])5\s?G(?![0-9A-Za-z])", re.IGNORECASE)
+_RE_4G = re.compile(r"(?<![0-9A-Za-z])4\s?G(?![0-9A-Za-z])", re.IGNORECASE)
+
+
+def rete_mobile(scheda: dict | None, nome: str = "", grezzo: str = "") -> dict | None:
+    """«5G», «4G» o «3G» per il modello mostrato, con la fonte del dato."""
+    for testo, fonte in ((nome, "dal nome del modello"),
+                         (grezzo, "dal database TAC")):
+        if not testo:
+            continue
+        if _RE_5G.search(testo):
+            return {"sigla": "5G", "fonte": fonte, "dettaglio": ""}
+        if _RE_4G.search(testo):
+            return {"sigla": "4G", "fonte": fonte, "dettaglio": ""}
+
+    tecnologie = (((scheda or {}).get("sezioni") or {}).get("Network")
+                  or {}).get("Technology") or ""
+    tecnologie = tecnologie.strip()
+    if not tecnologie:
+        return None
+    fonte = "dalla scheda tecnica"
+    if _RE_5G.search(tecnologie):
+        return {"sigla": "5G", "fonte": fonte, "dettaglio": tecnologie}
+    if re.search(r"\bLTE\b", tecnologie, re.IGNORECASE):
+        return {"sigla": "4G", "fonte": fonte, "dettaglio": tecnologie}
+    # Un telefono senza LTE esiste ancora, e dirlo è più utile che tacere:
+    # chi guarda capisce subito che non è una lacuna dell'app.
+    if re.search(r"\b(HSPA|UMTS|CDMA2000|EVDO)\b", tecnologie, re.IGNORECASE):
+        return {"sigla": "3G", "fonte": fonte, "dettaglio": tecnologie}
+    return None
+
+
 def scheda_tecnica(nome: str, codice: str = "", brand: str = "",
                    device: dict | None = None) -> dict:
     """Foto, hardware e supporto di un modello, pronti per il template.
@@ -362,6 +417,11 @@ def scheda_tecnica(nome: str, codice: str = "", brand: str = "",
     if not foto:
         foto = images.find_device_image(_domanda_per_la_foto(marca, titolo))
 
+    # Le sezioni si srotolano UNA volta sola: `Scheda.sezioni` è una
+    # proprietà che rilegge il JSON ripiegato a ogni accesso (vedi
+    # `_ripiega_sezioni`), e da qui in giù servono due volte.
+    sezioni = scheda.sezioni if scheda else {}
+
     voci = []
     if scheda:
         voci = [
@@ -387,7 +447,13 @@ def scheda_tecnica(nome: str, codice: str = "", brand: str = "",
         "storage": scheda.storage_etichetta if scheda else None,
         "batteria": scheda.batteria if scheda else None,
         "voci": [(k, v) for k, v in voci if v],
-        "sezioni": scheda.sezioni if scheda else {},
+        "sezioni": sezioni,
+        # 4G o 5G anche per chi arriva alla scheda senza passare dalla
+        # ricerca (la pagina di un dispositivo in archivio). Quando invece
+        # si arriva da una ricerca, `web/main._con_rete` ricalcola questo
+        # campo sul nome definitivo e lo sovrascrive: il nome mostrato può
+        # essere più preciso del titolo della scheda.
+        "rete": rete_mobile({"sezioni": sezioni}, titolo),
         "fonte": scheda.fonte if scheda else None,
         "patch_fino_a": fmt_date(aer["security_until"]) if (aer or {}).get(
             "security_until") else None,
