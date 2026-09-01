@@ -720,10 +720,47 @@ def _dell_era_android(specs: str) -> bool:
     codice, anno = _split_code_and_year(_unglue_year(" ".join((specs or "").split())))
     if codice:
         return True
+    if anno is None:
+        # L'ANNO PUÒ ESSERE ATTACCATO A UNA PAROLA CORTA, e per due mesi
+        # questo ha buttato via i telefoni più nuovi di tutti.
+        #
+        # Segnalato dall'utente il 31/08/2026 con l'IMEI 865587084948173:
+        # la base dati lo conosce benissimo — `HONOR,86558708,"HONOR 400
+        # PRO, N/A2025"` — e la pagina rispondeva «modello sconosciuto».
+        # Quando il dataset non ha un codice modello scrive `N/A` e ci
+        # attacca l'anno; `_unglue_year` però separa l'anno solo se
+        # davanti ha almeno cinque caratteri (regola giusta, serve a non
+        # spezzare `CPH2019` in `CPH 2019`), e `N/A` ne ha tre. Nessun
+        # codice, nessun anno visto: fuori dall'indice.
+        #
+        # Colpiva esattamente i modelli appena usciti — HONOR 400 Pro,
+        # REDMI 15, REDMI A5, Pixel 7a, i Tecno — cioè quelli per cui il
+        # dataset non ha ancora il codice. 1.810 righe recuperate,
+        # misurate sul file vero.
+        #
+        # La regola larga sta QUI e non dentro `_unglue_year`: lì
+        # servirebbe a estrarre un codice, e spezzare `CPH2019` sarebbe un
+        # danno vero. Qui si arriva solo dopo che nessun codice è stato
+        # riconosciuto, e la domanda è più modesta: «questa riga dichiara
+        # un anno da qualche parte?».
+        anno = _anno_appiccicato(specs)
     try:
         return anno is not None and int(anno) >= C.TAC_ANNO_MINIMO
     except (TypeError, ValueError):
         return False
+
+
+# Un anno in fondo a una parola, qualunque lunghezza abbia la parola:
+# «N/A2025», «Pixel 7a2023», «KG5p2022». Deve chiudere la parola — così
+# «BD202403» non diventa il 2024 — e non si applica mai a una riga in cui
+# un codice modello è già stato riconosciuto (vedi `_dell_era_android`).
+_ANNO_APPICCICATO_RE = re.compile(
+    r"[A-Za-z0-9][A-Za-z0-9/\-]*?((?:19|20)\d{2})(?![0-9A-Za-z])")
+
+
+def _anno_appiccicato(specs: str) -> str | None:
+    trovato = _ANNO_APPICCICATO_RE.search(" ".join((specs or "").split()))
+    return trovato.group(1) if trovato else None
 
 
 def _build_index() -> dict[str, list[tuple[str, str, str]]]:
@@ -832,8 +869,14 @@ def _build_index() -> dict[str, list[tuple[str, str, str]]]:
         if inseriti:
             _status += f" · {len(inseriti)} inseriti da te"
         if scartati:
-            _status += (f" · {scartati} scartati perché anteriori ad Android 8 "
-                        f"e senza codice modello")
+            # «FUORI DALL'INDICE» NON VUOL PIÙ DIRE «PERDUTI», e la
+            # differenza va scritta qui: era la riga che faceva sembrare
+            # normale non rispondere su un TAC che l'applicazione ha in
+            # casa. Dal 31/08/2026 quelle righe si cercano nei file al
+            # momento del bisogno (vedi `_seconda_lettura`).
+            _status += (f" · {scartati} fuori dall'indice perché anteriori ad "
+                        f"Android 8 e senza codice modello — restano "
+                        f"cercabili nei file, una riga alla volta")
     return index
 
 
@@ -1202,7 +1245,73 @@ def _voci_per_tac(tac: str) -> list[tuple[str, str, str]]:
     # `core/modelcodes.py`, dove un ciclo di sforzo con thread paralleli
     # l'ha fatto scattare davvero.
     indice = _memory_index
-    return _voci_dalla_cella((indice or {}).get(tac))
+    voci = _voci_dalla_cella((indice or {}).get(tac))
+    return voci or _seconda_lettura(tac)
+
+
+# ======================================================================
+# LA SECONDA LETTURA: quello che il filtro scarta non è più perduto
+# ======================================================================
+# Segnalato dall'utente il 31/08/2026: «trovare gli imei sta diventando
+# difficile, su due imei non ne ha trovato neanche uno». Uno dei due era
+# `865587084948173`, e la base dati lo conosce: `HONOR,86558708,"HONOR 400
+# PRO, N/A2025"`. La pagina rispondeva «modello sconosciuto».
+#
+# La causa immediata era il difetto dell'anno appiccicato (vedi
+# `_dell_era_android`), ma dietro c'è una scelta di fondo da correggere:
+# l'indice tiene la sola era Android — 216.617 righe scartate su 248.373,
+# misurate in produzione — e finora quelle righe erano semplicemente
+# PERSE. Un dato che sta in un file dentro l'applicazione, e a cui
+# l'applicazione risponde «non lo so», non è un buco di copertura: è un
+# dato buttato.
+#
+# Il filtro però serve, ed è il motivo per cui l'indice sta in 22 MB
+# invece che in 70. La via d'uscita è smettere di trattare «in memoria» e
+# «disponibile» come la stessa cosa:
+#
+#     l'INDICE   è la via veloce, per l'era che interessa quasi sempre;
+#     il FILE    è la via lenta, per tutto il resto — e non costa memoria.
+#
+# Misurato: scorrere le 248.373 righe cercando UN TAC costa **0,24
+# secondi** e 0,2 MB, perché i byte sono già in archivio e si leggono in
+# flusso. Si paga solo quando l'indice non sa rispondere, cioè proprio nel
+# caso in cui prima si rispondeva «non lo so» — e prima di spendere una
+# delle cento interrogazioni mensili del servizio esterno, che è la strada
+# subito successiva.
+_CACHE_SECONDE_LETTURE: dict[str, str] = {}
+_MAX_SECONDE_LETTURE = 512
+
+
+def _seconda_lettura(tac: str) -> list[tuple[str, str, str]]:
+    """Cerca un TAC dentro i file, riga per riga, senza tenerli in memoria."""
+    if not tac:
+        return []
+    if tac in _CACHE_SECONDE_LETTURE:
+        return _voci_dalla_cella(_CACHE_SECONDE_LETTURE[tac])
+
+    pezzi: list[str] = []
+    for fonte, righe in ((FONTE_PRINCIPALE, _voci_principali),
+                         (FONTE_IMEIDB, _voci_imeidb),
+                         (FONTE_OSMOCOM, _voci_storiche)):
+        try:
+            for altro, marca, specs in righe():
+                if altro == tac:
+                    pezzi.append(fonte + _CAMPO + marca + _CAMPO + specs)
+        except Exception:
+            # Una fonte che non si legge non deve impedire alle altre di
+            # rispondere: è la stessa regola dell'indice.
+            continue
+
+    cella = _VOCE.join(pezzi)
+    # SI RICORDA ANCHE IL «NON C'È». Una pagina interroga questa funzione
+    # più di una volta (l'identità, il confronto fra le fonti, il secondo
+    # tempo della ricerca): senza memoria, un TAC sconosciuto farebbe
+    # rileggere i file a ogni giro. Il tetto tiene la cosa piccola: è una
+    # comodità, non un secondo indice.
+    if len(_CACHE_SECONDE_LETTURE) >= _MAX_SECONDE_LETTURE:
+        _CACHE_SECONDE_LETTURE.clear()
+    _CACHE_SECONDE_LETTURE[tac] = cella
+    return _voci_dalla_cella(cella)
 
 
 def _voci_dalla_cella(cella) -> list[tuple[str, str, str]]:
@@ -1351,6 +1460,38 @@ _CODE_PATTERNS = [
     # ("RMX53132025" = RMX5313 + 2025), che viene poi separato più sotto.
     re.compile(r"\b(?:RMX|RMP|CPH|PJ[A-Z])\d{3,8}[A-Z]*\b"),  # realme/Oppo/OnePlus
     re.compile(r"\b\d{4,5}[A-Z]{2,4}\d{2,3}[A-Z]{0,2}\b"),    # Xiaomi: 2312DRA50C, 23053RN02A
+    # Xiaomi/Redmi/POCO, le forme che la riga qui sopra NON prende.
+    #
+    # Quel pattern pretende 2-3 CIFRE dopo il gruppo di lettere, e mezza
+    # produzione Xiaomi recente non ce le ha: `2406ERN9CC`, `24074RPD2I`,
+    # `25078PC3EE`, `2510ERA8BT`, `22111317PI`. Sono i Redmi e i POCO
+    # degli ultimi due anni, cioè i telefoni che si provano adesso.
+    #
+    # La seconda riga è la famiglia più vecchia, quella che comincia per
+    # M: `M1910F4G` (Mi Note 10), `M2101K6G`, `M2012C3P1C`.
+    #
+    # Misurato sul file vero: 1.093 righe guadagnano un codice, e fra
+    # quelle già indicizzate una sola cambia codice (`CELLON M8047UC
+    # IQ180`, che di sigle ne ha due scritte in fila).
+    re.compile(r"\b2\d{3,7}[A-Z][A-Z0-9]{1,6}\b"),
+    re.compile(r"\bM\d{4}[A-Z][A-Z0-9]{1,5}\b"),
+    re.compile(r"\bTA-\d{4}\b"),                        # Nokia: TA-1234
+    # vivo/iQOO: V2124, V2307, V2529, V2283A. UNA lettera sola, ed è per
+    # questo che mancavano: il pattern generico qui sotto ne pretende
+    # almeno due, quindi NESSUN codice vivo veniva riconosciuto.
+    #
+    # Non è un dettaglio di catalogazione. Segnalato dall'utente il
+    # 01/09/2026 con l'IMEI 862245059650208: la riga è `VIVO,86224505,
+    # "VIVO Y76 5G, Vivo Mobile V2124"` e senza codice riconosciuto quel
+    # telefono (a) restava fuori dall'indice, perché la riga non ha
+    # nemmeno un anno, e (b) veniva cercato per nome invece che per
+    # codice, che è la chiave esatta con cui le fonti rispondono —
+    # `modelcodes` sa benissimo che V2124 è lo Y76 5G.
+    #
+    # Riguarda due terzi dei vivo del database (3.202 righe fuori contro
+    # 1.610 dentro), fra cui modelli del 2025 come il V60 Lite 5G
+    # (`V2529`).
+    re.compile(r"\bV\d{4}[A-Z]{0,2}\b"),
     re.compile(r"\b[A-Z]{2,4}\d{3,5}[A-Z]{0,3}\b"),     # generico, per ultimo
 ]
 _YEAR_RE = re.compile(r"\b((?:19|20)\d{2})\b")
@@ -1382,6 +1523,12 @@ def _split_code_and_year(text: str) -> tuple[str | None, str | None]:
     return None, (anno_match.group(1) if anno_match else None)
 
 
+# «N/A» come lo scrive il dataset quando un dato non ce l'ha, con
+# l'eventuale anno attaccato: `N/A2025`, `N/A`, `n/a 2024`.
+_RE_NON_DISPONIBILE = re.compile(r"\bN\s*/?\s*A\s*((?:19|20)\d{2})?\b",
+                                 re.IGNORECASE)
+
+
 def parse_specs(brand: str, specs: str) -> dict:
     """Scompone il campo descrittivo grezzo del database TAC in parti utili.
 
@@ -1403,9 +1550,22 @@ def parse_specs(brand: str, specs: str) -> dict:
 
     codice, anno = _split_code_and_year(coda or grezzo)
 
+    # «N/A» VUOL DIRE «NON CE L'HO», e non è né un codice né un produttore.
+    #
+    # Quando il dataset non conosce il codice modello scrive `N/A` e ci
+    # attacca l'anno: `HONOR 400 PRO, N/A2025`. Senza questa riga la coda
+    # finiva intera nel campo «produttore», e la pagina scriveva «Honor
+    # 400 Pro (N/A2025)» — una sigla che sembra un codice modello e non lo
+    # è. L'anno invece è un dato vero e si tiene.
+    coda_senza_na = _RE_NON_DISPONIBILE.sub(" ", coda)
+    if anno is None:
+        trovato = _RE_NON_DISPONIBILE.search(coda)
+        if trovato and trovato.group(1):
+            anno = trovato.group(1)
+
     # Produttore: la coda ripulita da codice e anno. Si scarta se ripete il
     # nome o il brand, per non mostrare due volte la stessa informazione.
-    produttore = coda
+    produttore = coda_senza_na
     for pezzo in filter(None, [(codice or "") + (anno or ""), codice, anno]):
         produttore = produttore.replace(pezzo, " ")
     produttore = " ".join(produttore.replace("-", " ").split())
@@ -1479,3 +1639,7 @@ def reset_cache() -> None:
     global _memory_index, _status
     _memory_index = None
     _status = "non ancora caricato"
+    # Anche la memoria delle seconde letture: chi azzera la cache lo fa
+    # perché un dato è cambiato (`/tac/salva`), e un «non c'è» ricordato da
+    # prima risponderebbe al posto del dato nuovo.
+    _CACHE_SECONDE_LETTURE.clear()

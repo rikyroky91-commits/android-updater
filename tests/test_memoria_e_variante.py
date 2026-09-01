@@ -247,6 +247,39 @@ class TestUnTacConosciutoNonSiPerdePiu(unittest.TestCase):
         codice, _anno = imeicheck._split_code_and_year("OPPO A5, Oppo CPH2019")
         self.assertEqual(codice, "CPH2019")
 
+    def test_n_a_non_e_un_codice_ne_un_produttore(self):
+        """«N/A» vuol dire «non ce l'ho», e la pagina scriveva «Honor 400
+        Pro (N/A2025)» — una sigla che sembra un codice modello. L'anno
+        invece è un dato vero e si tiene."""
+        letto = imeicheck.parse_specs("HONOR", "HONOR 400 PRO, N/A2025")
+        self.assertEqual(letto["model"], "Honor 400 Pro")
+        self.assertEqual(letto["year"], "2025")
+        self.assertIsNone(letto["code"])
+        self.assertIsNone(letto["maker"])
+        self.assertEqual(imeicheck.describe("HONOR", "HONOR 400 PRO, N/A2025"),
+                         "Honor 400 Pro (2025)")
+
+    # ---- il codice vivo, che nessun pattern riconosceva ----------------
+    def test_i_codici_vivo_hanno_una_lettera_sola(self):
+        """`V2124` — segnalato dall'utente il 01/09/2026 con l'IMEI
+        862245059650208. Il pattern generico pretende almeno due lettere,
+        quindi NESSUN codice vivo veniva riconosciuto: due terzi dei vivo
+        del database restavano fuori dall'indice e venivano cercati per
+        nome invece che per codice."""
+        letto = imeicheck.parse_specs("VIVO", "VIVO Y76 5G, Vivo Mobile V2124")
+        self.assertEqual(letto["code"], "V2124")
+        self.assertTrue(imeicheck._dell_era_android("VIVO Y76 5G, Vivo Mobile V2124"))
+        self.assertEqual(
+            imeicheck._split_code_and_year("VIVO V60 LITE 5G, Vivo Mobile V2529")[0],
+            "V2529")
+
+    def test_una_sigla_corta_non_diventa_un_codice_vivo(self):
+        """Il pattern chiede quattro cifre: «Motorola V66» e «SGH-V100»
+        restano quello che sono, cioè telefoni vecchi senza codice."""
+        for testo in ("Motorola V66", "SAMSUNG, SAMSUNG SGH-V100", "Nokia 6108"):
+            with self.subTest(testo=testo):
+                self.assertIsNone(imeicheck._split_code_and_year(testo)[0])
+
     # ---- difetto 2: fuori dall'indice non vuol dire perduto ------------
     def _con_una_base_dati_finta(self, csv_finto: str):
         """Sostituisce la base dati principale e azzera le cache."""
@@ -397,6 +430,37 @@ class TestIlNomeEuropeoVinceSulNomeDiUnAltroMercato(unittest.TestCase):
             self.skipTest("catalogo dei codici non disponibile in questo ambiente")
         self.assertEqual(modelcodes.nome_scelto_a_mano("CPH2219"), "OPPO A74")
         self.assertEqual(modelcodes.nome_canonico("CPH2219"), "OPPO A74")
+
+
+class TestRedmiNoteDieciNonEUnMiNoteDieci(unittest.TestCase):
+    """Il freno che doveva accorgersi di un nome estraneo diceva di sì.
+
+    `_nome_appartiene_al_codice` confrontava le stringhe APPIATTITE, senza
+    spazi: `minote10` sta dentro `redminote10` per tre lettere di
+    distanza, quindi «Redmi Note 10 EEA» risultava un nome legittimo di
+    `M1910F4G`, che è un Mi Note 10. Sono due telefoni diversi.
+
+    Era il difetto dietro l'unico test rosso che questo repository si
+    portava dietro da prima di questa sessione.
+    """
+
+    def test_una_parola_piu_lunga_non_contiene_l_altra(self):
+        from web import main as M
+        self.assertFalse(M._uno_dentro_l_altro("Mi Note 10", "Redmi Note 10 EEA"))
+
+    def test_una_parola_intera_in_piu_non_cambia_telefono(self):
+        from web import main as M
+        self.assertTrue(M._uno_dentro_l_altro("Galaxy A54 5G",
+                                              "Samsung Galaxy A54 5G"))
+        self.assertTrue(M._uno_dentro_l_altro("Reno12 F", "OPPO Reno12 F 5G"))
+
+    def test_gli_ideogrammi_sono_lettere(self):
+        """Buttarli via riduceva «小米 Note 10» a «note10», che risulta
+        contenuto in mezzo mondo: era la seconda strada per cui «Redmi
+        Note 10» passava per un «Mi Note 10»."""
+        from web import main as M
+        self.assertFalse(M._uno_dentro_l_altro("小米 Note 10", "Redmi Note 10 EEA"))
+        self.assertTrue(M._uno_dentro_l_altro("一加 10R", "一加 10R 5G"))
 
 
 class TestQuattroGoCinqueG(unittest.TestCase):

@@ -1566,6 +1566,18 @@ def _nome_appartiene_al_codice(nome: str, codice: str) -> bool:
     Il confronto è generoso su come è scritto — maiuscole, spazi e
     trattini non contano, e un nome contenuto nell'altro basta, perché le
     fonti aggiungono e tolgono la parola della marca a piacere.
+
+    MA IL CONTENUTO DEVE COMINCIARE E FINIRE DOVE FINISCE UNA PAROLA.
+    Prima il confronto avveniva sulle stringhe appiattite, senza spazi, e
+    «Mi Note 10» risultava contenuto in «Redmi Note 10» — `minote10` sta
+    dentro `redminote10` per tre lettere di distanza. Sono due telefoni
+    diversi, e il freno che doveva accorgersene diceva di sì.
+    Segnalato dal banco di prova (`M1910F4G`, che è un Mi Note 10) mentre
+    la fonte Xiaomi rispondeva «Redmi Note 10 EEA»: nome accettato,
+    scheda tecnica di un altro telefono, e nessun modo di accorgersene.
+
+    «Galaxy A54 5G» dentro «Samsung Galaxy A54 5G» continua a valere:
+    lì il pezzo in più è una parola intera.
     """
     if not nome or not codice:
         return True
@@ -1577,11 +1589,43 @@ def _nome_appartiene_al_codice(nome: str, codice: str) -> bool:
         # Nessuno conosce quel codice: non c'è niente con cui smentire il
         # nome, e un nome vale più del nulla.
         return True
-    piatto = _semplifica_nome(nome)
-    if not piatto:
+    if not _semplifica_nome(nome):
         return True
-    return any(piatto in _semplifica_nome(n) or _semplifica_nome(n) in piatto
-               for n in noti)
+    return any(_uno_dentro_l_altro(nome, n) for n in noti)
+
+
+def _parole_e_confini(nome: str) -> tuple[str, set[int]]:
+    """La forma appiattita di un nome e le posizioni in cui, dentro quella
+    forma, comincia (o finisce) una parola.
+
+    Le parole si tagliano su tutto ciò che non è una lettera o una cifra —
+    ideogrammi COMPRESI, che sono lettere. Buttarli via, come faceva la
+    versione appiattita di prima, riduce «小米 Note 10» a «note10», che poi
+    risulta contenuto in mezzo mondo: era la seconda strada per cui «Redmi
+    Note 10» passava per un «Mi Note 10».
+    """
+    parole = [p for p in re.split(r"[\W_]+", (nome or "").lower()) if p]
+    confini = {0}
+    posizione = 0
+    for parola in parole:
+        posizione += len(parola)
+        confini.add(posizione)
+    return "".join(parole), confini
+
+
+def _uno_dentro_l_altro(uno: str, altro: str) -> bool:
+    """Se uno dei due nomi è l'altro con parole intere in più."""
+    a, confini_a = _parole_e_confini(uno)
+    b, confini_b = _parole_e_confini(altro)
+    if not a or not b:
+        return False
+    for piccolo, grande, confini in ((a, b, confini_b), (b, a, confini_a)):
+        inizio = grande.find(piccolo)
+        while inizio != -1:
+            if inizio in confini and inizio + len(piccolo) in confini:
+                return True
+            inizio = grande.find(piccolo, inizio + 1)
+    return False
 
 
 def _con_rete(scheda: dict | None, nome: str, grezzo: str = "") -> dict | None:
@@ -2417,6 +2461,26 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
     notizie = [i for i in risultato.get("items", [])
                if i.get("source") not in ("official_lookup", "curated_lookup")]
 
+    # UNA RISPOSTA CHE PARLA DI UN ALTRO TELEFONO NON È UNA RISPOSTA.
+    #
+    # Cercando `M1910F4G` (Xiaomi Mi Note 10) il catalogo Xiaomi rispondeva
+    # con TRE ROM diverse — «Redmi Note 10 EEA», «Mi Note 10 / Note 10 Pro
+    # EEA», «Redmi Note 10 Global» — tutte marcate con il codice che era
+    # stato cercato, perché è la ricerca stessa a incollarglielo. Vinceva la
+    # prima, e la pagina mostrava nome e build di un telefono diverso.
+    #
+    # Qui si tengono solo le risposte il cui nome è uno dei nomi di quel
+    # codice. La rete di sicurezza è la condizione `if pertinenti`: se
+    # NESSUNA passa il controllo non si butta via tutto — quando il
+    # catalogo dei codici non conosce il modello,
+    # `_nome_appartiene_al_codice` risponde comunque «sì», quindi restare
+    # senza candidati significa che il dato non c'è, non che è sbagliato.
+    pertinenti = [i for i in fonti_dirette
+                  if _nome_appartiene_al_codice(i.get("device_model") or "",
+                                                i.get("model_code") or "")]
+    if pertinenti:
+        fonti_dirette = pertinenti
+
     def tipo(item: dict) -> str:
         # Le vecchie righe in archivio e i test precedenti alla distinzione
         # semantica non portano ancora il campo: una lookup ufficiale con
@@ -2487,8 +2551,26 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
     # in Europa ha bisogno dell'ultimo. Senza questa eccezione la ricerca
     # per IMEI e quella per codice davano due nomi diversi per lo stesso
     # telefono, che è il difetto che l'utente ha segnalato.
+    # E UN NOME CHE NON APPARTIENE AL CODICE NON È UNA VARIANTE REGIONALE:
+    # È UN ALTRO TELEFONO.
+    #
+    # La regola qui sopra protegge il nome di una fonte strutturata, che
+    # conosce i mercati meglio del dataset community, e resta giusta —
+    # finché quel nome è UNO DEI NOMI di quel codice. Cercando `M1910F4G`
+    # (Xiaomi Mi Note 10) una fonte rispondeva «Redmi Note 10 EEA», che di
+    # quel codice non è un nome di nessun mercato, e la pagina lo metteva
+    # per titolo: un telefono diverso, con la sua scheda tecnica, sotto il
+    # codice che qualcuno aveva scritto.
+    #
+    # `_nome_appartiene_al_codice` è lo stesso freno che la pagina
+    # dell'IMEI usa da agosto, e vale la stessa cautela: se il catalogo
+    # dei codici non conosce quel codice risponde «sì», perché senza prove
+    # non si smentisce nessuno.
+    nome_estraneo = bool(codice and identita.get("device_model")
+                         and not _nome_appartiene_al_codice(nome, codice))
     scelto_a_mano = modelcodes.nome_scelto_a_mano(codice) if codice else None
-    if codice and (scelto_a_mano or not identita.get("device_model")):
+    if codice and (scelto_a_mano or nome_estraneo
+                   or not identita.get("device_model")):
         try:
             canonico = modelcodes.nome_canonico(codice)
         except Exception:
