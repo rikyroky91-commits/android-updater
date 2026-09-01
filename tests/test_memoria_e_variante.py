@@ -204,6 +204,121 @@ class TestLeRisposteDiUnTacSiSrotolano(unittest.TestCase):
                          [("35692411", "MOTOROLA", "Moto G84 5G")])
 
 
+class TestUnTacConosciutoNonSiPerdePiu(unittest.TestCase):
+    """«trovare gli imei sta diventando difficile: su due imei non ne ha
+    trovato neanche uno», 31/08/2026.
+
+    Uno dei due era `865587084948173`, e la base dati lo conosce
+    benissimo: `HONOR,86558708,"HONOR 400 PRO, N/A2025"`. La pagina
+    rispondeva «modello sconosciuto». Due difetti sovrapposti, tutti e due
+    corretti qui sotto.
+    """
+
+    def setUp(self):
+        imeicheck.reset_cache()
+        self.addCleanup(imeicheck.reset_cache)
+
+    # ---- difetto 1: l'anno attaccato a una parola corta ----------------
+    def test_l_anno_attaccato_a_n_a_viene_visto(self):
+        """`N/A` sono tre caratteri, e `_unglue_year` ne chiede almeno
+        cinque: l'anno spariva, e con lui i modelli più nuovi — quelli per
+        cui il dataset non ha ancora un codice."""
+        self.assertTrue(imeicheck._dell_era_android("HONOR 400 PRO, N/A2025"))
+        self.assertTrue(imeicheck._dell_era_android("REDMI 15 5G, N/A2025"))
+
+    def test_anche_quando_e_attaccato_a_un_nome(self):
+        self.assertEqual(imeicheck._anno_appiccicato("Google Pixel 7a2023"), "2023")
+        self.assertEqual(imeicheck._anno_appiccicato("Tecno HK KG5p2022, MT H G37"),
+                         "2022")
+
+    def test_un_anno_deve_chiudere_la_parola(self):
+        """`BD202403` è un codice, non un telefono del 2024: le quattro
+        cifre non finiscono la parola, e senza questo freno la regola
+        larga diventerebbe una regola che indovina."""
+        self.assertIsNone(imeicheck._anno_appiccicato("BIRD BD202403"))
+
+    def test_un_codice_che_finisce_con_un_anno_non_si_spezza(self):
+        """`CPH2019` è un codice OPPO, non «CPH» del 2019. La regola larga
+        vive solo dentro `_dell_era_android`, dopo che nessun codice è
+        stato riconosciuto: `_unglue_year`, che serve a estrarre i codici,
+        resta stretta come prima."""
+        self.assertEqual(imeicheck._unglue_year("OPPO A5, Oppo CPH2019"),
+                         "OPPO A5, Oppo CPH2019")
+        codice, _anno = imeicheck._split_code_and_year("OPPO A5, Oppo CPH2019")
+        self.assertEqual(codice, "CPH2019")
+
+    # ---- difetto 2: fuori dall'indice non vuol dire perduto ------------
+    def _con_una_base_dati_finta(self, csv_finto: str):
+        """Sostituisce la base dati principale e azzera le cache."""
+        veri = (imeicheck._cached_bytes, imeicheck._cached_bytes_url)
+        imeicheck._cached_bytes = lambda: csv_finto.encode("utf-8")
+        imeicheck._cached_bytes_url = lambda *a, **k: None
+        imeicheck.reset_cache()
+
+        def rimetti():
+            imeicheck._cached_bytes, imeicheck._cached_bytes_url = veri
+            imeicheck.reset_cache()
+
+        self.addCleanup(rimetti)
+
+    # Una riga che il filtro dell'era Android scarta di sicuro: niente
+    # anno, niente codice riconoscibile.
+    BASE = ("Brand,TAC,SPECS\n"
+            "NOKIA,11111111,\"Nokia 6108\"\n"
+            "HONOR,22222222,\"HONOR 400 PRO, N/A2025\"\n")
+
+    def test_una_riga_scartata_resta_cercabile_nei_file(self):
+        """216.617 righe su 248.373 stavano fuori dall'indice, e finora
+        erano semplicemente perse: un dato che sta in un file dentro
+        l'applicazione, e a cui l'applicazione risponde «non lo so», non è
+        un buco di copertura — è un dato buttato."""
+        self._con_una_base_dati_finta(self.BASE)
+        indice = imeicheck._build_index()
+        self.assertNotIn("11111111", indice)      # il filtro l'ha esclusa
+        voci = imeicheck._voci_per_tac("11111111")
+        self.assertEqual([v[2] for v in voci], ["Nokia 6108"])
+
+    def test_la_riga_recente_sta_invece_nell_indice(self):
+        """Il caso dell'utente: dopo la correzione dell'anno appiccicato
+        l'HONOR 400 Pro non ha nemmeno bisogno della seconda lettura."""
+        self._con_una_base_dati_finta(self.BASE)
+        self.assertIn("22222222", imeicheck._build_index())
+
+    def test_un_tac_che_non_c_e_resta_un_no(self):
+        """La seconda lettura allarga la copertura, non inventa risposte."""
+        self._con_una_base_dati_finta(self.BASE)
+        imeicheck._build_index()
+        self.assertEqual(imeicheck._voci_per_tac("99999999"), [])
+
+    def test_i_file_non_si_rileggono_a_ogni_domanda(self):
+        """Una pagina sola interroga questa strada più volte — identità,
+        confronto fra le fonti, secondo tempo della ricerca — e rileggere
+        i file a ogni giro sarebbe il modo di trasformare una correzione
+        in un rallentamento."""
+        self._con_una_base_dati_finta(self.BASE)
+        imeicheck._build_index()
+        imeicheck._voci_per_tac("11111111")
+        letture = []
+        vero = imeicheck._voci_principali
+        imeicheck._voci_principali = lambda: letture.append(1) or iter(())
+        try:
+            imeicheck._voci_per_tac("11111111")
+        finally:
+            imeicheck._voci_principali = vero
+        self.assertEqual(letture, [])
+
+    def test_salvare_un_modello_cancella_il_ricordo_del_no(self):
+        """`reset_cache` viene chiamata da `/tac/salva`: un «non c'è»
+        ricordato da prima risponderebbe al posto del dato appena
+        scritto."""
+        self._con_una_base_dati_finta(self.BASE)
+        imeicheck._build_index()
+        imeicheck._voci_per_tac("99999999")
+        self.assertIn("99999999", imeicheck._CACHE_SECONDE_LETTURE)
+        imeicheck.reset_cache()
+        self.assertEqual(imeicheck._CACHE_SECONDE_LETTURE, {})
+
+
 class TestIlNomeEuropeoVinceSulNomeDiUnAltroMercato(unittest.TestCase):
     """«cercando 866068054131131 mi trova l'oppo f19 invece dell'a74 che è
     quello venduto in europa», 31/08/2026.
