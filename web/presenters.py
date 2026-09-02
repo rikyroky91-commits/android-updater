@@ -339,15 +339,28 @@ _RE_4G = re.compile(r"(?<![0-9A-Za-z])4\s?G(?![0-9A-Za-z])", re.IGNORECASE)
 
 
 def rete_mobile(scheda: dict | None, nome: str = "", grezzo: str = "") -> dict | None:
-    """«5G», «4G» o «3G» per il modello mostrato, con la fonte del dato."""
+    """«5G», «4G» o «3G» per il modello mostrato, con la fonte del dato.
+
+    `nel_nome` dice che l'informazione è GIÀ nel titolo che si sta per
+    mostrare. Visto in produzione il 01/09/2026, appena distribuita la
+    pastiglia: «vivo Y76 5G 5G». Il nome commerciale finiva già per «5G»,
+    e la pastiglia lo ripeteva attaccato. Chi legge quel titolo la
+    risposta ce l'ha davanti; ripeterla non aggiunge niente e sembra un
+    errore dell'app. La riga della scheda tecnica invece resta, perché lì
+    la voce «Rete» sta in una tabella di caratteristiche, dove il valore
+    va scritto anche quando è ovvio.
+    """
     for testo, fonte in ((nome, "dal nome del modello"),
                          (grezzo, "dal database TAC")):
         if not testo:
             continue
+        nel_nome = fonte == "dal nome del modello"
         if _RE_5G.search(testo):
-            return {"sigla": "5G", "fonte": fonte, "dettaglio": ""}
+            return {"sigla": "5G", "fonte": fonte, "dettaglio": "",
+                    "nel_nome": nel_nome}
         if _RE_4G.search(testo):
-            return {"sigla": "4G", "fonte": fonte, "dettaglio": ""}
+            return {"sigla": "4G", "fonte": fonte, "dettaglio": "",
+                    "nel_nome": nel_nome}
 
     tecnologie = (((scheda or {}).get("sezioni") or {}).get("Network")
                   or {}).get("Technology") or ""
@@ -356,13 +369,16 @@ def rete_mobile(scheda: dict | None, nome: str = "", grezzo: str = "") -> dict |
         return None
     fonte = "dalla scheda tecnica"
     if _RE_5G.search(tecnologie):
-        return {"sigla": "5G", "fonte": fonte, "dettaglio": tecnologie}
+        return {"sigla": "5G", "fonte": fonte, "dettaglio": tecnologie,
+                "nel_nome": False}
     if re.search(r"\bLTE\b", tecnologie, re.IGNORECASE):
-        return {"sigla": "4G", "fonte": fonte, "dettaglio": tecnologie}
+        return {"sigla": "4G", "fonte": fonte, "dettaglio": tecnologie,
+                "nel_nome": False}
     # Un telefono senza LTE esiste ancora, e dirlo è più utile che tacere:
     # chi guarda capisce subito che non è una lacuna dell'app.
     if re.search(r"\b(HSPA|UMTS|CDMA2000|EVDO)\b", tecnologie, re.IGNORECASE):
-        return {"sigla": "3G", "fonte": fonte, "dettaglio": tecnologie}
+        return {"sigla": "3G", "fonte": fonte, "dettaglio": tecnologie,
+                "nel_nome": False}
     return None
 
 

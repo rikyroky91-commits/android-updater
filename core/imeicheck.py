@@ -1043,10 +1043,95 @@ def stato_servizio_esterno() -> str:
                 "nessun database locale conosce vengono chiesti al servizio "
                 "esterno (solo le 8 cifre del TAC, mai l'IMEI intero)")
     quante = len(tac_esterni())
-    if not quante:
-        return "chiave presente · nessun TAC ancora chiesto al servizio"
-    return (f"chiave presente · {quante} TAC risolti dal servizio e conservati "
-            f"(non verranno richiesti di nuovo)")
+    pezzi = ["chiave presente"]
+    pezzi.append(f"{quante} TAC risolti dal servizio e conservati"
+                 if quante else "nessun TAC ancora risolto dal servizio")
+    # E COM'E' ANDATA L'ULTIMA VOLTA.
+    #
+    # Segnalato dall'utente il 01/09/2026: «il servizio esterno non
+    # funziona». Aveva ragione, e la cosa peggiore e' che NON SI POTEVA
+    # SAPERE: ogni guasto — chiave rifiutata, quota finita, servizio giu',
+    # rete che non passa — finiva nello stesso `return ("errore", None)`,
+    # senza lasciare traccia da nessuna parte, e la pagina diceva
+    # «modello sconosciuto» esattamente come quando il servizio risponde
+    # «non lo conosco». Una chiave sbagliata e un TAC introvabile
+    # raccontati con la stessa frase.
+    ultimo = ultimo_esito_servizio()
+    if ultimo.get("dettaglio"):
+        quando = ultimo.get("quando") or ""
+        pezzi.append(f"ultima chiamata: {ultimo['dettaglio']}"
+                     + (f" ({quando[:16].replace('T', ' ')} UTC)" if quando else ""))
+    else:
+        pezzi.append("nessuna chiamata ancora registrata")
+    return " · ".join(pezzi)
+
+
+# ======================================================================
+# COM'E' ANDATA L'ULTIMA CHIAMATA AL SERVIZIO ESTERNO
+# ======================================================================
+# Si conserva in archivio (sopravvive ai riavvii, che qui sono all'ordine
+# del giorno) e si mostra in Diagnostica e in `/health`. La pausa dopo un
+# guasto invece sta in memoria: e' una cortesia verso un servizio che sta
+# male, non un dato da ricordare, e cosi' un riavvio la azzera da sola.
+_META_ESITO_SERVIZIO = "imei_tac_servizio_ultimo"
+_MINUTI_PAUSA_SERVIZIO = 5
+_pausa_servizio: tuple[float, str] | None = None
+# La copia in memoria dell'ultimo esito, e non è un vezzo: `/health` la
+# legge, e quella rotta la interroga l'host OGNI MINUTO. Il suo docstring
+# promette di non toccare l'archivio, e una promessa del genere si
+# mantiene o si toglie. Così il database si legge una volta sola per
+# processo — al primo che chiede dopo un riavvio — e da lì in poi la
+# risposta è già in mano.
+_ultimo_esito: dict | None = None
+
+
+def ultimo_esito_servizio() -> dict:
+    """`{"quando", "esito", "dettaglio"}` dell'ultima chiamata, o `{}`."""
+    global _ultimo_esito
+    if _ultimo_esito is not None:
+        return _ultimo_esito
+    dati = {}
+    grezzo = storage.get_meta(_META_ESITO_SERVIZIO)
+    if grezzo:
+        try:
+            letto = json.loads(grezzo)
+            dati = letto if isinstance(letto, dict) else {}
+        except Exception:
+            dati = {}
+    _ultimo_esito = dati
+    return dati
+
+
+def _ricorda_esito_servizio(esito: str, dettaglio: str) -> None:
+    global _pausa_servizio, _ultimo_esito
+    registrato = {
+        "quando": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "esito": esito,
+        "dettaglio": dettaglio,
+    }
+    _ultimo_esito = registrato
+    try:
+        storage.set_meta(_META_ESITO_SERVIZIO, json.dumps(registrato))
+    except Exception:      # pragma: no cover - una diagnosi non rompe nulla
+        pass
+    # UN SERVIZIO CHE NON RISPONDE NON SI RIPROVA A OGNI PAGINA. Ogni
+    # tentativo costa il tempo del timeout, e chi cerca lo aspetta per
+    # ricevere comunque «non lo so». Cinque minuti sono abbastanza da non
+    # martellare e abbastanza pochi da accorgersi subito quando torna.
+    import time as _time
+    _pausa_servizio = ((_time.monotonic(), dettaglio) if esito == "errore"
+                       else None)
+
+
+def servizio_in_pausa() -> str | None:
+    """Il motivo per cui non si richiama adesso, se c'e'."""
+    if not _pausa_servizio:
+        return None
+    import time as _time
+    quando, dettaglio = _pausa_servizio
+    if _time.monotonic() - quando > _MINUTI_PAUSA_SERVIZIO * 60:
+        return None
+    return dettaglio
 
 
 def cerca_tac_online(tac: str) -> tuple[str, str] | None:
@@ -1083,6 +1168,13 @@ def cerca_tac_online_esito(tac: str) -> tuple[str, tuple[str, str] | None]:
     if len(tac) != 8:
         return ("errore", None)
 
+    # OGNI STRADA DA QUI IN GIU' LASCIA DETTO COM'E' ANDATA. Prima
+    # finivano tutte nello stesso `("errore", None)` muto: vedi il
+    # commento in `stato_servizio_esterno`.
+    fermo = servizio_in_pausa()
+    if fermo:
+        return ("errore", None)
+
     try:
         risposta = requests.post(
             TAC_API_URL,
@@ -1090,21 +1182,27 @@ def cerca_tac_online_esito(tac: str) -> tuple[str, tuple[str, str] | None]:
             headers={"X-Api-Key": chiave, "User-Agent": C.USER_AGENT},
             timeout=C.HTTP_TIMEOUT,
         )
-    except Exception:
+    except Exception as errore:
+        _ricorda_esito_servizio(
+            "errore", f"non raggiungibile ({type(errore).__name__})")
         return ("errore", None)
     stato = getattr(risposta, "status_code", 0)
     # 404 E' UNA RISPOSTA, NON UN GUASTO. Alcuni fornitori dicono «non ce
     # l'ho» con il codice HTTP invece che nel corpo: trattarlo come un
     # errore di rete significherebbe richiederlo — e pagarlo — per sempre.
     if stato == 404:
+        _ricorda_esito_servizio("assente", "HTTP 404: TAC non in catalogo")
         return ("assente", None)
     if stato != 200:
+        _ricorda_esito_servizio("errore", _spiega_stato(stato))
         return ("errore", None)
     try:
         dati = risposta.json()
     except Exception:
+        _ricorda_esito_servizio("errore", "HTTP 200 ma risposta illeggibile")
         return ("errore", None)
     if not isinstance(dati, dict):
+        _ricorda_esito_servizio("errore", "HTTP 200 ma risposta di forma inattesa")
         return ("errore", None)
 
     corpo = dati.get("data") if isinstance(dati.get("data"), dict) else dati
@@ -1113,6 +1211,7 @@ def cerca_tac_online_esito(tac: str) -> tuple[str, tuple[str, str] | None]:
     # va creduto. Un `found: false` con i campi vuoti non è una risposta
     # da interpretare, è un no.
     if corpo.get("found") is False:
+        _ricorda_esito_servizio("assente", "il servizio non conosce questo TAC")
         return ("assente", None)
 
     marca = _testo_o_nome(corpo.get("brand") or corpo.get("manufacturer"))
@@ -1120,6 +1219,7 @@ def cerca_tac_online_esito(tac: str) -> tuple[str, tuple[str, str] | None]:
     if not marca and not modello:
         # Il servizio ha risposto 200 senza dire che telefono e': per
         # questo TAC non ha niente. E' un no, non un guasto.
+        _ricorda_esito_servizio("assente", "il servizio non conosce questo TAC")
         return ("assente", None)
 
     # Il chipset arriva solo con i piani a pagamento, ma se c'è si prende:
@@ -1129,7 +1229,27 @@ def cerca_tac_online_esito(tac: str) -> tuple[str, tuple[str, str] | None]:
     if chipset:
         modello = f"{modello}, {chipset}".strip(", ")
 
+    _ricorda_esito_servizio("trovato", "risposta ricevuta")
     return ("trovato", (marca or "Sconosciuto", modello))
+
+
+def _spiega_stato(stato: int) -> str:
+    """Un numero HTTP e cosa vuol dire sono due cose diverse.
+
+    «HTTP 401» dice tutto a chi sa leggerlo e niente a chi deve decidere
+    cosa fare. Questi sono i tre guasti che capitano davvero a un servizio
+    a chiave, e ognuno ha una mossa diversa: rifare la chiave, aspettare
+    il mese nuovo, aspettare e basta.
+    """
+    if stato in (401, 403):
+        return (f"HTTP {stato}: chiave rifiutata — da rifare o da "
+                f"ricontrollare in TAC_API_KEY")
+    if stato == 429:
+        return (f"HTTP {stato}: troppe richieste o quota del mese finita "
+                f"(il piano gratuito ne dà cento)")
+    if stato >= 500:
+        return f"HTTP {stato}: guasto del servizio, non nostro"
+    return f"HTTP {stato}: risposta inattesa"
 
 
 def _testo_o_nome(valore) -> str:
@@ -1636,9 +1756,14 @@ def describe(brand: str, specs: str) -> str:
 
 
 def reset_cache() -> None:
-    global _memory_index, _status
+    global _memory_index, _status, _pausa_servizio, _ultimo_esito
     _memory_index = None
     _status = "non ancora caricato"
+    _ultimo_esito = None
+    # Anche la pausa del servizio esterno: chi azzera le cache sta
+    # rimettendo le cose in ordine, e una pausa presa cinque minuti fa non
+    # deve far sembrare spento un servizio che magari è appena tornato.
+    _pausa_servizio = None
     # Anche la memoria delle seconde letture: chi azzera la cache lo fa
     # perché un dato è cambiato (`/tac/salva`), e un «non c'è» ricordato da
     # prima risponderebbe al posto del dato nuovo.

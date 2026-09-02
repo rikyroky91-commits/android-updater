@@ -1677,6 +1677,42 @@ class TestRicercaPerImei(_Sito):
                       "il campo per insegnare il TAC e' ancora sepolto "
                       "dentro il riquadro del confronto")
 
+    def test_un_servizio_esterno_rotto_lo_dice_la_pagina(self):
+        """«il servizio esterno non funziona», segnalato il 01/09/2026.
+
+        Fino a quel giorno un guasto del servizio — chiave rifiutata,
+        quota finita, servizio giù — produceva ESATTAMENTE la pagina di
+        un TAC che nessun catalogo al mondo conosce. Chi guarda conclude
+        che il telefono non esiste da nessuna parte, mentre il problema
+        sta a monte e di solito si ripara in un minuto.
+        """
+        from core import imeicheck
+
+        imeicheck._ricorda_esito_servizio("errore", "HTTP 401: chiave rifiutata")
+        self.addCleanup(imeicheck.reset_cache)
+        pagina = self.client.get("/", params={"q": "998877660000000"}).text
+        self.assertIn("modello sconosciuto", pagina)
+        self.assertIn("HTTP 401: chiave rifiutata", pagina)
+        self.assertIn("non dice che il telefono è introvabile", pagina)
+
+    def test_un_guasto_vecchio_non_spiega_il_silenzio_di_oggi(self):
+        """La finestra di sei ore: un guasto di tre giorni fa
+        spiegherebbe una cosa diversa da quella che sta succedendo, che è
+        il modo peggiore di aiutare."""
+        from core import imeicheck, storage
+        import json as _json
+
+        storage.set_meta(imeicheck._META_ESITO_SERVIZIO, _json.dumps({
+            "quando": "2020-01-01T00:00:00+00:00",
+            "esito": "errore",
+            "dettaglio": "HTTP 401: chiave rifiutata",
+        }))
+        imeicheck.reset_cache()
+        self.addCleanup(imeicheck.reset_cache)
+        pagina = self.client.get("/", params={"q": "998877660000000"}).text
+        self.assertIn("modello sconosciuto", pagina)
+        self.assertNotIn("HTTP 401", pagina)
+
     def test_per_un_tac_noto_la_correzione_resta_dove_stava(self):
         """Su una risposta che c'è, riscrivere il modello è una
         correzione: un'azione rara, che non deve competere con il
@@ -1757,11 +1793,13 @@ class TestRicercaPerImei(_Sito):
             # titolo, che è ciò che questo test difende, sta nel primo.
             pagina = self.client.get(
                 "/", params={"q": "351355315430630", "completo": 1}).text
-            # Dal 31/08/2026 il titolo porta anche la pastiglia 4G/5G
-            # (chiesta dall'utente), quindi non finisce piu' subito dopo
-            # il nome. Il nome resta quello che questo test difende.
+            # Dal 31/08/2026 il titolo puo' portare la pastiglia 4G/5G
+            # (chiesta dall'utente), quindi non finisce per forza subito
+            # dopo il nome. Qui pero' la pastiglia NON deve esserci: il
+            # nome dice gia' «4G», e ripeterlo attaccato darebbe «Galaxy
+            # A16 4G 4G» — visto in produzione su «vivo Y76 5G 5G».
             self.assertIn("<h2>Samsung Galaxy A16 4G", pagina)
-            self.assertIn('<span class="pastiglia-rete"', pagina)
+            self.assertNotIn('<span class="pastiglia-rete"', pagina)
             self.assertIn("Versione Android verificata: Android 14", pagina)
             self.assertNotIn("<h2>SM-A165F</h2>", pagina)
         finally:

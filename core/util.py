@@ -217,3 +217,78 @@ def memoria_picco_mb() -> float | None:
     except Exception:
         return None
     return None
+
+
+def _peso_profondo(oggetto, visti: set | None = None) -> int:
+    """Byte occupati da una struttura e da tutto ciò che contiene.
+
+    `sys.getsizeof` guarda solo il contenitore: per un dizionario di
+    liste di stringhe — la forma che in questo progetto è già costata
+    112 MB una volta — risponde il 5% del vero. Qui si scende dentro, una
+    volta sola per oggetto (gli identificatori già visti non si contano
+    due volte, altrimenti le stringhe condivise gonfierebbero il totale).
+
+    Non è gratis: su ottantamila voci costa qualche decimo di secondo. Per
+    questo non sta in `/health`, che l'host interroga ogni minuto, ma
+    dietro `?dettaglio=1`.
+    """
+    import sys
+
+    visti = set() if visti is None else visti
+    identificatore = id(oggetto)
+    if identificatore in visti:
+        return 0
+    visti.add(identificatore)
+    peso = sys.getsizeof(oggetto)
+    if isinstance(oggetto, dict):
+        for chiave, valore in oggetto.items():
+            peso += _peso_profondo(chiave, visti) + _peso_profondo(valore, visti)
+    elif isinstance(oggetto, (list, tuple, set, frozenset)):
+        for voce in oggetto:
+            peso += _peso_profondo(voce, visti)
+    return peso
+
+
+def memoria_dei_cataloghi() -> dict:
+    """Quanto pesa ogni catalogo tenuto in memoria, in MB.
+
+    ESISTE PER NON TIRARE A INDOVINARE. Il 01/09/2026, con l'indice TAC
+    già ridotto da 165 MB a 22, il servizio in produzione stava a 432 MB
+    su 512 e continuava a salire: la causa non era più quella corretta, e
+    senza un numero per catalogo l'unica strada era provare a caso.
+
+    I nomi sono quelli che compaiono in Diagnostica, così una riga alta
+    qui indica una riga di lì.
+    """
+    from core import aer_catalog, imeicheck, modelcodes, soc, specs
+
+    strutture = {
+        "indice TAC": getattr(imeicheck, "_memory_index", None),
+        "codici modello": getattr(modelcodes, "_memory_cache", None),
+        "codici, indici inversi": [
+            getattr(modelcodes, "_reverse_cache", None),
+            getattr(modelcodes, "_reverse_senza_suffisso", None),
+            getattr(modelcodes, "_reverse_compatto", None),
+            getattr(modelcodes, "_per_cifre", None),
+            getattr(modelcodes, "_marca_di_codice", None),
+        ],
+        "schede tecniche": [getattr(specs, "_schede", None),
+                            getattr(specs, "_per_codice", None),
+                            getattr(specs, "_per_nome", None),
+                            getattr(specs, "_curate_per_codice", None),
+                            getattr(specs, "_curate_per_nome", None),
+                            getattr(specs, "_honor_specs_cache", None)],
+        "processori": [getattr(soc, "_dataset", None),
+                       getattr(soc, "_curato", None),
+                       getattr(soc, "_play", None)],
+        "catalogo aziendale": [getattr(aer_catalog, "_dispositivi", None),
+                               getattr(aer_catalog, "_per_nome", None),
+                               getattr(aer_catalog, "_per_codice", None)],
+    }
+    pesi = {}
+    for nome, struttura in strutture.items():
+        try:
+            pesi[nome] = round(_peso_profondo(struttura) / (1024 * 1024), 1)
+        except Exception:  # pragma: no cover - una misura non deve rompere nulla
+            pesi[nome] = None
+    return pesi

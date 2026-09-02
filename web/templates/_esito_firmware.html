@@ -25,8 +25,8 @@
    risposta. Quando nessuna fonte lo dichiara non si scrive niente:
    dedurlo dal processore sarebbe indovinarlo. #}
 <h2>{% if risultato.trovato or risultato.senza_firmware or (risultato.nome and risultato.nome != risultato.query) %}{{ risultato.nome }}{% else %}Nessun firmware per «{{ risultato.query }}»{% endif %}
-{%- if risultato.rete %} <span class="pastiglia-rete" title="Rete {{ risultato.rete.sigla }} · {{ risultato.rete.fonte }}{% if risultato.rete.dettaglio %} — {{ risultato.rete.dettaglio }}{% endif %}">{{ risultato.rete.sigla }}</span>{% endif %}</h2>
-{% if risultato.rete %}<p class="nota">Rete mobile: <strong>{{ risultato.rete.sigla }}</strong> · {{ risultato.rete.fonte }}</p>{% endif %}
+{%- if risultato.rete and not risultato.rete.nel_nome %} <span class="pastiglia-rete" title="Rete {{ risultato.rete.sigla }} · {{ risultato.rete.fonte }}{% if risultato.rete.dettaglio %} — {{ risultato.rete.dettaglio }}{% endif %}">{{ risultato.rete.sigla }}</span>{% endif %}</h2>
+{% if risultato.rete and not risultato.rete.nel_nome %}<p class="nota">Rete mobile: <strong>{{ risultato.rete.sigla }}</strong> · {{ risultato.rete.fonte }}</p>{% endif %}
 
 {% if risultato.trovato and not risultato.senza_firmware %}
   <p class="riga-esito">{{ risultato.riga }}</p>

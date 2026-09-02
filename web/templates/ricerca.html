@@ -78,8 +78,8 @@
        scheda tecnica sono definitivi, è il firmware che si sta ancora
        cercando. Vedi la nota in `_esito_firmware.html`. #}
     <h2>{{ risultato.nome }}
-      {%- if risultato.rete %} <span class="pastiglia-rete" title="Rete {{ risultato.rete.sigla }} · {{ risultato.rete.fonte }}{% if risultato.rete.dettaglio %} — {{ risultato.rete.dettaglio }}{% endif %}">{{ risultato.rete.sigla }}</span>{% endif %}</h2>
-    {% if risultato.rete %}<p class="nota">Rete mobile: <strong>{{ risultato.rete.sigla }}</strong> · {{ risultato.rete.fonte }}</p>{% endif %}
+      {%- if risultato.rete and not risultato.rete.nel_nome %} <span class="pastiglia-rete" title="Rete {{ risultato.rete.sigla }} · {{ risultato.rete.fonte }}{% if risultato.rete.dettaglio %} — {{ risultato.rete.dettaglio }}{% endif %}">{{ risultato.rete.sigla }}</span>{% endif %}</h2>
+    {% if risultato.rete and not risultato.rete.nel_nome %}<p class="nota">Rete mobile: <strong>{{ risultato.rete.sigla }}</strong> · {{ risultato.rete.fonte }}</p>{% endif %}
     {% endif %}
     {# DUE ATTESE DIVERSE, DETTE IN MODO DIVERSO. Cercare il firmware di un
        telefono già riconosciuto è la normalità; interrogare un archivio

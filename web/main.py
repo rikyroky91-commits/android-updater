@@ -39,7 +39,7 @@ import os
 import re
 import shutil
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, datetime, timezone
 from urllib.parse import quote
 
 from fastapi import FastAPI, File, Form, Query, Request, UploadFile
@@ -50,7 +50,8 @@ from fastapi.staticfiles import StaticFiles
 from core import aer_catalog, aiquery, allegati, appledevices, cifratura, config as C
 from core import extract, imeicheck, mail, modelcodes, retest, scan, soc, sources, specs
 from core import storage, suggest, versus
-from core.util import fmt_date, memoria_mb, memoria_picco_mb
+from core.util import (fmt_date, memoria_dei_cataloghi, memoria_mb,
+                       memoria_picco_mb)
 
 from . import account, auth_web, presenters as P
 from .cache import CacheATempo
@@ -1269,7 +1270,7 @@ def api_suggerimenti(q: str = Query(default="")):
 
 @app.get("/health")
 @app.head("/health")
-def health():
+def health(dettaglio: str = Query(default="")):
     """Per il servizio che tiene sveglio l'host.
 
     Deliberatamente leggerissima: non tocca il database. Un controllo di
@@ -1309,15 +1310,70 @@ def health():
     #
     # Non sono un dato sensibile: dicono quanta RAM usa un processo, non
     # cosa contiene.
-    return {"ok": True, "app": C.APP_TITLE,
-            "tac_esterno": "configurato" if imeicheck._chiave_api() else "non configurato",
-            "memoria_mb": memoria_mb(),
-            "memoria_picco_mb": memoria_picco_mb()}
+    risposta = {"ok": True, "app": C.APP_TITLE,
+                "tac_esterno": "configurato" if imeicheck._chiave_api() else "non configurato",
+                "memoria_mb": memoria_mb(),
+                "memoria_picco_mb": memoria_picco_mb()}
+    # «CONFIGURATO» NON VUOL DIRE «FUNZIONA», e per due settimane le due
+    # cose sono state raccontate con la stessa parola.
+    #
+    # Segnalato dall'utente il 01/09/2026: «il servizio esterno non
+    # funziona». Qui c'era scritto «configurato», che è vero — la chiave
+    # c'è — e non dice niente su cosa succede quando la si usa. Ora
+    # accanto compare com'è andata l'ultima chiamata vera: chiave
+    # rifiutata, quota finita, servizio giù, o una risposta ricevuta.
+    # Si legge senza login, che è il punto: Diagnostica sta dietro
+    # l'accesso, e una configurazione che si controlla solo da dentro è
+    # una configurazione che nessuno controlla.
+    ultimo = imeicheck.ultimo_esito_servizio()
+    if ultimo.get("dettaglio"):
+        risposta["tac_esterno_ultima_chiamata"] = ultimo["dettaglio"]
+        risposta["tac_esterno_quando"] = ultimo.get("quando")
+    elif imeicheck._chiave_api():
+        risposta["tac_esterno_ultima_chiamata"] = "mai chiamato dall'ultimo riavvio"
+    # IL DETTAGLIO SI CHIEDE, non si calcola a ogni battito.
+    #
+    # Pesare i cataloghi voce per voce costa qualche decimo di secondo su
+    # centomila voci, e questa rotta la interroga l'host ogni minuto: farlo
+    # sempre significherebbe spendere per un dato che serve quando qualcosa
+    # non va. Con `?dettaglio=1` invece si vede quale catalogo occupa cosa —
+    # ed è la domanda a cui il 01/09/2026 non si sapeva rispondere, con il
+    # servizio a 432 MB su 512 e l'indice TAC ormai innocente.
+    if dettaglio:
+        risposta["cataloghi_mb"] = memoria_dei_cataloghi()
+    return risposta
 
 
 # ======================================================================
 # IMEI
 # ======================================================================
+def _guasto_esterno_recente(entro_ore: int = 6) -> str:
+    """Il guasto del servizio esterno, se è di poco fa.
+
+    LA FINESTRA SERVE. Questo messaggio compare accanto a un «modello
+    sconosciuto» per spiegarlo, e un guasto di tre giorni fa non spiega
+    niente: spiegherebbe una cosa diversa da quella che sta succedendo,
+    che è il modo peggiore di aiutare. Sei ore sono abbastanza da coprire
+    il guasto che si sta guardando adesso e poche abbastanza da non
+    raccontare la storia di ieri.
+
+    Fuori dalla finestra il dato non sparisce: resta in Diagnostica e in
+    `/health`, che sono i posti dove si va a guardare la storia.
+    """
+    ultimo = imeicheck.ultimo_esito_servizio()
+    if ultimo.get("esito") != "errore" or not ultimo.get("dettaglio"):
+        return ""
+    quando = ultimo.get("quando") or ""
+    try:
+        istante = datetime.fromisoformat(quando)
+    except (TypeError, ValueError):
+        return ""
+    if istante.tzinfo is None:
+        istante = istante.replace(tzinfo=timezone.utc)
+    eta = (datetime.now(timezone.utc) - istante).total_seconds()
+    return ultimo["dettaglio"] if 0 <= eta <= entro_ore * 3600 else ""
+
+
 def _esito_imei(imei: str, solo_locale: bool = False) -> dict:
     """Da quindici cifre a un modello, dicendo da dove arriva la risposta.
 
@@ -1410,6 +1466,17 @@ def _esito_imei(imei: str, solo_locale: bool = False) -> dict:
         # un'attesa, e va detto con parole sue invece di lasciare la
         # stessa pagina di un TAC mai chiesto a nessuno.
         "chiesto_invano": chiesto_invano,
+        # E SE IL SERVIZIO ESTERNO È ROTTO, VA DETTO QUI, NON IN
+        # DIAGNOSTICA.
+        #
+        # Segnalato dall'utente il 01/09/2026: «il servizio esterno non
+        # funziona». Fino a ieri un guasto — chiave rifiutata, quota
+        # finita, servizio giù — produceva la stessa identica pagina di un
+        # TAC che nessuno conosce: «modello sconosciuto», e chi guarda
+        # conclude che il telefono non è in nessun catalogo, mentre il
+        # problema è a monte e si risolve in un minuto. Il quarto silenzio
+        # della serie, e il più fuorviante dei quattro.
+        "servizio_esterno_guasto": _guasto_esterno_recente(),
         # SE IL SERVIZIO ESTERNO NON È ATTIVO, VA DETTO DOVE SI VEDE.
         #
         # Un TAC che nessun database locale conosce viene chiesto fuori, ma

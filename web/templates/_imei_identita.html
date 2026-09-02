@@ -42,6 +42,18 @@
   telefono è, scrivilo nel riquadro qui sotto: resta salvato e da quel
   momento l'IMEI lo riconosce subito. Altrimenti riprovo fra un mese.</p>
 {% endif %}
+{# QUARTO SILENZIO, E IL PIU' FUORVIANTE: il servizio c'è ma è rotto.
+   Prima questa pagina era identica a quella di un TAC che nessuno
+   conosce, e portava alla conclusione sbagliata — «questo telefono non è
+   in nessun catalogo» — mentre il guasto sta a monte e di solito si
+   risolve in un minuto. Segnalato dall'utente il 01/09/2026. #}
+{% if imei.servizio_esterno_guasto %}
+<p class="nota lacuna">Il servizio esterno è configurato ma in questo
+  momento non risponde: <strong>{{ imei.servizio_esterno_guasto }}</strong>.
+  Questo «non lo so» quindi non dice che il telefono è introvabile: dice
+  che l'ultima fonte rimasta non ha parlato. Lo stato completo è in
+  Diagnostica e, senza login, su <code>/health</code>.</p>
+{% endif %}
 {% if imei.servizio_esterno_attivo is defined and not imei.servizio_esterno_attivo %}
 <p class="nota lacuna">Su questo sito il riconoscimento tramite servizio
   esterno non è attivo: i TAC che i database locali non hanno restano

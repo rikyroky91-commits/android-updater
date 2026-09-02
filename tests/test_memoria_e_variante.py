@@ -510,3 +510,142 @@ class TestQuattroGoCinqueG(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main(verbosity=2)
+
+
+class TestUnServizioRottoLoDeveDire(unittest.TestCase):
+    """«il servizio esterno non funziona», 01/09/2026.
+
+    Aveva ragione, e la cosa peggiore è che NON SI POTEVA SAPERE: chiave
+    rifiutata, quota finita, servizio giù, rete che non passa — ogni
+    guasto finiva nello stesso `return ("errore", None)` muto, e la pagina
+    diceva «modello sconosciuto» esattamente come quando il servizio
+    risponde «non lo conosco». Due situazioni opposte con la stessa
+    frase: una si risolve in un minuto rifacendo una chiave, l'altra no.
+    """
+
+    def setUp(self):
+        self._chiave = imeicheck._chiave_api
+        self._requests = imeicheck.requests
+        imeicheck._chiave_api = lambda: "chiave-di-prova"
+        imeicheck.reset_cache()
+
+        def rimetti():
+            imeicheck._chiave_api = self._chiave
+            imeicheck.requests = self._requests
+            imeicheck.reset_cache()
+
+        self.addCleanup(rimetti)
+
+    def _servizio_che_risponde(self, stato, corpo=None):
+        class Finto:
+            def post(self_interno, *a, **k):
+                class R:
+                    status_code = stato
+
+                    @staticmethod
+                    def json():
+                        return corpo if corpo is not None else {}
+                return R()
+        imeicheck.requests = Finto()
+
+    def test_una_chiave_rifiutata_si_riconosce_dal_numero(self):
+        self._servizio_che_risponde(401)
+        self.assertEqual(imeicheck.cerca_tac_online_esito("35692411"),
+                         ("errore", None))
+        ultimo = imeicheck.ultimo_esito_servizio()
+        self.assertEqual(ultimo["esito"], "errore")
+        self.assertIn("401", ultimo["dettaglio"])
+        self.assertIn("chiave rifiutata", ultimo["dettaglio"])
+
+    def test_la_quota_finita_ha_parole_sue(self):
+        self._servizio_che_risponde(429)
+        imeicheck.cerca_tac_online_esito("35692411")
+        self.assertIn("quota", imeicheck.ultimo_esito_servizio()["dettaglio"])
+
+    def test_una_rete_che_non_passa_non_e_un_no(self):
+        class Rotto:
+            def post(self, *a, **k):
+                raise OSError("niente rete")
+        imeicheck.requests = Rotto()
+        self.assertEqual(imeicheck.cerca_tac_online_esito("35692411"),
+                         ("errore", None))
+        ultimo = imeicheck.ultimo_esito_servizio()
+        self.assertEqual(ultimo["esito"], "errore")
+        self.assertIn("non raggiungibile", ultimo["dettaglio"])
+
+    def test_dopo_un_guasto_non_si_martella(self):
+        """Ogni tentativo costa il tempo del timeout, e chi cerca lo
+        aspetta per ricevere comunque «non lo so»."""
+        chiamate = []
+
+        class Rotto:
+            def post(self, *a, **k):
+                chiamate.append(1)
+                raise OSError("niente rete")
+
+        imeicheck.requests = Rotto()
+        imeicheck.cerca_tac_online_esito("35692411")
+        imeicheck.cerca_tac_online_esito("35692412")
+        self.assertEqual(len(chiamate), 1)
+        self.assertIn("non raggiungibile", imeicheck.servizio_in_pausa() or "")
+
+    def test_una_risposta_buona_toglie_la_pausa(self):
+        class Rotto:
+            def post(self, *a, **k):
+                raise OSError("niente rete")
+
+        imeicheck.requests = Rotto()
+        imeicheck.cerca_tac_online_esito("35692411")
+        self.assertIsNotNone(imeicheck.servizio_in_pausa())
+        imeicheck.reset_cache()          # come fa `/tac/salva`
+        self._servizio_che_risponde(200, {"manufacturer": "Samsung",
+                                          "model": "Galaxy Test"})
+        self.assertEqual(imeicheck.cerca_tac_online_esito("35692411"),
+                         ("trovato", ("Samsung", "Galaxy Test")))
+        self.assertIsNone(imeicheck.servizio_in_pausa())
+
+    def test_un_no_del_servizio_resta_un_no(self):
+        """La distinzione che regge tutto: «non lo conosco» è una
+        risposta e si conserva, un guasto no."""
+        self._servizio_che_risponde(404)
+        self.assertEqual(imeicheck.cerca_tac_online_esito("35692411"),
+                         ("assente", None))
+        self.assertEqual(imeicheck.ultimo_esito_servizio()["esito"], "assente")
+        self.assertIsNone(imeicheck.servizio_in_pausa())
+
+    def test_lo_stato_per_diagnostica_dice_com_e_andata(self):
+        self._servizio_che_risponde(401)
+        imeicheck.cerca_tac_online_esito("35692411")
+        stato = imeicheck.stato_servizio_esterno()
+        self.assertIn("chiave presente", stato)
+        self.assertIn("401", stato)
+
+
+class TestLaRetaNonSiRipeteNelTitolo(unittest.TestCase):
+    """Visto in produzione il 01/09/2026, appena distribuita la pastiglia:
+    «vivo Y76 5G 5G». Il nome commerciale finiva già per «5G» e la
+    pastiglia lo ripeteva attaccato.
+
+    Chi legge quel titolo la risposta ce l'ha davanti; ripeterla non
+    aggiunge niente e sembra un errore dell'app. Nella scheda tecnica la
+    voce «Rete» resta invece sempre, perché lì sta in una tabella di
+    caratteristiche, dove un valore va scritto anche quando è ovvio.
+    """
+
+    def test_il_nome_che_lo_dice_gia_alza_la_bandierina(self):
+        rete = P.rete_mobile(None, "vivo Y76 5G")
+        self.assertEqual(rete["sigla"], "5G")
+        self.assertTrue(rete["nel_nome"])
+
+    def test_la_scheda_tecnica_non_e_nel_nome(self):
+        scheda = {"sezioni": {"Network": {"Technology": "GSM / HSPA / LTE"}}}
+        rete = P.rete_mobile(scheda, "OPPO A74")
+        self.assertEqual(rete["sigla"], "4G")
+        self.assertFalse(rete["nel_nome"])
+
+    def test_nemmeno_la_riga_del_database_tac(self):
+        """Lì il dato non è sotto gli occhi di chi legge: il titolo mostra
+        il nome canonico, non la riga grezza del TAC."""
+        rete = P.rete_mobile(None, "Galaxy A54", "SAMSUNG GALAXY A54 5G, SM-A546B")
+        self.assertEqual(rete["sigla"], "5G")
+        self.assertFalse(rete["nel_nome"])
