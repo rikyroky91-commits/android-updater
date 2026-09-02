@@ -1364,6 +1364,15 @@ def health(dettaglio: str = Query(default="")):
                 storage.get_meta("ultima_scansione_memoria") or "{}")
         except Exception:
             risposta["ultima_scansione"] = {}
+        # E LE ULTIME OTTO, perché una fotografia sola non distingue «i
+        # cataloghi si stanno ancora scaldando» da «ogni giro lascia
+        # qualcosa»: sono due storie diverse con lo stesso numero. Otto
+        # righe lo dicono a colpo d'occhio.
+        try:
+            risposta["storico_scansioni"] = json.loads(
+                storage.get_meta(scan._STORICO_MEMORIA) or "[]")
+        except Exception:
+            risposta["storico_scansioni"] = []
     return risposta
 
 

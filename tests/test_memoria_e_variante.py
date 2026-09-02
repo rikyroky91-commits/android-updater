@@ -729,3 +729,69 @@ class TestLaMemoriaTornaAlSistema(unittest.TestCase):
         import json as _json
         salvata = _json.loads(storage.get_meta("ultima_scansione_memoria") or "{}")
         self.assertIn("dopo la raccolta", salvata)
+
+
+class TestLaValvolaDellaMemoria(unittest.TestCase):
+    """Sopra una soglia i cataloghi si buttano, invece di aspettare l'OOM.
+
+    Misurato in produzione il 02/09/2026, con il rilascio già attivo: 350
+    MB dopo una scansione, 396 un'ora dopo, picco 423 su 512. Il rilascio
+    funziona — corrente e picco non coincidono più — ma il pavimento
+    continua a salire, e a quel ritmo il limite arriva prima di sera.
+
+    Qui non si indovina la causa: si evita la conseguenza. I cataloghi
+    sono cache e sanno ricostruirsi da soli, quindi buttarli non perde
+    nessun dato — costa qualche secondo a chi cerca subito dopo. Un
+    riavvio per memoria esaurita, invece, perde tutto quello che non è
+    ancora finito nel salvataggio esterno.
+    """
+
+    def setUp(self):
+        from core import config as C
+
+        self._soglia = C.MEMORIA_MASSIMA_MB
+        self.addCleanup(lambda: setattr(C, "MEMORIA_MASSIMA_MB", self._soglia))
+
+    def test_sotto_la_soglia_non_si_butta_niente(self):
+        from core import config as C, imeicheck, scan
+
+        C.MEMORIA_MASSIMA_MB = 100_000        # irraggiungibile
+        imeicheck._memory_index = {"11111111": "prova\x1fA\x1fB"}
+        self.assertFalse(scan._libera_cataloghi_se_serve())
+        self.assertIsNotNone(imeicheck._memory_index)
+
+    def test_sopra_la_soglia_i_cataloghi_se_ne_vanno(self):
+        from core import config as C, imeicheck, scan
+
+        C.MEMORIA_MASSIMA_MB = 1              # sempre superata
+        imeicheck._memory_index = {"11111111": "prova\x1fA\x1fB"}
+        self.assertTrue(scan._libera_cataloghi_se_serve())
+        # Buttato, non svuotato a metà: il prossimo che lo cerca lo
+        # ricostruisce da capo.
+        self.assertIsNone(imeicheck._memory_index)
+
+    def test_lo_storico_tiene_le_ultime_otto(self):
+        from core import scan, storage
+        import json as _json
+
+        storage.init_db()
+        storage.set_meta(scan._STORICO_MEMORIA, "[]")
+        for giro in range(12):
+            scan._annota_storico_memoria({"avvio": 100 + giro,
+                                          "dopo il salvataggio": 110 + giro,
+                                          "restituiti": 1.0})
+        storico = _json.loads(storage.get_meta(scan._STORICO_MEMORIA))
+        self.assertEqual(len(storico), scan._QUANTE_SCANSIONI_RICORDATE)
+        # Le ultime, non le prime: quello che serve è la tendenza di
+        # adesso, non com'era ieri.
+        self.assertEqual(storico[-1]["avvio"], 111)
+
+    def test_uno_storico_illeggibile_non_ferma_la_scansione(self):
+        """Una diagnosi non deve poter rompere il lavoro che diagnostica."""
+        from core import scan, storage
+
+        storage.init_db()
+        storage.set_meta(scan._STORICO_MEMORIA, "questo non e' json")
+        scan._annota_storico_memoria({"avvio": 1, "dopo il salvataggio": 2})
+        import json as _json
+        self.assertEqual(len(_json.loads(storage.get_meta(scan._STORICO_MEMORIA))), 1)

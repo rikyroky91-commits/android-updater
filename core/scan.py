@@ -500,8 +500,25 @@ def run_scan(auto_notify: bool = True, only_sources: list | None = None) -> dict
         # 10,4 dopo. Vedi `core/util.libera_memoria`.
         memoria["restituiti"] = libera_memoria()
         memoria["dopo il salvataggio"] = memoria_mb()
+        # LA VALVOLA: prima di arrivare al limite si lasciano andare i
+        # cataloghi.
+        #
+        # Misurato in produzione il 02/09/2026, con il rilascio già
+        # attivo: 350 MB dopo una scansione, 396 un'ora dopo, picco 423 su
+        # 512. Il rilascio funziona — corrente e picco non coincidono più —
+        # ma il pavimento continua a salire, e a quel ritmo il limite
+        # arriva prima di sera.
+        #
+        # Qui non si indovina la causa: si evita la conseguenza. Sopra la
+        # soglia i cataloghi si buttano e si ricaricano alla prima
+        # richiesta che li vuole. Costa qualche secondo a chi cerca subito
+        # dopo; l'alternativa è che il contenitore venga ucciso, e allora
+        # si perde tutto quello che non è ancora finito nel salvataggio.
+        # Una lentezza dichiarata è meglio di un riavvio silenzioso.
+        memoria["cataloghi lasciati andare"] = _libera_cataloghi_se_serve()
         try:
             storage.set_meta("ultima_scansione_memoria", json.dumps(memoria))
+            _annota_storico_memoria(memoria)
         except Exception:  # pragma: no cover - una diagnosi non rompe nulla
             pass
         _scan_lock.release()
@@ -516,6 +533,66 @@ def run_scan(auto_notify: bool = True, only_sources: list | None = None) -> dict
         "error": error_text,
         "memoria": memoria,
     }
+
+
+def _libera_cataloghi_se_serve() -> bool:
+    """Butta i cataloghi quando la memoria si avvicina al limite.
+
+    Non è una pulizia di routine: è una valvola. I cataloghi sono cache —
+    l'indice TAC, i codici modello con i suoi indici inversi, le schede
+    tecniche, i processori — e ognuno sa ricostruirsi da solo alla prima
+    richiesta che lo cerca. Buttarli non perde nessun dato: costa tempo,
+    una volta, a chi cerca subito dopo.
+
+    La soglia sta in `MEMORIA_MASSIMA_MB` e di default è a 420 su 512,
+    cioè con abbastanza margine da fare in tempo: il salvataggio
+    dell'archivio, che è il lavoro più affamato, ne chiede una trentina
+    tutti insieme.
+    """
+    quanto = memoria_mb()
+    if quanto is None or quanto < C.MEMORIA_MASSIMA_MB:
+        return False
+    # Import qui dentro: `core/scan.py` lo importa mezzo progetto, e
+    # tirarsi appresso tutti i cataloghi per una valvola che scatta di
+    # rado li farebbe pagare anche a chi non ci arriva mai.
+    from . import aer_catalog, imeicheck, specs
+
+    for catalogo in (imeicheck, modelcodes, soc, specs, aer_catalog):
+        try:
+            catalogo.reset_cache()
+        except Exception:  # pragma: no cover - un catalogo testardo non blocca
+            continue
+    libera_memoria()
+    return True
+
+
+_STORICO_MEMORIA = "storico_memoria_scansioni"
+_QUANTE_SCANSIONI_RICORDATE = 8
+
+
+def _annota_storico_memoria(memoria: dict) -> None:
+    """Le ultime otto scansioni, per vedere se il pavimento sale.
+
+    Una fotografia sola non distingue «i cataloghi si stanno ancora
+    scaldando» da «ogni giro lascia qualcosa»: sono due storie diverse con
+    lo stesso numero. Otto righe lo dicono a colpo d'occhio, e stanno in
+    poche centinaia di byte.
+    """
+    try:
+        storico = json.loads(storage.get_meta(_STORICO_MEMORIA) or "[]")
+        if not isinstance(storico, list):
+            storico = []
+    except Exception:
+        storico = []
+    storico.append({
+        "quando": now_iso()[:16].replace("T", " "),
+        "avvio": memoria.get("avvio"),
+        "fine": memoria.get("dopo il salvataggio"),
+        "restituiti": memoria.get("restituiti"),
+        "cataloghi buttati": memoria.get("cataloghi lasciati andare"),
+    })
+    storage.set_meta(_STORICO_MEMORIA,
+                     json.dumps(storico[-_QUANTE_SCANSIONI_RICORDATE:]))
 
 
 # ----------------------------------------------------------------------

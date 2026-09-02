@@ -55,6 +55,19 @@ RETENTION_DAYS = env_int("RETENTION_DAYS", 400)
 # --- Scansione ---------------------------------------------------------
 SCAN_INTERVAL_MINUTES = env_int("SCAN_INTERVAL_MINUTES", 60)
 HTTP_TIMEOUT = env_int("HTTP_TIMEOUT", 15)
+# LA SOGLIA OLTRE LA QUALE I CATALOGHI SI BUTTANO, in MB.
+#
+# Non è un limite di sistema: è la valvola di `scan._libera_cataloghi_se_serve`.
+# Il piano gratuito di Render ne concede 512 e uccide il contenitore quando li
+# supera; 420 lascia il margine che serve al lavoro più affamato — il
+# salvataggio dell'archivio, che ne chiede una trentina tutti insieme — per
+# finire senza che nel frattempo si arrivi al limite.
+#
+# I cataloghi sono cache e sanno ricostruirsi da soli: buttarli non perde
+# nessun dato, costa qualche secondo alla prima ricerca che li rivuole. Un
+# riavvio per OOM, invece, perde tutto quello che non è ancora finito nel
+# salvataggio esterno.
+MEMORIA_MASSIMA_MB = env_int("MEMORIA_MASSIMA_MB", 420)
 # I cataloghi bulk si preparano in background solo dopo che il sito e' gia'
 # pronto a rispondere. Su Render la memoria e' limitata: avviarli insieme al
 # worker e' il picco che produceva gli OOM, avviarli uno alla volta evita che
