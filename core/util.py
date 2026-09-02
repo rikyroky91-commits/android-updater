@@ -292,3 +292,49 @@ def memoria_dei_cataloghi() -> dict:
         except Exception:  # pragma: no cover - una misura non deve rompere nulla
             pesi[nome] = None
     return pesi
+
+
+def libera_memoria() -> float:
+    """Restituisce al sistema la memoria che Python ha smesso di usare.
+
+    IL PROBLEMA CHE RISOLVE, MISURATO. Il 02/09/2026 l'utente segnala che
+    «il sito crasha di notte anche quando nessuno lo usa»: di notte non ci
+    sono visite, ma ci sono i lavori periodici — la scansione ogni ora e
+    il salvataggio dell'archivio ogni mezz'ora. Provato qui con la stessa
+    sequenza del salvataggio (database di 20 MB → gzip → base64 → corpo
+    della richiesta):
+
+        picco durante l'invio      43,6 MB
+        dopo `del` e `gc.collect`  43,6 MB   ← non torna NIENTE
+        dopo `malloc_trim(0)`      10,4 MB
+
+    `gc.collect()` libera gli oggetti Python; non restituisce al sistema
+    operativo le arene di memoria che li contenevano. Per il kernel — e
+    quindi per il limite dei 512 MB di Render — quel processo continua a
+    occupare 43 MB. Ogni ciclo che alloca un po' più del precedente alza
+    il pavimento e non lo riabbassa mai: è la scala che porta all'OOM
+    nella notte, ed è anche il motivo per cui `memoria_picco_mb` e
+    `memoria_mb` sono sempre uguali.
+
+    `malloc_trim` è la chiamata di glibc che quel pavimento lo riabbassa.
+    Esiste solo lì: su un sistema che non ce l'ha (musl, macOS, Windows)
+    questa funzione fa il `gc.collect()` e torna zero, senza rompere
+    niente.
+
+    Ritorna i MB effettivamente tornati al sistema, così chi la chiama può
+    scriverlo in un registro invece di sperare.
+    """
+    import gc
+
+    prima = memoria_mb() or 0.0
+    gc.collect()
+    try:
+        import ctypes
+
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except Exception:
+        # Nessuna glibc: resta il `gc.collect()` qui sopra, che è comunque
+        # la metà utile del lavoro.
+        pass
+    dopo = memoria_mb() or 0.0
+    return round(max(0.0, prima - dopo), 1)

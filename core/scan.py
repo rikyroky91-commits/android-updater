@@ -7,12 +7,14 @@ diverse produce **un solo** item e **una sola** notifica.
 """
 from __future__ import annotations
 
+import json
 import threading
 import time
 import traceback
 
 from . import backup, classify, config as C, extract, modelcodes, notify, skinmap, soc, sources, storage
-from .util import now_iso, short_hash, slug, utcnow
+from .util import (libera_memoria, memoria_mb, now_iso, short_hash, slug,
+                   utcnow)
 
 _scan_lock = threading.Lock()
 
@@ -450,11 +452,22 @@ def run_scan(auto_notify: bool = True, only_sources: list | None = None) -> dict
     error_text = None
     items, status, new_items = [], [], []
     notifications = 0
+    # LA MEMORIA DI OGNI FASE, perché di notte non c'è nessuno a guardare.
+    #
+    # Segnalato il 02/09/2026: «il sito crasha di notte anche quando
+    # nessuno lo usa». Di notte non ci sono visite, ma c'è questa
+    # funzione, che gira ogni ora, e il salvataggio dell'archivio che la
+    # segue. Se il servizio riparte non resta niente da leggere — Render
+    # registra un avvio, non una causa — quindi qui si annota quanto costa
+    # OGNI fase, e il conto finisce in `/health?dettaglio=1`.
+    memoria: dict[str, float | None] = {"avvio": memoria_mb()}
     try:
         items, status = collect(only_sources)
+        memoria["dopo la raccolta"] = memoria_mb()
         for item in items:
             if storage.upsert_update(item):
                 new_items.append(item)
+        memoria["dopo la scrittura"] = memoria_mb()
         if auto_notify:
             notifications = notify_new(new_items)
         storage.purge_old()
@@ -462,30 +475,46 @@ def run_scan(auto_notify: bool = True, only_sources: list | None = None) -> dict
         error_text = traceback.format_exc(limit=3)
     finally:
         duration = time.time() - started
+        quanti, quanti_nuovi = len(items), len(new_items)
         storage.finish_scan(
-            scan_id, total=len(items), new_items=len(new_items),
+            scan_id, total=quanti, new_items=quanti_nuovi,
             notifications=notifications, duration=duration, error=error_text,
         )
         storage.set_meta("last_scan_at", now_iso())
-        # Il database vive su disco effimero: senza questo salvataggio,
-        # tutto il lavoro appena fatto sparirebbe al prossimo riavvio.
-        # Non più spesso di BACKUP_EVERY_MINUTES, e silenzioso se non
-        # configurato: un archivio irraggiungibile non deve far fallire
-        # una scansione andata a buon fine.
+        # LE VOCI SI LASCIANO ANDARE PRIMA DEL SALVATAGGIO, non dopo.
+        # Sono migliaia di dizionari con dentro i titoli interi, e il
+        # salvataggio subito sotto è il momento più caro di tutta la
+        # nottata: tenerle in vita mentre l'archivio viene compresso e
+        # codificato somma i due picchi invece di alternarli.
+        items = new_items = []
         try:
             backup.salva_se_serve()
         except Exception:  # pragma: no cover - il salvataggio non è critico
+            pass
+        # E QUI SI RESTITUISCE AL SISTEMA QUELLO CHE NON SERVE PIÙ.
+        #
+        # È la riga che chiude la segnalazione del 02/09/2026: senza,
+        # `gc.collect()` libera gli oggetti ma le arene restano al
+        # processo, il pavimento si alza a ogni giro e non si riabbassa
+        # mai. Misurato sulla sequenza del salvataggio: 43,6 MB prima,
+        # 10,4 dopo. Vedi `core/util.libera_memoria`.
+        memoria["restituiti"] = libera_memoria()
+        memoria["dopo il salvataggio"] = memoria_mb()
+        try:
+            storage.set_meta("ultima_scansione_memoria", json.dumps(memoria))
+        except Exception:  # pragma: no cover - una diagnosi non rompe nulla
             pass
         _scan_lock.release()
 
     return {
         "skipped": False,
-        "total": len(items),
-        "new": len(new_items),
+        "total": quanti,
+        "new": quanti_nuovi,
         "notifications": notifications,
         "sources": status,
         "duration": duration,
         "error": error_text,
+        "memoria": memoria,
     }
 
 

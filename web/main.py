@@ -35,6 +35,7 @@ il motivo per cui il salvataggio su Gist esiste già.
 from __future__ import annotations
 
 import html as _html
+import json
 import os
 import re
 import shutil
@@ -50,8 +51,8 @@ from fastapi.staticfiles import StaticFiles
 from core import aer_catalog, aiquery, allegati, appledevices, cifratura, config as C
 from core import extract, imeicheck, mail, modelcodes, retest, scan, soc, sources, specs
 from core import storage, suggest, versus
-from core.util import (fmt_date, memoria_dei_cataloghi, memoria_mb,
-                       memoria_picco_mb)
+from core.util import (fmt_date, libera_memoria, memoria_dei_cataloghi,
+                       memoria_mb, memoria_picco_mb)
 
 from . import account, auth_web, presenters as P
 from .cache import CacheATempo
@@ -199,6 +200,12 @@ def _scalda_i_cataloghi() -> None:
                 STATO_AVVIO[f"catalogo «{nome}»"] = "pronto"
             except Exception as errore:  # un catalogo in meno, non un guasto
                 STATO_AVVIO[f"catalogo «{nome}»"] = f"non caricato: {errore}"
+        # Scaldare un catalogo vuol dire scaricare qualche megabyte,
+        # decomprimerlo e attraversarlo: il risultato è piccolo, il
+        # passaggio no. Senza questa riga tutto quel transito resta al
+        # processo per sempre — vedi `core/util.libera_memoria`.
+        STATO_AVVIO["memoria restituita dopo il preriscaldamento"] = (
+            f"{libera_memoria()} MB")
 
     # `daemon` perché non deve trattenere la chiusura del processo, e in
     # un thread perché l'avvio non deve aspettarlo: se la prima visita
@@ -1341,6 +1348,22 @@ def health(dettaglio: str = Query(default="")):
     # servizio a 432 MB su 512 e l'indice TAC ormai innocente.
     if dettaglio:
         risposta["cataloghi_mb"] = memoria_dei_cataloghi()
+        # QUANTO PESA L'ARCHIVIO, che è il moltiplicatore del salvataggio:
+        # ogni invio ne tiene in memoria la copia intera, quella compressa,
+        # quella in base64 e il corpo della richiesta.
+        try:
+            risposta["archivio_mb"] = round(
+                os.path.getsize(C.DB_PATH) / (1024 * 1024), 1)
+        except OSError:
+            risposta["archivio_mb"] = None
+        # E LA MEMORIA DELL'ULTIMA SCANSIONE, fase per fase. È il lavoro
+        # che gira di notte, quando non c'è nessuno a guardare e il
+        # servizio riparte senza lasciare detto perché.
+        try:
+            risposta["ultima_scansione"] = json.loads(
+                storage.get_meta("ultima_scansione_memoria") or "{}")
+        except Exception:
+            risposta["ultima_scansione"] = {}
     return risposta
 
 

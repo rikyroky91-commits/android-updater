@@ -649,3 +649,83 @@ class TestLaRetaNonSiRipeteNelTitolo(unittest.TestCase):
         rete = P.rete_mobile(None, "Galaxy A54", "SAMSUNG GALAXY A54 5G, SM-A546B")
         self.assertEqual(rete["sigla"], "5G")
         self.assertFalse(rete["nel_nome"])
+
+
+class TestLaMemoriaTornaAlSistema(unittest.TestCase):
+    """«il sito crasha di notte anche quando nessuno lo usa», 02/09/2026.
+
+    Di notte non ci sono visite: ci sono la scansione ogni ora e il
+    salvataggio dell'archivio ogni mezz'ora. Misurato qui, con la stessa
+    sequenza del salvataggio (database → gzip → base64 → corpo della
+    richiesta):
+
+        picco durante l'invio      43,6 MB
+        dopo `del` e `gc.collect`  43,6 MB   ← non torna niente
+        dopo `malloc_trim(0)`      10,4 MB
+
+    `gc.collect()` libera gli oggetti Python ma non restituisce le arene
+    al sistema operativo: per il limite dei 512 MB di Render quel processo
+    continua a occuparle. Ogni giro alza il pavimento e non lo riabbassa
+    mai — è la scala che porta all'OOM nella notte, ed è anche il motivo
+    per cui `memoria_mb` e `memoria_picco_mb` sono sempre uguali.
+    """
+
+    def test_quello_che_si_lascia_andare_torna_davvero_al_sistema(self):
+        """Il test misura i MEGABYTE, non le chiamate: un test che
+        controllasse «è stato invocato malloc_trim» resterebbe verde anche
+        il giorno che non serve più a niente."""
+        import gzip as _gzip
+        import base64 as _base64
+        import json as _json
+
+        from core.util import libera_memoria, memoria_mb
+
+        if memoria_mb() is None:
+            self.skipTest("memoria non misurabile su questo sistema")
+
+        prima = memoria_mb()
+        grezzo = os.urandom(4_000_000) + b"x" * 16_000_000
+        compresso = _gzip.compress(grezzo, compresslevel=6)
+        del grezzo
+        contenuto = _base64.b64encode(compresso).decode("ascii")
+        corpo = _json.dumps({"files": {"db": {"content": contenuto}}}).encode()
+        picco = memoria_mb()
+        del corpo, contenuto, compresso
+
+        restituiti = libera_memoria()
+        dopo = memoria_mb()
+        self.assertGreater(picco - prima, 10,
+                           "la prova non ha allocato abbastanza per misurare")
+        # La soglia è larga di proposito: su glibc tornano quasi tutti i
+        # megabyte, altrove nessuno. Quello che questo test difende è che
+        # la memoria NON resti tutta al processo.
+        self.assertLess(
+            dopo - prima, (picco - prima) / 2,
+            f"dopo il rilascio il processo tiene ancora {dopo - prima:.1f} MB "
+            f"dei {picco - prima:.1f} del picco (restituiti {restituiti})")
+
+    def test_la_scansione_dichiara_quanto_e_costata(self):
+        """Se il servizio riparte di notte non resta niente da leggere:
+        Render registra un avvio, non una causa. La scansione annota da
+        sé quanto ha speso in ogni fase."""
+        from core import config as C, scan, sources, storage
+
+        def finta():
+            return [sources.RawItem(title="Galaxy A16 riceve Android 15",
+                                    link="https://esempio.test/1",
+                                    brand="Samsung", device="Galaxy A16")], None
+
+        fonte = sources.Source(key="prova-memoria", label="Prova",
+                               trust=C.TRUST_NOISY, fetch=finta,
+                               brand="Samsung", homepage="")
+        storage.init_db()
+        esito = scan.run_scan(auto_notify=False, only_sources=[fonte])
+        self.assertIn("memoria", esito)
+        for fase in ("avvio", "dopo la raccolta", "dopo la scrittura",
+                     "dopo il salvataggio", "restituiti"):
+            self.assertIn(fase, esito["memoria"])
+        # E resta scritta in archivio, che è dove la si va a cercare il
+        # giorno dopo.
+        import json as _json
+        salvata = _json.loads(storage.get_meta("ultima_scansione_memoria") or "{}")
+        self.assertIn("dopo la raccolta", salvata)
