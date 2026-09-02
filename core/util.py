@@ -240,11 +240,21 @@ def _peso_profondo(oggetto, visti: set | None = None) -> int:
         return 0
     visti.add(identificatore)
     peso = sys.getsizeof(oggetto)
+    # SI MISURA UNA FOTOGRAFIA, NON IL CATALOGO VIVO.
+    #
+    # I cataloghi si costruiscono in un thread di sottofondo, e questa
+    # misura arriva da una richiesta web: percorrere un dizionario mentre
+    # qualcun altro ci scrive dentro solleva «dictionary changed size
+    # during iteration». Visto in produzione il 02/09/2026 — la riga degli
+    # indici inversi tornava `null` proprio mentre venivano riempiti, e un
+    # `null` in mezzo ai numeri sembra un guasto invece che una misura
+    # arrivata un attimo troppo presto. `list(...)` copia i riferimenti,
+    # non i contenuti: costa poco e toglie la corsa.
     if isinstance(oggetto, dict):
-        for chiave, valore in oggetto.items():
+        for chiave, valore in list(oggetto.items()):
             peso += _peso_profondo(chiave, visti) + _peso_profondo(valore, visti)
     elif isinstance(oggetto, (list, tuple, set, frozenset)):
-        for voce in oggetto:
+        for voce in list(oggetto):
             peso += _peso_profondo(voce, visti)
     return peso
 
@@ -285,12 +295,29 @@ def memoria_dei_cataloghi() -> dict:
                                getattr(aer_catalog, "_per_nome", None),
                                getattr(aer_catalog, "_per_codice", None)],
     }
+    def vuoto(struttura) -> bool:
+        """Un catalogo non ancora caricato, che è diverso da uno leggero."""
+        if struttura is None:
+            return True
+        if isinstance(struttura, list):
+            return all(pezzo is None or not pezzo for pezzo in struttura)
+        return not struttura
+
     pesi = {}
     for nome, struttura in strutture.items():
+        # «NON CARICATO» E «PESA POCO» NON DEVONO LEGGERSI UGUALI. Un
+        # catalogo ancora spento rispondeva `0.0`, cioè lo stesso numero di
+        # uno caricato e minuscolo: chi legge conclude che quella riga non
+        # costa niente, mentre il costo deve ancora arrivare. Visto in
+        # produzione il 02/09/2026 su «codici modello», misurato mentre il
+        # preriscaldamento non c'era ancora arrivato.
+        if vuoto(struttura):
+            pesi[nome] = "non ancora caricato"
+            continue
         try:
             pesi[nome] = round(_peso_profondo(struttura) / (1024 * 1024), 1)
         except Exception:  # pragma: no cover - una misura non deve rompere nulla
-            pesi[nome] = None
+            pesi[nome] = "in costruzione, riprova fra un minuto"
     return pesi
 
 
