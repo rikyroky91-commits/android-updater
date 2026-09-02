@@ -1233,6 +1233,93 @@ def cerca_tac_online_esito(tac: str) -> tuple[str, tuple[str, str] | None]:
     return ("trovato", (marca or "Sconosciuto", modello))
 
 
+# Un nome in codice Motorola come lo scrive il database TAC: il codename
+# interno, poi l'eventuale marcatore di rete o di regione, poi due cifre
+# d'anno. `PENANG5GNA23`, `IBIZA21`, `TAIPEI24`, `BRONCO23`.
+_RE_CODENAME = re.compile(r"^([A-Za-z]+)(?:5G)?(?:NA|EU|IN|LATAM)?(\d{2})$")
+
+
+def _nome_da_codename(nome: str) -> str:
+    """Il nome commerciale di un nome in codice, se lo conosciamo già.
+
+    SEGNALATO DALL'UTENTE IL 02/09/2026, ed è la domanda giusta: «è un
+    moto g34, come mai gli altri lo trovano e noi no?». La riga del
+    database dice `MOTOROLA, FOGO5G23` — che non è un nome mancante, è il
+    NOME IN CODICE interno di quel telefono. E i database gratuiti lo
+    scrivono così per tutta la produzione Motorola recente:
+
+        MOTOROLA BRONCO23      bronco  → ThinkPhone
+        MOTOROLA IBIZA21       ibiza   → G50
+        MOTOROLA PENANG5G23    penang  → G53 5G
+        MOTOROLA TAIPEI24      taipei  → G55
+        MOTOROLA PAROS24       paros   → G75
+
+    Il dizionario per tradurli è **dentro questo progetto da mesi**:
+    `sources.MOTOROLA_LOLINET_DEVICES`, quaranta codename verificati
+    sull'indice XDA e sul database community, che serve a cercare i
+    firmware sul mirror lolinet. Nessuno aveva mai unito le due cose: il
+    database TAC parlava in codice e noi avevamo il vocabolario chiuso in
+    un cassetto.
+
+    LA CORRISPONDENZA DEVE ESSERE ESATTA dopo aver tolto anno e
+    marcatori: `sabahlite23` non diventa `sabahl` per somiglianza, e
+    `fogo5g23` non diventa `fogos`. Somigliarsi non è essere lo stesso
+    telefono, e questo progetto preferisce dire «non lo so» che indovinare
+    — per quei casi c'è la tabella curata `data/tac_modelli.csv`, dove una
+    riga la scrive una persona che il telefono ce l'ha in mano.
+    """
+    trovato = _RE_CODENAME.match(" ".join((nome or "").split()))
+    if not trovato:
+        return ""
+    codename = trovato.group(1).lower()
+    try:
+        from . import sources
+    except Exception:  # pragma: no cover - percorso difensivo
+        return ""
+    for _anno, noto, commerciale in sources.MOTOROLA_LOLINET_DEVICES:
+        if noto.lower() == codename:
+            return commerciale
+    return ""
+
+
+def _solo_la_marca(nome: str, brand: str) -> bool:
+    """Se questo «nome» non è altro che il nome della marca.
+
+    Parole identiche, non una dentro l'altra: «OPPO A74» contiene «OPPO»
+    ma è un modello, «MOTOROLA» da solo non lo è.
+    """
+    def parole(testo: str) -> frozenset:
+        return frozenset(p for p in re.sub(r"[^a-z0-9]+", " ",
+                                           (testo or "").lower()).split() if p)
+
+    di_marca = parole(brand)
+    return bool(di_marca) and parole(nome) == di_marca
+
+
+def _senza_la_marca_davanti(coda: str, brand: str) -> str:
+    """La coda senza la marca ripetuta all'inizio: quello che resta è il
+    modello.
+
+    Si taglia DALL'ULTIMA occorrenza della parola di marca, non dalla
+    prima: `Vivo Mobile vivo Y55` ha la ragione sociale in mezzo, e
+    fermarsi alla prima lascerebbe «Mobile vivo Y55». Se la marca non
+    compare affatto — `LG, SKT X SCREEN` — la coda si tiene intera,
+    perché è comunque tutto quello che il database dice di quel telefono.
+    """
+    parole = (coda or "").split()
+    marca = (brand or "").strip().lower()
+    if not parole or not marca:
+        return coda
+    posizioni = [i for i, parola in enumerate(parole)
+                 if parola.strip(",.").lower() == marca]
+    if not posizioni:
+        return coda
+    resto = parole[posizioni[-1] + 1:]
+    # Se dopo la marca non resta niente, meglio la coda com'era: un nome
+    # vuoto non è un miglioramento.
+    return " ".join(resto) if resto else coda
+
+
 def _spiega_stato(stato: int) -> str:
     """Un numero HTTP e cosa vuol dire sono due cose diverse.
 
@@ -1668,6 +1755,48 @@ def parse_specs(brand: str, specs: str) -> dict:
     nome = parti[0] if parti else grezzo
     coda = " ".join(parti[1:]) if len(parti) > 1 else ""
 
+    # QUANDO IL PRIMO CAMPO È SOLO LA MARCA, IL MODELLO STA NELLA CODA.
+    #
+    # Segnalato dall'utente il 02/09/2026 con l'IMEI 352643332782672: la
+    # pagina diceva di aver riconosciuto il telefono e poi mostrava
+    # «Motorola», senza modello e senza scheda. La riga è
+    # `MOTOROLA,35264333,"MOTOROLA, FOGO5G23"`: il primo campo è la marca,
+    # e questa funzione lo prendeva per nome commerciale.
+    #
+    # Non è un caso isolato — è la forma di **156.375 righe su 248.373**,
+    # misurate sul file vero, e quasi tutte (156.159) hanno la stessa
+    # struttura: `MARCA, MARCA MODELLO`.
+    #
+    #     INFINIX, INFINIX NOTE 50      → «NOTE 50», un telefono del 2025
+    #     ZTE, ZTE BLADE V40 DESIGN     → «BLADE V40 DESIGN»
+    #     SAMSUNG, SAMSUNG E1195        → «E1195»
+    #     LG, SKT X SCREEN              → «SKT X SCREEN» (la marca non si
+    #                                      ripete: si tiene la coda intera)
+    #
+    # Il modello era lì, scritto, e veniva sostituito dal nome della marca.
+    # Contava poco finché quelle righe stavano fuori dall'indice; da quando
+    # si cercano anche nei file (v67) sono tutte raggiungibili, e questo
+    # difetto è diventato quello che si vede.
+    # IL CONFRONTO DEVE ESSERE «È SOLO LA MARCA», NON «CONTIENE LA MARCA».
+    # Con `_same_words`, che accetta un insieme contenuto nell'altro,
+    # «OPPO A74» risultava uguale a «OPPO» e questa riga si mangiava il
+    # nome di mezzo database: misurato subito, `OPPO A74, Oppo CPH2219`
+    # diventava «Cph2219».
+    if len(parti) > 1 and _solo_la_marca(nome, brand):
+        senza_marca = _senza_la_marca_davanti(coda, brand)
+        if senza_marca:
+            nome = senza_marca
+
+    # E SE QUEL NOME È UN NOME IN CODICE, LO TRADUCIAMO: il dizionario ce
+    # l'abbiamo già in casa.
+    #
+    # Il nome che esce dalla tabella è già scritto come lo scrive
+    # Motorola («ThinkPhone», non «Thinkphone»), quindi salta il
+    # correttore di maiuscole di `_best_name`: quello serve ai nomi
+    # TUTTI MAIUSCOLI del database TAC, e su un nome verificato non
+    # correggerebbe, rovinerebbe.
+    da_codename = _nome_da_codename(nome)
+
     codice, anno = _split_code_and_year(coda or grezzo)
 
     # «N/A» VUOL DIRE «NON CE L'HO», e non è né un codice né un produttore.
@@ -1696,7 +1825,7 @@ def parse_specs(brand: str, specs: str) -> dict:
         produttore = ""
 
     return {
-        "model": _best_name(nome, codice),
+        "model": da_codename or _best_name(nome, codice),
         "maker": produttore or None,
         "code": codice,
         "year": anno,
@@ -1726,6 +1855,16 @@ def _best_name(nome_grezzo: str, codice: str | None) -> str:
             # sostituire il nome con quello di un modello diverso.
             if _same_words(candidato, nome_grezzo):
                 return " ".join(candidato.split())
+    # UNA SIGLA RESTA COME L'HANNO SCRITTA. `prettify_model` mette le
+    # maiuscole come le mette un nome commerciale — «FOGO5G23» diventa
+    # «Fogo5g23», che non è né il dato del database né un nome di
+    # telefono: sembra solo un errore di battitura dell'app. Una parola
+    # sola con dentro lettere e cifre è una sigla (un codice interno, un
+    # nome in codice), e di una sigla si riporta la grafia della fonte.
+    pulito = " ".join((nome_grezzo or "").split())
+    if (" " not in pulito and any(c.isdigit() for c in pulito)
+            and any(c.isalpha() for c in pulito)):
+        return pulito
     return prettify_model(nome_grezzo)
 
 

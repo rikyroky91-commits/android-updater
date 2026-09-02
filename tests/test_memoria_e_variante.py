@@ -795,3 +795,113 @@ class TestLaValvolaDellaMemoria(unittest.TestCase):
         scan._annota_storico_memoria({"avvio": 1, "dopo il salvataggio": 2})
         import json as _json
         self.assertEqual(len(_json.loads(storage.get_meta(scan._STORICO_MEMORIA))), 1)
+
+
+class TestIlModelloNonPuoEssereLaMarca(unittest.TestCase):
+    """«dice che trova il modello ma non me lo dà né la scheda tecnica»,
+    02/09/2026, IMEI 352643332782672.
+
+    La riga è `MOTOROLA,35264333,"MOTOROLA, FOGO5G23"`: il primo campo è
+    la marca, e `parse_specs` lo prendeva per nome commerciale. La pagina
+    diceva quindi di aver riconosciuto il telefono e mostrava «Motorola» —
+    niente modello, niente scheda, e nessun modo di capire perché.
+
+    Non è un caso isolato: è la forma di **156.375 righe su 248.373**,
+    misurate sul file vero, e 156.159 di quelle hanno la stessa struttura
+    `MARCA, MARCA MODELLO`. Il modello era scritto lì e veniva buttato.
+    """
+
+    def test_il_modello_si_prende_dalla_coda(self):
+        letto = imeicheck.parse_specs("INFINIX", "INFINIX, INFINIX NOTE 50")
+        self.assertEqual(letto["model"], "Note 50")
+
+    def test_la_ragione_sociale_in_mezzo_non_disturba(self):
+        """`Vivo Mobile vivo Y55`: si taglia dall'ULTIMA occorrenza della
+        marca, non dalla prima, o resterebbe «Mobile vivo Y55»."""
+        letto = imeicheck.parse_specs("VIVO", "VIVO, Vivo Mobile vivo Y55")
+        self.assertEqual(letto["model"], "Y55")
+
+    def test_se_la_marca_non_si_ripete_la_coda_si_tiene_intera(self):
+        """`LG, SKT X SCREEN` — è comunque tutto quello che il database
+        dice di quel telefono, ed è meglio della sola parola «LG»."""
+        letto = imeicheck.parse_specs("LG", "LG, SKT X SCREEN")
+        self.assertEqual(letto["model"], "Skt X Screen")
+
+    def test_una_sigla_resta_come_l_hanno_scritta(self):
+        """«FOGO5G23» è un nome in codice: `prettify_model` lo
+        trasformava in «Fogo5g23», che non è né il dato della fonte né un
+        nome di telefono — sembra un errore di battitura dell'app."""
+        letto = imeicheck.parse_specs("MOTOROLA", "MOTOROLA, FOGO5G23")
+        self.assertEqual(letto["model"], "FOGO5G23")
+
+    def test_un_nome_che_comincia_per_marca_non_viene_toccato(self):
+        """IL FRENO CHE SERVE, e che al primo tentativo mancava: con un
+        confronto «contiene la marca» invece di «è la marca», questa
+        regola si mangiava il nome di mezzo database — `OPPO A74` diventava
+        «Cph2219». Misurato subito, prima di spedire."""
+        for marca, riga, atteso in (
+            ("OPPO", "OPPO A74, Oppo CPH2219", "OPPO A74"),
+            ("SAMSUNG", "SAMSUNG GALAXY A16 4G, Samsung SM-A165F, 2024",
+             "Galaxy A16"),
+            ("HONOR", "HONOR 400 PRO, N/A2025", "Honor 400 Pro"),
+        ):
+            with self.subTest(riga=riga):
+                self.assertEqual(imeicheck.parse_specs(marca, riga)["model"],
+                                 atteso)
+
+
+class TestIlNomeInCodiceSiTraduce(unittest.TestCase):
+    """«è un moto g34. come mai gli altri lo trovano e noi no?», 02/09/2026.
+
+    Perché il database gratuito quel telefono lo scrive in un'altra
+    lingua: `MOTOROLA, FOGO5G23` non è un nome mancante, è il NOME IN
+    CODICE interno. E i database scrivono così tutta la produzione
+    Motorola recente — BRONCO23, IBIZA21, PENANG5G23, TAIPEI24, PAROS24.
+
+    Il dizionario per tradurli era **dentro il progetto da mesi**
+    (`sources.MOTOROLA_LOLINET_DEVICES`, quaranta codename verificati, usati
+    per cercare i firmware sul mirror lolinet): il database TAC parlava in
+    codice e noi tenevamo il vocabolario chiuso in un cassetto.
+    """
+
+    def test_un_codename_noto_diventa_il_nome_commerciale(self):
+        for riga, atteso in (("MOTOROLA, MOTOROLA BRONCO23", "ThinkPhone"),
+                             ("MOTOROLA, MOTOROLA IBIZA21", "G50"),
+                             ("MOTOROLA, MOTOROLA TAIPEI24", "G55")):
+            with self.subTest(riga=riga):
+                self.assertEqual(
+                    imeicheck.parse_specs("MOTOROLA", riga)["model"], atteso)
+
+    def test_il_marcatore_di_rete_e_di_regione_non_disturba(self):
+        """`PENANG5GNA23` è penang, 5G, Nord America, 2023."""
+        for riga in ("MOTOROLA, MOTOROLA PENANG5G23",
+                     "MOTOROLA, MOTOROLA PENANG5GNA23"):
+            with self.subTest(riga=riga):
+                self.assertEqual(
+                    imeicheck.parse_specs("MOTOROLA", riga)["model"], "G53 5G")
+
+    def test_un_nome_verificato_non_passa_dal_correttore_di_maiuscole(self):
+        """La tabella scrive «ThinkPhone» come lo scrive Motorola. Il
+        correttore serve ai nomi TUTTI MAIUSCOLI del database TAC: su un
+        nome verificato non corregge, rovina — «Thinkphone»."""
+        self.assertEqual(
+            imeicheck.parse_specs("MOTOROLA", "MOTOROLA, MOTOROLA BRONCO23")["model"],
+            "ThinkPhone")
+
+    def test_somigliarsi_non_basta(self):
+        """`SABAHLITE23` comincia per `sabahl` e `FOGO5G23` per `fogos`,
+        ma somigliarsi non è essere lo stesso telefono. Per quei casi c'è
+        la tabella curata, dove una riga la scrive chi il telefono ce l'ha
+        in mano."""
+        for riga, atteso in (("MOTOROLA, MOTOROLA SABAHLITE23", "SABAHLITE23"),
+                             ("MOTOROLA, FOGO5G23", "FOGO5G23")):
+            with self.subTest(riga=riga):
+                self.assertEqual(
+                    imeicheck.parse_specs("MOTOROLA", riga)["model"], atteso)
+
+    def test_il_moto_g34_dell_utente_e_nella_tabella_curata(self):
+        """Verificato da chi il telefono ce l'ha in mano: da lì in poi
+        quel TAC è riconosciuto subito, senza nessuna chiamata esterna."""
+        curati = imeicheck._indice_curato()
+        self.assertIn("35264333", curati)
+        self.assertEqual(curati["35264333"][1], "moto g34 5G")

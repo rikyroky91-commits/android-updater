@@ -55,3 +55,4 @@ tac,marca,modello,nota
 # confermata dall'utente. Stesso modello del TAC 35135531 qui sopra: e'
 # normale, un modello ha molti TAC.
 35286149,Samsung,"Galaxy A16 4G, Samsung SM-A165F",identificato su imei.info, assente dalle basi dati gratuite
+35264333,Motorola,moto g34 5G,"Segnalato dall'utente il 02/09/2026 con l'IMEI 352643332782672 e verificato da lui sul telefono che ha in mano: «e' un moto g34». Il database gratuito scrive il solo nome in codice interno — MOTOROLA, FOGO5G23 — e nessun catalogo commerciale indicizza quella sigla. La tabella dei codename del progetto (sources.MOTOROLA_LOLINET_DEVICES) ha 'fogos' -> G34 5G, stessa famiglia, ma 'fogo' senza la s le fonti pubbliche lo legano al moto g 5G 2024: troppo per dedurlo, abbastanza per confermare quello che l'utente ha letto sul suo telefono."
