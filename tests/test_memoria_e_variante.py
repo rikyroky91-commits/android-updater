@@ -905,3 +905,64 @@ class TestIlNomeInCodiceSiTraduce(unittest.TestCase):
         curati = imeicheck._indice_curato()
         self.assertIn("35264333", curati)
         self.assertEqual(curati["35264333"][1], "moto g34 5G")
+
+
+class TestLoZeroInizialeDelTac(unittest.TestCase):
+    """«questa imei come tanti imei sopratutto samsung non me li trova»,
+    04/09/2026.
+
+    Misurato sulla base dati principale scaricata quel giorno: **6 344
+    righe su 254 996** portano un TAC di sette cifre invece che di otto, e
+    il lettore le buttava tutte perché chiedeva `len(tac) == 8`. Non erano
+    righe rotte: erano i TAC che cominciano per zero, passati per un foglio
+    di calcolo che ha letto la colonna come un numero. Fra loro c'è il TCL
+    Flip 2 del 2024 e 257 Samsung.
+
+    Lo zero si rimette senza inventare niente: le prime due cifre di un TAC
+    sono l'ente che l'ha assegnato, e per sette cifre l'unico completamento
+    possibile è `01` — il PTCRB, le assegnazioni nordamericane.
+    """
+
+    def test_sette_cifre_diventano_otto(self):
+        self.assertEqual(imeicheck._tac_normalizzato("1620200"), "01620200")
+
+    def test_otto_cifre_restano_come_sono(self):
+        self.assertEqual(imeicheck._tac_normalizzato("35692411"), "35692411")
+
+    def test_un_numero_intero_va_bene_lo_stesso(self):
+        """È da qui che nasce il difetto: il foglio di calcolo consegna un
+        intero, non una stringa, e `openpyxl` lo passa così com'è."""
+        self.assertEqual(imeicheck._tac_normalizzato(1620200), "01620200")
+
+    def test_sei_cifre_restano_fuori(self):
+        """Sono 277 righe che dicono tutte «NOKIA THIS IS A TEST IMEI TO BE
+        USED», e `00` non è un ente che assegna niente: qui completare lo
+        zero vorrebbe dire inventare un TAC che non esiste."""
+        self.assertIsNone(imeicheck._tac_normalizzato("860006"))
+
+    def test_quello_che_non_e_un_numero_resta_fuori(self):
+        self.assertIsNone(imeicheck._tac_normalizzato(""))
+        self.assertIsNone(imeicheck._tac_normalizzato("356924AB"))
+        self.assertIsNone(imeicheck._tac_normalizzato(None))
+
+    def test_la_base_principale_non_perde_piu_quelle_righe(self):
+        import io
+
+        testo = ("Brand,TAC,SPECS\n"
+                 "TCL,1620200,\"TCL FLIP 2, TCL Comm 4058G2024\"\n"
+                 "SAMSUNG,35692411,\"SAMSUNG GALAXY A54 5G, Samsung SM-A546B, 2023\"\n")
+        self.assertEqual(
+            [t for t, _, _ in imeicheck._righe_principali(io.StringIO(testo))],
+            ["01620200", "35692411"])
+
+    def test_anche_le_altre_due_basi_dati(self):
+        import io
+
+        self.assertEqual(
+            list(imeicheck._righe_imeidb(io.StringIO("1620200,TCL,TCL Flip 2,,\n"))),
+            [("01620200", "TCL", "TCL Flip 2")])
+
+    def test_e_la_tabella_verificata_a_mano(self):
+        curati = imeicheck.carica_tac_curati(
+            "tac,marca,modello\n1620200,TCL,TCL Flip 2\n")
+        self.assertEqual(curati, {"01620200": ("TCL", "TCL Flip 2")})

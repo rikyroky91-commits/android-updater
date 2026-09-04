@@ -223,10 +223,10 @@ def carica_tac_curati(testo: str) -> dict[str, tuple[str, str]]:
     righe = [r for r in (testo or "").splitlines() if not r.lstrip().startswith("#")]
     indice: dict[str, tuple[str, str]] = {}
     for riga in csv.DictReader(io.StringIO("\n".join(righe))):
-        tac = (riga.get("tac") or "").strip()
+        tac = _tac_normalizzato(riga.get("tac"))
         marca = (riga.get("marca") or "").strip()
         modello = (riga.get("modello") or "").strip()
-        if len(tac) == 8 and tac.isdigit() and (marca or modello):
+        if tac and (marca or modello):
             indice[tac] = (marca or "Sconosciuto", modello)
     return indice
 
@@ -490,10 +490,10 @@ def _leggi_workbook(workbook, index: dict) -> None:
         for row in rows:
             if len(row) <= max(i_brand, i_tac, i_specs):
                 continue
-            tac = str(row[i_tac] or "").strip()
+            tac = _tac_normalizzato(row[i_tac])
             brand = str(row[i_brand] or "").strip()
             specs = str(row[i_specs] or "").strip()
-            if len(tac) == 8 and tac.isdigit() and brand:
+            if tac and brand:
                 index[tac] = (brand, specs)
 
 
@@ -655,6 +655,37 @@ def _flusso_di_testo(grezzo: bytes | None):
                             errors="replace", newline="")
 
 
+# ======================================================================
+# LO ZERO INIZIALE CHE IL FOGLIO DI CALCOLO SI MANGIA
+# ======================================================================
+# Misurato il 04/09/2026 sulla base principale scaricata: **6 344 righe su
+# 254 996** hanno il TAC di SETTE cifre invece che di otto, e finivano
+# tutte nel cestino perché il filtro chiedeva `len(tac) == 8`. Non sono
+# righe rotte: sono i TAC che cominciano per zero — `01620200` (TCL Flip 2,
+# 2024), `01307500` (Galaxy S2 HD LTE) — passati per un foglio di calcolo
+# che ha letto la colonna come un numero e ha buttato via lo zero davanti.
+#
+# Lo zero si può rimettere senza inventare niente, ed è l'unica cifra
+# possibile: le prime due cifre di un TAC sono l'ente che l'ha assegnato
+# (il Reporting Body Identifier) e `01` è il PTCRB, cioè le assegnazioni
+# nordamericane. Un TAC di sette cifre non è ambiguo — o è `0` + quelle
+# sette, o non è un TAC.
+#
+# Quelle di SEI cifre invece si buttano, e non è un'incoerenza: sono 277
+# righe che dicono tutte `NOKIA THIS IS A TEST IMEI TO BE USED`, e `00`
+# non è un ente che assegna niente.
+#
+# Guadagno misurato: da 248 373 a 254 703 TAC distinti (+2,5 %).
+def _tac_normalizzato(valore) -> str | None:
+    """Le otto cifre di un TAC, o None se questa riga non ne contiene uno."""
+    tac = str(valore if valore is not None else "").strip()
+    if not tac.isdigit():
+        return None
+    if len(tac) == 7:
+        return "0" + tac
+    return tac if len(tac) == 8 else None
+
+
 def _righe_principali(flusso):
     """`Brand,TAC,SPECS`, una riga alla volta: (tac, marca, specs)."""
     lettore = csv.reader(flusso)
@@ -670,9 +701,9 @@ def _righe_principali(flusso):
     for riga in lettore:
         if len(riga) <= ultimo:
             continue
-        tac = (riga[i_tac] or "").strip()
+        tac = _tac_normalizzato(riga[i_tac])
         marca = (riga[i_marca] or "").strip()
-        if len(tac) == 8 and tac.isdigit() and marca:
+        if tac and marca:
             specs = (riga[i_specs] or "").strip() if i_specs is not None else ""
             yield tac, marca, specs
 
@@ -682,9 +713,9 @@ def _righe_imeidb(flusso):
     for riga in csv.reader(flusso):
         if len(riga) < 3:
             continue
-        tac = str(riga[0] or "").strip()
+        tac = _tac_normalizzato(riga[0])
         marca = str(riga[1] or "").strip()
-        if len(tac) == 8 and tac.isdigit() and marca:
+        if tac and marca:
             yield tac, marca, str(riga[2] or "").strip()
 
 

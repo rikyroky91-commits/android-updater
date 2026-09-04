@@ -59,7 +59,8 @@ def main() -> int:
         return 1
 
     tenute = [r for r in righe
-              if imeicheck._dell_era_android(r.get("SPECS") or r.get("specs") or "")]
+              if imeicheck._dell_era_android(r.get("SPECS") or r.get("specs") or "")
+              and imeicheck._tac_normalizzato(r.get("TAC") or r.get("tac"))]
     if len(tenute) < len(righe) // 10:
         # Una caduta simile significa che il formato è cambiato e il
         # criterio non riconosce più niente. Meglio non sovrascrivere una
@@ -75,7 +76,12 @@ def main() -> int:
     for r in tenute:
         scrittore.writerow({
             "Brand": r.get("Brand") or r.get("brand") or "",
-            "TAC": r.get("TAC") or r.get("tac") or "",
+            # LO ZERO INIZIALE SI RIMETTE PRIMA DI SCRIVERE. La fonte lo
+            # perde per 6 344 righe (vedi `_tac_normalizzato`): il lettore
+            # ora lo ricostruisce comunque, ma un file che gira dentro il
+            # repository e che si apre a mano deve contenere il TAC vero,
+            # non quello che un foglio di calcolo ha accorciato.
+            "TAC": imeicheck._tac_normalizzato(r.get("TAC") or r.get("tac")),
             "SPECS": r.get("SPECS") or r.get("specs") or "",
         })
 
