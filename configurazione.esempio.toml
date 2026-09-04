@@ -20,6 +20,36 @@ TELEGRAM_CHAT_ID = ""
 # Escono SOLO le prime 8 cifre dell'IMEI, mai il numero intero.
 TAC_API_KEY = ""
 
+# SE NE POSSONO METTERE FINO A TRE, provati in quest'ordine finché uno
+# risponde. Cento interrogazioni al mese sono poche e finiscono; e una
+# chiave che smette di funzionare non deve chiudere l'ultima strada
+# rimasta.
+#
+# Un fornitore senza chiave è spento e non viene nemmeno provato.
+# TAC_API_KEY_2 = ""
+# TAC_API_KEY_3 = ""
+
+# Se un fornitore cambia indirizzo, o se la chiave che sei riuscito a
+# ottenere è di un altro servizio, si cambia da qui senza toccare il
+# codice. Il primo ha già l'indirizzo di HiCellTek.
+#
+# L'indirizzo decide anche il verbo: con `{tac}` dentro si chiama in GET
+# mettendo le 8 cifre al posto del segnaposto, senza si chiama in POST
+# con {"query": "<tac>"} nel corpo.
+# TAC_API_URL_2 = "https://esempio.it/api/v1/tac/{tac}"
+# TAC_API_URL_3 = ""
+
+# L'intestazione con cui si manda la chiave. Se metti "Authorization" e la
+# chiave non ha già uno schema davanti, ci viene messo "Bearer ".
+# TAC_API_HEADER   = "X-Api-Key"
+# TAC_API_HEADER_2 = "X-Api-Key"
+# TAC_API_HEADER_3 = "X-Api-Key"
+
+# Come chiamarli in Diagnostica, per capire a colpo d'occhio quale delle
+# tre chiavi ha risposto e quale no.
+# TAC_API_NOME_2 = ""
+# TAC_API_NOME_3 = ""
+
 # Chiave per l'interprete AI della ricerca (il tasto ✨ accanto a «Cerca»).
 #
 # SE NE METTE UNA SOLA, e vince la prima presente in questo ordine:

@@ -1046,9 +1046,87 @@ def carica_tac_imeidb(testo: str) -> dict[str, tuple[str, str]]:
 # esattamente come prima: nessuna chiamata, nessun errore.
 TAC_API_URL = "https://imei.hicelltek.com/api/v1/tac/lookup"
 
+# ======================================================================
+# UN FORNITORE SOLO ERA UN PUNTO SINGOLO DI ROTTURA
+# ======================================================================
+# Segnalato dall'utente il 04/09/2026: «quel api key di hi cell tek non
+# funziona». È la seconda volta (vedi v70), e il problema vero non è
+# quale sia il guasto: è che quando quell'unico fornitore tace, l'ultima
+# strada rimasta è chiusa e non ce n'è una seconda. Il piano gratuito è
+# di cento interrogazioni al mese: anche quando funziona, finisce.
+#
+# Da qui in poi i fornitori sono UN ELENCO, provato in ordine, e si
+# configurano dall'ambiente senza toccare il codice — che è la
+# differenza fra «aspetto un rilascio» e «cambio una variabile su Render
+# e riprovo». Tre sono abbastanza: sono le chiavi gratuite che una
+# persona sola riesce realisticamente a tenere.
+#
+#     TAC_API_KEY        la chiave (senza, il fornitore è spento)
+#     TAC_API_URL        l'indirizzo, se il fornitore l'ha cambiato
+#     TAC_API_HEADER     l'intestazione di autenticazione
+#     TAC_API_NOME       come chiamarlo in Diagnostica
+#
+# e le stesse quattro con il suffisso `_2` e `_3` per il secondo e il
+# terzo. Il primo ha già i valori di HiCellTek, quindi chi aveva solo
+# `TAC_API_KEY` non deve cambiare niente.
+#
+# L'indirizzo decide anche il verbo: se contiene `{tac}` si chiama in
+# GET con le otto cifre al posto del segnaposto, altrimenti in POST con
+# `{"query": "<tac>"}` nel corpo — le due forme che usano i servizi TAC.
+_FORNITORI_PREDEFINITI = [
+    # (suffisso, nome, url, intestazione)
+    ("", "HiCellTek", TAC_API_URL, "X-Api-Key"),
+    ("_2", "secondo servizio", "", "X-Api-Key"),
+    ("_3", "terzo servizio", "", "X-Api-Key"),
+]
+
+
+def fornitori_tac() -> list[dict]:
+    """I fornitori configurati, in ordine di interrogazione.
+
+    Un fornitore senza chiave o senza indirizzo non compare: spento vuol
+    dire assente, non «presente e sempre in errore».
+    """
+    elenco = []
+    for suffisso, nome, url_base, intestazione in _FORNITORI_PREDEFINITI:
+        # Il primo passa da `_chiave_api()` invece che dall'ambiente
+        # diretto, e non e' un dettaglio: quella funzione e' il punto in
+        # cui la chiave si legge da sempre, ed e' l'aggancio che le prove
+        # sostituiscono per far finta di averne una. Leggere `C.env` qui
+        # avrebbe scavalcato l'unico posto dove la lettura si puo'
+        # osservare.
+        chiave = (_chiave_api() if not suffisso
+                  else C.env("TAC_API_KEY" + suffisso).strip())
+        url = C.env("TAC_API_URL" + suffisso, url_base).strip()
+        if not chiave or not url:
+            continue
+        elenco.append({
+            "nome": C.env("TAC_API_NOME" + suffisso, nome).strip() or nome,
+            "url": url,
+            "chiave": chiave,
+            "intestazione": (C.env("TAC_API_HEADER" + suffisso,
+                                   intestazione).strip() or intestazione),
+        })
+    return elenco
+
+
+def _intestazioni_fornitore(fornitore: dict) -> dict[str, str]:
+    """Le intestazioni della chiamata, con l'unica cortesia che serve.
+
+    `Authorization` senza schema non è un'intestazione valida, e chi
+    incolla una chiave in una variabile d'ambiente incolla la chiave, non
+    `Bearer` più la chiave. Se manca lo schema lo si mette; se c'è già —
+    `Bearer …`, `Token …`, `Basic …` — non si tocca.
+    """
+    chiave = fornitore["chiave"]
+    nome = fornitore["intestazione"]
+    if nome.lower() == "authorization" and " " not in chiave:
+        chiave = "Bearer " + chiave
+    return {nome: chiave, "User-Agent": C.USER_AGENT}
+
 
 def _chiave_api() -> str:
-    """La chiave, dall'ambiente.
+    """La chiave del PRIMO fornitore, dall'ambiente.
 
     Prima si leggeva da `st.secrets`, cioè dalla cassaforte di Streamlit.
     Tolta la dashboard, quel ramo non poteva che fallire — e falliva in
@@ -1069,12 +1147,20 @@ def stato_servizio_esterno() -> str:
     che un errore di configurazione si manifesti — e quando si manifesta
     sembra un buco dei dati, non una chiave sbagliata.
     """
-    if not _chiave_api():
+    configurati = fornitori_tac()
+    if not configurati:
         return ("non configurata — con una chiave in TAC_API_KEY i TAC che "
                 "nessun database locale conosce vengono chiesti al servizio "
-                "esterno (solo le 8 cifre del TAC, mai l'IMEI intero)")
+                "esterno (solo le 8 cifre del TAC, mai l'IMEI intero). Se ne "
+                "possono mettere fino a tre: TAC_API_KEY, TAC_API_KEY_2, "
+                "TAC_API_KEY_3, provati in quest'ordine")
     quante = len(tac_esterni())
-    pezzi = ["chiave presente"]
+    # QUALI fornitori, non «la chiave»: con un elenco, «chiave presente»
+    # non dice piu' quale delle tre e' stata letta ne' in che ordine si
+    # provano, che e' proprio cio' che serve sapere quando una non
+    # funziona.
+    pezzi = [", ".join(f["nome"] for f in configurati)
+             + (" (in quest'ordine)" if len(configurati) > 1 else "")]
     pezzi.append(f"{quante} TAC risolti dal servizio e conservati"
                  if quante else "nessun TAC ancora risolto dal servizio")
     # E COM'E' ANDATA L'ULTIMA VOLTA.
@@ -1106,7 +1192,12 @@ def stato_servizio_esterno() -> str:
 # male, non un dato da ricordare, e cosi' un riavvio la azzera da sola.
 _META_ESITO_SERVIZIO = "imei_tac_servizio_ultimo"
 _MINUTI_PAUSA_SERVIZIO = 5
-_pausa_servizio: tuple[float, str] | None = None
+#: nome del fornitore -> (quando, perché). LA PAUSA È DI CHI STA MALE,
+#: NON DI TUTTI: con un elenco di fornitori, mettere in pausa «il
+#: servizio» significherebbe che il primo che sbaglia zittisce anche i
+#: due che funzionano — cioè l'esatto contrario del motivo per cui
+#: l'elenco esiste.
+_pausa_servizio: dict[str, tuple[float, str]] = {}
 # La copia in memoria dell'ultimo esito, e non è un vezzo: `/health` la
 # legge, e quella rotta la interroga l'host OGNI MINUTO. Il suo docstring
 # promette di non toccare l'archivio, e una promessa del genere si
@@ -1133,12 +1224,14 @@ def ultimo_esito_servizio() -> dict:
     return dati
 
 
-def _ricorda_esito_servizio(esito: str, dettaglio: str) -> None:
-    global _pausa_servizio, _ultimo_esito
+def _ricorda_esito_servizio(esito: str, dettaglio: str,
+                            fornitore: str = "") -> None:
+    global _ultimo_esito
     registrato = {
         "quando": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "esito": esito,
-        "dettaglio": dettaglio,
+        "dettaglio": (f"{fornitore}: {dettaglio}" if fornitore else dettaglio),
+        "fornitore": fornitore,
     }
     _ultimo_esito = registrato
     try:
@@ -1150,19 +1243,32 @@ def _ricorda_esito_servizio(esito: str, dettaglio: str) -> None:
     # ricevere comunque «non lo so». Cinque minuti sono abbastanza da non
     # martellare e abbastanza pochi da accorgersi subito quando torna.
     import time as _time
-    _pausa_servizio = ((_time.monotonic(), dettaglio) if esito == "errore"
-                       else None)
+    if esito == "errore":
+        _pausa_servizio[fornitore] = (_time.monotonic(), dettaglio)
+    else:
+        _pausa_servizio.pop(fornitore, None)
 
 
-def servizio_in_pausa() -> str | None:
-    """Il motivo per cui non si richiama adesso, se c'e'."""
-    if not _pausa_servizio:
-        return None
+def servizio_in_pausa(fornitore: str = "") -> str | None:
+    """Il motivo per cui non si richiama adesso QUESTO fornitore, se c'e'.
+
+    Senza argomento risponde per il primo che sia in pausa: e' la forma
+    che serve a chi vuole solo sapere se c'e' un guasto in corso.
+    """
     import time as _time
-    quando, dettaglio = _pausa_servizio
-    if _time.monotonic() - quando > _MINUTI_PAUSA_SERVIZIO * 60:
-        return None
-    return dettaglio
+    if fornitore:
+        voci = [(fornitore, _pausa_servizio.get(fornitore))]
+    else:
+        voci = list(_pausa_servizio.items())
+    for nome, pausa in voci:
+        if not pausa:
+            continue
+        quando, dettaglio = pausa
+        if _time.monotonic() - quando > _MINUTI_PAUSA_SERVIZIO * 60:
+            _pausa_servizio.pop(nome, None)
+            continue
+        return dettaglio
+    return None
 
 
 def cerca_tac_online(tac: str) -> tuple[str, str] | None:
@@ -1179,78 +1285,81 @@ def cerca_tac_online(tac: str) -> tuple[str, str] | None:
     return cerca_tac_online_esito(tac)[1]
 
 
-def cerca_tac_online_esito(tac: str) -> tuple[str, tuple[str, str] | None]:
-    """Come `cerca_tac_online`, ma dice anche com'e' andata.
+def _interroga_fornitore(fornitore: dict, tac: str) -> tuple[str, tuple[str, str] | None]:
+    """Chiede questo TAC a UN fornitore e traduce la sua risposta.
 
-    Ritorna `("trovato", (marca, modello))`, `("assente", None)` quando il
-    servizio ha risposto ed e' un no, oppure `("errore", None)` quando la
-    domanda non e' nemmeno arrivata a destinazione o la risposta e'
-    illeggibile.
-
-    LA DIFFERENZA FRA «ASSENTE» E «ERRORE» E' TUTTO IL PUNTO. Solo il
-    primo si puo' conservare: e' una risposta. Il secondo e' silenzio, e
-    ricordare il silenzio come un no rende ignoto per un mese un
-    telefono che il servizio conosce.
+    Il verbo lo decide l'indirizzo: `{tac}` dentro l'URL vuol dire una
+    rotta in GET (`…/tac/35692411`), la sua assenza vuol dire la POST con
+    il corpo JSON. Sono le due forme in cui i servizi TAC si presentano,
+    e indovinarne una sola significava non poterne cambiare.
     """
-    chiave = _chiave_api()
-    if not chiave or requests is None:
-        return ("errore", None)
-    tac = "".join(c for c in (tac or "") if c.isdigit())[:8]
-    if len(tac) != 8:
-        return ("errore", None)
-
-    # OGNI STRADA DA QUI IN GIU' LASCIA DETTO COM'E' ANDATA. Prima
-    # finivano tutte nello stesso `("errore", None)` muto: vedi il
-    # commento in `stato_servizio_esterno`.
-    fermo = servizio_in_pausa()
-    if fermo:
-        return ("errore", None)
-
+    nome = fornitore["nome"]
+    url = fornitore["url"]
     try:
-        risposta = requests.post(
-            TAC_API_URL,
-            json={"query": tac},
-            headers={"X-Api-Key": chiave, "User-Agent": C.USER_AGENT},
-            timeout=C.HTTP_TIMEOUT,
-        )
+        if "{tac}" in url:
+            risposta = requests.get(
+                url.replace("{tac}", tac),
+                headers=_intestazioni_fornitore(fornitore),
+                timeout=C.HTTP_TIMEOUT,
+            )
+        else:
+            risposta = requests.post(
+                url,
+                json={"query": tac},
+                headers=_intestazioni_fornitore(fornitore),
+                timeout=C.HTTP_TIMEOUT,
+            )
     except Exception as errore:
         _ricorda_esito_servizio(
-            "errore", f"non raggiungibile ({type(errore).__name__})")
+            "errore", f"non raggiungibile ({type(errore).__name__})", nome)
         return ("errore", None)
+
     stato = getattr(risposta, "status_code", 0)
     # 404 E' UNA RISPOSTA, NON UN GUASTO. Alcuni fornitori dicono «non ce
     # l'ho» con il codice HTTP invece che nel corpo: trattarlo come un
     # errore di rete significherebbe richiederlo — e pagarlo — per sempre.
     if stato == 404:
-        _ricorda_esito_servizio("assente", "HTTP 404: TAC non in catalogo")
+        _ricorda_esito_servizio("assente", "HTTP 404: TAC non in catalogo", nome)
         return ("assente", None)
     if stato != 200:
-        _ricorda_esito_servizio("errore", _spiega_stato(stato))
+        _ricorda_esito_servizio("errore", _spiega_stato(stato), nome)
         return ("errore", None)
     try:
         dati = risposta.json()
     except Exception:
-        _ricorda_esito_servizio("errore", "HTTP 200 ma risposta illeggibile")
+        _ricorda_esito_servizio("errore", "HTTP 200 ma risposta illeggibile", nome)
         return ("errore", None)
     if not isinstance(dati, dict):
-        _ricorda_esito_servizio("errore", "HTTP 200 ma risposta di forma inattesa")
+        _ricorda_esito_servizio("errore",
+                                "HTTP 200 ma risposta di forma inattesa", nome)
         return ("errore", None)
 
     corpo = dati.get("data") if isinstance(dati.get("data"), dict) else dati
+    if not isinstance(corpo, dict):
+        _ricorda_esito_servizio("errore",
+                                "HTTP 200 ma risposta di forma inattesa", nome)
+        return ("errore", None)
 
     # Il servizio dichiara esplicitamente l'esito con `found`: quando c'è,
     # va creduto. Un `found: false` con i campi vuoti non è una risposta
     # da interpretare, è un no.
     if corpo.get("found") is False:
-        _ricorda_esito_servizio("assente", "il servizio non conosce questo TAC")
+        _ricorda_esito_servizio("assente", "non conosce questo TAC", nome)
         return ("assente", None)
 
-    marca = _testo_o_nome(corpo.get("brand") or corpo.get("manufacturer"))
-    modello = _testo_o_nome(corpo.get("model"))
+    # I NOMI DEI CAMPI CAMBIANO DA UN FORNITORE ALL'ALTRO, e sono
+    # l'unica cosa che impedisce a una chiave nuova di funzionare
+    # subito. Si accettano quelli che usano davvero i servizi TAC —
+    # inglese e italiano — invece di obbligare a un adattatore per
+    # ognuno.
+    marca = _testo_o_nome(corpo.get("brand") or corpo.get("manufacturer")
+                          or corpo.get("marca") or corpo.get("vendor"))
+    modello = _testo_o_nome(corpo.get("model") or corpo.get("modello")
+                            or corpo.get("device") or corpo.get("name"))
     if not marca and not modello:
         # Il servizio ha risposto 200 senza dire che telefono e': per
         # questo TAC non ha niente. E' un no, non un guasto.
-        _ricorda_esito_servizio("assente", "il servizio non conosce questo TAC")
+        _ricorda_esito_servizio("assente", "non conosce questo TAC", nome)
         return ("assente", None)
 
     # Il chipset arriva solo con i piani a pagamento, ma se c'è si prende:
@@ -1260,8 +1369,49 @@ def cerca_tac_online_esito(tac: str) -> tuple[str, tuple[str, str] | None]:
     if chipset:
         modello = f"{modello}, {chipset}".strip(", ")
 
-    _ricorda_esito_servizio("trovato", "risposta ricevuta")
+    _ricorda_esito_servizio("trovato", "risposta ricevuta", nome)
     return ("trovato", (marca or "Sconosciuto", modello))
+
+
+def cerca_tac_online_esito(tac: str) -> tuple[str, tuple[str, str] | None]:
+    """Come `cerca_tac_online`, ma dice anche com'e' andata.
+
+    Ritorna `("trovato", (marca, modello))`, `("assente", None)` quando i
+    servizi hanno risposto ed e' un no, oppure `("errore", None)` quando
+    la domanda non e' nemmeno arrivata a destinazione o la risposta e'
+    illeggibile.
+
+    LA DIFFERENZA FRA «ASSENTE» E «ERRORE» E' TUTTO IL PUNTO. Solo il
+    primo si puo' conservare: e' una risposta. Il secondo e' silenzio, e
+    ricordare il silenzio come un no rende ignoto per un mese un
+    telefono che il servizio conosce.
+
+    **E CON PIÙ FORNITORI IL «NO» DIVENTA PIÙ CARO DA DARE.** Un
+    fornitore che non conosce un TAC non chiude la questione: quello dopo
+    puo' conoscerlo, ed e' esattamente il motivo per cui ce n'e' piu'
+    d'uno. Si va avanti finche' uno risponde, e si conserva un «assente»
+    solo se ALMENO UNO ha detto no e NESSUNO ha detto sì. Se hanno taciuto
+    tutti e' un errore, e un errore non si conserva.
+    """
+    if requests is None:
+        return ("errore", None)
+    tac = "".join(c for c in (tac or "") if c.isdigit())[:8]
+    if len(tac) != 8:
+        return ("errore", None)
+
+    qualcuno_ha_detto_no = False
+    for fornitore in fornitori_tac():
+        # OGNI STRADA DA QUI IN GIU' LASCIA DETTO COM'E' ANDATA. Prima
+        # finivano tutte nello stesso `("errore", None)` muto: vedi il
+        # commento in `stato_servizio_esterno`.
+        if servizio_in_pausa(fornitore["nome"]):
+            continue
+        esito, risposta = _interroga_fornitore(fornitore, tac)
+        if esito == "trovato":
+            return (esito, risposta)
+        if esito == "assente":
+            qualcuno_ha_detto_no = True
+    return ("assente", None) if qualcuno_ha_detto_no else ("errore", None)
 
 
 # Un nome in codice Motorola come lo scrive il database TAC: il codename
@@ -1383,8 +1533,35 @@ def _testo_o_nome(valore) -> str:
     return str(valore or "").strip()
 
 
+# ======================================================================
+# QUINDICI CIFRE NON SONO L'UNICA FORMA IN CUI UN IMEI ARRIVA
+# ======================================================================
+# Segnalato dall'utente il 04/09/2026: «ho bisogno di trovare piu imei
+# possibili». Questo pezzo non costa nessuna fonte nuova, e finora
+# buttava via due forme legittime su tre.
+#
+# Chi compone `*#06#` su un telefono non legge sempre quindici cifre:
+#
+#   16 cifre  è l'IMEISV, e sui Samsung è quello che lo schermo mostra
+#             per primo. Le prime 14 sono le stesse dell'IMEI; al posto
+#             della cifra di controllo ci sono DUE cifre che dicono la
+#             versione del software.
+#   14 cifre  è l'IMEI senza la cifra di controllo, come lo scrivono le
+#             etichette sulla scatola e come lo restituiscono parecchi
+#             gestionali, che quella cifra la calcolano e non la salvano.
+#
+# In tutte e tre le forme le prime OTTO cifre sono le stesse, e sono
+# l'unica cosa che serve qui. Rifiutare le altre due significava mandare
+# quel numero a `search_model`, cioè cercare un telefono che si chiama
+# «351397403741486 12» e trovarne zero — con il messaggio sbagliato per
+# giunta, perché diceva «non trovato» invece di «questo non è un IMEI».
 def is_imei_like(imei: str) -> bool:
-    """True for a 15-digit value, even when the Luhn check digit is wrong.
+    """True per un IMEI in una qualunque delle sue tre lunghezze.
+
+    Quattordici cifre (senza controllo), quindici (l'IMEI intero, anche
+    con la cifra di controllo sbagliata) o sedici (l'IMEISV). Il TAC —
+    le prime otto — è lo stesso in tutte e tre, ed è l'unica parte che
+    questo modulo guarda.
 
     A transcription error in the last digit must not turn a TAC lookup into a
     model-name search: the first eight digits still identify the equipment
@@ -1392,14 +1569,42 @@ def is_imei_like(imei: str) -> bool:
     serial part for local identification.
     """
     digits = "".join(ch for ch in (imei or "") if ch.isdigit())
-    return len(digits) == 15
+    return len(digits) in (14, 15, 16)
+
+
+#: Le tre forme, con il nome da mostrare a chi legge.
+FORMA_IMEI = "imei"
+FORMA_SENZA_CONTROLLO = "senza cifra di controllo"
+FORMA_IMEISV = "IMEISV"
+
+
+def forma_imei(imei: str) -> str:
+    """Quale delle tre forme è questo numero, o «» se non è nessuna.
+
+    Serve alla pagina per non dire la cosa sbagliata: il controllo Luhn
+    riguarda la quindicesima cifra, quindi su un numero che quella cifra
+    non ce l'ha — 14 cifre — o che al suo posto ha la versione del
+    software — 16 — «cifra di controllo errata» sarebbe un allarme falso
+    su un numero perfettamente valido.
+    """
+    digits = "".join(ch for ch in (imei or "") if ch.isdigit())
+    return {14: FORMA_SENZA_CONTROLLO,
+            15: FORMA_IMEI,
+            16: FORMA_IMEISV}.get(len(digits), "")
 
 
 def is_valid_imei(imei: str) -> bool:
     """Controllo Luhn standard sui 15 cifre di un IMEI (solo formato, non
-    verifica se è realmente assegnato/attivo)."""
+    verifica se è realmente assegnato/attivo).
+
+    RESTA A QUINDICI CIFRE anche ora che `is_imei_like` ne accetta tre
+    lunghezze, e non è una svista: Luhn è un controllo SULLA
+    quindicesima cifra. Un numero che quella cifra non ce l'ha non è
+    «non valido», è semplicemente un altro formato — vedi `forma_imei`,
+    che è la funzione da usare per decidere cosa scrivere a schermo.
+    """
     digits = "".join(ch for ch in (imei or "") if ch.isdigit())
-    if not is_imei_like(digits):
+    if len(digits) != 15:
         return False
     total = 0
     for i, ch in enumerate(digits):
@@ -1421,6 +1626,14 @@ def imei_con_cifra_di_controllo(imei: str) -> str | None:
     l'IMEI sia assegnato, non bloccato o appartenente al telefono mostrato.
     """
     digits = "".join(ch for ch in (imei or "") if ch.isdigit())
+    # DA QUATTORDICI CIFRE SI CALCOLA, NON SI CORREGGE, ed è il caso in
+    # cui questa funzione serve di più: chi copia un IMEI da un'etichetta
+    # o da un gestionale spesso non ha l'ultima cifra, e qui gliela si
+    # restituisce invece di rispondere «niente». Da sedici (l'IMEISV) si
+    # tengono le prime quattordici: le ultime due sono la versione del
+    # software, non fanno parte dell'IMEI.
+    if len(digits) in (14, 16):
+        digits = digits[:14] + "0"
     if len(digits) != 15:
         return None
     totale = 0
@@ -1933,7 +2146,7 @@ def reset_cache() -> None:
     # Anche la pausa del servizio esterno: chi azzera le cache sta
     # rimettendo le cose in ordine, e una pausa presa cinque minuti fa non
     # deve far sembrare spento un servizio che magari è appena tornato.
-    _pausa_servizio = None
+    _pausa_servizio = {}
     # Anche la memoria delle seconde letture: chi azzera la cache lo fa
     # perché un dato è cambiato (`/tac/salva`), e un «non c'è» ricordato da
     # prima risponderebbe al posto del dato nuovo.

@@ -304,11 +304,12 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
             archivio_vuoto=not stats.get("devices"),
         ))
 
-    # L'IMEI PRIMA DI TUTTO. Quindici cifre non sono né un nome né un
-    # codice modello: passarle a `search_model` significa cercare un
-    # telefono che si chiama «867051060315467», e trovarne zero. Va prima
-    # riconosciuto, ridotto al TAC (le prime otto cifre) e tradotto in un
-    # modello; solo allora si cerca il firmware.
+    # L'IMEI PRIMA DI TUTTO. Un numero di quattordici, quindici o sedici
+    # cifre non è né un nome né un codice modello: passarlo a
+    # `search_model` significa cercare un telefono che si chiama
+    # «867051060315467», e trovarne zero. Va prima riconosciuto, ridotto
+    # al TAC (le prime otto cifre) e tradotto in un modello; solo allora
+    # si cerca il firmware.
     imei = None
     if imeicheck.is_imei_like(domanda):
         imei = (_esito_imei_salvato(domanda) if saved
@@ -1407,7 +1408,12 @@ def _guasto_esterno_recente(entro_ore: int = 6) -> str:
 
 
 def _esito_imei(imei: str, solo_locale: bool = False) -> dict:
-    """Da quindici cifre a un modello, dicendo da dove arriva la risposta.
+    """Da un IMEI a un modello, dicendo da dove arriva la risposta.
+
+    «Un IMEI» sono quattordici, quindici o sedici cifre — l'IMEI senza
+    cifra di controllo, l'IMEI intero, l'IMEISV (vedi `is_imei_like`). Qui
+    non cambia niente: tutto passa da `tac_di`, e le prime otto cifre sono
+    le stesse in tutte e tre.
 
     **Il confronto fra le fonti si mostra sempre, anche quando l'IMEI è
     stato riconosciuto.** I database TAC sono alimentati dalla community,
@@ -1480,6 +1486,7 @@ def _esito_imei(imei: str, solo_locale: bool = False) -> dict:
         "imei": imei,
         "tac": raffronto.get("tac") or "",
         "luhn_valid": imeicheck.is_valid_imei(imei),
+        "forma_imei": imeicheck.forma_imei(imei),
         "imei_corretto": imeicheck.imei_con_cifra_di_controllo(imei),
         "riconosciuto": bool(trovato),
         "descrizione": descrizione,
@@ -1537,6 +1544,7 @@ def _esito_imei_salvato(imei: str) -> dict:
     modello = dettagli.get("model") or dettagli_grezzi
     return {
         "imei": imei, "tac": tac, "luhn_valid": imeicheck.is_valid_imei(imei),
+        "forma_imei": imeicheck.forma_imei(imei),
         "imei_corretto": imeicheck.imei_con_cifra_di_controllo(imei),
         "riconosciuto": bool(modello),
         "descrizione": imeicheck.describe(marca, dettagli_grezzi) if modello else "",

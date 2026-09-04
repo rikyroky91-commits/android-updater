@@ -24,7 +24,9 @@
   {% with grande = true %}{% include "_ricerca.html" %}{% endwith %}
   <p class="ingresso-nota">
     Scrivi un nome («Galaxy S24»), un codice modello («SM-S921B») o un
-    IMEI di 15 cifre, e premi Invio.
+    IMEI, e premi Invio. Va bene com'è: 15 cifre, le prime 14 senza la
+    cifra di controllo, o le 16 dell'IMEISV che molti telefoni mostrano
+    con <code>*#06#</code>.
     {% if ai_attiva %}Se non ti viene il nome esatto, il tasto
     <strong>AI</strong> interpreta quello che hai scritto.{% endif %}
   </p>

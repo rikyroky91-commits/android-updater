@@ -18,7 +18,7 @@
   · TAC <code>{{ imei.tac }}</code></p>
 {% endif %}
 {% else %}
-<p class="etichetta-imei etichetta-imei-incerta">IMEI a 15 cifre, modello sconosciuto
+<p class="etichetta-imei etichetta-imei-incerta">IMEI valido, modello sconosciuto
   · TAC <code>{{ imei.tac }}</code></p>
 {# DUE SILENZI DIVERSI NON DEVONO SUONARE UGUALI. Un TAC che i database
    locali non hanno viene chiesto a un servizio esterno, ma solo se una
@@ -58,11 +58,33 @@
 <p class="nota lacuna">Su questo sito il riconoscimento tramite servizio
   esterno non è attivo: i TAC che i database locali non hanno restano
   sconosciuti. Chi amministra il sito può attivarlo indicando una chiave in
-  <code>TAC_API_KEY</code>.</p>
+  <code>TAC_API_KEY</code> — e fino a tre, in <code>TAC_API_KEY_2</code> e
+  <code>TAC_API_KEY_3</code>, provate in ordine finché una risponde.</p>
 {% endif %}
 {% endif %}
 
-{% if imei.luhn_valid is defined and not imei.luhn_valid %}
+{# TRE FORME, TRE MESSAGGI DIVERSI. Il controllo Luhn riguarda la
+   quindicesima cifra: su un numero a 14 cifre, che quella cifra non ce
+   l'ha, e su un IMEISV a 16, che al suo posto ha la versione del
+   software, «cifra di controllo errata» sarebbe un allarme falso su un
+   numero perfettamente valido. Il TAC — e quindi il modello — è lo
+   stesso in tutte e tre. #}
+{% if imei.forma_imei == "senza cifra di controllo" %}
+<p class="nota">Hai scritto le prime 14 cifre, senza la cifra di controllo:
+  è la forma che stampano le etichette e che restituiscono molti
+  gestionali. Il modello si trova lo stesso, perché viene dal TAC
+  <code>{{ imei.tac }}</code> (le prime 8). L'IMEI completo è
+  <code>{{ imei.imei_corretto }}</code>:
+  <a class="proposta" href="/?q={{ imei.imei_corretto }}">cercalo così</a>.</p>
+{% elif imei.forma_imei == "IMEISV" %}
+<p class="nota">Sedici cifre sono un <strong>IMEISV</strong>: le ultime due
+  non fanno parte dell'IMEI, dicono la versione del software installato. È
+  quello che parecchi telefoni — Samsung in testa — mostrano per primo con
+  <code>*#06#</code>. Il modello si trova lo stesso, perché viene dal TAC
+  <code>{{ imei.tac }}</code> (le prime 8). L'IMEI vero è
+  <code>{{ imei.imei_corretto }}</code>:
+  <a class="proposta" href="/?q={{ imei.imei_corretto }}">cercalo così</a>.</p>
+{% elif imei.luhn_valid is defined and not imei.luhn_valid %}
 <p class="avviso">La cifra di controllo calcolata con Luhn è
   <code>{{ imei.imei_corretto }}</code>. Corregge solo l'ultima cifra:
   <a class="proposta" href="/?q={{ imei.imei_corretto }}">cerca questo IMEI</a>

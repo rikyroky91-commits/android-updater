@@ -791,6 +791,15 @@ errori.
   il **solo TAC** e non l'IMEI intero. Il codice c'e' ed e' spento: si
   attiva valorizzando `TAC_API_KEY`. La registrazione richiede un'email
   aziendale (vedi v36).
+- **Fino a tre fornitori, non uno** (04/09/2026). Segnalato due volte che
+  la chiave HiCellTek non funziona, e il difetto vero non e' quale sia il
+  guasto: e' che con un fornitore solo, quando tace, l'ultima strada e'
+  chiusa. E cento interrogazioni al mese finiscono comunque. Da
+  `TAC_API_KEY`, `TAC_API_KEY_2`, `TAC_API_KEY_3` — piu' `_URL`, `_HEADER`
+  e `_NOME` per ognuno — si configurano tre servizi provati in ordine.
+  Un «non lo conosco» si conserva solo se **almeno uno ha risposto** e
+  nessuno ha detto sì: darlo perche' uno dei tre non conosce il TAC
+  renderebbe ignoto per un mese un telefono che gli altri conoscono.
 - **GSMA (l'autorita' che assegna i TAC)**: database ufficiale, a
   pagamento e sotto contratto.
 

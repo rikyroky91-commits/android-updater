@@ -614,10 +614,14 @@ class TestUnServizioRottoLoDeveDire(unittest.TestCase):
         self.assertIsNone(imeicheck.servizio_in_pausa())
 
     def test_lo_stato_per_diagnostica_dice_com_e_andata(self):
+        """Dal 04/09/2026 la riga NOMINA il fornitore invece di dire
+        «chiave presente». Con un elenco di fornitori quella frase non
+        distingueva piu' quale chiave era stata letta, che e' proprio la
+        cosa da sapere quando una delle tre non funziona."""
         self._servizio_che_risponde(401)
         imeicheck.cerca_tac_online_esito("35692411")
         stato = imeicheck.stato_servizio_esterno()
-        self.assertIn("chiave presente", stato)
+        self.assertIn("HiCellTek", stato)
         self.assertIn("401", stato)
 
 
@@ -966,3 +970,264 @@ class TestLoZeroInizialeDelTac(unittest.TestCase):
         curati = imeicheck.carica_tac_curati(
             "tac,marca,modello\n1620200,TCL,TCL Flip 2\n")
         self.assertEqual(curati, {"01620200": ("TCL", "TCL Flip 2")})
+
+
+class TestPiuDiUnFornitoreDiTac(unittest.TestCase):
+    """«ho bisogno di trovare piu imei possibili e quel api key di hi cell
+    tek non funziona», 04/09/2026.
+
+    È la seconda segnalazione sullo stesso fornitore (la prima è la v70) e
+    il difetto vero non è quale sia il guasto: è che quando quell'unico
+    fornitore tace, l'ultima strada rimasta è chiusa e non ce n'è una
+    seconda. Anche quando funziona, cento interrogazioni al mese
+    finiscono.
+    """
+
+    def setUp(self):
+        self._ambiente = {k: os.environ.get(k) for k in (
+            "TAC_API_KEY", "TAC_API_KEY_2", "TAC_API_KEY_3",
+            "TAC_API_URL", "TAC_API_URL_2", "TAC_API_HEADER",
+            "TAC_API_NOME_2")}
+        self._requests = imeicheck.requests
+        for k in self._ambiente:
+            os.environ.pop(k, None)
+        imeicheck.reset_cache()
+
+        def rimetti():
+            for k, v in self._ambiente.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+            imeicheck.requests = self._requests
+            imeicheck.reset_cache()
+
+        self.addCleanup(rimetti)
+
+    def _servizio(self, risposte):
+        """`risposte` è url -> (stato, corpo). Registra chi è stato chiamato."""
+        chiamati = []
+
+        class Finto:
+            def post(self_interno, url, **k):
+                return self_interno._rispondi(url, k)
+
+            def get(self_interno, url, **k):
+                return self_interno._rispondi(url, k)
+
+            def _rispondi(self_interno, url, k):
+                chiamati.append((url, k.get("headers", {})))
+                stato, corpo = risposte.get(url, (500, {}))
+
+                class R:
+                    status_code = stato
+
+                    @staticmethod
+                    def json():
+                        return corpo
+                return R()
+
+        imeicheck.requests = Finto()
+        return chiamati
+
+    def test_senza_chiave_nessun_fornitore(self):
+        self.assertEqual(imeicheck.fornitori_tac(), [])
+
+    def test_la_sola_chiave_di_sempre_configura_hicelltek(self):
+        """Chi aveva solo `TAC_API_KEY` non deve cambiare niente."""
+        os.environ["TAC_API_KEY"] = "abc"
+        fornitori = imeicheck.fornitori_tac()
+        self.assertEqual(len(fornitori), 1)
+        self.assertEqual(fornitori[0]["nome"], "HiCellTek")
+        self.assertEqual(fornitori[0]["url"], imeicheck.TAC_API_URL)
+
+    def test_il_secondo_si_prova_quando_il_primo_non_conosce_il_tac(self):
+        """È tutto il motivo per cui ce n'è più d'uno."""
+        os.environ["TAC_API_KEY"] = "abc"
+        os.environ["TAC_API_KEY_2"] = "def"
+        os.environ["TAC_API_URL_2"] = "https://secondo.example/tac"
+        chiamati = self._servizio({
+            imeicheck.TAC_API_URL: (200, {"found": False}),
+            "https://secondo.example/tac": (200, {"brand": "Samsung",
+                                                  "model": "Galaxy S26"}),
+        })
+        self.assertEqual(imeicheck.cerca_tac_online_esito("35139740"),
+                         ("trovato", ("Samsung", "Galaxy S26")))
+        self.assertEqual([u for u, _ in chiamati],
+                         [imeicheck.TAC_API_URL, "https://secondo.example/tac"])
+
+    def test_una_chiave_rotta_non_ferma_le_altre(self):
+        """Il caso segnalato: la prima chiave non funziona e la ricerca
+        deve comunque arrivare in fondo."""
+        os.environ["TAC_API_KEY"] = "scaduta"
+        os.environ["TAC_API_KEY_2"] = "buona"
+        os.environ["TAC_API_URL_2"] = "https://secondo.example/tac"
+        self._servizio({
+            imeicheck.TAC_API_URL: (401, {}),
+            "https://secondo.example/tac": (200, {"brand": "Samsung",
+                                                  "model": "Galaxy S26"}),
+        })
+        self.assertEqual(imeicheck.cerca_tac_online_esito("35139740"),
+                         ("trovato", ("Samsung", "Galaxy S26")))
+
+    def test_la_pausa_e_di_chi_sta_male_non_di_tutti(self):
+        """Mettere in pausa «il servizio» significherebbe che il primo che
+        sbaglia zittisce anche i due che funzionano."""
+        os.environ["TAC_API_KEY"] = "scaduta"
+        os.environ["TAC_API_KEY_2"] = "buona"
+        os.environ["TAC_API_URL_2"] = "https://secondo.example/tac"
+        chiamati = self._servizio({
+            imeicheck.TAC_API_URL: (500, {}),
+            "https://secondo.example/tac": (200, {"brand": "Samsung",
+                                                  "model": "Galaxy S26"}),
+        })
+        imeicheck.cerca_tac_online_esito("35139740")
+        imeicheck.cerca_tac_online_esito("35139741")
+        chiamate_al_primo = [u for u, _ in chiamati if u == imeicheck.TAC_API_URL]
+        chiamate_al_secondo = [u for u, _ in chiamati if u != imeicheck.TAC_API_URL]
+        self.assertEqual(len(chiamate_al_primo), 1, "il rotto si martella")
+        self.assertEqual(len(chiamate_al_secondo), 2, "il sano è stato zittito")
+
+    def test_un_no_serve_da_tutti_non_da_uno(self):
+        """Un «assente» si conserva per un mese: darlo perché UNO dei tre
+        non conosce il TAC renderebbe ignoto un telefono che gli altri
+        conoscono."""
+        os.environ["TAC_API_KEY"] = "abc"
+        os.environ["TAC_API_KEY_2"] = "def"
+        os.environ["TAC_API_URL_2"] = "https://secondo.example/tac"
+        self._servizio({
+            imeicheck.TAC_API_URL: (200, {"found": False}),
+            "https://secondo.example/tac": (500, {}),
+        })
+        # Uno ha detto no, l'altro ha taciuto: resta un no, perché una
+        # risposta c'è stata.
+        self.assertEqual(imeicheck.cerca_tac_online_esito("35139740"),
+                         ("assente", None))
+
+    def test_se_tacciono_tutti_e_un_errore_non_un_no(self):
+        os.environ["TAC_API_KEY"] = "abc"
+        os.environ["TAC_API_KEY_2"] = "def"
+        os.environ["TAC_API_URL_2"] = "https://secondo.example/tac"
+        self._servizio({
+            imeicheck.TAC_API_URL: (500, {}),
+            "https://secondo.example/tac": (503, {}),
+        })
+        self.assertEqual(imeicheck.cerca_tac_online_esito("35139740"),
+                         ("errore", None))
+
+    def test_l_indirizzo_col_segnaposto_si_chiama_in_get(self):
+        """Metà dei servizi TAC espone una rotta `…/tac/35692411` invece
+        del corpo JSON: indovinarne una sola significava non poterne
+        cambiare."""
+        os.environ["TAC_API_KEY"] = "abc"
+        os.environ["TAC_API_URL"] = "https://terzo.example/v1/tac/{tac}"
+        chiamati = self._servizio({
+            "https://terzo.example/v1/tac/35139740": (200, {"brand": "Samsung",
+                                                            "model": "S26"}),
+        })
+        self.assertEqual(imeicheck.cerca_tac_online_esito("35139740"),
+                         ("trovato", ("Samsung", "S26")))
+        self.assertEqual(chiamati[0][0], "https://terzo.example/v1/tac/35139740")
+
+    def test_authorization_senza_schema_diventa_bearer(self):
+        """Chi incolla una chiave in una variabile d'ambiente incolla la
+        chiave, non «Bearer» più la chiave."""
+        os.environ["TAC_API_KEY"] = "abc123"
+        os.environ["TAC_API_HEADER"] = "Authorization"
+        chiamati = self._servizio({
+            imeicheck.TAC_API_URL: (200, {"brand": "Samsung", "model": "S26"}),
+        })
+        imeicheck.cerca_tac_online_esito("35139740")
+        self.assertEqual(chiamati[0][1]["Authorization"], "Bearer abc123")
+
+    def test_uno_schema_gia_scritto_non_si_tocca(self):
+        os.environ["TAC_API_KEY"] = "Token xyz"
+        os.environ["TAC_API_HEADER"] = "Authorization"
+        chiamati = self._servizio({
+            imeicheck.TAC_API_URL: (200, {"brand": "Samsung", "model": "S26"}),
+        })
+        imeicheck.cerca_tac_online_esito("35139740")
+        self.assertEqual(chiamati[0][1]["Authorization"], "Token xyz")
+
+    def test_diagnostica_nomina_i_fornitori_in_ordine(self):
+        os.environ["TAC_API_KEY"] = "abc"
+        os.environ["TAC_API_KEY_2"] = "def"
+        os.environ["TAC_API_URL_2"] = "https://secondo.example/tac"
+        os.environ["TAC_API_NOME_2"] = "IMEIpro"
+        stato = imeicheck.stato_servizio_esterno()
+        self.assertIn("HiCellTek, IMEIpro", stato)
+        self.assertIn("in quest'ordine", stato)
+
+    def test_i_nomi_dei_campi_cambiano_da_un_servizio_all_altro(self):
+        """È l'unica cosa che impedisce a una chiave nuova di funzionare
+        subito, e non vale un adattatore per ogni fornitore."""
+        os.environ["TAC_API_KEY"] = "abc"
+        self._servizio({imeicheck.TAC_API_URL: (200, {"data": {
+            "marca": "Samsung", "modello": "Galaxy S26"}})})
+        self.assertEqual(imeicheck.cerca_tac_online_esito("35139740"),
+                         ("trovato", ("Samsung", "Galaxy S26")))
+
+
+class TestLeTreFormeDiUnImei(unittest.TestCase):
+    """«ho bisogno di trovare piu imei possibili», 04/09/2026.
+
+    Chi compone `*#06#` non legge sempre quindici cifre. Sedici sono
+    l'IMEISV — le ultime due dicono la versione del software, e sui
+    Samsung è quello che lo schermo mostra per primo. Quattordici sono
+    l'IMEI senza cifra di controllo, come lo stampano le etichette e come
+    lo restituiscono parecchi gestionali.
+
+    In tutte e tre le prime OTTO cifre sono le stesse, e sono l'unica
+    cosa che serve per trovare il modello. Prima le altre due venivano
+    rifiutate e finivano a `search_model`, cioè si cercava un telefono
+    che si chiama «3513974037414812»: zero risultati, e il messaggio
+    sbagliato per giunta.
+    """
+
+    IMEI = "351397403741486"          # 15, cifra di controllo giusta
+    SENZA = "35139740374148"          # 14, senza controllo
+    IMEISV = "3513974037414812"       # 16, con la versione del software
+
+    def test_tutte_e_tre_sono_imei(self):
+        for numero in (self.IMEI, self.SENZA, self.IMEISV):
+            self.assertTrue(imeicheck.is_imei_like(numero), numero)
+
+    def test_e_danno_lo_stesso_tac(self):
+        for numero in (self.IMEI, self.SENZA, self.IMEISV):
+            self.assertEqual(imeicheck.tac_di(numero), "35139740", numero)
+
+    def test_le_altre_lunghezze_restano_fuori(self):
+        for numero in ("1234567890123", "351397403741486123", "abc"):
+            self.assertFalse(imeicheck.is_imei_like(numero), numero)
+
+    def test_la_forma_si_riconosce(self):
+        self.assertEqual(imeicheck.forma_imei(self.IMEI), imeicheck.FORMA_IMEI)
+        self.assertEqual(imeicheck.forma_imei(self.SENZA),
+                         imeicheck.FORMA_SENZA_CONTROLLO)
+        self.assertEqual(imeicheck.forma_imei(self.IMEISV),
+                         imeicheck.FORMA_IMEISV)
+        self.assertEqual(imeicheck.forma_imei("12345"), "")
+
+    def test_luhn_resta_una_cosa_da_quindici_cifre(self):
+        """Non è una svista: Luhn è un controllo SULLA quindicesima cifra.
+        Un numero che quella cifra non ce l'ha non è «non valido», è un
+        altro formato — e dirgli «cifra di controllo errata» sarebbe un
+        allarme falso su un numero perfettamente buono."""
+        self.assertTrue(imeicheck.is_valid_imei(self.IMEI))
+        self.assertFalse(imeicheck.is_valid_imei(self.SENZA))
+        self.assertFalse(imeicheck.is_valid_imei(self.IMEISV))
+
+    def test_da_quattordici_cifre_la_cifra_si_calcola(self):
+        """È il caso in cui questa funzione serve di più: chi copia da
+        un'etichetta l'ultima cifra spesso non ce l'ha."""
+        self.assertEqual(imeicheck.imei_con_cifra_di_controllo(self.SENZA),
+                         self.IMEI)
+
+    def test_dall_imeisv_si_torna_all_imei(self):
+        self.assertEqual(imeicheck.imei_con_cifra_di_controllo(self.IMEISV),
+                         self.IMEI)
+
+    def test_gli_spazi_e_i_trattini_non_contano(self):
+        self.assertTrue(imeicheck.is_imei_like("35-139740-374148-6"))
+        self.assertEqual(imeicheck.forma_imei("3513974 0374148 12"),
+                         imeicheck.FORMA_IMEISV)

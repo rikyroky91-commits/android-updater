@@ -1655,6 +1655,40 @@ class TestRicercaPerImei(_Sito):
         self.assertIn("86705106", pagina)          # il TAC
         self.assertNotIn("Nessun firmware per «867051060315467»", pagina)
 
+    def test_un_imeisv_di_sedici_cifre_arriva_allo_stesso_modello(self):
+        """«ho bisogno di trovare piu imei possibili», 04/09/2026.
+
+        Sedici cifre sono l'IMEISV: le ultime due dicono la versione del
+        software, non fanno parte dell'IMEI, e sui Samsung è quello che
+        `*#06#` mostra per primo. Prima `is_imei_like` le rifiutava e il
+        numero finiva a `search_model` — cioè si cercava un telefono che
+        si chiama «8670510603154612», con zero risultati e il messaggio
+        sbagliato.
+        """
+        pagina = self.client.get("/", params={"q": "8670510603154612"}).text
+        self.assertIn("IMEI riconosciuto", pagina)
+        self.assertIn("86705106", pagina)          # lo stesso TAC
+        self.assertIn("IMEISV", pagina,
+                      "la pagina deve dire che forma ha letto")
+
+    def test_quattordici_cifre_senza_controllo_arrivano_allo_stesso_modello(self):
+        """È la forma che stampano le etichette e che restituiscono
+        parecchi gestionali, che la cifra di controllo la calcolano e non
+        la salvano."""
+        pagina = self.client.get("/", params={"q": "86705106031546"}).text
+        self.assertIn("IMEI riconosciuto", pagina)
+        self.assertIn("86705106", pagina)
+        self.assertIn("867051060315467", pagina,
+                      "la pagina deve proporre l'IMEI completo")
+
+    def test_le_forme_corte_non_gridano_alla_cifra_sbagliata(self):
+        """Luhn è un controllo SULLA quindicesima cifra: dirlo a un numero
+        che quella cifra non ce l'ha è un allarme falso."""
+        for numero in ("86705106031546", "8670510603154612"):
+            pagina = self.client.get("/", params={"q": numero}).text
+            self.assertNotIn("La cifra di controllo calcolata con Luhn",
+                             pagina, numero)
+
     def test_per_un_tac_ignoto_il_campo_per_insegnarlo_e_in_chiaro(self):
         """La risposta era a un clic, il modo di riportarla dentro l'app no.
 
@@ -1821,7 +1855,7 @@ class TestRicercaPerImei(_Sito):
 
         self.assertFalse(imeicheck.is_valid_imei("111111111111111"))
         pagina = self.client.get("/", params={"q": "111111111111111"}).text
-        self.assertIn("IMEI a 15 cifre, modello sconosciuto", pagina)
+        self.assertIn("IMEI valido, modello sconosciuto", pagina)
         self.assertIn("cifra di controllo", pagina)
         self.assertIn("imei.info", pagina)
 
