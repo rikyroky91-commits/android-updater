@@ -51,8 +51,9 @@ from fastapi.staticfiles import StaticFiles
 from core import aer_catalog, aiquery, allegati, appledevices, cifratura, config as C
 from core import extract, imeicheck, mail, modelcodes, retest, scan, soc, sources, specs
 from core import storage, suggest, versus
-from core.util import (fmt_date, libera_memoria, memoria_dei_cataloghi,
-                       memoria_mb, memoria_picco_mb)
+from core.util import (alleggerisci_se_serve, fmt_date, libera_memoria,
+                       memoria_dei_cataloghi, memoria_mb, memoria_picco_mb,
+                       registra_da_svuotare, stato_alleggerimento)
 
 from . import account, auth_web, presenters as P
 from .cache import CacheATempo
@@ -85,6 +86,45 @@ app = FastAPI(title=C.APP_TITLE, docs_url=None, redoc_url=None,
               lifespan=ciclo_di_vita)
 app.mount("/static", StaticFiles(directory=RADICE / "static"), name="static")
 app.include_router(account.router)
+
+
+# La cache delle ricerche è la prima cosa che l'alleggerimento può
+# buttare: si rifà da sola alla ricerca successiva e non contiene niente
+# che non stia già altrove. Si dichiara qui perché `core/util.py` non può
+# importare `web/` — vedi `registra_da_svuotare`.
+registra_da_svuotare("ricerche recenti", RICERCHE.svuota)
+
+
+@app.middleware("http")
+async def guarda_la_memoria(request: Request, call_next):
+    """Dopo ogni risposta, un'occhiata al contatore della memoria.
+
+    PERCHÉ QUI E NON NELLA SCANSIONE. `libera_memoria()` esisteva già ed
+    è la cura giusta, ma la chiamavano solo la scansione (ogni ora), il
+    salvataggio (ogni mezz'ora) e un tasto in Diagnostica. Fra due
+    scansioni ci stanno sessanta minuti di ricerche, e ogni ricerca è una
+    manciata di richieste HTTP con il loro transito: se il pavimento
+    arriva a 500 MB dentro quell'ora, nessuno se ne accorge finché Render
+    non uccide il contenitore. Segnalato dall'utente il 04/09/2026 con
+    423 MB usati e 457 di picco su 512.
+
+    QUANTO COSTA, nel caso normale: la lettura di `/proc/self/statm`, un
+    file piccolo che sta in memoria. Sotto soglia finisce lì. Sopra
+    soglia c'è comunque una pausa di trenta secondi fra un intervento e
+    l'altro, quindi una raffica di richieste non paga il `malloc_trim`
+    a ognuna.
+
+    Si guarda DOPO la risposta di proposito: la richiesta che scopre la
+    soglia superata non deve anche aspettare la pulizia. E si ingoia
+    qualunque errore, perché una misura che fallisce non deve mai
+    trasformare una pagina buona in un 500.
+    """
+    risposta = await call_next(request)
+    try:
+        alleggerisci_se_serve()
+    except Exception:  # pragma: no cover - la pulizia non rompe le pagine
+        pass
+    return risposta
 
 
 # ======================================================================
@@ -204,6 +244,16 @@ def _scalda_i_cataloghi() -> None:
         # decomprimerlo e attraversarlo: il risultato è piccolo, il
         # passaggio no. Senza questa riga tutto quel transito resta al
         # processo per sempre — vedi `core/util.libera_memoria`.
+        # E SI SCALDA ANCHE L'ESITO DEL SERVIZIO TAC. Non è un catalogo,
+        # è mezzo kilobyte: sta qui perché `/health` lo mostra e ha
+        # promesso di non aprire l'archivio (vedi `carica=False` là). Il
+        # posto giusto per pagare quella lettura è questo, una volta, in
+        # un thread che nessuno sta aspettando.
+        try:
+            imeicheck.ultimo_esito_servizio()
+            imeicheck.storico_servizio()
+        except Exception as errore:  # pragma: no cover - non blocca l'avvio
+            STATO_AVVIO["esito del servizio TAC"] = f"non letto: {errore}"
         STATO_AVVIO["memoria restituita dopo il preriscaldamento"] = (
             f"{libera_memoria()} MB")
 
@@ -757,6 +807,18 @@ def _riga_memoria() -> str:
     # proprietà del piano, quindi si dichiara qui e si dice che è
     # dichiarato, invece di far credere che sia misurato.
     pezzi.append("il piano gratuito di Render ne concede 512")
+    # E QUANTE VOLTE È GIÀ SERVITO INTERVENIRE. Un alleggerimento che non
+    # scatta mai e uno che scatta ogni due minuti sono due diagnosi
+    # diverse: il primo dice che la soglia è larga, il secondo che il
+    # processo è al limite e sta solo galleggiando.
+    stato = stato_alleggerimento()
+    if stato["quanti"]:
+        pezzi.append(f"alleggerito {stato['quanti']} volte sopra i "
+                     f"{stato['soglia_mb']:g} MB, restituiti in tutto "
+                     f"{stato['restituiti_mb']} MB (ultimo: {stato['ultimo']})")
+    else:
+        pezzi.append(f"mai stato sopra i {stato['soglia_mb']:g} MB, "
+                     f"la soglia oltre cui si alleggerisce da solo")
     return " · ".join(pezzi)
 
 
@@ -1322,6 +1384,17 @@ def health(dettaglio: str = Query(default="")):
                 "tac_esterno": "configurato" if imeicheck._chiave_api() else "non configurato",
                 "memoria_mb": memoria_mb(),
                 "memoria_picco_mb": memoria_picco_mb()}
+    # L'ALLEGGERIMENTO SI VEDE DA FUORI, e sta qui e non in `?dettaglio=1`
+    # perché costa una lettura di due contatori in memoria. Zero interventi
+    # con la memoria alta e zero interventi con la memoria bassa sono due
+    # situazioni opposte che senza questo numero si leggono uguali.
+    alleggerimento = stato_alleggerimento()
+    risposta["memoria_soglia_mb"] = alleggerimento["soglia_mb"]
+    risposta["alleggerimenti"] = alleggerimento["quanti"]
+    if alleggerimento["quanti"]:
+        risposta["alleggerimento_restituiti_mb"] = alleggerimento["restituiti_mb"]
+        risposta["alleggerimento_ultimo"] = alleggerimento["ultimo"]
+        risposta["alleggerimento_quando"] = alleggerimento["quando"]
     # «CONFIGURATO» NON VUOL DIRE «FUNZIONA», e per due settimane le due
     # cose sono state raccontate con la stessa parola.
     #
@@ -1333,12 +1406,26 @@ def health(dettaglio: str = Query(default="")):
     # Si legge senza login, che è il punto: Diagnostica sta dietro
     # l'accesso, e una configurazione che si controlla solo da dentro è
     # una configurazione che nessuno controlla.
-    ultimo = imeicheck.ultimo_esito_servizio()
+    # `carica=False` NON È UN DETTAGLIO: il docstring di questa rotta
+    # promette di non toccare l'archivio, e l'host la interroga ogni
+    # minuto. Con il caricamento pigro acceso, la prima chiamata dopo ogni
+    # riavvio apriva il database — e da quando qui sotto c'è anche
+    # l'andamento delle ultime dieci, sarebbe stata una lettura in più a
+    # ogni battito. I valori li mette in memoria il preriscaldamento
+    # all'avvio, che l'archivio lo apre una volta sola e nel suo thread.
+    ultimo = imeicheck.ultimo_esito_servizio(carica=False)
     if ultimo.get("dettaglio"):
         risposta["tac_esterno_ultima_chiamata"] = ultimo["dettaglio"]
         risposta["tac_esterno_quando"] = ultimo.get("quando")
     elif imeicheck._chiave_api():
         risposta["tac_esterno_ultima_chiamata"] = "mai chiamato dall'ultimo riavvio"
+    # E SE SUCCEDE SEMPRE O SOLO STAVOLTA. Un 503 isolato passa da solo e
+    # si aspetta; un 503 a ogni chiamata da tre giorni vuol dire che quel
+    # fornitore non torna e che bisogna prenderne un altro. Sono decisioni
+    # opposte, e l'ultima chiamata da sola non le distingue.
+    riassunto = imeicheck.riassunto_servizio(carica=False)
+    if riassunto:
+        risposta["tac_esterno_andamento"] = riassunto
     # IL DETTAGLIO SI CHIEDE, non si calcola a ogni battito.
     #
     # Pesare i cataloghi voce per voce costa qualche decimo di secondo su
@@ -1348,7 +1435,26 @@ def health(dettaglio: str = Query(default="")):
     # ed è la domanda a cui il 01/09/2026 non si sapeva rispondere, con il
     # servizio a 432 MB su 512 e l'indice TAC ormai innocente.
     if dettaglio:
-        risposta["cataloghi_mb"] = memoria_dei_cataloghi()
+        # Le dieci chiamate per esteso, con l'ora: il riassunto qui sopra
+        # dice quante sono andate male, questo dice quando.
+        risposta["tac_esterno_storico"] = imeicheck.storico_servizio()
+        pesi = memoria_dei_cataloghi()
+        risposta["cataloghi_mb"] = pesi
+        # «SECONDO ME NON SONO TUTTI CATALOGHI», 04/09/2026. Aveva ragione,
+        # ed era una cosa che questa rotta faceva calcolare a mano: dava i
+        # pesi uno per uno e lasciava a chi legge il compito di sommarli e
+        # sottrarli dal totale. Le due righe qui sotto rispondono alla
+        # domanda vera — quanto di questo processo è catalogo e quanto no.
+        #
+        # Il resto NON è memoria sprecata: è l'interprete Python, le
+        # librerie caricate, i buffer delle connessioni e — la parte che
+        # cresce — le arene che l'allocatore non ha ancora restituito.
+        # È esattamente ciò su cui lavora `alleggerisci_se_serve`.
+        somma = round(sum(v for v in pesi.values() if isinstance(v, (int, float))), 1)
+        adesso = memoria_mb()
+        risposta["cataloghi_totale_mb"] = somma
+        risposta["non_cataloghi_mb"] = (round(adesso - somma, 1)
+                                        if adesso is not None else None)
         # QUANTO PESA L'ARCHIVIO, che è il moltiplicatore del salvataggio:
         # ogni invio ne tiene in memoria la copia intera, quella compressa,
         # quella in base64 e il corpo della richiesta.

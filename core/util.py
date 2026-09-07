@@ -9,6 +9,8 @@ import hashlib
 import html
 import os
 import re
+import threading
+import time
 import unicodedata
 from datetime import datetime, timezone
 
@@ -319,6 +321,197 @@ def memoria_dei_cataloghi() -> dict:
         except Exception:  # pragma: no cover - una misura non deve rompere nulla
             pesi[nome] = "in costruzione, riprova fra un minuto"
     return pesi
+
+
+
+# ======================================================================
+# L'ALLEGGERIMENTO AUTOMATICO: non aspettare la scansione per accorgersene
+# ======================================================================
+# Richiesto dall'utente il 04/09/2026, guardando `/health`: 423 MB usati e
+# 457 di picco su 512. «Già a circa 450 MB usati fai un alleggerimento,
+# perché secondo me non sono tutti cataloghi: al primo scaricamento sono
+# molto meno.»
+#
+# L'osservazione è giusta e la spiegazione sta già in `libera_memoria` qui
+# sotto: `gc.collect()` libera gli oggetti Python ma NON restituisce al
+# sistema le arene che li contenevano, quindi ogni ciclo che alloca un po'
+# più del precedente alza il pavimento e non lo riabbassa mai. Non è un
+# catalogo che cresce: è il pavimento che sale.
+#
+# `libera_memoria()` c'era già ed è la cura giusta. Il difetto era CHI la
+# chiamava: soltanto la scansione (ogni ora), il salvataggio (ogni mezz'ora)
+# e un tasto in Diagnostica. Fra due scansioni ci stanno sessanta minuti di
+# ricerche, e ogni ricerca è una manciata di richieste HTTP con il loro
+# transito. Se il pavimento arriva a 500 in quell'ora, nessuno se ne
+# accorge finché il contenitore non viene ucciso.
+#
+# Da qui in poi il controllo si fa a ogni richiesta servita. Costa la
+# lettura di `/proc/self/statm` — un file piccolo, in memoria, niente disco
+# — e sotto soglia finisce lì. Sopra soglia si interviene in due tempi:
+#
+#   1. `libera_memoria()`: restituisce il pavimento. Non perde niente.
+#   2. se ancora sopra soglia, si buttano gli indici RICOSTRUIBILI —
+#      quelli che si rifanno da soli dai byte già in archivio, senza
+#      rete. Costa qualche decimo di secondo alla prossima ricerca che
+#      ne ha bisogno, e vale la pena: un indice da rifare è un fastidio,
+#      un processo ucciso a metà ricerca è una pagina bianca.
+#
+# LA SOGLIA È 450 SU 512 E NON PIÙ ALTA di proposito. Il picco misurato è
+# 457, cioè il margine vero è già stato consumato una volta: intervenire a
+# 480 vorrebbe dire intervenire dopo.
+SOGLIA_ALLEGGERIMENTO_MB = 450.0
+#: Sotto questo intervallo non si riprova. `malloc_trim` non è gratis e la
+#: memoria non cambia in un secondo: senza questa pausa, una raffica di
+#: richieste sopra soglia pagherebbe il trim a ognuna.
+_PAUSA_ALLEGGERIMENTO_S = 30.0
+
+_lucchetto_memoria = threading.Lock()
+_ultimo_tentativo = 0.0
+_alleggerimenti = {
+    "quanti": 0,
+    "restituiti_mb": 0.0,
+    "svuotamenti": 0,
+    "ultimo": "",
+    "quando": "",
+}
+
+#: Cache che il livello 2 può buttare, aggiunte da chi le possiede.
+#: Serve perché la cache delle ricerche vive in `web/`, e questo modulo
+#: non può importarlo — è la regola dichiarata in cima al file, e vale
+#: anche quando romperla farebbe comodo.
+_da_svuotare: list[tuple[str, object]] = []
+
+
+def registra_da_svuotare(nome: str, funzione) -> None:
+    """Dichiara una cache che l'alleggerimento può buttare via.
+
+    Il contratto è stretto e va rispettato: la funzione deve poter essere
+    chiamata in qualunque momento, e ciò che butta deve ricostruirsi da
+    solo SENZA rete. Una cache che per tornare deve scaricare qualcosa non
+    va registrata qui: la butteremmo proprio quando il processo sta male,
+    per poi chiedergli anche un download.
+    """
+    if not any(n == nome for n, _ in _da_svuotare):
+        _da_svuotare.append((nome, funzione))
+
+
+def soglia_alleggerimento_mb() -> float:
+    """La soglia, sovrascrivibile con `MEMORIA_SOGLIA_MB`.
+
+    Si legge da `os.environ` invece che da `core.config` perché questo
+    modulo non dipende da nient'altro (vedi il docstring in cima), e
+    quella promessa vale più della comodità di una riga.
+    """
+    grezzo = (os.environ.get("MEMORIA_SOGLIA_MB") or "").strip()
+    if not grezzo:
+        return SOGLIA_ALLEGGERIMENTO_MB
+    try:
+        valore = float(grezzo)
+    except ValueError:
+        return SOGLIA_ALLEGGERIMENTO_MB
+    # Zero (o meno) spegne l'alleggerimento automatico: serve ai test e a
+    # chi gira su una macchina senza il limite dei 512 MB.
+    return valore
+
+
+def _svuota_ricostruibili() -> list[str]:
+    """Butta gli indici che si rifanno da soli, e dice quali.
+
+    NON C'È DENTRO NESSUN CATALOGO CHE PER TORNARE DEVE SCARICARE. Codici
+    modello, schede tecniche, processori e catalogo aziendale pesano di
+    più e sarebbero la scorciatoia ovvia, ma si ricostruiscono da un
+    download: buttarli sotto pressione significa chiedere una connessione
+    al processo che sta per essere ucciso. L'indice TAC e le schede di
+    confronto invece si rifanno dai byte che stanno già in archivio.
+    """
+    svuotati: list[str] = []
+    try:
+        from . import imeicheck
+        if getattr(imeicheck, "_memory_index", None):
+            imeicheck.libera_indice()
+            svuotati.append("indice TAC")
+    except Exception:  # pragma: no cover - un alleggerimento non rompe nulla
+        pass
+    try:
+        from . import versus
+        if getattr(versus, "_cache", None):
+            # Senza `anche_archivio`: si scorda il ricordo in memoria, non
+            # quello su disco. Buttare anche quello vorrebbe dire
+            # riscaricare le schede, cioè l'esatto contrario.
+            versus.reset_cache()
+            svuotati.append("schede di confronto")
+    except Exception:  # pragma: no cover
+        pass
+    for nome, funzione in list(_da_svuotare):
+        try:
+            funzione()
+            svuotati.append(nome)
+        except Exception:  # pragma: no cover
+            continue
+    return svuotati
+
+
+def alleggerisci_se_serve(soglia_mb: float | None = None) -> dict:
+    """Controlla la memoria e, se è oltre soglia, la riporta giù.
+
+    Pensata per essere chiamata spessissimo — a ogni richiesta servita —
+    quindi il caso normale (sotto soglia) deve costare quanto la lettura
+    di un file di `/proc`, e costa quello.
+
+    Ritorna sempre un dizionario che dice cosa è successo, così chi la
+    chiama può scriverlo in un registro invece di sperare.
+    """
+    global _ultimo_tentativo
+
+    prima = memoria_mb()
+    if prima is None:
+        return {"fatto": False, "motivo": "memoria non misurabile"}
+    soglia = soglia_alleggerimento_mb() if soglia_mb is None else float(soglia_mb)
+    if soglia <= 0:
+        return {"fatto": False, "motivo": "alleggerimento spento", "mb": prima}
+    if prima < soglia:
+        return {"fatto": False, "mb": prima, "soglia": soglia}
+
+    with _lucchetto_memoria:
+        if time.monotonic() - _ultimo_tentativo < _PAUSA_ALLEGGERIMENTO_S:
+            return {"fatto": False, "motivo": "appena fatto", "mb": prima}
+        _ultimo_tentativo = time.monotonic()
+
+    restituiti = libera_memoria()
+    dopo = memoria_mb() or 0.0
+    svuotati: list[str] = []
+    # SECONDO TEMPO SOLO SE SERVE. Nel caso normale il pavimento scende e
+    # gli indici restano dove sono: buttarli comunque significherebbe far
+    # pagare a ogni ricerca successiva un problema che non c'è più.
+    if dopo >= soglia:
+        svuotati = _svuota_ricostruibili()
+        restituiti += libera_memoria()
+        dopo = memoria_mb() or 0.0
+
+    _alleggerimenti["quanti"] += 1
+    _alleggerimenti["restituiti_mb"] = round(
+        _alleggerimenti["restituiti_mb"] + restituiti, 1)
+    if svuotati:
+        _alleggerimenti["svuotamenti"] += 1
+    _alleggerimenti["ultimo"] = (
+        f"{prima} → {dopo} MB, restituiti {round(restituiti, 1)}"
+        + (f", svuotati: {', '.join(svuotati)}" if svuotati else ""))
+    _alleggerimenti["quando"] = now_iso()
+    return {"fatto": True, "prima": prima, "dopo": dopo,
+            "restituiti_mb": round(restituiti, 1), "svuotati": svuotati,
+            "soglia": soglia}
+
+
+def stato_alleggerimento() -> dict:
+    """Quante volte è servito e quanto ha reso: per Diagnostica e /health.
+
+    Zero interventi con la memoria alta e zero interventi con la memoria
+    bassa sono due situazioni opposte che senza questo contatore si
+    leggono uguali.
+    """
+    stato = dict(_alleggerimenti)
+    stato["soglia_mb"] = soglia_alleggerimento_mb()
+    return stato
 
 
 def libera_memoria() -> float:

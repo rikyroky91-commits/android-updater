@@ -69,3 +69,13 @@ GEMINI_API_KEY = ""
 # Il modello si sceglie da solo fra quelli con quota gratuita, provandoli
 # in ordine. Si indica a mano SOLO per puntarne uno preciso.
 # AI_QUERY_MODEL = "gemini-3.6-flash"
+
+# Sopra questi MB il processo si alleggerisce da solo, a ogni richiesta
+# servita. Prima restituisce al sistema le arene che l'allocatore non ha
+# ancora liberato — è quella la parte che cresce, non i cataloghi — e se
+# non basta butta gli indici che sanno rifarsi da soli senza rete.
+#
+# 450 su 512 e non più in alto di proposito: con un picco misurato a 457
+# il margine è già stato consumato una volta, e intervenire a 480
+# vorrebbe dire intervenire dopo. A "0" si spegne.
+# MEMORIA_SOGLIA_MB = "450"

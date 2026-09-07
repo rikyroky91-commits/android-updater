@@ -2362,3 +2362,90 @@ class TestIlTastoAiCerca(_Sito):
         self.assertIn("rotella", script)
         foglio = self.client.get("/static/style.css").text
         self.assertIn("@keyframes gira", foglio)
+
+
+class TestLaMemoriaSiAlleggerisceDaSola(_Sito):
+    """Il gancio che mancava: il controllo a ogni richiesta servita.
+
+    `libera_memoria()` esisteva già ed è la cura giusta, ma la chiamavano
+    solo la scansione (ogni ora), il salvataggio (ogni mezz'ora) e un
+    tasto in Diagnostica. Fra due scansioni ci stanno sessanta minuti di
+    ricerche: se il pavimento arriva a 500 MB dentro quell'ora, nessuno se
+    ne accorge finché Render non uccide il contenitore.
+    """
+
+    def setUp(self):
+        import os
+
+        from core import util
+
+        self.util = util
+        self._soglia = os.environ.get("MEMORIA_SOGLIA_MB")
+        self._contatori = dict(util._alleggerimenti)
+        util._ultimo_tentativo = 0.0
+
+        def rimetti():
+            if self._soglia is None:
+                os.environ.pop("MEMORIA_SOGLIA_MB", None)
+            else:
+                os.environ["MEMORIA_SOGLIA_MB"] = self._soglia
+            util._alleggerimenti.clear()
+            util._alleggerimenti.update(self._contatori)
+            util._ultimo_tentativo = 0.0
+
+        self.addCleanup(rimetti)
+
+    def test_una_richiesta_sopra_soglia_alleggerisce(self):
+        import os
+
+        from core import imeicheck
+
+        from web.main import RICERCHE
+
+        os.environ["MEMORIA_SOGLIA_MB"] = "1"
+        imeicheck._memory_index = {"12345678": "x\x1fSAMSUNG\x1fGalaxy"}
+        RICERCHE.scrivi("una-ricerca-qualsiasi", {"nome": "x"})
+        self.client.get("/health")
+        self.assertIsNone(imeicheck._memory_index,
+                          "l'indice TAC doveva essere liberato")
+        self.assertEqual(RICERCHE.stato()["voci"], 0)
+        self.assertGreater(self.util.stato_alleggerimento()["quanti"], 0)
+
+    def test_sotto_soglia_non_tocca_niente(self):
+        import os
+
+        from core import imeicheck
+
+        os.environ["MEMORIA_SOGLIA_MB"] = "999999"
+        imeicheck._memory_index = {"12345678": "x\x1fSAMSUNG\x1fGalaxy"}
+        self.client.get("/health")
+        self.assertIsNotNone(imeicheck._memory_index)
+        imeicheck.reset_cache()
+
+    def test_health_dice_la_soglia_e_gli_interventi(self):
+        dati = self.client.get("/health").json()
+        self.assertIn("memoria_soglia_mb", dati)
+        self.assertIn("alleggerimenti", dati)
+
+    def test_il_dettaglio_separa_cataloghi_e_resto(self):
+        """«secondo me non sono tutti cataloghi»: la rotta dava i pesi uno
+        per uno e lasciava la somma a chi legge."""
+        dati = self.client.get("/health", params={"dettaglio": "1"}).json()
+        self.assertIn("cataloghi_totale_mb", dati)
+        self.assertIn("non_cataloghi_mb", dati)
+        self.assertGreaterEqual(dati["non_cataloghi_mb"], 0)
+
+    def test_una_misura_che_esplode_non_rompe_la_pagina(self):
+        """Una pulizia che fallisce non deve mai trasformare una pagina
+        buona in un 500."""
+        vero = self.util.alleggerisci_se_serve
+        import web.main as M
+
+        def rotta():
+            raise RuntimeError("misura fallita")
+
+        M.alleggerisci_se_serve = rotta
+        try:
+            self.assertEqual(self.client.get("/health").status_code, 200)
+        finally:
+            M.alleggerisci_se_serve = vero

@@ -805,6 +805,37 @@ errori.
 
 ---
 
+## L'alleggerimento automatico della memoria (2026-09-04)
+
+Segnalato dall'utente guardando `/health`: 423 MB usati, 457 di picco su
+512. «Secondo me non sono tutti cataloghi: al primo scaricamento sono
+molto meno.» Ha ragione, e la causa era gia' scritta in
+`core/util.libera_memoria`: `gc.collect()` libera gli oggetti Python ma
+NON restituisce al sistema le arene che li contenevano, quindi ogni ciclo
+che alloca un po' piu' del precedente alza il pavimento e non lo
+riabbassa mai. Non e' un catalogo che cresce: e' il pavimento che sale.
+
+La cura c'era. Mancava chi la chiamasse: solo la scansione (ogni ora), il
+salvataggio (ogni mezz'ora) e un tasto in Diagnostica. Fra due scansioni
+ci stanno sessanta minuti di ricerche, e ogni ricerca e' una manciata di
+richieste HTTP con il loro transito.
+
+Ora il controllo si fa a ogni richiesta servita (`MEMORIA_SOGLIA_MB`,
+predefinito 450). Sotto soglia costa la lettura di `/proc/self/statm`.
+Sopra soglia interviene in due tempi: prima `libera_memoria()`, che non
+perde niente; poi, solo se ancora sopra, butta gli indici RICOSTRUIBILI
+— indice TAC, schede di confronto, cache delle ricerche. Fuori da quella
+lista, di proposito, i cataloghi che per tornare devono SCARICARE:
+codici modello, schede tecniche, processori, catalogo aziendale. Pesano
+di piu' e sarebbero la scorciatoia ovvia, ma buttarli sotto pressione
+significa chiedere una connessione al processo che sta per essere ucciso.
+
+`/health?dettaglio=1` risponde anche `cataloghi_totale_mb` e
+`non_cataloghi_mb`: la domanda «quanto di questo processo e' catalogo»
+prima si doveva calcolare a mano sommando le righe.
+
+---
+
 ## Investire su HONOR, HUAWEI, realme, Nothing (2026-08-11)
 
 Richiesta dell'utente: scheda tecnica completa (almeno chip e firmware) per

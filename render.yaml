@@ -40,6 +40,30 @@ services:
         value: "true"
       - key: PRERISCALDA_ATTESA_SECONDI
         value: "8"
+      # SOPRA QUESTI MB IL PROCESSO SI ALLEGGERISCE DA SOLO, a ogni
+      # richiesta servita: prima restituisce al sistema le arene che
+      # l'allocatore non ha ancora liberato (e' quella la parte che
+      # cresce, non i cataloghi), poi — se non basta — butta gli indici
+      # che sanno rifarsi da soli senza rete.
+      #
+      # 450 su 512 e non piu' in alto di proposito: il 04/09/2026 il
+      # picco misurato era 457, cioe' il margine e' gia' stato consumato
+      # una volta. Intervenire a 480 vorrebbe dire intervenire dopo.
+      # A "0" si spegne.
+      - key: MEMORIA_SOGLIA_MB
+        value: "450"
+      # I TAC che nessun database locale conosce si chiedono a un servizio
+      # esterno. Se ne possono configurare fino a tre, provati in ordine:
+      # cento interrogazioni al mese finiscono, e una chiave che smette di
+      # funzionare non deve chiudere l'ultima strada rimasta.
+      # Con TAC_API_URL / _HEADER / _NOME si punta a un altro fornitore
+      # senza toccare il codice.
+      - key: TAC_API_KEY
+        sync: false
+      - key: TAC_API_KEY_2
+        sync: false
+      - key: TAC_API_KEY_3
+        sync: false
       # I segreti NON stanno qui: si inseriscono dal pannello di Render.
       # `sync: false` significa esattamente questo — la variabile esiste,
       # il valore lo metti a mano e non finisce nel repository.

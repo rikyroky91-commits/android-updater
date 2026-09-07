@@ -1180,6 +1180,9 @@ def stato_servizio_esterno() -> str:
                      + (f" ({quando[:16].replace('T', ' ')} UTC)" if quando else ""))
     else:
         pezzi.append("nessuna chiamata ancora registrata")
+    riassunto = riassunto_servizio()
+    if riassunto:
+        pezzi.append(riassunto)
     return " · ".join(pezzi)
 
 
@@ -1191,6 +1194,20 @@ def stato_servizio_esterno() -> str:
 # guasto invece sta in memoria: e' una cortesia verso un servizio che sta
 # male, non un dato da ricordare, e cosi' un riavvio la azzera da sola.
 _META_ESITO_SERVIZIO = "imei_tac_servizio_ultimo"
+# ======================================================================
+# NON L'ULTIMA CHIAMATA: LE ULTIME DIECI
+# ======================================================================
+# Il 04/09/2026 `/health` diceva «HiCellTek: HTTP 503». Vero e inutile,
+# perché la domanda che conta non è che cos'è successo l'ultima volta: è
+# se succede sempre. Un 503 isolato passa da solo e si aspetta; un 503 a
+# ogni chiamata da tre giorni vuol dire che quel fornitore non torna e
+# che bisogna prenderne un altro. Sono decisioni opposte, e una
+# fotografia sola non le distingue.
+#
+# Dieci righe con l'ora bastano a vederlo a occhio, pesano qualche
+# centinaio di byte e si leggono senza login su `/health?dettaglio=1`.
+_META_STORICO_SERVIZIO = "imei_tac_servizio_storico"
+_QUANTE_CHIAMATE_RICORDATE = 10
 _MINUTI_PAUSA_SERVIZIO = 5
 #: nome del fornitore -> (quando, perché). LA PAUSA È DI CHI STA MALE,
 #: NON DI TUTTI: con un elenco di fornitori, mettere in pausa «il
@@ -1205,13 +1222,26 @@ _pausa_servizio: dict[str, tuple[float, str]] = {}
 # processo — al primo che chiede dopo un riavvio — e da lì in poi la
 # risposta è già in mano.
 _ultimo_esito: dict | None = None
+#: La copia in memoria dello storico, per la stessa ragione di
+#: `_ultimo_esito` qui sopra: `/health` la legge e quella rotta la
+#: interroga l'host OGNI MINUTO, promettendo di non toccare l'archivio.
+#: Una promessa del genere si mantiene o si toglie.
+_storico: list | None = None
 
 
-def ultimo_esito_servizio() -> dict:
-    """`{"quando", "esito", "dettaglio"}` dell'ultima chiamata, o `{}`."""
+def ultimo_esito_servizio(carica: bool = True) -> dict:
+    """`{"quando", "esito", "dettaglio"}` dell'ultima chiamata, o `{}`.
+
+    Con `carica=False` risponde SOLO con quello che è già in memoria e
+    non apre l'archivio nemmeno la prima volta. Serve a `/health`, che
+    promette di non toccarlo e viene interrogata ogni minuto: il valore
+    lo mette lì il preriscaldamento all'avvio (vedi `web/main.py`).
+    """
     global _ultimo_esito
     if _ultimo_esito is not None:
         return _ultimo_esito
+    if not carica:
+        return {}
     dati = {}
     grezzo = storage.get_meta(_META_ESITO_SERVIZIO)
     if grezzo:
@@ -1222,6 +1252,49 @@ def ultimo_esito_servizio() -> dict:
             dati = {}
     _ultimo_esito = dati
     return dati
+
+
+def storico_servizio(carica: bool = True) -> list[dict]:
+    """Le ultime chiamate al servizio esterno, dalla più vecchia.
+
+    Come `ultimo_esito_servizio`, con `carica=False` non apre l'archivio.
+    """
+    global _storico
+    if _storico is not None:
+        return list(_storico)
+    if not carica:
+        return []
+    grezzo = storage.get_meta(_META_STORICO_SERVIZIO)
+    letto = []
+    if grezzo:
+        try:
+            grezze = json.loads(grezzo)
+            if isinstance(grezze, list):
+                letto = [v for v in grezze if isinstance(v, dict)]
+        except Exception:
+            letto = []
+    _storico = letto
+    return list(_storico)
+
+
+def riassunto_servizio(carica: bool = True) -> str:
+    """«ultime 10 chiamate: 10 errori, 0 risposte, dal 02/09 14:10».
+
+    È la riga che dice se aspettare o cambiare fornitore, e per questo sta
+    in `/health` accanto all'ultima chiamata invece che dentro il
+    dettaglio: chi guarda perché «non funziona» deve trovarla lì.
+    """
+    storico = storico_servizio(carica=carica)
+    if not storico:
+        return ""
+    errori = sum(1 for v in storico if v.get("esito") == "errore")
+    risposte = len(storico) - errori
+    da = (storico[0].get("quando") or "")[:16].replace("T", " ")
+    pezzi = [f"ultime {len(storico)} chiamate: {errori} in errore",
+             f"{risposte} con risposta"]
+    if da:
+        pezzi.append(f"dal {da} UTC")
+    return ", ".join(pezzi)
 
 
 def _ricorda_esito_servizio(esito: str, dettaglio: str,
@@ -1236,6 +1309,14 @@ def _ricorda_esito_servizio(esito: str, dettaglio: str,
     _ultimo_esito = registrato
     try:
         storage.set_meta(_META_ESITO_SERVIZIO, json.dumps(registrato))
+    except Exception:      # pragma: no cover - una diagnosi non rompe nulla
+        pass
+    global _storico
+    storico = storico_servizio()
+    storico.append(registrato)
+    _storico = storico[-_QUANTE_CHIAMATE_RICORDATE:]
+    try:
+        storage.set_meta(_META_STORICO_SERVIZIO, json.dumps(_storico))
     except Exception:      # pragma: no cover - una diagnosi non rompe nulla
         pass
     # UN SERVIZIO CHE NON RISPONDE NON SI RIPROVA A OGNI PAGINA. Ogni
@@ -2138,11 +2219,35 @@ def describe(brand: str, specs: str) -> str:
     return f"{parsed['model']} ({', '.join(extra)})" if extra else parsed["model"]
 
 
+def libera_indice() -> bool:
+    """Butta SOLO l'indice TAC in memoria, e dice se c'era qualcosa da buttare.
+
+    Serve all'alleggerimento automatico (`core/util.alleggerisci_se_serve`),
+    che sopra i 450 MB deve poter restituire i 22 MB dell'indice senza
+    effetti collaterali. `reset_cache()` non andava bene: azzera anche la
+    pausa del servizio esterno e l'ultimo esito, cioè roba che con la
+    memoria non c'entra — e rimettere in gioco un fornitore appena andato
+    in errore, ogni volta che il processo è sotto pressione, vuol dire
+    proprio martellarlo nel momento peggiore.
+
+    L'indice si rifà da solo alla prossima ricerca, dai byte che stanno
+    già in archivio: nessuna rete, qualche decimo di secondo.
+    """
+    global _memory_index, _status
+    c_era = _memory_index is not None
+    _memory_index = None
+    _CACHE_SECONDE_LETTURE.clear()
+    if c_era:
+        _status = "indice liberato per memoria, si ricostruisce alla prossima ricerca"
+    return c_era
+
+
 def reset_cache() -> None:
-    global _memory_index, _status, _pausa_servizio, _ultimo_esito
+    global _memory_index, _status, _pausa_servizio, _ultimo_esito, _storico
     _memory_index = None
     _status = "non ancora caricato"
     _ultimo_esito = None
+    _storico = None
     # Anche la pausa del servizio esterno: chi azzera le cache sta
     # rimettendo le cose in ordine, e una pausa presa cinque minuti fa non
     # deve far sembrare spento un servizio che magari è appena tornato.

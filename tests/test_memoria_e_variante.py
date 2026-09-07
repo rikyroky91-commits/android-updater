@@ -1231,3 +1231,218 @@ class TestLeTreFormeDiUnImei(unittest.TestCase):
         self.assertTrue(imeicheck.is_imei_like("35-139740-374148-6"))
         self.assertEqual(imeicheck.forma_imei("3513974 0374148 12"),
                          imeicheck.FORMA_IMEISV)
+
+
+class TestAlleggerimentoAutomatico(unittest.TestCase):
+    """«già a circa 450 mb usati fai un alleggerimento, perché secondo me
+    non sono tutti cataloghi: al primo scaricamento sono molto meno»,
+    04/09/2026, con `/health` a 423 MB usati e 457 di picco su 512.
+
+    L'osservazione è giusta e la causa sta già scritta in
+    `core/util.libera_memoria`: `gc.collect()` libera gli oggetti Python
+    ma non restituisce al sistema le arene che li contenevano, quindi ogni
+    ciclo che alloca un po' più del precedente alza il pavimento e non lo
+    riabbassa mai. Non è un catalogo che cresce, è il pavimento che sale.
+
+    La cura c'era. Mancava chi la chiamasse: solo la scansione (ogni ora),
+    il salvataggio (ogni mezz'ora) e un tasto in Diagnostica.
+    """
+
+    def setUp(self):
+        from core import util
+
+        self.util = util
+        self._soglia = os.environ.get("MEMORIA_SOGLIA_MB")
+        self._registrate = list(util._da_svuotare)
+        self._contatori = dict(util._alleggerimenti)
+        util._ultimo_tentativo = 0.0
+
+        def rimetti():
+            if self._soglia is None:
+                os.environ.pop("MEMORIA_SOGLIA_MB", None)
+            else:
+                os.environ["MEMORIA_SOGLIA_MB"] = self._soglia
+            util._da_svuotare[:] = self._registrate
+            util._alleggerimenti.clear()
+            util._alleggerimenti.update(self._contatori)
+            util._ultimo_tentativo = 0.0
+
+        self.addCleanup(rimetti)
+
+    def test_la_soglia_predefinita_e_450(self):
+        os.environ.pop("MEMORIA_SOGLIA_MB", None)
+        self.assertEqual(self.util.soglia_alleggerimento_mb(), 450.0)
+
+    def test_la_soglia_si_puo_cambiare_dall_ambiente(self):
+        os.environ["MEMORIA_SOGLIA_MB"] = "300"
+        self.assertEqual(self.util.soglia_alleggerimento_mb(), 300.0)
+
+    def test_un_valore_scritto_male_non_spegne_la_protezione(self):
+        """Una variabile d'ambiente sbagliata non deve trasformarsi in
+        «nessun limite»: sarebbe il guasto peggiore di tutti, silenzioso."""
+        os.environ["MEMORIA_SOGLIA_MB"] = "quattrocento"
+        self.assertEqual(self.util.soglia_alleggerimento_mb(), 450.0)
+
+    def test_a_zero_si_spegne(self):
+        os.environ["MEMORIA_SOGLIA_MB"] = "0"
+        esito = self.util.alleggerisci_se_serve()
+        self.assertFalse(esito["fatto"])
+        self.assertEqual(esito["motivo"], "alleggerimento spento")
+
+    def test_sotto_soglia_non_fa_niente(self):
+        """È il caso normale, e deve costare quanto leggere /proc."""
+        esito = self.util.alleggerisci_se_serve(soglia_mb=999_999)
+        self.assertFalse(esito["fatto"])
+        self.assertNotIn("svuotati", esito)
+
+    def test_sopra_soglia_interviene(self):
+        esito = self.util.alleggerisci_se_serve(soglia_mb=1)
+        self.assertTrue(esito["fatto"])
+        self.assertIn("prima", esito)
+        self.assertIn("dopo", esito)
+
+    def test_non_si_ripete_a_raffica(self):
+        """`malloc_trim` non è gratis e la memoria non cambia in un
+        secondo: senza la pausa, ogni richiesta sopra soglia lo pagherebbe."""
+        self.assertTrue(self.util.alleggerisci_se_serve(soglia_mb=1)["fatto"])
+        secondo = self.util.alleggerisci_se_serve(soglia_mb=1)
+        self.assertFalse(secondo["fatto"])
+        self.assertEqual(secondo["motivo"], "appena fatto")
+
+    def test_il_secondo_tempo_butta_le_cache_registrate(self):
+        svuotata = {"quante": 0}
+        self.util.registra_da_svuotare("prova", lambda: svuotata.__setitem__(
+            "quante", svuotata["quante"] + 1))
+        # Soglia 1 MB: nessun trim la fa scendere sotto, quindi si arriva
+        # per forza al secondo tempo.
+        esito = self.util.alleggerisci_se_serve(soglia_mb=1)
+        self.assertIn("prova", esito["svuotati"])
+        self.assertEqual(svuotata["quante"], 1)
+
+    def test_una_cache_che_esplode_non_ferma_le_altre(self):
+        def rotta():
+            raise RuntimeError("questa cache sta male")
+
+        ordine = []
+        self.util.registra_da_svuotare("rotta", rotta)
+        self.util.registra_da_svuotare("sana", lambda: ordine.append("sana"))
+        esito = self.util.alleggerisci_se_serve(soglia_mb=1)
+        self.assertNotIn("rotta", esito["svuotati"])
+        self.assertIn("sana", esito["svuotati"])
+        self.assertEqual(ordine, ["sana"])
+
+    def test_registrare_due_volte_lo_stesso_nome_non_lo_duplica(self):
+        self.util.registra_da_svuotare("doppia", lambda: None)
+        self.util.registra_da_svuotare("doppia", lambda: None)
+        nomi = [n for n, _ in self.util._da_svuotare]
+        self.assertEqual(nomi.count("doppia"), 1)
+
+    def test_lo_stato_conta_gli_interventi(self):
+        prima = self.util.stato_alleggerimento()["quanti"]
+        self.util.alleggerisci_se_serve(soglia_mb=1)
+        stato = self.util.stato_alleggerimento()
+        self.assertEqual(stato["quanti"], prima + 1)
+        self.assertIn("MB", stato["ultimo"])
+        self.assertTrue(stato["quando"])
+
+    def test_l_indice_tac_si_libera_senza_toccare_il_servizio(self):
+        """`reset_cache()` azzerava anche la pausa del servizio esterno:
+        rimettere in gioco un fornitore appena andato in errore ogni volta
+        che il processo è sotto pressione vuol dire martellarlo nel
+        momento peggiore."""
+        imeicheck._memory_index = {"12345678": "x\x1fSAMSUNG\x1fGalaxy"}
+        imeicheck._pausa_servizio = {"HiCellTek": (1.0, "HTTP 503")}
+        self.assertTrue(imeicheck.libera_indice())
+        self.assertIsNone(imeicheck._memory_index)
+        self.assertEqual(imeicheck._pausa_servizio,
+                         {"HiCellTek": (1.0, "HTTP 503")})
+        imeicheck.reset_cache()
+
+    def test_liberare_un_indice_gia_vuoto_lo_dice(self):
+        imeicheck.reset_cache()
+        self.assertFalse(imeicheck.libera_indice())
+
+    def test_niente_cataloghi_che_per_tornare_devono_scaricare(self):
+        """Buttare i codici modello o le schede tecniche sarebbe la
+        scorciatoia ovvia — pesano di più — ma si ricostruiscono da un
+        download: significherebbe chiedere una connessione al processo che
+        sta per essere ucciso."""
+        import inspect
+
+        sorgente = inspect.getsource(self.util._svuota_ricostruibili)
+        for vietato in ("modelcodes", "specs", "soc", "aer_catalog"):
+            self.assertNotIn(vietato, sorgente,
+                             f"{vietato} si ricostruisce solo dalla rete")
+
+
+class TestLoStoricoDelServizioEsterno(unittest.TestCase):
+    """`/health` diceva «HiCellTek: HTTP 503». Vero e inutile.
+
+    La domanda che conta non è che cos'è successo l'ultima volta: è se
+    succede sempre. Un 503 isolato passa da solo e si aspetta; un 503 a
+    ogni chiamata da tre giorni vuol dire che quel fornitore non torna e
+    che bisogna prenderne un altro. Sono decisioni opposte, e una
+    fotografia sola non le distingue.
+    """
+
+    def setUp(self):
+        import tempfile
+
+        from core import config as C, storage
+
+        self._db = C.DB_PATH
+        C.DB_PATH = tempfile.mktemp(suffix=".db")
+        storage.reset_state()
+        storage.init_db()
+        imeicheck.reset_cache()
+
+        def rimetti():
+            C.DB_PATH = self._db
+            storage.reset_state()
+            imeicheck.reset_cache()
+
+        self.addCleanup(rimetti)
+
+    def test_senza_chiamate_non_inventa_niente(self):
+        self.assertEqual(imeicheck.storico_servizio(), [])
+        self.assertEqual(imeicheck.riassunto_servizio(), "")
+
+    def test_ogni_chiamata_lascia_una_riga(self):
+        imeicheck._ricorda_esito_servizio("errore", "HTTP 503", "HiCellTek")
+        imeicheck._ricorda_esito_servizio("trovato", "risposta", "HiCellTek")
+        storico = imeicheck.storico_servizio()
+        self.assertEqual([v["esito"] for v in storico], ["errore", "trovato"])
+        self.assertEqual(storico[0]["fornitore"], "HiCellTek")
+
+    def test_il_riassunto_conta_errori_e_risposte(self):
+        for _ in range(3):
+            imeicheck._ricorda_esito_servizio("errore", "HTTP 503", "HiCellTek")
+        imeicheck._ricorda_esito_servizio("assente", "non conosce", "HiCellTek")
+        riassunto = imeicheck.riassunto_servizio()
+        self.assertIn("ultime 4 chiamate", riassunto)
+        self.assertIn("3 in errore", riassunto)
+        self.assertIn("1 con risposta", riassunto)
+
+    def test_un_assente_non_e_un_errore(self):
+        """«non conosco questo TAC» è una risposta: contarlo fra i guasti
+        farebbe sembrare rotto un servizio che sta funzionando."""
+        imeicheck._ricorda_esito_servizio("assente", "non conosce", "HiCellTek")
+        self.assertIn("0 in errore", imeicheck.riassunto_servizio())
+
+    def test_si_ricordano_le_ultime_dieci_e_basta(self):
+        for i in range(15):
+            imeicheck._ricorda_esito_servizio("errore", f"HTTP 50{i % 10}",
+                                              "HiCellTek")
+        storico = imeicheck.storico_servizio()
+        self.assertEqual(len(storico), imeicheck._QUANTE_CHIAMATE_RICORDATE)
+        # Le ULTIME, non le prime: uno storico che si ferma alla prima
+        # decina racconta com'era il servizio la settimana scorsa.
+        self.assertEqual(storico[-1]["dettaglio"], "HiCellTek: HTTP 504")
+
+    def test_uno_storico_illeggibile_non_rompe_niente(self):
+        from core import storage
+
+        storage.set_meta(imeicheck._META_STORICO_SERVIZIO, "{non json")
+        self.assertEqual(imeicheck.storico_servizio(), [])
+        imeicheck._ricorda_esito_servizio("errore", "HTTP 503", "HiCellTek")
+        self.assertEqual(len(imeicheck.storico_servizio()), 1)
