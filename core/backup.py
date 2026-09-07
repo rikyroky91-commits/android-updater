@@ -190,7 +190,98 @@ def istantanea_compressa() -> tuple[bytes | None, str]:
     return gzip.compress(grezzo, compresslevel=6), ""
 
 
-def salva() -> tuple[bool, str]:
+
+# ======================================================================
+# UN BACKUP NON SOVRASCRIVE MAI UNA COPIA PIENA CON UNA VUOTA
+# ======================================================================
+# Il 07/09/2026 l'utente segnala che il parco di test e' sparito:
+# «settimane fa era pieno di roba, come si e' perso tutto?». La catena
+# che porta li' e' questa, e il pezzo grave e' l'ultimo:
+#
+#   1. il contenitore riparte — su Render `/tmp` si azzera a ogni deploy,
+#      a ogni riavvio per memoria, a ogni risveglio dopo il sonno;
+#   2. l'avvio prova `ripristina()`, che e' l'unica cosa che rimette i
+#      dati al loro posto;
+#   3. se quel ripristino NON riesce — chiave scaduta, GitHub
+#      irraggiungibile, archivio danneggiato — l'app parte VUOTA, e
+#      questa parte e' sempre stata visibile in Diagnostica;
+#   4. mezz'ora dopo il salvataggio periodico carica nel Gist il database
+#      vuoto, e da quel momento la copia buona non e' piu' l'ultima.
+#
+# Il passo 4 e' il difetto, e non e' un caso limite: e' il funzionamento
+# normale applicato a una situazione anormale. Un archivio di sicurezza
+# che sostituisce da solo una copia piena con una vuota non e' un
+# archivio di sicurezza — e nessuno se ne accorge, perche' ogni singolo
+# salvataggio «riesce».
+#
+# LA GUARDIA SI MISURA SU QUELLO CHE C'E' NEL GIST, NON SU UN RICORDO
+# LOCALE. Ricordare qui quanto pesava l'ultimo salvataggio buono sarebbe
+# inutile: quel ricordo vive nello stesso database che si e' appena
+# azzerato. L'unico riferimento che sopravvive alla cancellazione e'
+# l'archivio remoto stesso.
+#: Sotto questa frazione del salvataggio precedente, il nuovo non parte.
+#: Meta' e' larga di proposito: la potatura degli aggiornamenti vecchi fa
+#: rimpicciolire l'archivio per motivi legittimi, e una guardia che
+#: scatta sul rumore verrebbe disattivata dopo il secondo falso allarme.
+FRAZIONE_MINIMA_SALVATAGGIO = 0.5
+#: Sotto questa dimensione il confronto non si fa: un archivio remoto
+#: minuscolo e' un primo salvataggio, non una copia da proteggere.
+_BYTE_MINIMI_PER_CONFRONTO = 32 * 1024
+
+
+def _dimensione_remota() -> tuple[int, str]:
+    """Quanto pesa il salvataggio che c'e' adesso nel Gist, in byte.
+
+    `0` quando non c'e' niente da proteggere: nessun Gist configurato,
+    primo salvataggio, o GitHub che non risponde. In tutti quei casi la
+    guardia si fa da parte — bloccare un salvataggio perche' non si e'
+    riusciti a leggere il precedente vorrebbe dire smettere di salvare
+    proprio quando la rete e' incerta.
+    """
+    if not C.env("BACKUP_GIST_ID") or requests is None:
+        return 0, ""
+    try:
+        risposta = requests.get(
+            f"https://api.github.com/gists/{C.env('BACKUP_GIST_ID')}",
+            headers=_headers_github(), timeout=C.HTTP_TIMEOUT,
+        )
+    except Exception as exc:
+        return 0, f"dimensione precedente non leggibile ({type(exc).__name__})"
+    if risposta.status_code != 200:
+        return 0, f"dimensione precedente non leggibile (HTTP {risposta.status_code})"
+    try:
+        file_gist = (risposta.json().get("files") or {}).get(_GIST_FILENAME) or {}
+        return int(file_gist.get("size") or 0), ""
+    except (ValueError, TypeError, AttributeError):
+        return 0, "dimensione precedente non leggibile (risposta inattesa)"
+
+
+def _crollo_sospetto(nuovo_byte: int) -> str:
+    """Il motivo per cui questo salvataggio NON deve partire, o «».
+
+    Il confronto e' fra byte in base64 da una parte e byte compressi
+    dall'altra, quindi non e' esatto: il base64 gonfia di un terzo. E'
+    voluto — la soglia lavora sugli ordini di grandezza, e sbagliare
+    dalla parte del «non sovrascrivo» e' l'errore giusto da fare.
+    """
+    remota, nota = _dimensione_remota()
+    if nota or remota < _BYTE_MINIMI_PER_CONFRONTO:
+        return ""
+    # Il contenuto caricato e' base64 del compresso: ~4/3 dei byte.
+    stimato = nuovo_byte * 4 // 3
+    if stimato >= remota * FRAZIONE_MINIMA_SALVATAGGIO:
+        return ""
+    return (f"salvataggio ANNULLATO per sicurezza: l'archivio da caricare "
+            f"({stimato // 1024} KB) e' molto piu' piccolo di quello gia' "
+            f"presente ({remota // 1024} KB). Di solito vuol dire che "
+            f"l'applicazione e' ripartita senza i suoi dati e sta per "
+            f"sovrascrivere la copia buona con una vuota. Controlla in "
+            f"Diagnostica se il ripristino all'avvio e' riuscito; se il "
+            f"contenuto attuale e' giusto e la riduzione voluta, usa "
+            f"«Salva adesso» che passa oltre questo controllo")
+
+
+def salva(forza: bool = False) -> tuple[bool, str]:
     """Carica il database sull'archivio esterno.
 
     Il file viene compresso: un database di qualche megabyte scende a
@@ -281,6 +372,20 @@ def salva() -> tuple[bool, str]:
 
         _stato["byte"] = len(compresso)
 
+        # L'ULTIMO CONTROLLO PRIMA DI SOVRASCRIVERE. Vedi il commento
+        # sopra `FRAZIONE_MINIMA_SALVATAGGIO`: e' il passo 4 della catena
+        # che il 07/09/2026 ha fatto sparire il parco di test.
+        #
+        # `forza` esiste perche' una riduzione puo' essere voluta, e una
+        # guardia senza via d'uscita si finisce per toglierla. Ma la via
+        # d'uscita e' un gesto esplicito di una persona, non il
+        # comportamento automatico di ogni mezz'ora.
+        if not forza:
+            crollo = _crollo_sospetto(len(compresso))
+            if crollo:
+                _esito("salvataggio", False, crollo)
+                return False, crollo
+
         if C.env("BACKUP_GIST_ID"):
             ok, messaggio = _salva_su_gist(compresso)
         else:
@@ -353,13 +458,26 @@ def _salva_su_url(dati: bytes) -> tuple[bool, str]:
 # ----------------------------------------------------------------------
 # Ripristino
 # ----------------------------------------------------------------------
-def ripristina(solo_se_mancante: bool = True) -> tuple[bool, str]:
+def ripristina(solo_se_mancante: bool = True,
+               revisione: str = "") -> tuple[bool, str]:
     """Scarica il database dall'archivio esterno.
 
     `solo_se_mancante` protegge dal caso peggiore: sovrascrivere un
     database locale già popolato con una copia più vecchia. All'avvio il
     file non esiste (disco effimero) e il ripristino è quello che serve;
     in ogni altra situazione si preferisce non toccare nulla.
+
+    `revisione` SERVE QUANDO L'ULTIMA COPIA E' QUELLA SBAGLIATA, ed e' il
+    caso che il 07/09/2026 non aveva via d'uscita: il parco di test era
+    sparito, il Gist conteneva ormai il salvataggio del database vuoto, e
+    il ripristino automatico — che legge solo l'ultima versione e solo se
+    l'archivio manca — non poteva fare niente. Le versioni precedenti
+    c'erano sempre state (vedi `revisioni`), ma nessuna riga di codice
+    sapeva chiederle.
+
+    PRIMA DI SOVRASCRIVERE SI METTE DA PARTE QUELLO CHE C'E'. Un
+    ripristino da una revisione sbagliata sarebbe un secondo disastro
+    sopra il primo, e senza copia non ci sarebbe modo di tornare indietro.
     """
     if not configurato():
         messaggio = "nessun archivio configurato"
@@ -378,7 +496,11 @@ def ripristina(solo_se_mancante: bool = True) -> tuple[bool, str]:
 
     with _lock:
         if C.env("BACKUP_GIST_ID"):
-            dati, messaggio = _leggi_da_gist()
+            dati, messaggio = _leggi_da_gist(revisione)
+        elif revisione:
+            messaggio = "le revisioni esistono solo per i Gist"
+            _esito("ripristino", False, messaggio)
+            return False, messaggio
         else:
             dati, messaggio = _leggi_da_url()
 
@@ -453,6 +575,18 @@ def ripristina(solo_se_mancante: bool = True) -> tuple[bool, str]:
                 if os.path.exists(giornale):
                     os.remove(giornale)
 
+            # QUELLO CHE C'ERA SI METTE DA PARTE, NON SI BUTTA. Un
+            # ripristino dalla revisione sbagliata sarebbe un secondo
+            # disastro sopra il primo, e senza questa copia non ci sarebbe
+            # modo di tornare indietro: il file appena sovrascritto era
+            # l'unica cosa rimasta. Costa un raddoppio temporaneo dello
+            # spazio e vale ogni byte.
+            if os.path.exists(percorso):
+                try:
+                    os.replace(percorso, percorso + ".prima-del-ripristino")
+                except OSError:  # pragma: no cover - meglio proseguire
+                    pass
+
             os.replace(temporaneo, percorso)
         except OSError as exc:
             messaggio = f"scrittura del database non riuscita: {exc}"
@@ -468,10 +602,77 @@ def ripristina(solo_se_mancante: bool = True) -> tuple[bool, str]:
         return True, messaggio
 
 
-def _leggi_da_gist() -> tuple[bytes | None, str]:
+
+# ======================================================================
+# LE VERSIONI PRECEDENTI DEL SALVATAGGIO
+# ======================================================================
+# Il 07/09/2026 l'utente segnala che il parco di test e' vuoto: «settimane
+# fa era pieno di roba, come si e' perso tutto?». L'archivio vive in
+# `/tmp` su Render e sopravvive solo grazie a questo backup; se un
+# ripristino all'avvio non riesce, l'app riparte vuota e il salvataggio
+# periodico — che gira ogni mezz'ora — scrive nel Gist il database VUOTO,
+# seppellendo la copia buona.
+#
+# Seppellendo, non cancellando: `_salva_su_gist` fa una `PATCH`, e GitHub
+# conserva la storia completa di un Gist. Ogni salvataggio e' una
+# revisione, e quelle di settimane fa ci sono ancora tutte. Mancava solo
+# una riga di codice che sapesse chiederle — il ripristino automatico
+# legge l'ultima versione, che in questo scenario e' proprio quella
+# sbagliata.
+def revisioni(quante: int = 30) -> tuple[list[dict], str]:
+    """`([{sha, quando, byte, chi}], errore)` — la storia del Gist.
+
+    Dalla piu' recente. I byte sono quelli del file base64 dentro il
+    Gist, non del database: servono a RICONOSCERE la revisione giusta, ed
+    e' esattamente il salto di dimensione a tradire il salvataggio del
+    database vuoto.
+    """
+    if not C.env("BACKUP_GIST_ID"):
+        return [], "le revisioni esistono solo per i Gist"
+    if requests is None:  # pragma: no cover
+        return [], "libreria 'requests' non disponibile"
     try:
         risposta = requests.get(
             f"https://api.github.com/gists/{C.env('BACKUP_GIST_ID')}",
+            headers=_headers_github(), timeout=C.HTTP_TIMEOUT + 30,
+        )
+    except Exception as exc:
+        return [], f"connessione fallita: {exc}"
+    if risposta.status_code != 200:
+        return [], f"GitHub ha risposto {risposta.status_code}"
+    try:
+        storia = risposta.json().get("history") or []
+    except ValueError:
+        return [], "risposta di GitHub in forma inattesa"
+
+    elenco = []
+    for voce in storia[:max(1, quante)]:
+        cambi = voce.get("change_status") or {}
+        elenco.append({
+            "sha": str(voce.get("version") or ""),
+            "quando": str(voce.get("committed_at") or ""),
+            "byte": int(cambi.get("additions") or 0),
+            "chi": ((voce.get("user") or {}) or {}).get("login") or "",
+        })
+    return [v for v in elenco if v["sha"]], ""
+
+
+def _leggi_da_gist(revisione: str = "") -> tuple[bytes | None, str]:
+    """Il salvataggio dal Gist; con `revisione`, quella versione precisa.
+
+    OGNI SALVATAGGIO E' UNA REVISIONE, e questa e' la cosa che ha reso
+    recuperabile il disastro del 07/09/2026. `_salva_su_gist` fa una
+    `PATCH`, e GitHub conserva la storia completa: la copia buona di
+    settimane fa non e' stata cancellata dai salvataggi successivi, e'
+    solo finita sotto. Senza questo parametro l'unica cosa leggibile era
+    l'ultima versione — cioe' proprio quella vuota.
+    """
+    indirizzo = f"https://api.github.com/gists/{C.env('BACKUP_GIST_ID')}"
+    if revisione:
+        indirizzo += f"/{revisione}"
+    try:
+        risposta = requests.get(
+            indirizzo,
             headers=_headers_github(), timeout=C.HTTP_TIMEOUT + 30,
         )
     except Exception as exc:

@@ -353,7 +353,7 @@ class TestDiagnosticaConfigurazioneBackup(_SitoConLogin):
         from core import backup
 
         self._configurato_e_attivo()
-        backup.salva = lambda: (True, "salvato (9 KB compressi)")
+        backup.salva = lambda forza=False: (True, "salvato (9 KB compressi)")
 
         pagina = self.client.post("/catalogo/backup/salva").text
         self.assertIn("Salvataggio riuscito", pagina)
@@ -363,7 +363,7 @@ class TestDiagnosticaConfigurazioneBackup(_SitoConLogin):
         from core import backup
 
         self._configurato_e_attivo()
-        backup.salva = lambda: (False, "GitHub ha risposto 401: token non valido")
+        backup.salva = lambda forza=False: (False, "GitHub ha risposto 401: token non valido")
 
         pagina = self.client.post("/catalogo/backup/salva").text
         self.assertIn("Salvataggio non riuscito", pagina)
@@ -2539,3 +2539,53 @@ class TestSalvaIncollando(_Sito):
     def test_il_campo_da_incollare_e_in_pagina(self):
         pagina = self.client.get("/", params={"q": "998877660000000"}).text
         self.assertIn('name="incollato"', pagina)
+
+
+class TestIlSalvataggioAutomaticoNonSeppellisceIBuoni(_SitoConLogin):
+    """La protezione vista dalla parte delle rotte.
+
+    Il salvataggio automatico (ogni mezz'ora) deve fermarsi davanti a un
+    crollo di dimensione; «Salva adesso», che preme una persona che ha
+    appena guardato la pagina, deve passare oltre.
+    """
+
+    def test_salva_adesso_forza(self):
+        from core import backup
+
+        visti = {}
+
+        def finto(forza=False):
+            visti["forza"] = forza
+            return True, "salvato"
+
+        vero = backup.salva
+        backup.salva = finto
+        try:
+            self.client.post("/catalogo/backup/salva")
+        finally:
+            backup.salva = vero
+        self.assertIs(visti.get("forza"), True)
+
+    def test_il_ciclo_automatico_non_forza(self):
+        """È il punto: la guardia esiste proprio per quel percorso."""
+        import inspect
+
+        from core import backup
+
+        sorgente = inspect.getsource(backup._ciclo_salvataggio)
+        self.assertNotIn("forza", sorgente)
+        self.assertIn("salva()", sorgente)
+
+    def test_health_dice_com_e_andato_il_ripristino(self):
+        """Finora quella riga stava solo in Diagnostica, dietro
+        l'accesso: si vedeva solo entrando apposta, che è esattamente
+        quello che nessuno fa finché non manca qualcosa."""
+        from web.main import STATO_AVVIO
+
+        STATO_AVVIO["archivio esterno"] = "non riuscito: prova"
+        try:
+            dati = self.client.get("/health").json()
+            self.assertEqual(dati.get("archivio_esterno_allavvio"),
+                             "non riuscito: prova")
+        finally:
+            STATO_AVVIO.pop("archivio esterno", None)

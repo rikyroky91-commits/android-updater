@@ -115,6 +115,62 @@
 </div>
 {% endif %}
 
+{% if risultato_ripristino %}
+<div class="esito {{ 'trovato' if risultato_ripristino.ok else 'incerto' }}">
+  <p><strong>{{ "Ripristino riuscito." if risultato_ripristino.ok else "Ripristino non eseguito." }}</strong>
+    {{ risultato_ripristino.messaggio }}</p>
+  {% if risultato_ripristino.ok %}
+  <p class="nota">L'archivio di prima non è stato buttato: sta in
+    <code>tracker.db.prima-del-ripristino</code> finché il contenitore
+    resta acceso. Se hai scelto la versione sbagliata, dillo prima di un
+    riavvio.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{#
+  LE VERSIONI PRECEDENTI DEL SALVATAGGIO. Nate da una perdita di dati il
+  07/09/2026: il parco di test era sparito, e la copia buona esisteva
+  ancora nella storia del Gist — ma nessuna riga di codice sapeva
+  chiederla, quindi era irraggiungibile pur essendo a un clic.
+
+  Il numero da guardare è la DIMENSIONE: un salvataggio del database
+  vuoto pesa una frazione di uno pieno, ed è quel salto a dire dove è
+  successo il guaio.
+#}
+{% if versioni_backup is defined %}
+<h3 class="occhiello">Versioni precedenti del salvataggio</h3>
+{% if versioni_errore %}
+<p class="nota lacuna">{{ versioni_errore }}</p>
+{% elif not versioni_backup %}
+<p class="nota">Nessuna versione precedente: l'archivio è stato salvato
+  una volta sola.</p>
+{% else %}
+<table class="tabella">
+  <thead><tr><th>Quando</th><th>Dimensione</th><th>Ripristina</th></tr></thead>
+  <tbody>
+    {% for v in versioni_backup %}
+    <tr>
+      <td>{{ v.quando[:16].replace("T", " ") }} UTC</td>
+      <td class="tenue">{{ (v.byte // 1024) }} KB</td>
+      <td>
+        <form method="post" action="/catalogo/backup/ripristina" class="modulo">
+          <input type="hidden" name="sha" value="{{ v.sha }}">
+          <input type="text" name="conferma" placeholder="scrivi RIPRISTINA"
+                 autocomplete="off" size="16">
+          <button type="submit" class="secondario">Rimetti questa</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="nota">Sovrascrive l'archivio attuale, che viene comunque messo
+  da parte. La conferma scritta serve a questo: è l'unica azione del sito
+  che tocca tutto insieme.</p>
+{% endif %}
+{% endif %}
+
 {#
   IL MODULO CAMBIA A SECONDA DELLO STATO — non ha senso proporre di
   «creare l'archivio» a chi ne ha già uno attivo, né un pulsante «salva

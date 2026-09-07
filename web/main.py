@@ -1008,8 +1008,75 @@ def diagnostica_backup_salva(request: Request):
         return redirect
     from core import backup
 
-    ok, messaggio = backup.salva()
+    # `forza=True` PERCHE' QUI C'E' UNA PERSONA. Il salvataggio
+    # automatico si ferma quando l'archivio da caricare e' molto piu'
+    # piccolo di quello gia' salvato (vedi `backup._crollo_sospetto`):
+    # e' la protezione contro il caso in cui l'app riparte senza dati e
+    # seppellisce la copia buona. Chi preme questo tasto invece ha appena
+    # guardato la pagina e sa cosa sta salvando.
+    ok, messaggio = backup.salva(forza=True)
     return _pagina_diagnostica(request, risultato_salva={"ok": ok, "messaggio": messaggio})
+
+
+@app.post("/catalogo/backup/versioni", response_class=HTMLResponse)
+def diagnostica_backup_versioni(request: Request):
+    """Le versioni precedenti del salvataggio, per riconoscere quella buona.
+
+    NASCE DA UNA PERDITA DI DATI, il 07/09/2026: «il parco test è vuoto,
+    settimane fa era pieno di roba, come si è perso tutto?». L'archivio
+    vive in `/tmp` su Render e sopravvive solo grazie al backup; se un
+    ripristino all'avvio non riesce, l'app riparte vuota e il salvataggio
+    periodico scrive nel Gist il database VUOTO, seppellendo la copia
+    buona.
+
+    Seppellendo, non cancellando: ogni salvataggio è una revisione e
+    GitHub le conserva tutte. Mancava solo il modo di guardarle e di
+    sceglierne una — e senza quel modo, una perdita di dati era
+    definitiva pur avendo la copia a un clic di distanza.
+    """
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
+    from core import backup
+
+    elenco, errore = backup.revisioni()
+    return _pagina_diagnostica(request,
+                               versioni_backup=elenco, versioni_errore=errore)
+
+
+@app.post("/catalogo/backup/ripristina", response_class=HTMLResponse)
+def diagnostica_backup_ripristina(request: Request, sha: str = Form(""),
+                                  conferma: str = Form("")):
+    """Rimette una versione precedente al posto dell'archivio attuale.
+
+    CHIEDE UNA CONFERMA SCRITTA, e non è burocrazia: questa è l'unica
+    rotta del sito che sovrascrive l'archivio intero. Un clic per sbaglio
+    qui costa quanto il guasto che questa pagina serve a riparare.
+
+    Quello che c'è viene comunque messo da parte in
+    `tracker.db.prima-del-ripristino` (vedi `backup.ripristina`): una
+    revisione scelta male non deve diventare un secondo disastro sopra il
+    primo.
+    """
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
+    from core import backup
+
+    if conferma.strip().upper() != "RIPRISTINA":
+        return _pagina_diagnostica(request, risultato_ripristino={
+            "ok": False,
+            "messaggio": "per procedere scrivi RIPRISTINA nella casella di "
+                         "conferma: questa azione sovrascrive l'archivio intero"})
+    ok, messaggio = backup.ripristina(solo_se_mancante=False,
+                                      revisione=sha.strip())
+    if ok:
+        # I cataloghi in memoria puntavano al database di prima: senza
+        # questo, la pagina continuerebbe a mostrare i dati vecchi e
+        # sembrerebbe che il ripristino non abbia fatto niente.
+        imeicheck.reset_cache()
+    return _pagina_diagnostica(request,
+                               risultato_ripristino={"ok": ok, "messaggio": messaggio})
 
 
 # LA CHIAVE VA IN QUERY, NON NEL PERCORSO. Le chiavi dispositivo hanno
@@ -1505,6 +1572,20 @@ def health(dettaglio: str = Query(default="")):
     consumo = imeicheck.riassunto_consumo(carica=False)
     if consumo:
         risposta["tac_esterno_consumo"] = consumo
+    # COM'E' ANDATO IL RIPRISTINO ALL'AVVIO, e si legge senza login.
+    #
+    # È il primo anello della catena che il 07/09/2026 ha fatto sparire
+    # il parco di test: il contenitore riparte, `/tmp` è vuoto, e se il
+    # ripristino non riesce l'app parte senza i suoi dati. Finora quella
+    # riga stava solo in Diagnostica, dietro l'accesso — cioè si vedeva
+    # solo entrando apposta, che è esattamente quello che nessuno fa
+    # finché non si accorge che manca qualcosa.
+    #
+    # Viene da STATO_AVVIO, scritto una volta sola all'avvio: non tocca
+    # l'archivio, che questa rotta promette di non aprire.
+    avvio = STATO_AVVIO.get("archivio esterno")
+    if avvio:
+        risposta["archivio_esterno_allavvio"] = avvio
     # IL DETTAGLIO SI CHIEDE, non si calcola a ogni battito.
     #
     # Pesare i cataloghi voce per voce costa qualche decimo di secondo su

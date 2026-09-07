@@ -961,6 +961,51 @@ da una quota o da un antibot.
 
 ---
 
+## Il backup non sovrascrive piu' il pieno col vuoto (2026-09-07)
+
+Segnalato dall'utente: «il parco test e' vuoto, settimane fa era pieno di
+roba, come si e' perso tutto?». La catena, e il pezzo grave e' l'ultimo:
+
+1. il contenitore riparte — su Render `/tmp` si azzera a ogni deploy, a
+   ogni riavvio per memoria, a ogni risveglio dopo il sonno;
+2. l'avvio prova `ripristina()`, l'unica cosa che rimette i dati;
+3. se quel ripristino NON riesce l'app parte **vuota**;
+4. mezz'ora dopo il salvataggio periodico carica nel Gist il database
+   vuoto, e la copia buona non e' piu' l'ultima.
+
+Il passo 4 e' il difetto, e non e' un caso limite: e' il funzionamento
+normale applicato a una situazione anormale. Un archivio di sicurezza che
+sostituisce da solo una copia piena con una vuota non e' un archivio di
+sicurezza — e nessuno se ne accorge, perche' ogni singolo salvataggio
+«riesce».
+
+**La guardia si misura sul Gist, non su un ricordo locale.** Ricordare
+quanto pesava l'ultimo salvataggio buono sarebbe inutile: quel ricordo
+vive nello stesso database che si e' appena azzerato. L'unico riferimento
+che sopravvive alla cancellazione e' l'archivio remoto stesso.
+
+Sotto meta' della dimensione precedente il salvataggio automatico si
+ferma e lo scrive in Diagnostica. Meta' e' largo di proposito: la potatura
+degli aggiornamenti vecchi fa rimpicciolire l'archivio per motivi
+legittimi, e una guardia che scatta sul rumore verrebbe disattivata dopo
+il secondo falso allarme. «Salva adesso» passa oltre, perche' li' c'e'
+una persona che ha appena guardato la pagina.
+
+**E il primo anello ora si vede senza login.** `/health` risponde
+`archivio_esterno_allavvio`: com'e' andato il ripristino. Finora stava
+solo in Diagnostica, dietro l'accesso — cioe' si vedeva solo entrando
+apposta, che e' quello che nessuno fa finche' non manca qualcosa.
+
+Restano anche le **versioni precedenti**: `_salva_su_gist` fa una `PATCH`
+e GitHub conserva la storia, quindi le copie di settimane fa non sono mai
+state cancellate, solo seppellite. `revisioni()` le elenca e
+`ripristina(revisione=...)` ne rimette una, con conferma scritta e
+mettendo da parte quella attuale. Non e' la protezione — la protezione e'
+la guardia sopra — e' la rete sotto, per il giorno in cui la protezione
+non basta.
+
+---
+
 ## L'alleggerimento automatico della memoria (2026-09-04)
 
 Segnalato dall'utente guardando `/health`: 423 MB usati, 457 di picco su
