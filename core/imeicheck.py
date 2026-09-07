@@ -1532,6 +1532,48 @@ def _chi_ha_risposto(risposta) -> str:
     return " · ".join(pezzi)
 
 
+# ======================================================================
+# I TRE SEGNAPOSTO DELL'INDIRIZZO
+# ======================================================================
+# Guardando i servizi TAC veri, l'intestazione con la chiave e il corpo
+# JSON — la forma di HiCellTek — sono una delle tre in circolazione, non
+# la sola:
+#
+#   {tac}     `…/api/tac/35692411`         le otto cifre nel percorso
+#   {chiave}  `…?token=abc&format=json`    la chiave nella query, che e'
+#                                          come fa imeidb.xyz
+#   {imei}    `…?imei=356924110000009`     quindici cifre, perche' alcuni
+#                                          accettano solo un IMEI intero
+#
+# `{imei}` NON MANDA FUORI L'IMEI DI NESSUNO, ed e' il punto delicato: si
+# compone dal TAC piu' sei zeri e la cifra di controllo calcolata, cioe'
+# un numero ben formato la cui parte seriale e' inventata. Il modulo
+# promette in cima al file che l'IMEI ricevuto non esce mai da questa
+# macchina, e questa e' la strada per tenere quella promessa anche con un
+# fornitore che vuole quindici cifre — la risposta e' identica, perche'
+# quei servizi cercano comunque sul TAC.
+#
+# Senza segnaposto l'indirizzo resta com'e' e si chiama in POST col corpo
+# `{"query": "<tac>"}`: nessuna configurazione esistente cambia.
+def _imei_finto_dal_tac(tac: str) -> str:
+    """Un IMEI ben formato con questo TAC e la parte seriale a zero."""
+    return imei_con_cifra_di_controllo(tac + "000000") or tac
+
+
+def _indirizzo_composto(fornitore: dict, tac: str) -> str:
+    """L'indirizzo con i segnaposto riempiti, o identico se non ce ne sono."""
+    from urllib.parse import quote
+
+    url = fornitore["url"]
+    if "{tac}" in url:
+        url = url.replace("{tac}", tac)
+    if "{imei}" in url:
+        url = url.replace("{imei}", _imei_finto_dal_tac(tac))
+    if "{chiave}" in url:
+        url = url.replace("{chiave}", quote(fornitore["chiave"], safe=""))
+    return url
+
+
 def _interroga_fornitore(fornitore: dict, tac: str) -> tuple[str, tuple[str, str] | None]:
     """Chiede questo TAC a UN fornitore e traduce la sua risposta.
 
@@ -1541,11 +1583,11 @@ def _interroga_fornitore(fornitore: dict, tac: str) -> tuple[str, tuple[str, str
     e indovinarne una sola significava non poterne cambiare.
     """
     nome = fornitore["nome"]
-    url = fornitore["url"]
+    url = _indirizzo_composto(fornitore, tac)
     try:
-        if "{tac}" in url:
+        if url != fornitore["url"]:
             risposta = requests.get(
-                url.replace("{tac}", tac),
+                url,
                 headers=_intestazioni_fornitore(fornitore),
                 timeout=C.HTTP_TIMEOUT,
             )

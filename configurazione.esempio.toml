@@ -33,10 +33,25 @@ TAC_API_KEY = ""
 # ottenere è di un altro servizio, si cambia da qui senza toccare il
 # codice. Il primo ha già l'indirizzo di HiCellTek.
 #
-# L'indirizzo decide anche il verbo: con `{tac}` dentro si chiama in GET
-# mettendo le 8 cifre al posto del segnaposto, senza si chiama in POST
-# con {"query": "<tac>"} nel corpo.
-# TAC_API_URL_2 = "https://esempio.it/api/v1/tac/{tac}"
+# L'indirizzo decide anche il verbo: con un segnaposto dentro si chiama in
+# GET, senza si chiama in POST con {"query": "<tac>"} nel corpo.
+#
+# I segnaposto sono tre, e coprono le forme dei servizi TAC veri:
+#
+#   {tac}     le 8 cifre        …/api/tac/{tac}
+#   {chiave}  la chiave         …?token={chiave}&format=json
+#   {imei}    15 cifre          …?imei={imei}
+#
+# {imei} NON manda fuori l'IMEI di nessuno: compone il TAC piu' sei zeri e
+# la cifra di controllo calcolata, cioe' un numero ben formato la cui
+# parte seriale e' inventata. La risposta e' identica, perche' quei
+# servizi cercano comunque sul TAC — e la promessa in cima a
+# core/imeicheck.py (l'IMEI ricevuto non esce mai da qui) resta intatta.
+#
+# {chiave} serve ai servizi che vogliono il token nell'indirizzo invece
+# che in un'intestazione: la chiave resta comunque in TAC_API_KEY_n, in
+# un posto solo.
+# TAC_API_URL_2 = "https://esempio.it/api/imei/{imei}?token={chiave}&format=json"
 # TAC_API_URL_3 = ""
 
 # COME CI SI PRESENTA. Verso un sito di notizie l'app si dichiara un

@@ -1748,3 +1748,124 @@ class TestUnAntibotNonEUnGuastoPasseggero(unittest.TestCase):
         self._servizio(500, "Internal Server Error")
         imeicheck.cerca_tac_online_esito("35139740")
         self.assertIn("500", imeicheck.ultimo_esito_servizio()["dettaglio"])
+
+
+class TestITreSegnapostoDellIndirizzo(unittest.TestCase):
+    """I servizi TAC non hanno tutti la forma di HiCellTek.
+
+    Guardando quelli veri, la chiave in un'intestazione e il corpo JSON
+    sono UNA delle forme in circolazione, non la sola: c'è chi vuole le
+    otto cifre nel percorso, chi la chiave nella query, chi accetta solo
+    un IMEI intero di quindici cifre. Senza questi segnaposto, ogni
+    fornitore nuovo sarebbe un rilascio invece di tre variabili.
+    """
+
+    def test_il_tac_nel_percorso(self):
+        composto = imeicheck._indirizzo_composto(
+            {"url": "https://esempio.it/api/tac/{tac}", "chiave": "k"}, "35692411")
+        self.assertEqual(composto, "https://esempio.it/api/tac/35692411")
+
+    def test_la_chiave_nella_query(self):
+        """È come fa imeidb.xyz: il token sta nell'indirizzo, non in
+        un'intestazione. La chiave resta comunque in TAC_API_KEY, cioè in
+        un posto solo."""
+        composto = imeicheck._indirizzo_composto(
+            {"url": "https://esempio.it/api?token={chiave}&format=json",
+             "chiave": "abc123"}, "35692411")
+        self.assertEqual(composto,
+                         "https://esempio.it/api?token=abc123&format=json")
+
+    def test_una_chiave_con_caratteri_speciali_non_rompe_l_indirizzo(self):
+        composto = imeicheck._indirizzo_composto(
+            {"url": "https://esempio.it/api?token={chiave}", "chiave": "a/b c&d"},
+            "35692411")
+        self.assertIn("token=a%2Fb%20c%26d", composto)
+
+    def test_l_imei_finto_e_ben_formato(self):
+        """Alcuni servizi accettano solo quindici cifre."""
+        finto = imeicheck._imei_finto_dal_tac("35692411")
+        self.assertEqual(len(finto), 15)
+        self.assertTrue(imeicheck.is_valid_imei(finto))
+        self.assertEqual(imeicheck.tac_di(finto), "35692411")
+
+    def test_e_non_e_l_imei_di_nessuno(self):
+        """È il punto delicato di tutta questa funzione. Il modulo promette
+        in cima al file che l'IMEI ricevuto non esce mai da questa
+        macchina: la parte seriale qui è inventata, e la risposta è
+        identica perché quei servizi cercano comunque sul TAC."""
+        finto = imeicheck._imei_finto_dal_tac("35692411")
+        self.assertEqual(finto[8:14], "000000")
+
+    def test_senza_segnaposto_l_indirizzo_non_si_tocca(self):
+        """Nessuna configurazione esistente cambia comportamento."""
+        url = "https://imei.hicelltek.com/api/v1/tac/lookup"
+        self.assertEqual(
+            imeicheck._indirizzo_composto({"url": url, "chiave": "k"}, "35692411"),
+            url)
+
+    def test_senza_segnaposto_si_chiama_in_post(self):
+        visti = {}
+
+        class Finto:
+            def post(self_interno, url, **k):
+                visti["verbo"] = "post"
+                visti["url"] = url
+                visti["corpo"] = k.get("json")
+
+                class R:
+                    status_code = 200
+                    headers = {}
+                    text = ""
+
+                    @staticmethod
+                    def json():
+                        return {"brand": "Samsung", "model": "S26"}
+                return R()
+
+            def get(self_interno, url, **k):
+                visti["verbo"] = "get"
+                visti["url"] = url
+                raise AssertionError("non doveva chiamare in GET")
+
+        vero = imeicheck.requests
+        imeicheck.requests = Finto()
+        try:
+            imeicheck._interroga_fornitore(
+                {"nome": "x", "url": "https://esempio.it/api", "chiave": "k",
+                 "intestazione": "X-Api-Key", "agente": "prova"}, "35692411")
+        finally:
+            imeicheck.requests = vero
+        self.assertEqual(visti["verbo"], "post")
+        self.assertEqual(visti["corpo"], {"query": "35692411"})
+
+    def test_con_un_segnaposto_si_chiama_in_get(self):
+        visti = {}
+
+        class Finto:
+            def get(self_interno, url, **k):
+                visti["url"] = url
+
+                class R:
+                    status_code = 200
+                    headers = {}
+                    text = ""
+
+                    @staticmethod
+                    def json():
+                        return {"brand": "Samsung", "model": "S26"}
+                return R()
+
+            def post(self_interno, url, **k):
+                raise AssertionError("non doveva chiamare in POST")
+
+        vero = imeicheck.requests
+        imeicheck.requests = Finto()
+        try:
+            imeicheck._interroga_fornitore(
+                {"nome": "x", "chiave": "abc",
+                 "url": "https://imeidb.xyz/api/imei/{imei}?token={chiave}",
+                 "intestazione": "X-Api-Key", "agente": "prova"}, "35692411")
+        finally:
+            imeicheck.requests = vero
+        self.assertIn("356924110000008", visti["url"])
+        self.assertIn("token=abc", visti["url"])

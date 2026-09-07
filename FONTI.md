@@ -877,6 +877,26 @@ precisa — oppure usare un altro fornitore in `TAC_API_KEY_2`.
 niente — non passera' domani ne' fra un mese, finche' non lo tolgono
 loro. Resta comunque un errore e non un «no»: conservarlo per un mese
 renderebbe ignoto un telefono che il servizio conosce.
+### I tre segnaposto dell'indirizzo (2026-09-07)
+
+Guardando i servizi TAC veri, la chiave in un'intestazione piu' il corpo
+JSON — la forma di HiCellTek — e' UNA delle forme in circolazione, non la
+sola. Senza segnaposto ogni fornitore nuovo sarebbe un rilascio invece di
+tre variabili d'ambiente.
+
+    {tac}     le 8 cifre    …/api/tac/{tac}
+    {chiave}  la chiave     …?token={chiave}&format=json
+    {imei}    15 cifre      …?imei={imei}
+
+`{imei}` **non manda fuori l'IMEI di nessuno**, ed e' il punto delicato:
+compone il TAC piu' sei zeri e la cifra di controllo calcolata, cioe' un
+numero ben formato la cui parte seriale e' inventata. La risposta e'
+identica, perche' quei servizi cercano comunque sul TAC, e la promessa in
+cima a `core/imeicheck.py` — l'IMEI ricevuto non esce mai da questa
+macchina — resta intatta anche con un fornitore che vuole 15 cifre.
+
+Senza segnaposto l'indirizzo resta com'e' e si chiama in POST col corpo
+`{"query": "<tac>"}`: nessuna configurazione esistente cambia.
 
 ---
 
