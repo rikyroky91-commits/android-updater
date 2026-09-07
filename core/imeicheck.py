@@ -1403,6 +1403,50 @@ def cerca_tac_online(tac: str) -> tuple[str, str] | None:
     return cerca_tac_online_esito(tac)[1]
 
 
+# Le prime 160 battute di una pagina d'errore sono `<!DOCTYPE HTML><html
+# lang="en-US"><head> <meta charset="UTF-8" ...`: intestazione, sempre
+# uguale, che non dice niente. Visto in produzione il 07/09/2026 — la
+# diagnosi arrivava, e finiva tutta dentro il preambolo.
+#
+# Il messaggio vero di una pagina d'errore sta nel `<title>` e nel primo
+# testo visibile: «Resource Limit Is Reached», «Account Suspended»,
+# «Service Temporarily Unavailable». Sono frasi diverse che portano ad
+# azioni diverse, e vanno lette.
+_RE_TAG = re.compile(r"<[^>]*>")
+_RE_TITOLO = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
+_RE_INVISIBILE = re.compile(r"<(script|style|head)\b.*?</\1>",
+                            re.IGNORECASE | re.DOTALL)
+
+
+def _parte_leggibile(testo: str, quante: int = 200) -> str:
+    """Il messaggio di una risposta, saltando il contorno.
+
+    Su una risposta JSON non c'è niente da saltare e si prende com'è. Su
+    una pagina HTML si prende il titolo e il testo visibile, buttando
+    `head`, `script` e `style`: e' l'unica parte scritta per essere letta
+    da una persona, ed e' esattamente quella che serve qui.
+    """
+    grezzo = " ".join((testo or "").split())
+    if not grezzo:
+        return ""
+    if "<" not in grezzo:
+        return grezzo[:quante]
+    titolo = _RE_TITOLO.search(grezzo)
+    visibile = _RE_TAG.sub(" ", _RE_INVISIBILE.sub(" ", grezzo))
+    visibile = " ".join(visibile.split())
+    pezzi = []
+    if titolo:
+        pulito = " ".join(_RE_TAG.sub(" ", titolo.group(1)).split())
+        if pulito:
+            pezzi.append(pulito)
+    if visibile and visibile not in pezzi:
+        pezzi.append(visibile)
+    unito = " — ".join(pezzi)[:quante]
+    # Una pagina di solo contorno (niente titolo, niente testo) non deve
+    # sembrare una risposta vuota: dire che era HTML e' gia' un'informazione.
+    return unito or "(pagina HTML senza testo)"
+
+
 def _chi_ha_risposto(risposta) -> str:
     """Le poche righe che dicono se ha parlato l'API o qualcosa davanti.
 
@@ -1432,7 +1476,7 @@ def _chi_ha_risposto(risposta) -> str:
     except Exception:  # pragma: no cover - una diagnosi non rompe nulla
         pass
     try:
-        corpo = " ".join((risposta.text or "").split())[:160]
+        corpo = _parte_leggibile(getattr(risposta, "text", "") or "")
         if corpo:
             pezzi.append(f"corpo: {corpo}")
     except Exception:  # pragma: no cover

@@ -831,6 +831,26 @@ Due correzioni, tutt'e due dall'ambiente senza toccare il codice:
   `retry-after` e le prime 160 battute del corpo. «HTTP 503» da solo non
   distingue «il servizio e' giu'», che si aspetta, da «il firewall ci
   rifiuta», che si risolve: sono settimane di differenza.
+**Esito, con la diagnosi in mano.** L'ipotesi dello User-Agent era
+SBAGLIATA. La riga registrata dice `server=o2switch-PowerBoost-v3` e un
+corpo HTML: o2switch e' l'hosting condiviso su cui gira
+`imei.hicelltek.com`, e il 503 lo scrive il server dell'hosting, non un
+antibot (nessun `cf-ray`, nessun «Attention Required») e non
+l'applicazione di HiCellTek — che infatti conta zero chiamate. E' un
+guasto loro, e da qui non si aggira in nessun modo.
+
+Le due modifiche restano perche' valgono comunque — presentarsi come un
+crawler a un'API a chiave non e' giusto, e sapere chi risponde e' quello
+che ha permesso di chiudere la questione in un giro invece che in
+settimane di attesa — ma non e' stata quella la causa.
+
+Un difetto della diagnosi stessa, corretto subito: il taglio a 160
+battute cadeva tutto dentro `<!DOCTYPE HTML><html lang=...><head><meta
+charset=...`, cioe' il preambolo, sempre uguale, che non dice niente. Ora
+`_parte_leggibile` prende il `<title>` e il testo visibile e butta
+`head`, `script` e `style`: «Resource Limit Is Reached», «Account
+Suspended», «Service Temporarily Unavailable» sono frasi diverse che
+portano ad azioni diverse, e vanno lette.
 
 ---
 

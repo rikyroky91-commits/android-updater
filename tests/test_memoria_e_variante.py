@@ -1560,3 +1560,75 @@ class TestPerchePasseraLaChiamata(unittest.TestCase):
         imeicheck.cerca_tac_online_esito("35139740")
         self.assertNotIn("una-chiave",
                          imeicheck.ultimo_esito_servizio()["dettaglio"])
+
+
+class TestIlMessaggioDentroLaPaginaDErrore(unittest.TestCase):
+    """Visto in produzione il 07/09/2026: la diagnosi arrivava e finiva
+    tutta dentro il preambolo.
+
+        corpo: <!DOCTYPE HTML><html lang="en-US"><head> <meta
+        charset="UTF-8" /> <meta http-equiv="Content-Type" ...
+
+    Centosessanta battute spese in intestazione, sempre uguale, che non
+    dice niente. Il messaggio vero di una pagina d'errore sta nel
+    `<title>` e nel primo testo visibile — «Resource Limit Is Reached»,
+    «Account Suspended», «Service Temporarily Unavailable» — e sono frasi
+    diverse che portano ad azioni diverse.
+    """
+
+    PAGINA_O2SWITCH = (
+        '<!DOCTYPE HTML><html lang="en-US"><head> <meta charset="UTF-8" />'
+        ' <title>503 Service Temporarily Unavailable</title>'
+        '<style>body{color:red}</style></head><body>'
+        '<h1>Resource Limit Is Reached</h1>'
+        '<p>The website is temporarily unable to service your request.</p>'
+        '</body></html>'
+    )
+
+    def test_di_una_pagina_html_si_prende_il_messaggio(self):
+        letto = imeicheck._parte_leggibile(self.PAGINA_O2SWITCH)
+        self.assertIn("503 Service Temporarily Unavailable", letto)
+        self.assertIn("Resource Limit Is Reached", letto)
+
+    def test_e_non_il_preambolo(self):
+        letto = imeicheck._parte_leggibile(self.PAGINA_O2SWITCH)
+        self.assertNotIn("DOCTYPE", letto)
+        self.assertNotIn("charset", letto)
+
+    def test_ne_il_foglio_di_stile(self):
+        """`style` e `script` sono testo, e sono l'ultimo posto dove
+        guardare per capire cos'è andato storto."""
+        self.assertNotIn("color:red",
+                         imeicheck._parte_leggibile(self.PAGINA_O2SWITCH))
+
+    def test_una_risposta_json_si_prende_com_e(self):
+        """Su una risposta di un'API non c'è nessun contorno da saltare."""
+        self.assertEqual(imeicheck._parte_leggibile('{"error":"quota finita"}'),
+                         '{"error":"quota finita"}')
+
+    def test_una_pagina_senza_testo_lo_dice(self):
+        """Non deve sembrare una risposta vuota: sapere che era HTML è
+        già un'informazione."""
+        self.assertEqual(
+            imeicheck._parte_leggibile("<html><head></head><body></body></html>"),
+            "(pagina HTML senza testo)")
+
+    def test_una_risposta_vuota_resta_vuota(self):
+        self.assertEqual(imeicheck._parte_leggibile(""), "")
+        self.assertEqual(imeicheck._parte_leggibile(None), "")
+
+    def test_resta_corta(self):
+        """Finisce in `/health`, che si legge senza login."""
+        lunga = "<html><body>" + ("parola " * 5000) + "</body></html>"
+        self.assertLessEqual(len(imeicheck._parte_leggibile(lunga)), 200)
+
+    def test_la_diagnosi_completa_dice_server_e_messaggio(self):
+        class R:
+            status_code = 503
+            headers = {"server": "o2switch-PowerBoost-v3"}
+            text = TestIlMessaggioDentroLaPaginaDErrore.PAGINA_O2SWITCH
+
+        diagnosi = imeicheck._chi_ha_risposto(R())
+        self.assertIn("o2switch", diagnosi)
+        self.assertIn("Resource Limit Is Reached", diagnosi)
+        self.assertNotIn("DOCTYPE", diagnosi)
