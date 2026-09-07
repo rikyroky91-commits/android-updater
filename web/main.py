@@ -44,8 +44,8 @@ from datetime import date, datetime, timezone
 from urllib.parse import quote
 
 from fastapi import FastAPI, File, Form, Query, Request, UploadFile
-from fastapi.responses import (HTMLResponse, JSONResponse, RedirectResponse,
-                               Response)
+from fastapi.responses import (HTMLResponse, JSONResponse, PlainTextResponse,
+                               RedirectResponse, Response)
 from fastapi.staticfiles import StaticFiles
 
 from core import aer_catalog, aiquery, allegati, appledevices, cifratura, config as C
@@ -823,6 +823,27 @@ def _riga_memoria() -> str:
     return " · ".join(pezzi)
 
 
+def _riga_tac_inseriti() -> str:
+    """«3 inseriti, 1 già nel repository · esportali da /tac/esporta»."""
+    inseriti = imeicheck.tac_inseriti()
+    if not inseriti:
+        return ("nessuno — si aggiungono dalla pagina di un IMEI che l'app "
+                "non riconosce, e valgono per tutti gli IMEI di quel modello")
+    gia_salvi = len(imeicheck.tac_inseriti_gia_curati())
+    pezzi = [f"{len(inseriti)} inseriti"]
+    # DA SALVARE e GIÀ SALVI non devono leggersi uguali: i primi vivono
+    # solo in `tracker.db`, che su Render sta in `/tmp`.
+    if gia_salvi:
+        pezzi.append(f"{gia_salvi} già in data/tac_modelli.csv")
+    da_salvare = len(inseriti) - gia_salvi
+    if da_salvare:
+        pezzi.append(f"{da_salvare} ancora solo in archivio — scaricali da "
+                     f"/tac/esporta e uniscili al file per renderli permanenti")
+    else:
+        pezzi.append("tutti già permanenti nel repository")
+    return " · ".join(pezzi)
+
+
 def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
     """Il corpo comune della pagina Diagnostica — estratto perché le
     rotte del backup (sotto) devono ririsegnare la STESSA pagina con in
@@ -842,6 +863,12 @@ def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
             ("Processori", soc.status()),
             ("Specifiche hardware", specs.status()),
             ("Servizio TAC esterno", imeicheck.stato_servizio_esterno()),
+            # I TAC INSEGNATI A MANO, e dove sono adesso. È l'unica fonte
+            # di copertura che non dipende da un servizio esterno, da una
+            # quota o da un antibot — e finché resta solo in `tracker.db`
+            # (che su Render vive in `/tmp`) è anche l'unica che si può
+            # perdere del tutto.
+            ("TAC inseriti a mano", _riga_tac_inseriti()),
             ("Interprete AI della ricerca", aiquery.status()),
             # LA MEMORIA, ACCANTO AI CATALOGHI CHE LA CONSUMANO.
             #
@@ -878,6 +905,35 @@ def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
 @app.get("/diagnostica", response_class=HTMLResponse)
 def pagina_diagnostica(request: Request):
     return _pagina_diagnostica(request)
+
+
+@app.get("/tac/esporta")
+def tac_esporta():
+    """I TAC inseriti a mano, pronti da unire a `data/tac_modelli.csv`.
+
+    PERCHÉ ESISTE. Un TAC insegnato all'app dalla pagina dell'IMEI finisce
+    in `tracker.db`, che su Render vive in `/tmp`: sopravvive solo finché
+    regge il backup su Gist. `imeicheck.riga_csv` era scritta apposta per
+    riportare quel lavoro nel repository — dove diventa permanente e
+    viaggia con il codice — ma non la chiamava nessuno, e la promessa nel
+    commento di `_META_TAC_UTENTE` («l'app mostra comunque la riga da
+    incollare nel CSV») non era mantenuta.
+
+    È l'unica fonte di copertura TAC che non dipende da un servizio
+    esterno, da una quota o da un antibot: cresce solo se qualcuno la
+    alimenta, e non deve perdersi al primo riavvio.
+    """
+    testo = imeicheck.esporta_tac_inseriti()
+    if not testo:
+        # Un file con la sola intestazione sembrerebbe un'esportazione
+        # riuscita e vuota, che è un'altra cosa da «non c'era niente».
+        return PlainTextResponse(
+            "Nessun TAC inserito a mano da esportare.\n\n"
+            "Se ne aggiungono dalla pagina di un IMEI che l'app non "
+            "riconosce, con il campo «Salva il modello».\n",
+            status_code=404)
+    return PlainTextResponse(testo, headers={
+        "Content-Disposition": 'attachment; filename="tac_inseriti.csv"'})
 
 
 @app.post("/catalogo/backup/crea", response_class=HTMLResponse)

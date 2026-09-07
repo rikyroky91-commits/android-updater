@@ -112,3 +112,89 @@ class TestLeFontiLocaliSopravvivonoAlDownload(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class TestQuelloCheInsegniNonDeveMorireColContenitore(unittest.TestCase):
+    """«non puoi fare inserimenti manuali tu stesso?», 07/09/2026.
+
+    No, non i TAC: le otto cifre le assegna la GSMA e non si deducono dal
+    codice modello. Inventarle vorrebbe dire far rispondere l'app con
+    sicurezza a un IMEI vero dando il telefono sbagliato — peggio di «non
+    lo so», e il contrario della riga in fondo a ogni pagina.
+
+    Chi PUÒ inserirli è chi ha il telefono in mano, e lo fa già dalla
+    pagina dell'IMEI. Il difetto era cosa succede dopo: quei TAC finiscono
+    in `tracker.db`, che su Render vive in `/tmp`. `riga_csv` esisteva
+    apposta per riportarli nel repository ma non la chiamava nessuno, e la
+    promessa nel commento di `_META_TAC_UTENTE` — «l'app mostra comunque
+    la riga da incollare nel CSV» — non era mantenuta.
+    """
+
+    def setUp(self):
+        import tempfile
+
+        from core import config as C, storage
+
+        self._db = C.DB_PATH
+        C.DB_PATH = tempfile.mktemp(suffix=".db")
+        storage.reset_state()
+        storage.init_db()
+        imeicheck.reset_cache()
+
+        def rimetti():
+            C.DB_PATH = self._db
+            storage.reset_state()
+            imeicheck.reset_cache()
+
+        self.addCleanup(rimetti)
+
+    def test_senza_inserimenti_non_si_esporta_un_file_vuoto(self):
+        """Un file con la sola intestazione sembrerebbe un'esportazione
+        riuscita e vuota, che è un'altra cosa da «non c'era niente»."""
+        self.assertEqual(imeicheck.esporta_tac_inseriti(), "")
+
+    def test_l_esportazione_e_un_pezzo_del_file_curato(self):
+        imeicheck.aggiungi_tac("35139740", "Samsung", "Galaxy A56 5G")
+        testo = imeicheck.esporta_tac_inseriti()
+        self.assertIn("tac,marca,modello,nota", testo)
+        self.assertIn("35139740,Samsung,Galaxy A56 5G,verificato a mano", testo)
+
+    def test_e_si_rilegge_con_lo_stesso_lettore_del_repository(self):
+        """È il collaudo che conta: quello che esce da qui deve poter
+        essere incollato in `data/tac_modelli.csv` e ritrovato uguale.
+        Un'esportazione che il lettore non riprende è carta straccia."""
+        imeicheck.aggiungi_tac("35139740", "Samsung", "Galaxy A56 5G")
+        imeicheck.aggiungi_tac("86558708", "HONOR", "HONOR 400 Pro")
+        riletti = imeicheck.carica_tac_curati(imeicheck.esporta_tac_inseriti())
+        self.assertEqual(riletti, {"35139740": ("Samsung", "Galaxy A56 5G"),
+                                   "86558708": ("HONOR", "HONOR 400 Pro")})
+
+    def test_una_virgola_nel_nome_non_spezza_la_riga(self):
+        """«Galaxy A56 5G, SM-A566B» è esattamente la forma che il
+        database TAC usa, ed è quella che si incolla nel campo."""
+        imeicheck.aggiungi_tac("35139740", "Samsung", "Galaxy A56 5G, SM-A566B")
+        riletti = imeicheck.carica_tac_curati(imeicheck.esporta_tac_inseriti())
+        self.assertEqual(riletti["35139740"],
+                         ("Samsung", "Galaxy A56 5G, SM-A566B"))
+
+    def test_si_sa_quali_sono_gia_al_sicuro(self):
+        """Senza, l'elenco da incollare crescerebbe per sempre e chi lo
+        guarda non saprebbe quali righe ha già messo dentro."""
+        imeicheck.aggiungi_tac("35139740", "Samsung", "Galaxy A56 5G")
+        self.assertEqual(imeicheck.tac_inseriti_gia_curati(), [])
+        # Un TAC che sta anche nel file del repository: il lavoro è salvo.
+        curato = imeicheck._indice_curato()
+        if curato:
+            gia = sorted(curato)[0]
+            imeicheck.aggiungi_tac(gia, "Marca", "Modello")
+            self.assertIn(gia, imeicheck.tac_inseriti_gia_curati())
+
+    def test_l_ordine_e_stabile(self):
+        """Un'esportazione che cambia ordine a ogni giro produce un diff
+        illeggibile in ogni commit."""
+        for tac in ("86558708", "35139740", "01620200"):
+            imeicheck.aggiungi_tac(tac, "M", "X")
+        righe = [r for r in imeicheck.esporta_tac_inseriti().splitlines()
+                 if r and not r.startswith(("#", "tac,"))]
+        self.assertEqual([r.split(",")[0] for r in righe],
+                         ["01620200", "35139740", "86558708"])

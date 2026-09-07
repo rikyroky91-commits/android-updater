@@ -461,7 +461,56 @@ def rimuovi_tac(tac: str) -> bool:
 
 def riga_csv(tac: str, marca: str = "Marca", modello: str = "Nome del modello") -> str:
     """La riga da incollare in `data/tac_modelli.csv` per renderlo permanente."""
-    return f"{tac},{marca},{modello},verificato a mano"
+    virgola = lambda t: '"%s"' % t.replace('"', '""') if "," in t or '"' in t else t
+    return f"{tac},{virgola(marca)},{virgola(modello)},verificato a mano"
+
+
+# ======================================================================
+# QUELLO CHE HAI INSEGNATO ALL'APP NON DEVE MORIRE CON IL CONTENITORE
+# ======================================================================
+# Chiesto dall'utente il 07/09/2026: «non puoi fare inserimenti manuali tu
+# stesso?». No, non i TAC: le otto cifre le assegna la GSMA e non si
+# deducono dal codice modello. Inventarle vorrebbe dire far rispondere
+# l'app con sicurezza a un IMEI vero dando il telefono sbagliato, che e'
+# peggio di «non lo so» — ed e' il contrario della riga in fondo a ogni
+# pagina, «le lacune sono dichiarate, non riempite».
+#
+# Chi PUO' inserirli e' chi ha il telefono in mano, e lo fa gia' dalla
+# pagina dell'IMEI. Il difetto e' cosa succede dopo: quei TAC finiscono
+# in `tracker.db`, che su Render vive in `/tmp` e sopravvive solo finche'
+# regge il backup su Gist. `riga_csv` esisteva apposta per riportarli nel
+# repository — dove diventano permanenti e viaggiano con il codice — ma
+# NON ERA COLLEGATA A NIENTE: nessuna pagina la chiamava. Il commento in
+# cima a `_META_TAC_UTENTE` prometteva «l'app mostra comunque la riga da
+# incollare nel CSV», e quella promessa non era mantenuta.
+def esporta_tac_inseriti() -> str:
+    """I TAC inseriti a mano, come un pezzo di `data/tac_modelli.csv`.
+
+    Vuoto se non ce n'e' nessuno: un file con la sola intestazione
+    sembrerebbe un'esportazione riuscita e vuota, che e' un'altra cosa da
+    «non c'era niente da esportare».
+    """
+    inseriti = tac_inseriti()
+    if not inseriti:
+        return ""
+    righe = ["# TAC inseriti a mano dall'app, da unire a data/tac_modelli.csv",
+             "tac,marca,modello,nota"]
+    for tac in sorted(inseriti):
+        marca, modello = inseriti[tac]
+        righe.append(riga_csv(tac, marca, modello))
+    return "\n".join(righe) + "\n"
+
+
+def tac_inseriti_gia_curati() -> list[str]:
+    """I TAC inseriti a mano che stanno GIA' nel file del repository.
+
+    Sono quelli che si possono togliere dall'archivio senza perdere
+    niente: il lavoro e' gia' al sicuro. Senza questa riga l'elenco da
+    incollare crescerebbe per sempre, e chi lo guarda non saprebbe quali
+    righe ha gia' messo dentro.
+    """
+    curati = _indice_curato()
+    return sorted(t for t in tac_inseriti() if t in curati)
 
 
 def _indice_curato() -> dict[str, tuple[str, str]]:

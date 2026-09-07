@@ -2449,3 +2449,51 @@ class TestLaMemoriaSiAlleggerisceDaSola(_Sito):
             self.assertEqual(self.client.get("/health").status_code, 200)
         finally:
             M.alleggerisci_se_serve = vero
+
+
+class TestEsportazioneDeiTacInseriti(_Sito):
+    """La rotta che rende permanente il lavoro manuale.
+
+    Un TAC insegnato all'app dalla pagina dell'IMEI finisce in
+    `tracker.db`, che su Render vive in `/tmp`: sopravvive solo finché
+    regge il backup su Gist. È l'unica fonte di copertura TAC che non
+    dipende da un servizio esterno, da una quota o da un antibot — e
+    finché resta solo lì è anche l'unica che si può perdere del tutto.
+    """
+
+    def setUp(self):
+        from core import imeicheck, storage
+
+        storage.set_meta("imei_tac_inseriti", "{}")
+        imeicheck.reset_cache()
+        self.addCleanup(lambda: (storage.set_meta("imei_tac_inseriti", "{}"),
+                                 imeicheck.reset_cache()))
+
+    def test_senza_inserimenti_dice_che_non_ce_n_e(self):
+        risposta = self.client.get("/tac/esporta")
+        self.assertEqual(risposta.status_code, 404)
+        self.assertIn("Nessun TAC inserito", risposta.text)
+
+    def test_con_un_inserimento_si_scarica_il_csv(self):
+        from core import imeicheck
+
+        imeicheck.aggiungi_tac("35139740", "Samsung", "Galaxy A56 5G")
+        risposta = self.client.get("/tac/esporta")
+        self.assertEqual(risposta.status_code, 200)
+        self.assertIn("attachment", risposta.headers["content-disposition"])
+        self.assertIn("tac_inseriti.csv", risposta.headers["content-disposition"])
+        self.assertIn("35139740,Samsung,Galaxy A56 5G", risposta.text)
+
+    def test_diagnostica_dice_quanti_ne_restano_da_salvare(self):
+        """«Ancora solo in archivio» e «già permanenti» sono due
+        situazioni diverse, e la prima è quella che si può perdere."""
+        from web.main import _riga_tac_inseriti
+
+        self.assertIn("nessuno", _riga_tac_inseriti())
+        from core import imeicheck
+
+        imeicheck.aggiungi_tac("35139740", "Samsung", "Galaxy A56 5G")
+        riga = _riga_tac_inseriti()
+        self.assertIn("1 inseriti", riga)
+        self.assertIn("ancora solo in archivio", riga)
+        self.assertIn("/tac/esporta", riga)

@@ -919,6 +919,35 @@ per fornitore (tre piani gratuiti distinti), si azzera da solo al cambio
 di giorno e di mese, e si legge su `/health` in
 `tac_esterno_consumo`. A `0` il tetto e' tolto: una scelta che si scrive
 a mano, non una che capita — un valore scritto male torna al predefinito.
+### I TAC inseriti a mano diventano permanenti (2026-09-07)
+
+Chiesto dall'utente: «non puoi fare inserimenti manuali tu stesso?». **No,
+non i TAC.** Le otto cifre le assegna la GSMA e non si deducono dal codice
+modello: inventarle vorrebbe dire far rispondere l'app con sicurezza a un
+IMEI vero dando il telefono sbagliato — peggio di «non lo so», e il
+contrario della riga in fondo a ogni pagina.
+
+Misurata anche la sola strada lecita, l'arricchimento dei nomi: 1.730 TAC
+mostrano solo il codice modello, ma di questi appena **263** hanno un nome
+ufficiale noto, e sono quasi tutti orologi (Xiaomi Watch) e modelli del
+mercato cinese. Non vale una riga di codice.
+
+Chi PUO' inserire un TAC e' chi ha il telefono in mano, e lo fa gia' dalla
+pagina dell'IMEI. Il difetto era cosa succede DOPO: quei TAC finiscono in
+`tracker.db`, che su Render vive in `/tmp`. `riga_csv` esisteva apposta
+per riportarli nel repository ma **non la chiamava nessuno**, e la
+promessa nel commento di `_META_TAC_UTENTE` («l'app mostra comunque la
+riga da incollare nel CSV») non era mantenuta.
+
+Ora `/tac/esporta` scarica quei TAC gia' nella forma di
+`data/tac_modelli.csv`, e Diagnostica distingue quanti sono gia' nel
+repository da quanti vivono ancora solo in archivio — che e' la
+differenza fra «al sicuro» e «si perde al prossimo riavvio». Un test
+rilegge l'esportazione con `carica_tac_curati`: un'esportazione che il
+lettore del repository non riprende sarebbe carta straccia.
+
+E' l'unica fonte di copertura TAC che non dipende da un servizio esterno,
+da una quota o da un antibot.
 
 ---
 
