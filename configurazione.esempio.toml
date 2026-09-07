@@ -39,6 +39,17 @@ TAC_API_KEY = ""
 # TAC_API_URL_2 = "https://esempio.it/api/v1/tac/{tac}"
 # TAC_API_URL_3 = ""
 
+# COME CI SI PRESENTA. Verso un sito di notizie l'app si dichiara un
+# crawler («Mozilla/5.0 (compatible; ...)»), ed è la cosa giusta. Verso
+# un'API a chiave è la cosa sbagliata: gli antibot davanti alle API
+# leggono «compatible;» e chiudono senza guardare la chiave — è quello
+# che il 07/09/2026 dava 503 con zero chiamate registrate dall'altra
+# parte. Qui ci si presenta come un programma con un nome e un
+# indirizzo. Se un filtro lo rifiuta lo stesso, si cambia da qui.
+# TAC_API_USER_AGENT   = "AndroidUpdateTracker/2.0 (+https://github.com/rikyroky91-commits/android-updater)"
+# TAC_API_USER_AGENT_2 = ""
+# TAC_API_USER_AGENT_3 = ""
+
 # L'intestazione con cui si manda la chiave. Se metti "Authorization" e la
 # chiave non ha già uno schema davanti, ci viene messo "Bearer ".
 # TAC_API_HEADER   = "X-Api-Key"

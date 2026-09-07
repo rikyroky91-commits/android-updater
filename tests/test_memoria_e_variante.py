@@ -1446,3 +1446,117 @@ class TestLoStoricoDelServizioEsterno(unittest.TestCase):
         self.assertEqual(imeicheck.storico_servizio(), [])
         imeicheck._ricorda_esito_servizio("errore", "HTTP 503", "HiCellTek")
         self.assertEqual(len(imeicheck.storico_servizio()), 1)
+
+
+class TestPerchePasseraLaChiamata(unittest.TestCase):
+    """Da una schermata del pannello HiCellTek, 07/09/2026: «0 / 100
+    chiamate — No data yet, make your first API call», mentre `/health`
+    registrava un HTTP 503 dopo l'altro.
+
+    Le due cose insieme dicono una cosa sola: la richiesta non arriva mai
+    alla loro applicazione. Il 503 lo scrive qualcos'altro davanti — un
+    firewall, un antibot — e «HTTP 503» da solo non distingue «il servizio
+    è giù», che si aspetta, da «il firewall ci rifiuta», che si risolve
+    cambiando come ci si presenta. Sono settimane di differenza.
+    """
+
+    def setUp(self):
+        self._ambiente = {k: os.environ.get(k) for k in
+                          ("TAC_API_KEY", "TAC_API_USER_AGENT")}
+        self._requests = imeicheck.requests
+        os.environ["TAC_API_KEY"] = "una-chiave"
+        os.environ.pop("TAC_API_USER_AGENT", None)
+        imeicheck.reset_cache()
+
+        def rimetti():
+            for k, v in self._ambiente.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+            imeicheck.requests = self._requests
+            imeicheck.reset_cache()
+
+        self.addCleanup(rimetti)
+
+    def _servizio(self, stato, corpo="", intestazioni=None, testo=""):
+        visti = {}
+
+        class Finto:
+            def post(self_interno, url, **k):
+                visti.update(k.get("headers") or {})
+
+                class R:
+                    status_code = stato
+                    headers = intestazioni or {}
+                    text = testo
+
+                    @staticmethod
+                    def json():
+                        return corpo or {}
+                return R()
+
+        imeicheck.requests = Finto()
+        return visti
+
+    def test_non_ci_si_dichiara_piu_un_crawler(self):
+        """`C.USER_AGENT` dice «Mozilla/5.0 (compatible; ...)», che è la
+        forma con cui un crawler si dichiara tale: giusta verso un sito di
+        notizie, sbagliata verso un'API a chiave, dove è proprio la parola
+        che fa scattare i filtri antibot."""
+        visti = self._servizio(200, {"brand": "Samsung", "model": "S26"})
+        imeicheck.cerca_tac_online_esito("35139740")
+        self.assertNotIn("compatible;", visti["User-Agent"])
+        self.assertNotIn("Mozilla", visti["User-Agent"])
+
+    def test_ma_non_ci_si_finge_nemmeno_un_browser(self):
+        """Mentire su chi si è sarebbe un altro problema, non una
+        soluzione: si dichiara un programma con un nome e un indirizzo."""
+        visti = self._servizio(200, {"brand": "Samsung", "model": "S26"})
+        imeicheck.cerca_tac_online_esito("35139740")
+        self.assertIn("AndroidUpdateTracker", visti["User-Agent"])
+        self.assertIn("+https://", visti["User-Agent"])
+
+    def test_lo_user_agent_si_cambia_dall_ambiente(self):
+        """Quale stringa passi un filtro non è una cosa che si possa
+        sapere scrivendo il codice."""
+        os.environ["TAC_API_USER_AGENT"] = "curl/8.7.1"
+        visti = self._servizio(200, {"brand": "Samsung", "model": "S26"})
+        imeicheck.cerca_tac_online_esito("35139740")
+        self.assertEqual(visti["User-Agent"], "curl/8.7.1")
+
+    def test_si_dichiara_che_si_vuole_json(self):
+        visti = self._servizio(200, {"brand": "Samsung", "model": "S26"})
+        imeicheck.cerca_tac_online_esito("35139740")
+        self.assertEqual(visti["Accept"], "application/json")
+
+    def test_un_errore_dice_anche_chi_ha_risposto(self):
+        """È la riga che distingue il firewall dal servizio giù."""
+        self._servizio(503, intestazioni={"server": "cloudflare",
+                                          "cf-ray": "8f2a1b3c4d5e"},
+                       testo="<html><title>Attention Required!</title></html>")
+        imeicheck.cerca_tac_online_esito("35139740")
+        dettaglio = imeicheck.ultimo_esito_servizio()["dettaglio"]
+        self.assertIn("503", dettaglio)
+        self.assertIn("cloudflare", dettaglio)
+        self.assertIn("Attention Required", dettaglio)
+
+    def test_la_diagnosi_resta_corta(self):
+        """Finisce in `/health`, che si legge senza login: è una diagnosi,
+        non un registro."""
+        self._servizio(503, testo="x" * 5000)
+        imeicheck.cerca_tac_online_esito("35139740")
+        self.assertLess(len(imeicheck.ultimo_esito_servizio()["dettaglio"]), 400)
+
+    def test_una_risposta_muta_non_rompe_la_diagnosi(self):
+        self._servizio(503)
+        imeicheck.cerca_tac_online_esito("35139740")
+        self.assertIn("503", imeicheck.ultimo_esito_servizio()["dettaglio"])
+
+    def test_la_chiave_non_finisce_mai_nella_diagnosi(self):
+        """`/health` si legge senza login."""
+        self._servizio(503, intestazioni={"server": "cloudflare"},
+                       testo="blocked")
+        imeicheck.cerca_tac_online_esito("35139740")
+        self.assertNotIn("una-chiave",
+                         imeicheck.ultimo_esito_servizio()["dettaglio"])

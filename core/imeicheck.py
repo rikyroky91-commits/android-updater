@@ -1080,6 +1080,32 @@ _FORNITORI_PREDEFINITI = [
     ("_3", "terzo servizio", "", "X-Api-Key"),
 ]
 
+# ======================================================================
+# COME CI SI PRESENTA A UN SERVIZIO TAC
+# ======================================================================
+# `C.USER_AGENT` dice «Mozilla/5.0 (compatible; AndroidUpdateTracker/2.0;
+# ...)». È la forma con cui un crawler si dichiara tale, ed è la cosa
+# giusta verso un sito di notizie: si va a leggere pagine pubbliche e si
+# dice chi si è.
+#
+# VERSO UN'API A CHIAVE È LA COSA SBAGLIATA, e il 07/09/2026 si è visto
+# perché. Il pannello di HiCellTek diceva «0 / 100 chiamate, nessun dato
+# ancora» mentre qui si registrava un 503 dopo l'altro: la richiesta non
+# arrivava alla loro applicazione, la fermava qualcosa davanti. E gli
+# antibot davanti alle API fanno esattamente questo — leggono
+# `compatible;` nello User-Agent e chiudono, senza guardare la chiave.
+#
+# Qui non siamo un crawler: siamo un client con una chiave valida che
+# chiama una rotta documentata. Il loro stesso esempio è un `curl`, che
+# manda `curl/8.x` e passa. Quindi ci si presenta come quello che si è —
+# un programma con un nome e un indirizzo — senza la parola che fa
+# scattare il filtro, e senza fingersi un browser: mentire su chi si è
+# sarebbe un altro problema, non una soluzione.
+#
+# Resta cambiabile dall'ambiente, perché quale stringa passi un filtro
+# non è una cosa che si possa sapere da qui.
+TAC_USER_AGENT_PREDEFINITO = "AndroidUpdateTracker/2.0 (+https://github.com/rikyroky91-commits/android-updater)"
+
 
 def fornitori_tac() -> list[dict]:
     """I fornitori configurati, in ordine di interrogazione.
@@ -1106,6 +1132,9 @@ def fornitori_tac() -> list[dict]:
             "chiave": chiave,
             "intestazione": (C.env("TAC_API_HEADER" + suffisso,
                                    intestazione).strip() or intestazione),
+            "agente": (C.env("TAC_API_USER_AGENT" + suffisso,
+                             TAC_USER_AGENT_PREDEFINITO).strip()
+                       or TAC_USER_AGENT_PREDEFINITO),
         })
     return elenco
 
@@ -1122,7 +1151,15 @@ def _intestazioni_fornitore(fornitore: dict) -> dict[str, str]:
     nome = fornitore["intestazione"]
     if nome.lower() == "authorization" and " " not in chiave:
         chiave = "Bearer " + chiave
-    return {nome: chiave, "User-Agent": C.USER_AGENT}
+    return {
+        nome: chiave,
+        # NON `C.USER_AGENT`: vedi `TAC_USER_AGENT_PREDEFINITO`.
+        "User-Agent": fornitore.get("agente") or TAC_USER_AGENT_PREDEFINITO,
+        # `Accept` esplicito perché è quello che vogliamo davvero, e
+        # perché un filtro che guarda le intestazioni vede una richiesta
+        # normale invece di una a metà.
+        "Accept": "application/json",
+    }
 
 
 def _chiave_api() -> str:
@@ -1366,6 +1403,43 @@ def cerca_tac_online(tac: str) -> tuple[str, str] | None:
     return cerca_tac_online_esito(tac)[1]
 
 
+def _chi_ha_risposto(risposta) -> str:
+    """Le poche righe che dicono se ha parlato l'API o qualcosa davanti.
+
+    NASCE DA UNA SCHERMATA, il 07/09/2026. Il pannello di HiCellTek
+    diceva «0 / 100 chiamate — No data yet, make your first API call»
+    mentre `/health` registrava un HTTP 503 dopo l'altro. Le due cose
+    insieme dicono una cosa sola: **la richiesta non arriva mai alla loro
+    applicazione**, e il 503 lo scrive qualcos'altro — un firewall, un
+    bilanciatore, un antibot davanti al servizio.
+
+    «HTTP 503» da solo non distingue «il loro servizio è giù» da «il loro
+    firewall ci rifiuta»: la prima si aspetta, la seconda no e si risolve
+    cambiando come ci si presenta. Sono settimane di differenza, e la
+    distinzione sta scritta nell'intestazione `Server` e nelle prime
+    righe del corpo — che finora venivano buttate senza guardarle.
+
+    Si tiene corto di proposito: questa riga finisce in `/health`, che si
+    legge senza login. È una diagnosi, non un registro.
+    """
+    pezzi = []
+    intestazioni = getattr(risposta, "headers", None) or {}
+    try:
+        for nome in ("server", "cf-ray", "retry-after", "x-cache"):
+            valore = intestazioni.get(nome) or intestazioni.get(nome.title())
+            if valore:
+                pezzi.append(f"{nome}={str(valore)[:40]}")
+    except Exception:  # pragma: no cover - una diagnosi non rompe nulla
+        pass
+    try:
+        corpo = " ".join((risposta.text or "").split())[:160]
+        if corpo:
+            pezzi.append(f"corpo: {corpo}")
+    except Exception:  # pragma: no cover
+        pass
+    return " · ".join(pezzi)
+
+
 def _interroga_fornitore(fornitore: dict, tac: str) -> tuple[str, tuple[str, str] | None]:
     """Chiede questo TAC a UN fornitore e traduce la sua risposta.
 
@@ -1403,7 +1477,12 @@ def _interroga_fornitore(fornitore: dict, tac: str) -> tuple[str, tuple[str, str
         _ricorda_esito_servizio("assente", "HTTP 404: TAC non in catalogo", nome)
         return ("assente", None)
     if stato != 200:
-        _ricorda_esito_servizio("errore", _spiega_stato(stato), nome)
+        # Non solo il numero: anche chi l'ha detto. Vedi `_chi_ha_risposto`.
+        dettaglio = _spiega_stato(stato)
+        testimone = _chi_ha_risposto(risposta)
+        _ricorda_esito_servizio(
+            "errore", f"{dettaglio} — {testimone}" if testimone else dettaglio,
+            nome)
         return ("errore", None)
     try:
         dati = risposta.json()

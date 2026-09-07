@@ -805,6 +805,35 @@ errori.
 
 ---
 
+## Perche' HiCellTek rispondeva 503 (2026-09-07)
+
+Dalla schermata del loro pannello: «MONTHLY USAGE 0 / 100 — No data yet,
+make your first API call», mentre `/health` registrava un 503 dopo
+l'altro. Le due cose insieme dicono una cosa sola: **la richiesta non
+arriva mai alla loro applicazione**. Il 503 lo scrive qualcosa davanti.
+
+Indirizzo, intestazione e corpo erano gia' identici al loro Quick Start.
+La differenza era lo **User-Agent**: `C.USER_AGENT` dice «Mozilla/5.0
+(compatible; AndroidUpdateTracker/2.0; ...)», cioe' la forma con cui un
+crawler si dichiara tale. Giusta verso un sito di notizie, dove si vanno
+a leggere pagine pubbliche; sbagliata verso un'API a chiave, dove gli
+antibot leggono `compatible;` e chiudono senza guardare la chiave. Il
+loro esempio funzionante e' un `curl`, che manda `curl/8.x` e passa.
+
+Due correzioni, tutt'e due dall'ambiente senza toccare il codice:
+
+- `TAC_API_USER_AGENT` (piu' `_2`, `_3`), predefinito
+  `AndroidUpdateTracker/2.0 (+https://github.com/...)`: un programma con
+  un nome e un indirizzo, senza la parola che fa scattare il filtro e
+  senza fingersi un browser — mentire su chi si e' sarebbe un altro
+  problema, non una soluzione. Piu' `Accept: application/json` esplicito.
+- Un errore ora registra anche CHI ha risposto: `server`, `cf-ray`,
+  `retry-after` e le prime 160 battute del corpo. «HTTP 503» da solo non
+  distingue «il servizio e' giu'», che si aspetta, da «il firewall ci
+  rifiuta», che si risolve: sono settimane di differenza.
+
+---
+
 ## L'alleggerimento automatico della memoria (2026-09-04)
 
 Segnalato dall'utente guardando `/health`: 423 MB usati, 457 di picco su
