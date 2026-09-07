@@ -105,3 +105,18 @@ GEMINI_API_KEY = ""
 # il margine è già stato consumato una volta, e intervenire a 480
 # vorrebbe dire intervenire dopo. A "0" si spegne.
 # MEMORIA_SOGLIA_MB = "450"
+
+# IL TETTO ALLE INTERROGAZIONI ESTERNE. Nessun fornitore puo' diventare
+# una fattura, e nessun bug in loop puo' bruciare un piano gratuito in
+# minuti — cosa gia' successa a questo progetto nella v65, con una pagina
+# lasciata aperta.
+#
+# Si contano i TENTATIVI, non le risposte: un servizio guasto non conta la
+# chiamata nel suo pannello, ma noi l'abbiamo fatta, ed e' proprio contro
+# un servizio guasto che un loop e' piu' probabile.
+#
+# I predefiniti sono quelli del piano gratuito piu' stretto in
+# circolazione. A "0" il tetto e' tolto: e' una scelta che si scrive a
+# mano, non una che capita.
+# TAC_API_MAX_GIORNO = "10"
+# TAC_API_MAX_MESE   = "100"

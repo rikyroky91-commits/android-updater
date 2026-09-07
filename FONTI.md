@@ -897,6 +897,28 @@ macchina — resta intatta anche con un fornitore che vuole 15 cifre.
 
 Senza segnaposto l'indirizzo resta com'e' e si chiama in POST col corpo
 `{"query": "<tac>"}`: nessuna configurazione esistente cambia.
+### Il tetto alle interrogazioni (2026-09-07)
+
+Richiesto dall'utente: «se dovessi mettere il portale online o qualche
+bug di richieste in loop si trasformerebbe in un salasso». Il rischio e'
+documentato in questo stesso progetto: nella v65 un ciclo infinito
+bruciava le cento interrogazioni mensili **in minuti**, con una pagina
+lasciata aperta.
+
+E non riguarda solo i servizi a pagamento: un piano gratuito lo esaurisci
+con lo stesso bug, e il risultato e' che per il resto del mese l'app non
+riconosce piu' niente. Il tetto serve sempre.
+
+    TAC_API_MAX_GIORNO   10 al giorno   limita il danno di un loop
+    TAC_API_MAX_MESE    100 al mese     il piano gratuito tipico
+
+Si contano i **tentativi**, non le risposte: un fornitore guasto non
+conta la chiamata nel suo pannello, ma noi l'abbiamo fatta, ed e' proprio
+contro un servizio guasto che un loop e' piu' probabile. Il conteggio e'
+per fornitore (tre piani gratuiti distinti), si azzera da solo al cambio
+di giorno e di mese, e si legge su `/health` in
+`tac_esterno_consumo`. A `0` il tetto e' tolto: una scelta che si scrive
+a mano, non una che capita — un valore scritto male torna al predefinito.
 
 ---
 

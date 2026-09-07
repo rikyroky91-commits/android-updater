@@ -1220,6 +1220,9 @@ def stato_servizio_esterno() -> str:
     riassunto = riassunto_servizio()
     if riassunto:
         pezzi.append(riassunto)
+    consumo = riassunto_consumo()
+    if consumo:
+        pezzi.append(consumo)
     return " · ".join(pezzi)
 
 
@@ -1387,6 +1390,147 @@ def servizio_in_pausa(fornitore: str = "") -> str | None:
             continue
         return dettaglio
     return None
+
+
+
+# ======================================================================
+# IL TETTO: nessun fornitore puo' diventare una fattura
+# ======================================================================
+# Richiesto dall'utente il 07/09/2026, ed e' il vincolo giusto: «non posso
+# inserire niente a pagamento, perche' se dovessi mettere il portale
+# online o qualche bug di richieste in loop si trasformerebbe in un
+# salasso».
+#
+# Ha ragione due volte. La prima e' che il rischio e' reale e documentato
+# QUI: nella v65 un ciclo infinito bruciava le cento interrogazioni
+# mensili del piano gratuito «in minuti», con una pagina lasciata aperta.
+# La seconda e' che il problema non riguarda solo i servizi a pagamento —
+# un piano gratuito lo esaurisci con lo stesso bug, e il risultato e' che
+# per il resto del mese l'app non riconosce piu' niente.
+#
+# Il tetto e' quindi utile SEMPRE, non solo se un giorno si pagasse:
+#
+#   TAC_API_MAX_GIORNO   10 al giorno   limita il danno di un loop
+#   TAC_API_MAX_MESE    100 al mese     e' il piano gratuito tipico
+#
+# I predefiniti sono quelli del piano gratuito di HiCellTek, cioe' i piu'
+# stretti in circolazione: si allargano da variabile d'ambiente, non si
+# stringono per sbaglio. A "0" il tetto e' tolto, ed e' una scelta che si
+# deve scrivere a mano.
+#
+# SI CONTANO I TENTATIVI, NON LE RISPOSTE. Un fornitore che risponde 503
+# non conta la chiamata nel suo pannello, ma noi l'abbiamo fatta: contare
+# le risposte lascerebbe un loop libero di girare all'infinito proprio
+# contro un servizio guasto, che e' il caso in cui il loop e' piu'
+# probabile.
+_META_CONSUMO = "imei_tac_consumo"
+MAX_AL_GIORNO_PREDEFINITO = 10
+MAX_AL_MESE_PREDEFINITO = 100
+
+#: Copia in memoria, come `_ultimo_esito`: `/health` la mostra e quella
+#: rotta promette di non aprire l'archivio.
+_consumo: dict | None = None
+
+
+def _tetto(nome_variabile: str, predefinito: int) -> int:
+    grezzo = C.env(nome_variabile).strip()
+    if not grezzo:
+        return predefinito
+    try:
+        valore = int(grezzo)
+    except ValueError:
+        # Un valore scritto male non deve MAI diventare «nessun tetto»:
+        # sarebbe il guasto peggiore, silenzioso e costoso.
+        return predefinito
+    return max(0, valore)
+
+
+def max_al_giorno() -> int:
+    return _tetto("TAC_API_MAX_GIORNO", MAX_AL_GIORNO_PREDEFINITO)
+
+
+def max_al_mese() -> int:
+    return _tetto("TAC_API_MAX_MESE", MAX_AL_MESE_PREDEFINITO)
+
+
+def _oggi_e_mese() -> tuple[str, str]:
+    adesso = datetime.now(timezone.utc)
+    return adesso.strftime("%Y-%m-%d"), adesso.strftime("%Y-%m")
+
+
+def consumo_tac(carica: bool = True) -> dict:
+    """`{fornitore: {"giorno", "oggi", "mese", "questo_mese"}}`."""
+    global _consumo
+    if _consumo is not None:
+        return _consumo
+    if not carica:
+        return {}
+    dati = {}
+    grezzo = storage.get_meta(_META_CONSUMO)
+    if grezzo:
+        try:
+            letto = json.loads(grezzo)
+            if isinstance(letto, dict):
+                dati = {k: v for k, v in letto.items() if isinstance(v, dict)}
+        except Exception:
+            dati = {}
+    _consumo = dati
+    return _consumo
+
+
+def _quota_di(nome: str) -> dict:
+    """Il conteggio di questo fornitore, azzerato se e' cambiato il giorno."""
+    oggi, mese = _oggi_e_mese()
+    voce = dict(consumo_tac().get(nome) or {})
+    # I contatori si azzerano DA SOLI al cambio di data: senza questo, un
+    # tetto raggiunto il 30 del mese resterebbe raggiunto per sempre.
+    if voce.get("giorno") != oggi:
+        voce["giorno"], voce["oggi"] = oggi, 0
+    if voce.get("mese") != mese:
+        voce["mese"], voce["questo_mese"] = mese, 0
+    return voce
+
+
+def tetto_raggiunto(nome: str) -> str:
+    """Perche' NON si chiama questo fornitore adesso, o «»."""
+    voce = _quota_di(nome)
+    al_giorno, al_mese = max_al_giorno(), max_al_mese()
+    if al_mese and voce.get("questo_mese", 0) >= al_mese:
+        return f"tetto mensile raggiunto ({al_mese})"
+    if al_giorno and voce.get("oggi", 0) >= al_giorno:
+        return f"tetto giornaliero raggiunto ({al_giorno})"
+    return ""
+
+
+def _segna_chiamata(nome: str) -> None:
+    """Una chiamata in piu' per questo fornitore, contata prima di farla."""
+    global _consumo
+    voce = _quota_di(nome)
+    voce["oggi"] = int(voce.get("oggi", 0)) + 1
+    voce["questo_mese"] = int(voce.get("questo_mese", 0)) + 1
+    tutti = dict(consumo_tac())
+    tutti[nome] = voce
+    _consumo = tutti
+    try:
+        storage.set_meta(_META_CONSUMO, json.dumps(tutti))
+    except Exception:  # pragma: no cover - un contatore non rompe una ricerca
+        pass
+
+
+def riassunto_consumo(carica: bool = True) -> str:
+    """«HiCellTek: 2 oggi su 10, 2 questo mese su 100»."""
+    tutti = consumo_tac(carica=carica)
+    if not tutti:
+        return ""
+    al_giorno, al_mese = max_al_giorno(), max_al_mese()
+    righe = []
+    for nome, voce in tutti.items():
+        righe.append(
+            f"{nome}: {voce.get('oggi', 0)} oggi"
+            + (f" su {al_giorno}" if al_giorno else " (senza tetto)")
+            + f", {voce.get('questo_mese', 0)} questo mese"
+            + (f" su {al_mese}" if al_mese else " (senza tetto)"))
+    return " · ".join(righe)
 
 
 def cerca_tac_online(tac: str) -> tuple[str, str] | None:
@@ -1711,6 +1855,15 @@ def cerca_tac_online_esito(tac: str) -> tuple[str, tuple[str, str] | None]:
         # commento in `stato_servizio_esterno`.
         if servizio_in_pausa(fornitore["nome"]):
             continue
+        # IL TETTO SI GUARDA PRIMA DI USCIRE IN RETE, e la chiamata si
+        # conta prima di farla: se si contasse dopo, un errore a meta'
+        # (timeout, processo ucciso) lascerebbe una chiamata fatta e non
+        # contata — cioe' esattamente il buco da cui un loop scappa.
+        fermo = tetto_raggiunto(fornitore["nome"])
+        if fermo:
+            _ricorda_esito_servizio("errore", fermo, fornitore["nome"])
+            continue
+        _segna_chiamata(fornitore["nome"])
         esito, risposta = _interroga_fornitore(fornitore, tac)
         if esito == "trovato":
             return (esito, risposta)
@@ -2468,10 +2621,12 @@ def libera_indice() -> bool:
 
 def reset_cache() -> None:
     global _memory_index, _status, _pausa_servizio, _ultimo_esito, _storico
+    global _consumo
     _memory_index = None
     _status = "non ancora caricato"
     _ultimo_esito = None
     _storico = None
+    _consumo = None
     # Anche la pausa del servizio esterno: chi azzera le cache sta
     # rimettendo le cose in ordine, e una pausa presa cinque minuti fa non
     # deve far sembrare spento un servizio che magari è appena tornato.

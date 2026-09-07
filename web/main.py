@@ -252,6 +252,7 @@ def _scalda_i_cataloghi() -> None:
         try:
             imeicheck.ultimo_esito_servizio()
             imeicheck.storico_servizio()
+            imeicheck.consumo_tac()
         except Exception as errore:  # pragma: no cover - non blocca l'avvio
             STATO_AVVIO["esito del servizio TAC"] = f"non letto: {errore}"
         STATO_AVVIO["memoria restituita dopo il preriscaldamento"] = (
@@ -1426,6 +1427,13 @@ def health(dettaglio: str = Query(default="")):
     riassunto = imeicheck.riassunto_servizio(carica=False)
     if riassunto:
         risposta["tac_esterno_andamento"] = riassunto
+    # QUANTE NE SONO STATE SPESE, e quante ne restano. È la riga che
+    # rende innocuo mettere online il portale: un bug in loop non può
+    # andare oltre il tetto giornaliero, e qui si vede subito se ci è
+    # andato a sbattere.
+    consumo = imeicheck.riassunto_consumo(carica=False)
+    if consumo:
+        risposta["tac_esterno_consumo"] = consumo
     # IL DETTAGLIO SI CHIEDE, non si calcola a ogni battito.
     #
     # Pesare i cataloghi voce per voce costa qualche decimo di secondo su

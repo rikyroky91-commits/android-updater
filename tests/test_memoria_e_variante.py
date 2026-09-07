@@ -527,11 +527,25 @@ class TestUnServizioRottoLoDeveDire(unittest.TestCase):
         self._chiave = imeicheck._chiave_api
         self._requests = imeicheck.requests
         imeicheck._chiave_api = lambda: "chiave-di-prova"
+        # QUESTA CLASSE NON PARLA DEL TETTO, e senza toglierlo lo
+        # incontrerebbe: dieci chiamate al giorno sono poche quando una
+        # classe di prove ne fa una per test, e il conteggio vive in
+        # archivio — quindi si porterebbe dietro anche quelle di ieri.
+        # Il tetto ha la sua classe (`TestIlTettoAlleInterrogazioni`).
+        self._tetti = {k: os.environ.get(k) for k in
+                       ("TAC_API_MAX_GIORNO", "TAC_API_MAX_MESE")}
+        os.environ["TAC_API_MAX_GIORNO"] = "0"
+        os.environ["TAC_API_MAX_MESE"] = "0"
         imeicheck.reset_cache()
 
         def rimetti():
             imeicheck._chiave_api = self._chiave
             imeicheck.requests = self._requests
+            for k, v in self._tetti.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
             imeicheck.reset_cache()
 
         self.addCleanup(rimetti)
@@ -987,10 +1001,14 @@ class TestPiuDiUnFornitoreDiTac(unittest.TestCase):
         self._ambiente = {k: os.environ.get(k) for k in (
             "TAC_API_KEY", "TAC_API_KEY_2", "TAC_API_KEY_3",
             "TAC_API_URL", "TAC_API_URL_2", "TAC_API_HEADER",
-            "TAC_API_NOME_2")}
+            "TAC_API_NOME_2", "TAC_API_MAX_GIORNO", "TAC_API_MAX_MESE")}
         self._requests = imeicheck.requests
         for k in self._ambiente:
             os.environ.pop(k, None)
+        # Il tetto ha la sua classe: qui darebbe solo fastidio (vedi
+        # `TestUnServizioRottoLoDeveDire`).
+        os.environ["TAC_API_MAX_GIORNO"] = "0"
+        os.environ["TAC_API_MAX_MESE"] = "0"
         imeicheck.reset_cache()
 
         def rimetti():
@@ -1462,10 +1480,13 @@ class TestPerchePasseraLaChiamata(unittest.TestCase):
 
     def setUp(self):
         self._ambiente = {k: os.environ.get(k) for k in
-                          ("TAC_API_KEY", "TAC_API_USER_AGENT")}
+                          ("TAC_API_KEY", "TAC_API_USER_AGENT",
+                           "TAC_API_MAX_GIORNO", "TAC_API_MAX_MESE")}
         self._requests = imeicheck.requests
         os.environ["TAC_API_KEY"] = "una-chiave"
         os.environ.pop("TAC_API_USER_AGENT", None)
+        os.environ["TAC_API_MAX_GIORNO"] = "0"
+        os.environ["TAC_API_MAX_MESE"] = "0"
         imeicheck.reset_cache()
 
         def rimetti():
@@ -1671,16 +1692,21 @@ class TestUnAntibotNonEUnGuastoPasseggero(unittest.TestCase):
     )
 
     def setUp(self):
-        self._chiave = os.environ.get("TAC_API_KEY")
+        self._ambiente = {k: os.environ.get(k) for k in
+                          ("TAC_API_KEY", "TAC_API_MAX_GIORNO",
+                           "TAC_API_MAX_MESE")}
         self._requests = imeicheck.requests
         os.environ["TAC_API_KEY"] = "una-chiave"
+        os.environ["TAC_API_MAX_GIORNO"] = "0"
+        os.environ["TAC_API_MAX_MESE"] = "0"
         imeicheck.reset_cache()
 
         def rimetti():
-            if self._chiave is None:
-                os.environ.pop("TAC_API_KEY", None)
-            else:
-                os.environ["TAC_API_KEY"] = self._chiave
+            for k, v in self._ambiente.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
             imeicheck.requests = self._requests
             imeicheck.reset_cache()
 
@@ -1869,3 +1895,152 @@ class TestITreSegnapostoDellIndirizzo(unittest.TestCase):
             imeicheck.requests = vero
         self.assertIn("356924110000008", visti["url"])
         self.assertIn("token=abc", visti["url"])
+
+
+class TestIlTettoAlleInterrogazioni(unittest.TestCase):
+    """«non posso inserire niente a pagamento, perché se dovessi mettere il
+    portale online o qualche bug di richieste in loop si trasformerebbe in
+    un salasso», 07/09/2026.
+
+    Il vincolo è giusto, e il rischio è documentato in questo stesso
+    progetto: nella v65 un ciclo infinito bruciava le cento interrogazioni
+    mensili «in minuti», con una pagina lasciata aperta.
+
+    E non riguarda solo i servizi a pagamento: un piano gratuito lo
+    esaurisci con lo stesso bug, e il risultato è che per il resto del
+    mese l'app non riconosce più niente. Il tetto serve sempre.
+    """
+
+    def setUp(self):
+        import tempfile
+
+        from core import config as C, storage
+
+        self._db = C.DB_PATH
+        C.DB_PATH = tempfile.mktemp(suffix=".db")
+        storage.reset_state()
+        storage.init_db()
+        self._ambiente = {k: os.environ.get(k) for k in
+                          ("TAC_API_KEY", "TAC_API_MAX_GIORNO", "TAC_API_MAX_MESE")}
+        os.environ["TAC_API_KEY"] = "una-chiave"
+        os.environ.pop("TAC_API_MAX_GIORNO", None)
+        os.environ.pop("TAC_API_MAX_MESE", None)
+        self._requests = imeicheck.requests
+        imeicheck.reset_cache()
+
+        def rimetti():
+            for k, v in self._ambiente.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+            imeicheck.requests = self._requests
+            C.DB_PATH = self._db
+            storage.reset_state()
+            imeicheck.reset_cache()
+
+        self.addCleanup(rimetti)
+
+    def _servizio_che_risponde(self, stato=200, corpo=None):
+        chiamate = {"n": 0}
+
+        class Finto:
+            def post(self_interno, url, **k):
+                chiamate["n"] += 1
+
+                class R:
+                    status_code = stato
+                    headers = {}
+                    text = ""
+
+                    @staticmethod
+                    def json():
+                        return corpo or {"brand": "Samsung", "model": "S26"}
+                return R()
+
+        imeicheck.requests = Finto()
+        return chiamate
+
+    def test_i_predefiniti_sono_quelli_del_piano_gratuito(self):
+        self.assertEqual(imeicheck.max_al_giorno(), 10)
+        self.assertEqual(imeicheck.max_al_mese(), 100)
+
+    def test_un_valore_scritto_male_non_toglie_il_tetto(self):
+        """Sarebbe il guasto peggiore: silenzioso e costoso."""
+        os.environ["TAC_API_MAX_GIORNO"] = "dieci"
+        self.assertEqual(imeicheck.max_al_giorno(), 10)
+
+    def test_a_zero_il_tetto_si_toglie(self):
+        os.environ["TAC_API_MAX_GIORNO"] = "0"
+        self.assertEqual(imeicheck.max_al_giorno(), 0)
+        self.assertEqual(imeicheck.tetto_raggiunto("HiCellTek"), "")
+
+    def test_un_loop_non_va_oltre_il_tetto_giornaliero(self):
+        """È il caso che ha motivato tutto: una pagina lasciata aperta che
+        richiama all'infinito."""
+        os.environ["TAC_API_MAX_GIORNO"] = "3"
+        chiamate = self._servizio_che_risponde()
+        for i in range(20):
+            imeicheck._pausa_servizio.clear()
+            imeicheck.cerca_tac_online_esito(f"3513974{i % 10}")
+        self.assertEqual(chiamate["n"], 3)
+
+    def test_si_contano_i_tentativi_non_le_risposte(self):
+        """Un servizio guasto non conta la chiamata nel suo pannello, ma
+        noi l'abbiamo fatta — ed è proprio contro un servizio guasto che
+        un loop è più probabile."""
+        os.environ["TAC_API_MAX_GIORNO"] = "2"
+        chiamate = self._servizio_che_risponde(stato=503)
+        for i in range(10):
+            imeicheck._pausa_servizio.clear()
+            imeicheck.cerca_tac_online_esito(f"3513974{i}")
+        self.assertEqual(chiamate["n"], 2)
+
+    def test_quando_il_tetto_e_raggiunto_lo_dice(self):
+        os.environ["TAC_API_MAX_GIORNO"] = "1"
+        self._servizio_che_risponde(stato=503)
+        imeicheck._pausa_servizio.clear()
+        imeicheck.cerca_tac_online_esito("35139740")
+        imeicheck._pausa_servizio.clear()
+        imeicheck.cerca_tac_online_esito("35139741")
+        self.assertIn("tetto giornaliero",
+                      imeicheck.ultimo_esito_servizio()["dettaglio"])
+
+    def test_il_tetto_mensile_vince_sul_giornaliero(self):
+        os.environ["TAC_API_MAX_MESE"] = "1"
+        os.environ["TAC_API_MAX_GIORNO"] = "50"
+        self._servizio_che_risponde()
+        imeicheck.cerca_tac_online_esito("35139740")
+        self.assertIn("mensile", imeicheck.tetto_raggiunto("HiCellTek"))
+
+    def test_il_conteggio_si_azzera_al_cambio_di_giorno(self):
+        """Senza, un tetto raggiunto il 30 del mese resterebbe raggiunto
+        per sempre."""
+        os.environ["TAC_API_MAX_GIORNO"] = "1"
+        self._servizio_che_risponde()
+        imeicheck.cerca_tac_online_esito("35139740")
+        self.assertTrue(imeicheck.tetto_raggiunto("HiCellTek"))
+        # Il giorno di ieri, come lo troverebbe l'app domani mattina.
+        imeicheck._consumo["HiCellTek"]["giorno"] = "2001-01-01"
+        self.assertEqual(imeicheck.tetto_raggiunto("HiCellTek"), "")
+
+    def test_ogni_fornitore_ha_la_sua_quota(self):
+        """Tre fornitori sono tre piani gratuiti distinti: contarli
+        insieme vorrebbe dire spegnerne due che hanno ancora credito."""
+        os.environ["TAC_API_KEY_2"] = "altra"
+        os.environ["TAC_API_URL_2"] = "https://secondo.example/tac"
+        os.environ["TAC_API_MAX_GIORNO"] = "1"
+        self.addCleanup(lambda: [os.environ.pop(k, None)
+                                 for k in ("TAC_API_KEY_2", "TAC_API_URL_2")])
+        self._servizio_che_risponde(stato=503)
+        imeicheck.cerca_tac_online_esito("35139740")
+        consumo = imeicheck.consumo_tac()
+        self.assertEqual(consumo["HiCellTek"]["oggi"], 1)
+        self.assertEqual(consumo["secondo servizio"]["oggi"], 1)
+
+    def test_il_riassunto_dice_quanto_resta(self):
+        self._servizio_che_risponde()
+        imeicheck.cerca_tac_online_esito("35139740")
+        riassunto = imeicheck.riassunto_consumo()
+        self.assertIn("1 oggi su 10", riassunto)
+        self.assertIn("1 questo mese su 100", riassunto)
