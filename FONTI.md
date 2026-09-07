@@ -851,6 +851,32 @@ charset=...`, cioe' il preambolo, sempre uguale, che non dice niente. Ora
 `head`, `script` e `style`: «Resource Limit Is Reached», «Account
 Suspended», «Service Temporarily Unavailable» sono frasi diverse che
 portano ad azioni diverse, e vanno lette.
+**E letta per intero, dice un'altra cosa ancora.** Non «Resource Limit Is
+Reached» ma:
+
+    Test de securite / Security check... Veuillez activer JavaScript
+    puis recharger cette page. Please turn JavaScript on and reload the
+    page. Security check Sorry, we need to verify that this request is
+    [not automated]
+
+E' l'hosting di HiCellTek che mette una **verifica con JavaScript**
+davanti al proprio endpoint API. Nessun programma la supera — e' fatta
+apposta — quindi la chiamata non arriva mai alla loro applicazione, ed e'
+per questo che il loro pannello conta zero chiamate mentre qui si contano
+solo 503.
+
+**Qui non si aggira, e non e' una rinuncia tecnica.** Un controllo del
+genere si supera solo fingendo di essere un browser, cioe' mentendo su
+chi si e' a un sistema costruito apposta per distinguere le due cose. La
+risposta giusta e' segnalarlo a chi gestisce il servizio — con una chiave
+valida, una rotta documentata e questa frase in mano la segnalazione e'
+precisa — oppure usare un altro fornitore in `TAC_API_KEY_2`.
+
+`sembra_controllo_antibot` riconosce il caso e cambia il messaggio: «HTTP
+503: guasto del servizio» dice di aspettare, e aspettare qui non serve a
+niente — non passera' domani ne' fra un mese, finche' non lo tolgono
+loro. Resta comunque un errore e non un «no»: conservarlo per un mese
+renderebbe ignoto un telefono che il servizio conosce.
 
 ---
 

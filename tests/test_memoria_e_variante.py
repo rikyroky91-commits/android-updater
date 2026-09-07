@@ -1531,15 +1531,22 @@ class TestPerchePasseraLaChiamata(unittest.TestCase):
         self.assertEqual(visti["Accept"], "application/json")
 
     def test_un_errore_dice_anche_chi_ha_risposto(self):
-        """È la riga che distingue il firewall dal servizio giù."""
-        self._servizio(503, intestazioni={"server": "cloudflare",
-                                          "cf-ray": "8f2a1b3c4d5e"},
-                       testo="<html><title>Attention Required!</title></html>")
+        """È la riga che distingue il firewall dal servizio giù.
+
+        Il corpo qui è un guasto vero e non una verifica antibot: quel
+        caso ha un messaggio suo (vedi
+        `TestUnAntibotNonEUnGuastoPasseggero`), perché porta a un'azione
+        opposta — lì aspettare non serve.
+        """
+        self._servizio(503, intestazioni={"server": "o2switch-PowerBoost-v3"},
+                       testo="<html><title>503 Service Temporarily "
+                             "Unavailable</title><body>Resource Limit Is "
+                             "Reached</body></html>")
         imeicheck.cerca_tac_online_esito("35139740")
         dettaglio = imeicheck.ultimo_esito_servizio()["dettaglio"]
         self.assertIn("503", dettaglio)
-        self.assertIn("cloudflare", dettaglio)
-        self.assertIn("Attention Required", dettaglio)
+        self.assertIn("o2switch", dettaglio)
+        self.assertIn("Resource Limit Is Reached", dettaglio)
 
     def test_la_diagnosi_resta_corta(self):
         """Finisce in `/health`, che si legge senza login: è una diagnosi,
@@ -1632,3 +1639,112 @@ class TestIlMessaggioDentroLaPaginaDErrore(unittest.TestCase):
         self.assertIn("o2switch", diagnosi)
         self.assertIn("Resource Limit Is Reached", diagnosi)
         self.assertNotIn("DOCTYPE", diagnosi)
+
+
+class TestUnAntibotNonEUnGuastoPasseggero(unittest.TestCase):
+    """Letto in produzione il 07/09/2026, dopo che la diagnosi ha smesso
+    di fermarsi al preambolo HTML:
+
+        server=o2switch-PowerBoost-v3 · corpo: Test de sécurité / Security
+        check... Veuillez activer JavaScript puis recharger cette page.
+        Please turn JavaScript on and reload the page. Security check
+        Sorry, we need to verify that this request i[s not automated]
+
+    È l'hosting di HiCellTek che mette una verifica con JavaScript davanti
+    al proprio endpoint API. Nessun programma la supera — è fatta apposta
+    — quindi la chiamata non arriva mai alla loro applicazione: ecco
+    perché il loro pannello conta zero chiamate mentre qui si contano solo
+    503.
+
+    Il numero da solo e' fuorviante: «HTTP 503: guasto del servizio» dice
+    di aspettare, e aspettare qui non serve a niente.
+    """
+
+    PAGINA = (
+        '<!DOCTYPE HTML><html lang="en-US"><head>'
+        '<title>Test de sécurité / Security check...</title></head><body>'
+        '<p>Veuillez activer JavaScript puis recharger cette page. '
+        'Please turn JavaScript on and reload the page.</p>'
+        '<h1>Security check</h1>'
+        '<p>Sorry, we need to verify that this request is not automated.</p>'
+        '</body></html>'
+    )
+
+    def setUp(self):
+        self._chiave = os.environ.get("TAC_API_KEY")
+        self._requests = imeicheck.requests
+        os.environ["TAC_API_KEY"] = "una-chiave"
+        imeicheck.reset_cache()
+
+        def rimetti():
+            if self._chiave is None:
+                os.environ.pop("TAC_API_KEY", None)
+            else:
+                os.environ["TAC_API_KEY"] = self._chiave
+            imeicheck.requests = self._requests
+            imeicheck.reset_cache()
+
+        self.addCleanup(rimetti)
+
+    def _servizio(self, stato, testo):
+        class Finto:
+            def post(self_interno, url, **k):
+                class R:
+                    status_code = stato
+                    headers = {"server": "o2switch-PowerBoost-v3"}
+                    text = testo
+
+                    @staticmethod
+                    def json():
+                        return {}
+                return R()
+
+        imeicheck.requests = Finto()
+
+    def test_si_riconosce_la_verifica_col_javascript(self):
+        self.assertTrue(imeicheck.sembra_controllo_antibot(self.PAGINA))
+
+    def test_in_francese_e_in_inglese(self):
+        for frase in ("Veuillez activer JavaScript",
+                      "Please turn JavaScript on",
+                      "Checking your browser before accessing",
+                      "Attention Required!"):
+            self.assertTrue(imeicheck.sembra_controllo_antibot(frase), frase)
+
+    def test_un_guasto_vero_non_e_un_antibot(self):
+        """Le due cose portano ad azioni opposte: un 503 di servizio si
+        aspetta, un antibot no — non passera' domani ne' fra un mese."""
+        for frase in ("503 Service Temporarily Unavailable",
+                      "Resource Limit Is Reached",
+                      '{"error":"quota exceeded"}',
+                      "Account Suspended"):
+            self.assertFalse(imeicheck.sembra_controllo_antibot(frase), frase)
+
+    def test_il_messaggio_smette_di_dire_di_aspettare(self):
+        self._servizio(503, self.PAGINA)
+        imeicheck.cerca_tac_online_esito("35139740")
+        dettaglio = imeicheck.ultimo_esito_servizio()["dettaglio"]
+        self.assertIn("non arriva all'API", dettaglio)
+        self.assertIn("antibot", dettaglio)
+        self.assertNotIn("guasto del servizio", dettaglio)
+
+    def test_e_dice_cosa_fare(self):
+        """Un messaggio che descrive un vicolo cieco senza indicare
+        l'uscita fa perdere lo stesso tempo del numero che sostituisce."""
+        self._servizio(503, self.PAGINA)
+        imeicheck.cerca_tac_online_esito("35139740")
+        dettaglio = imeicheck.ultimo_esito_servizio()["dettaglio"]
+        self.assertIn("TAC_API_KEY_2", dettaglio)
+
+    def test_resta_un_errore_non_un_no(self):
+        """Un antibot e' silenzio, non «questo TAC non esiste»:
+        conservarlo per un mese renderebbe ignoto un telefono che il
+        servizio conosce."""
+        self._servizio(503, self.PAGINA)
+        self.assertEqual(imeicheck.cerca_tac_online_esito("35139740"),
+                         ("errore", None))
+
+    def test_un_guasto_normale_resta_raccontato_col_numero(self):
+        self._servizio(500, "Internal Server Error")
+        imeicheck.cerca_tac_online_esito("35139740")
+        self.assertIn("500", imeicheck.ultimo_esito_servizio()["dettaglio"])

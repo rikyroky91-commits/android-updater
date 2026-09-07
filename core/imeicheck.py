@@ -1447,6 +1447,54 @@ def _parte_leggibile(testo: str, quante: int = 200) -> str:
     return unito or "(pagina HTML senza testo)"
 
 
+# ======================================================================
+# QUANDO DAVANTI ALL'API C'E' UN CONTROLLO ANTIBOT
+# ======================================================================
+# Letto in produzione il 07/09/2026, dopo che la diagnosi ha smesso di
+# fermarsi al preambolo:
+#
+#   server=o2switch-PowerBoost-v3 · corpo: Test de securite / Security
+#   check... Veuillez activer JavaScript puis recharger cette page.
+#   Please turn JavaScript on and reload the page. Security check Sorry,
+#   we need to verify that this request is [not automated]
+#
+# E' l'hosting di HiCellTek che mette una verifica con JavaScript davanti
+# al proprio endpoint API. Nessun programma la supera — e' fatta apposta
+# — quindi la chiamata non arriva mai alla loro applicazione: e' per
+# questo che il loro pannello conta zero chiamate mentre qui si contano
+# solo 503.
+#
+# QUI NON SI AGGIRA, E NON E' UNA RINUNCIA TECNICA. Un controllo del
+# genere si supera solo fingendo di essere un browser, cioe' mentendo su
+# chi si e' a un sistema costruito per distinguere le due cose. La
+# risposta giusta e' un'altra: dirlo con chiarezza a chi amministra il
+# sito, che ha una chiave valida e una rotta documentata, e che con
+# questa frase in mano puo' aprire una segnalazione precisa invece di un
+# generico «non funziona».
+#
+# Serve a distinguerlo da un guasto vero, perche' le due cose portano ad
+# azioni opposte: un 503 di servizio si aspetta, questo no — non passera'
+# domani ne' fra un mese, finche' non lo tolgono loro.
+_SEGNI_ANTIBOT = (
+    "turn javascript on",
+    "activer javascript",
+    "enable javascript",
+    "security check",
+    "test de s",           # «Test de securite», con o senza accento
+    "checking your browser",
+    "attention required",
+    "verify you are human",
+    "request is automated",
+    "not automated",
+)
+
+
+def sembra_controllo_antibot(testo: str) -> bool:
+    """Se questa risposta e' una verifica antibot invece che dell'API."""
+    minuscolo = (testo or "").lower()
+    return any(segno in minuscolo for segno in _SEGNI_ANTIBOT)
+
+
 def _chi_ha_risposto(risposta) -> str:
     """Le poche righe che dicono se ha parlato l'API o qualcosa davanti.
 
@@ -1524,6 +1572,17 @@ def _interroga_fornitore(fornitore: dict, tac: str) -> tuple[str, tuple[str, str
         # Non solo il numero: anche chi l'ha detto. Vedi `_chi_ha_risposto`.
         dettaglio = _spiega_stato(stato)
         testimone = _chi_ha_risposto(risposta)
+        # E SE DAVANTI C'E' UN ANTIBOT, IL NUMERO E' FUORVIANTE. «HTTP
+        # 503: guasto del servizio» dice di aspettare, e aspettare qui non
+        # serve a niente: la chiamata non arriva all'API e non ci arrivera'
+        # finche' non lo tolgono loro. Vedi `sembra_controllo_antibot`.
+        if sembra_controllo_antibot(getattr(risposta, "text", "") or ""):
+            dettaglio = (
+                "la chiamata non arriva all'API: davanti c'e' un controllo "
+                "antibot con JavaScript, che nessun programma supera. Non e' "
+                "la chiave e non e' un guasto passeggero — va segnalato a chi "
+                "gestisce il servizio, oppure si usa un altro fornitore in "
+                "TAC_API_KEY_2")
         _ricorda_esito_servizio(
             "errore", f"{dettaglio} — {testimone}" if testimone else dettaglio,
             nome)
