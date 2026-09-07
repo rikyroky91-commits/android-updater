@@ -198,3 +198,57 @@ class TestQuelloCheInsegniNonDeveMorireColContenitore(unittest.TestCase):
                  if r and not r.startswith(("#", "tac,"))]
         self.assertEqual([r.split(",")[0] for r in righe],
                          ["01620200", "35139740", "86558708"])
+
+
+class TestSiIncollaEBasta(unittest.TestCase):
+    """«riesci a far sì che se non trova l'IMEI prenda da solo il
+    risultato di imei.info e lo carichi sul nostro portale?», 07/09/2026.
+
+    No: quei siti bloccano l'accesso automatico o lo vietano nei termini
+    d'uso, ed è già scritto in FONTI.md fra le «Piste NON percorribili».
+    Consultarli di persona è del tutto lecito, ed è quello che i
+    collegamenti in pagina servono a fare.
+
+    Ma fra «leggere la risposta» e «averla dentro l'app» c'era una
+    frizione vera: due caselle da ribattere guardando un'altra finestra.
+    Chi ha appena letto «SAMSUNG GALAXY A56 5G» lo copia in un gesto solo.
+    """
+
+    def test_marca_e_modello_da_una_riga_sola(self):
+        self.assertEqual(imeicheck.interpreta_incollato("SAMSUNG GALAXY A56 5G"),
+                         ("SAMSUNG", "GALAXY A56 5G"))
+        self.assertEqual(
+            imeicheck.interpreta_incollato("Xiaomi Redmi Note 13 Pro"),
+            ("Xiaomi", "Redmi Note 13 Pro"))
+
+    def test_le_etichette_copiate_per_sbaglio_si_tolgono(self):
+        """Chi copia due caselle insieme si porta dietro anche
+        l'etichetta di mezzo."""
+        self.assertEqual(
+            imeicheck.interpreta_incollato("Marca: Samsung  Modello: Galaxy A56 5G"),
+            ("Samsung", "Galaxy A56 5G"))
+        self.assertEqual(
+            imeicheck.interpreta_incollato("Brand: HONOR - Model: 400 Pro"),
+            ("HONOR", "400 Pro"))
+
+    def test_un_imei_incollato_non_diventa_un_nome_di_telefono(self):
+        """Non è solo pulizia: quel numero identifica il singolo
+        esemplare, e questo modulo promette di non salvarlo. Nel campo
+        «modello» finirebbe in archivio e nel file del repository."""
+        _marca, modello = imeicheck.interpreta_incollato(
+            "Samsung Galaxy A56 5G 351397403741486")
+        self.assertNotIn("351397403741486", modello)
+        self.assertIn("Galaxy A56", modello)
+
+    def test_senza_marca_riconoscibile_non_se_ne_inventa_una(self):
+        """Un modello senza marca è comunque una risposta utile;
+        indovinare la marca sbagliata mette in archivio un dato falso che
+        poi ha la precedenza su tutti i database scaricati."""
+        self.assertEqual(imeicheck.interpreta_incollato("Galaxy A56 5G"),
+                         ("", "Galaxy A56 5G"))
+
+    def test_niente_incollato_niente_dato(self):
+        self.assertEqual(imeicheck.interpreta_incollato(""), ("", ""))
+        self.assertEqual(imeicheck.interpreta_incollato("   \n  "), ("", ""))
+        self.assertEqual(imeicheck.interpreta_incollato("351397403741486"),
+                         ("", ""))

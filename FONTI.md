@@ -787,6 +787,16 @@ errori.
   del tutto lecito, ed e' esattamente cio' che i collegamenti nell'app
   permettono. Solo imei.info accetta una ricerca diretta nell'indirizzo;
   gli altri sono pagine di ricerca e non ricevono nessun identificativo.
+  **Richiesto di nuovo il 07/09/2026** («riesci a far si' che prenda da
+  solo il risultato di imei.info e lo carichi sul nostro portale?»), e la
+  risposta resta questa. Quello che si poteva togliere e' la frizione
+  DOPO la consultazione: due caselle, marca e modello, da ribattere
+  guardando un'altra finestra. Ora il modulo ha un campo solo dove si
+  incolla quello che si e' letto, e `interpreta_incollato` separa marca e
+  modello — dal codice modello se c'e', altrimenti dalla prima parola se
+  e' una marca nota, altrimenti lascia la marca vuota invece di
+  indovinarla. Un IMEI incollato per sbaglio viene tolto: quel numero non
+  deve finire in archivio ne' nel file del repository.
 - **HiCellTek API**: piano gratuito da 100 interrogazioni al mese, accetta
   il **solo TAC** e non l'IMEI intero. Il codice c'e' ed e' spento: si
   attiva valorizzando `TAC_API_KEY`. La registrazione richiede un'email

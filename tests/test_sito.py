@@ -2497,3 +2497,45 @@ class TestEsportazioneDeiTacInseriti(_Sito):
         self.assertIn("1 inseriti", riga)
         self.assertIn("ancora solo in archivio", riga)
         self.assertIn("/tac/esporta", riga)
+
+
+class TestSalvaIncollando(_Sito):
+    """Il campo unico: si incolla quello che si è letto altrove.
+
+    L'app non va a leggere quei siti da sola — bloccano l'accesso
+    automatico o lo vietano nei termini d'uso. La consultazione la fa una
+    persona; qui si toglie solo la ribattitura in due caselle.
+    """
+
+    def setUp(self):
+        from core import imeicheck, storage
+
+        storage.set_meta("imei_tac_inseriti", "{}")
+        imeicheck.reset_cache()
+        self.addCleanup(lambda: (storage.set_meta("imei_tac_inseriti", "{}"),
+                                 imeicheck.reset_cache()))
+
+    def test_una_riga_incollata_salva_marca_e_modello(self):
+        from core import imeicheck
+
+        self.client.post("/tac/salva", data={
+            "tac": "35139740", "imei": "351397403741486",
+            "incollato": "SAMSUNG GALAXY A56 5G"})
+        self.assertEqual(imeicheck.tac_inseriti().get("35139740"),
+                         ("SAMSUNG", "GALAXY A56 5G"))
+
+    def test_i_campi_separati_vincono_su_quello_incollato(self):
+        """Chi scrive a mano sta correggendo, e una correzione non si
+        reinterpreta."""
+        from core import imeicheck
+
+        self.client.post("/tac/salva", data={
+            "tac": "35139740", "imei": "351397403741486",
+            "marca": "Samsung", "modello": "Galaxy A56 5G",
+            "incollato": "QUALCOSA DI SBAGLIATO"})
+        self.assertEqual(imeicheck.tac_inseriti().get("35139740"),
+                         ("Samsung", "Galaxy A56 5G"))
+
+    def test_il_campo_da_incollare_e_in_pagina(self):
+        pagina = self.client.get("/", params={"q": "998877660000000"}).text
+        self.assertIn('name="incollato"', pagina)

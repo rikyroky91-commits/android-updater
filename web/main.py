@@ -1259,14 +1259,29 @@ def _backup_subito() -> None:
 
 @app.post("/tac/salva")
 def tac_salva(tac: str = Form(...), marca: str = Form(""),
-              modello: str = Form(""), imei: str = Form("")):
+              modello: str = Form(""), imei: str = Form(""),
+              incollato: str = Form("")):
     """Il modello verificato a mano, salvato dentro l'app.
 
     È la via d'uscita quando i database TAC non conoscono un telefono, e
     ha la precedenza su ogni database scaricato: se lo hai verificato tu,
     hai ragione tu. Vale per tutti gli IMEI di quel modello, non solo per
     quello digitato.
+
+    `incollato` È LA STESSA COSA IN UN GESTO SOLO. Chi ha appena letto la
+    risposta su un altro sito la seleziona e la copia intera —
+    «SAMSUNG GALAXY A56 5G» — e doveva spezzarla in testa per riscriverla
+    in due caselle. Ora la incolla e basta: la persona fa la
+    consultazione, che è lecita e che i collegamenti in pagina servono a
+    fare; l'app fa il lavoro meccanico di separare marca e modello.
+
+    I due campi espliciti restano e VINCONO su quello incollato: chi
+    scrive a mano sta correggendo, e una correzione non si reinterpreta.
     """
+    if incollato.strip() and not (marca.strip() and modello.strip()):
+        letta_marca, letto_modello = imeicheck.interpreta_incollato(incollato)
+        marca = marca.strip() or letta_marca
+        modello = modello.strip() or letto_modello
     imeicheck.aggiungi_tac(tac, marca, modello)
     # E ANCHE IL «NO» DELL'ARCHIVIO ESTERNO va tolto: era vero finche'
     # nessuno sapeva che telefono fosse, adesso lo sappiamo. Lasciarlo

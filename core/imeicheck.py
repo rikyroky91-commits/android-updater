@@ -513,6 +513,92 @@ def tac_inseriti_gia_curati() -> list[str]:
     return sorted(t for t in tac_inseriti() if t in curati)
 
 
+
+# ======================================================================
+# UN CAMPO SOLO: SI INCOLLA QUELLO CHE SI E' LETTO
+# ======================================================================
+# Chiesto dall'utente il 07/09/2026: «riesci a far si' che se non trova
+# l'IMEI prenda da solo il risultato di imei.info e lo carichi sul nostro
+# portale?». No — e la ragione sta gia' scritta in FONTI.md, «Piste NON
+# percorribili»: quei siti bloccano l'accesso automatico o lo vietano nei
+# termini d'uso. Consultarli DI PERSONA e' del tutto lecito, ed e'
+# esattamente cio' che i collegamenti nella pagina permettono.
+#
+# Ma fra «leggere la risposta» e «averla dentro l'app» c'era una frizione
+# vera, e quella si toglie: due caselle separate, marca e modello, da
+# ribattere a mano guardando un'altra finestra. Chi ha appena letto
+# «SAMSUNG GALAXY A56 5G» lo seleziona e lo copia in un gesto solo; poi
+# doveva spezzarlo in testa e scriverlo in due punti.
+#
+# Da qui in poi si incolla e basta. La persona fa la consultazione, che e'
+# lecita; l'app fa il lavoro meccanico, che e' il suo mestiere.
+_MARCHE_NOTE = frozenset("""
+apple samsung xiaomi redmi poco huawei honor oppo realme oneplus vivo iqoo
+motorola nokia sony lg google pixel asus zte nubia tcl alcatel wiko meizu
+lenovo doogee ulefone blackview cubot umidigi infinix tecno itel sharp
+fairphone nothing cat crosscall gigaset hmd emporia hisense
+""".split())
+
+# «Marca:», «Brand:», «Modello:» e simili: chi copia da una pagina si
+# porta dietro anche l'etichetta della casella.
+#
+# NON ancorata all'inizio: chi copia due caselle insieme si porta dietro
+# anche l'etichetta di mezzo — «Marca: Samsung Modello: Galaxy A56 5G» —
+# e quella finirebbe dentro il nome del telefono.
+_RE_ETICHETTA = re.compile(
+    r"\b(marca|brand|modello|model|device|dispositivo|nome|name)\s*[:\-]\s*",
+    re.IGNORECASE)
+# UN IMEI INCOLLATO NON DIVENTA UN NOME DI TELEFONO, e non e' solo
+# pulizia: quel numero identifica il singolo esemplare, e questo modulo
+# promette in cima al file che non lo salva da nessuna parte. Se finisse
+# nel campo «modello» finirebbe in archivio e nel file del repository.
+_RE_NUMERO_LUNGO = re.compile(r"\b\d{10,17}\b")
+
+
+def interpreta_incollato(testo: str) -> tuple[str, str]:
+    """`(marca, modello)` da una riga incollata, o `("", "")`.
+
+    Tre regole, in ordine, dalla piu' affidabile alla piu' generica:
+
+    1. c'e' dentro un codice modello che i cataloghi conoscono — allora
+       marca e nome commerciale vengono da li', che e' il dato buono;
+    2. la prima parola e' una marca nota — si spezza li';
+    3. nient'altro: tutto il testo e' il modello, la marca resta vuota.
+
+    La terza non e' una resa. Un modello senza marca e' comunque una
+    risposta utile, mentre indovinare la marca sbagliata mette in
+    archivio un dato falso che poi ha la precedenza su tutti i database.
+    """
+    pulito = " ".join((testo or "").replace("\n", " ").split())
+    pulito = _RE_ETICHETTA.sub(" ", pulito)
+    pulito = _RE_NUMERO_LUNGO.sub(" ", pulito)
+    pulito = " ".join(pulito.split()).strip(" ,;|-")
+    if not pulito:
+        return ("", "")
+
+    codice, _anno = _split_code_and_year(pulito)
+    if codice:
+        try:
+            from . import modelcodes
+
+            marca = modelcodes.marca_di_codice(codice) or ""
+            ufficiali = modelcodes.resolve(codice)
+        except Exception:  # pragma: no cover - i cataloghi non sono obbligatori
+            marca, ufficiali = "", []
+        if marca or ufficiali:
+            # Il nome ufficiale batte quello incollato: chi copia si porta
+            # dietro maiuscole, suffissi di mercato e a volte il codice.
+            nome = ufficiali[0] if ufficiali else pulito.replace(codice, "").strip(" ,-")
+            return (marca, " ".join((nome or codice).split()))
+
+    parole = pulito.split()
+    if len(parole) >= 2 and parole[0].lower() in _MARCHE_NOTE:
+        # La punteggiatura di separazione fra le due caselle («HONOR -
+        # 400 Pro») non fa parte del nome del telefono.
+        return (parole[0], " ".join(parole[1:]).strip(" ,;|-·—"))
+    return ("", pulito)
+
+
 def _indice_curato() -> dict[str, tuple[str, str]]:
     try:
         with open(FILE_TAC_CURATO, encoding="utf-8-sig") as f:

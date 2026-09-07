@@ -16,13 +16,36 @@
   <code>{{ imei.tac }}</code>, cioè per tutti gli IMEI di quel modello. Ha
   la precedenza su ogni database scaricato: se lo hai verificato tu, hai
   ragione tu.</p>
+{# UN CAMPO SOLO, perché è così che arriva la risposta. Chi ha appena
+   letto «SAMSUNG GALAXY A56 5G» su uno dei siti qui sopra lo seleziona e
+   lo copia in un gesto; con due caselle doveva spezzarlo in testa e
+   ribatterlo in due punti, guardando un'altra finestra.
+
+   L'app non va a leggere quei siti da sola — bloccano l'accesso
+   automatico o lo vietano nei termini d'uso, vedi «Piste NON
+   percorribili» in FONTI.md. La consultazione la fa una persona, che è
+   lecita; qui si toglie solo la ribattitura. #}
 <form method="post" action="/tac/salva" class="modulo">
   <input type="hidden" name="tac" value="{{ imei.tac }}">
   <input type="hidden" name="imei" value="{{ imei.imei }}">
-  <input type="text" name="marca" placeholder="Marca — es. Samsung">
-  <input type="text" name="modello" placeholder="Modello — es. Galaxy A54 5G">
+  <label class="sr-only" for="tac-incollato">Marca e modello, incollati</label>
+  <input id="tac-incollato" type="text" name="incollato"
+         placeholder="Incolla qui — es. Samsung Galaxy A54 5G">
   <button type="submit" class="secondario">Salva questo modello</button>
 </form>
+<details class="correzione-libera">
+  <summary>Preferisci separarli tu?</summary>
+  <p class="nota">Usalo se il testo che hai copiato non si divide bene da
+    solo: quello che scrivi qui ha la precedenza, perché una correzione
+    non si reinterpreta.</p>
+  <form method="post" action="/tac/salva" class="modulo">
+    <input type="hidden" name="tac" value="{{ imei.tac }}">
+    <input type="hidden" name="imei" value="{{ imei.imei }}">
+    <input type="text" name="marca" placeholder="Marca — es. Samsung">
+    <input type="text" name="modello" placeholder="Modello — es. Galaxy A54 5G">
+    <button type="submit" class="secondario">Salva questo modello</button>
+  </form>
+</details>
 {# Il salvataggio vive nell'archivio, quindi sopravvive ai riavvii ma non
    a un archivio ricostruito da zero. La riga nel file del progetto è la
    forma definitiva: le due strade non si escludono, si completano. #}
