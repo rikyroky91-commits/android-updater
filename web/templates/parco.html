@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block titolo %}Parco di test · {{ titolo_sito }}{% endblock %}
 {% block corpo %}
-<h3 class="occhiello">Parco di test · {{ righe | length }} dispositivi
+{# «1-25 di 84» e non «25 dispositivi»: con l'impaginazione il numero
+   di righe disegnate non è più quante ne hai, ed era proprio quello che
+   il titolo diceva. #}
+<h3 class="occhiello">Parco di test ·
+  {%- if trovate > (righe | length) %} {{ primo }}-{{ ultimo }} di {{ trovate }}
+  {%- else %} {{ trovate }}{% endif %} dispositiv{{ "o" if trovate == 1 else "i" }}
   {%- if q %} su {{ totale_parco }}{% endif %}</h3>
 
 {% if totale_parco %}
@@ -47,9 +52,9 @@
           <input id="test-{{ loop.index }}" type="date" name="data_test" value="{{ r.data_test }}" required>
           <button type="submit" class="secondario">Segna test</button>
         </form>
-        <p class="nota">Ultimo test: {{ r.provato_il or "mai" }}</p>
-        {% else %}
-        <span class="tenue">Dati firmware non disponibili</span>
+        <p class="nota">Ultimo test: {{ r.provato_il or "mai" }}{%
+          if r.senza_dati_firmware %} · nessuna fonte pubblica il firmware
+          di questo modello, quindi la colonna Stato resta vuota{% endif %}</p>
         {% endif %}
       </td>
       {# Il pallino resta: dice se il firmware è cambiato dall'ultima
@@ -103,6 +108,21 @@
     {% endfor %}
   </tbody>
 </table>
+
+{# La ricerca e l'ordinamento viaggiano con la pagina: senza, il primo
+   «Avanti» butterebbe via il filtro appena scritto. #}
+{% if pagine > 1 %}
+{% set coda = ("&q=" ~ (q | urlencode) if q else "") ~ ("&ordina=" ~ ordina if ordina else "") %}
+<nav class="paginazione" aria-label="Pagine del parco">
+  {% if pagina > 1 %}
+  <a class="proposta" href="/parco?pagina={{ pagina - 1 }}{{ coda }}">← Indietro</a>
+  {% endif %}
+  <span class="tenue">Pagina {{ pagina }} di {{ pagine }}</span>
+  {% if pagina < pagine %}
+  <a class="proposta" href="/parco?pagina={{ pagina + 1 }}{{ coda }}">Avanti →</a>
+  {% endif %}
+</nav>
+{% endif %}
 {% elif q %}
 <p class="vuoto">Nessun modello nel parco corrisponde a «{{ q }}».
   <a href="/parco">Azzera la ricerca</a> per vedere tutti i {{ totale_parco }} dispositivi.</p>

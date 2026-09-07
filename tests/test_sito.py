@@ -2127,7 +2127,9 @@ class TestParcoDiTest(_SitoConLogin):
         pagina = self.client.get("/parco", params={"q": "A07"}).text
         self.assertIn("Galaxy A07", pagina)
         self.assertNotIn("Galaxy S24", pagina)
-        self.assertIn("1 dispositivi su 2", pagina)
+        # «1 dispositivo», non «1 dispositivi»: il singolare e' arrivato
+        # con l'impaginazione, che ha riscritto questo titolo.
+        self.assertIn("1 dispositivo su 2", pagina)
 
         pagina = self.client.get("/parco", params={"q": "Samsung"}).text
         self.assertIn("Galaxy A07", pagina)
@@ -2462,6 +2464,7 @@ class TestEsportazioneDeiTacInseriti(_Sito):
     """
 
     def setUp(self):
+        super().setUp()
         from core import imeicheck, storage
 
         storage.set_meta("imei_tac_inseriti", "{}")
@@ -2508,6 +2511,7 @@ class TestSalvaIncollando(_Sito):
     """
 
     def setUp(self):
+        super().setUp()
         from core import imeicheck, storage
 
         storage.set_meta("imei_tac_inseriti", "{}")
@@ -2589,3 +2593,132 @@ class TestIlSalvataggioAutomaticoNonSeppellisceIBuoni(_SitoConLogin):
                              "non riuscito: prova")
         finally:
             STATO_AVVIO.pop("archivio esterno", None)
+
+
+class TestParcoSenzaDatiFirmware(_SitoConLogin):
+    """«dopo un certo numero di test scompare "Segna test" con il
+    calendario», 07/09/2026.
+
+    Non era una questione di numero: spariva sulle righe che dicono «Dati
+    firmware non disponibili», cioè sui modelli che nessuna fonte
+    pubblica. Il ragionamento di prima era che «Segna test» salva la data
+    INSIEME alla versione del momento, e senza dati non c'è niente da
+    fotografare — ma mette il secondo scopo davanti al primo. La data del
+    test è un dato di chi il telefono l'ha provato, e non dipende da cosa
+    pubblica il produttore.
+    """
+
+    CHIAVE = "marca ignota|modello che nessuna fonte conosce"
+
+    def setUp(self):
+        # `_SitoConLogin.setUp` mette il cookie di sessione: senza questa
+        # riga ogni richiesta finisce sulla pagina di login.
+        super().setUp()
+        from core import storage
+
+        storage.add_to_watchlist(self.CHIAVE, brand="Marca ignota",
+                                 model="Modello che nessuna fonte conosce")
+        self.addCleanup(lambda: storage.remove_from_watchlist(self.CHIAVE))
+
+    def test_il_calendario_c_e_anche_senza_firmware(self):
+        pagina = self.client.get("/parco").text
+        self.assertIn("Modello che nessuna fonte conosce", pagina)
+        self.assertNotIn("Dati firmware non disponibili", pagina)
+
+    def test_la_data_si_registra_lo_stesso(self):
+        from core import storage
+
+        risposta = self.client.post(
+            "/parco/segna-test",
+            data={"chiave": self.CHIAVE, "data_test": "2026-09-07"},
+            follow_redirects=False)
+        self.assertEqual(risposta.status_code, 303)
+        self.assertIn("test_salvato=1", risposta.headers["location"])
+        riferimento = storage.get_test_baselines().get(self.CHIAVE)
+        self.assertIsNotNone(riferimento, "la data del test non è stata salvata")
+        self.assertTrue(riferimento["tested_at"].startswith("2026-09-07"))
+
+    def test_la_fotografia_resta_vuota_e_lo_dice(self):
+        """Non si inventa uno stato software che non si conosce: la
+        colonna Stato resta «—», che è la verità."""
+        from core import storage
+
+        self.client.post("/parco/segna-test",
+                         data={"chiave": self.CHIAVE, "data_test": "2026-09-07"},
+                         follow_redirects=False)
+        riferimento = storage.get_test_baselines()[self.CHIAVE]
+        for campo in ("os_version", "build", "patch_level", "android_version"):
+            self.assertIsNone(riferimento[campo], campo)
+
+    def test_una_data_sbagliata_resta_un_errore(self):
+        risposta = self.client.post(
+            "/parco/segna-test",
+            data={"chiave": self.CHIAVE, "data_test": "non-una-data"},
+            follow_redirects=False)
+        self.assertIn("errore_test=data", risposta.headers["location"])
+
+
+class TestParcoImpaginato(_SitoConLogin):
+    """«magari potresti mettere 20-30 risultati per pagina se può
+    aiutare», 07/09/2026.
+
+    Non è solo comodità di lettura: ogni riga porta un modulo con il
+    calendario, un `<details>` per la nota e uno per ogni allegato. Su
+    cento modelli sono centinaia di controlli in una pagina sola.
+    """
+
+    QUANTI = 60
+
+    def setUp(self):
+        super().setUp()
+        from core import storage
+
+        self.chiavi = [f"prova{n:03d}|modello prova {n:03d}"
+                       for n in range(self.QUANTI)]
+        for n, chiave in enumerate(self.chiavi):
+            storage.add_to_watchlist(chiave, brand="Prova",
+                                     model=f"Modello prova {n:03d}")
+
+        def pulisci():
+            for chiave in self.chiavi:
+                storage.remove_from_watchlist(chiave)
+
+        self.addCleanup(pulisci)
+
+    def test_una_pagina_non_mostra_tutto(self):
+        from web.main import PARCO_PER_PAGINA
+
+        self.assertLessEqual(PARCO_PER_PAGINA, 30)
+        self.assertGreaterEqual(PARCO_PER_PAGINA, 20)
+        pagina = self.client.get("/parco").text
+        mostrati = sum(1 for n in range(self.QUANTI)
+                       if f"Modello prova {n:03d}" in pagina)
+        self.assertEqual(mostrati, PARCO_PER_PAGINA)
+
+    def test_la_seconda_pagina_mostra_i_successivi(self):
+        from web.main import PARCO_PER_PAGINA
+
+        prima = self.client.get("/parco").text
+        seconda = self.client.get("/parco", params={"pagina": 2}).text
+        self.assertIn("Modello prova 000", prima)
+        self.assertNotIn("Modello prova 000", seconda)
+        self.assertIn(f"Modello prova {PARCO_PER_PAGINA:03d}", seconda)
+
+    def test_una_pagina_fuori_intervallo_si_riporta_dentro(self):
+        """Succede tornando indietro dopo aver tolto un modello: meglio
+        l'ultima pagina che una tabella vuota."""
+        risposta = self.client.get("/parco", params={"pagina": 999})
+        self.assertEqual(risposta.status_code, 200)
+        self.assertIn("Modello prova", risposta.text)
+
+    def test_la_ricerca_viaggia_con_la_pagina(self):
+        """Senza, il primo «Avanti» butterebbe via il filtro appena
+        scritto."""
+        pagina = self.client.get("/parco", params={"q": "prova"}).text
+        self.assertIn("q=prova", pagina)
+
+    def test_il_titolo_dice_quanti_su_quanti(self):
+        """Con l'impaginazione il numero di righe disegnate non è più
+        quante ne hai, ed era proprio quello che il titolo diceva."""
+        pagina = self.client.get("/parco").text
+        self.assertIn(f"di {self.QUANTI}", pagina)

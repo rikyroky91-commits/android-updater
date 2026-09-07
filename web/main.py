@@ -69,6 +69,16 @@ RICERCHE = CacheATempo(C.SEARCH_CACHE_SECONDS, C.SEARCH_CACHE_MAX)
 # costruiscono: nel template arrivava dopo, a lavoro già fatto.
 IN_PAGINA = 200
 
+# QUANTE RIGHE DEL PARCO PER PAGINA. Chiesto dall'utente il 07/09/2026,
+# guardando una tabella diventata lunghissima: «magari potresti mettere
+# 20-30 risultati per pagina».
+#
+# Non è solo comodità di lettura. Ogni riga del parco porta con sé un
+# modulo con il calendario, un `<details>` per la nota e uno per ogni
+# allegato: su cento modelli sono centinaia di controlli in una pagina
+# sola, che il browser costruisce tutti prima di mostrarne uno.
+PARCO_PER_PAGINA = C.env_int("PARCO_PER_PAGINA", 25)
+
 @asynccontextmanager
 async def ciclo_di_vita(app: FastAPI):
     avvio()
@@ -624,7 +634,8 @@ def pagina_parco(request: Request, test_salvato: int = Query(default=0),
                  ordina: str = Query(default=""), nota_salvata: int = Query(default=0),
                  allegato_salvato: int = Query(default=0),
                  allegato_tolto: int = Query(default=0),
-                 errore_allegato: str = Query(default="")):
+                 errore_allegato: str = Query(default=""),
+                 pagina: int = Query(default=1)):
     utente, redirect = _accesso_parco_richiesto(request)
     if redirect:
         return redirect
@@ -660,7 +671,28 @@ def pagina_parco(request: Request, test_salvato: int = Query(default=0),
             # conserva invece un istante ISO completo. Tenerli distinti
             # rende modificabile la data senza esporre un orario inutile.
             "data_test": (tested_at_iso[:10] if tested_at_iso else date.today().isoformat()),
-            "puo_segnare_test": bool(device),
+            # LA DATA E' TUA, LA FOTOGRAFIA E' UN DI PIU'.
+            #
+            # Segnalato dall'utente il 07/09/2026 guardando la pagina:
+            # «dopo un certo numero di test scompare "Segna test" con il
+            # calendario». Non era una questione di numero — spariva sulle
+            # righe che dicono «Dati firmware non disponibili», cioè sui
+            # modelli che nessuna fonte pubblica.
+            #
+            # Il ragionamento di prima: «Segna test» salva la data INSIEME
+            # alla versione/build/patch del momento, e senza dati firmware
+            # non c'è niente da fotografare — quindi niente pulsante. Ma
+            # mette il secondo scopo davanti al primo: la data del test è
+            # un dato di chi il telefono l'ha provato, e non dipende da
+            # cosa pubblica il produttore. Un parco di test che rifiuta di
+            # registrare una prova perché una fonte tace serve a meta'.
+            #
+            # Ora la data si registra sempre. La fotografia si salva se
+            # c'è (`test_baseline` ha tutti i campi tranne `tested_at`
+            # opzionali), e la colonna Stato resta «—», che è la verità:
+            # non c'è niente da confrontare.
+            "puo_segnare_test": True,
+            "senza_dati_firmware": not device,
             "confronto": confronto,
             # La nota vive nella colonna `note` di `watchlist`, che
             # esisteva da sempre ma non era mostrata da nessuna pagina.
@@ -686,6 +718,18 @@ def pagina_parco(request: Request, test_salvato: int = Query(default=0),
 
     righe = _ordina_righe_parco(righe, ordina)
 
+    # L'IMPAGINAZIONE VIENE DOPO IL FILTRO E DOPO L'ORDINAMENTO, e
+    # l'ordine conta: impaginare prima vorrebbe dire ordinare una fetta
+    # invece dell'insieme, cioè mostrare «i primi 25 per data» scegliendoli
+    # fra 25 qualunque.
+    trovate = len(righe)
+    pagine = max(1, (trovate + PARCO_PER_PAGINA - 1) // PARCO_PER_PAGINA)
+    # Una pagina fuori intervallo si riporta dentro invece di dare una
+    # tabella vuota: succede tornando indietro dopo aver tolto un modello.
+    pagina = min(max(1, pagina), pagine)
+    inizio = (pagina - 1) * PARCO_PER_PAGINA
+    righe = righe[inizio:inizio + PARCO_PER_PAGINA]
+
     messaggi_errore = {
         "data": "Inserisci una data valida per il test.",
         "dispositivo": "Questo modello non ha ancora dati firmware da salvare come riferimento.",
@@ -696,6 +740,9 @@ def pagina_parco(request: Request, test_salvato: int = Query(default=0),
     return _rendi(request, "parco.html", _contesto(
         request, attiva="parco", righe=righe,
         totale_parco=totale_parco, q=q, ordina=ordina,
+        pagina=pagina, pagine=pagine, trovate=trovate,
+        primo=inizio + 1 if trovate else 0,
+        ultimo=min(inizio + PARCO_PER_PAGINA, trovate),
         ordinamenti=ORDINAMENTI_PARCO,
         test_salvato=bool(test_salvato),
         errore_test=messaggi_errore.get(errore_test, ""),
@@ -1162,7 +1209,15 @@ def parco_segna_test(request: Request, chiave: str = Form(...), data_test: str =
     dispositivo = next((d for d in storage.get_devices()
                         if d.get("device_key") == chiave), None)
     if not dispositivo:
-        return RedirectResponse("/parco?errore_test=dispositivo", status_code=303)
+        # NESSUNA FONTE PUBBLICA QUESTO MODELLO, e non è un motivo per
+        # rifiutare la data: vedi il commento su `puo_segnare_test`. Si
+        # costruisce il minimo indispensabile da quello che il parco sa —
+        # marca e nome — e la fotografia resta vuota, che è la verità.
+        voce = next((v for v in storage.get_watchlist()
+                     if v.get("device_key") == chiave), {})
+        dispositivo = {"device_key": chiave,
+                       "brand": voce.get("brand") or "",
+                       "model": voce.get("model") or ""}
     istante = _istante_test(data_test)
     if not istante:
         return RedirectResponse("/parco?errore_test=data", status_code=303)

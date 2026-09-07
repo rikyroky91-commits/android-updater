@@ -120,3 +120,9 @@ GEMINI_API_KEY = ""
 # mano, non una che capita.
 # TAC_API_MAX_GIORNO = "10"
 # TAC_API_MAX_MESE   = "100"
+
+# Quante righe del parco di test per pagina. Non e' solo comodita' di
+# lettura: ogni riga porta un modulo con il calendario, un blocco per la
+# nota e uno per ogni allegato, e su cento modelli sono centinaia di
+# controlli che il browser costruisce tutti prima di mostrarne uno.
+# PARCO_PER_PAGINA = "25"

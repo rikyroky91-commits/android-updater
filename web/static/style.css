@@ -360,6 +360,12 @@ a { color: inherit; }
   display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
   margin: .8rem 0 1.1rem;
 }
+/* Le frecce fra una pagina e l'altra del parco. Centrate perche' stanno
+   sotto una tabella larga: allineate a sinistra si perdono. */
+.paginazione {
+  display: flex; gap: .8rem; align-items: center; justify-content: center;
+  flex-wrap: wrap; margin: 1rem 0 .4rem; font-size: .88rem;
+}
 .parco-filtri input[type="text"], .parco-filtri select {
   font: inherit; font-size: .88rem; padding: .4rem .6rem;
   border: 1px solid var(--filo); background: var(--carta); color: inherit;
