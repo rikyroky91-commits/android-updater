@@ -20,6 +20,17 @@ TELEGRAM_CHAT_ID = ""
 # Escono SOLO le prime 8 cifre dell'IMEI, mai il numero intero.
 TAC_API_KEY = ""
 
+# Secondo servizio gratuito documentato: IMEI Check Pro, previa approvazione
+# su https://imeicheckpro.com/tac-access . Non usare le chiavi demo temporanee.
+# Il profilo imposta GET /api/tac/{tac}, X-API-Key e legge il campo object.
+# Limite: 3 richieste nell'ultima ora, oltre ai tetti giornaliero/mensile locali.
+# TAC_API_PROVIDER_2 = "imeicheckpro"
+# TAC_API_KEY_2 = ""
+# Lascia TAC_API_URL_2 / HEADER_2 / NOME_2 non impostati per usare il profilo.
+# Il profilo "hicelltek" è disponibile negli stessi tre slot.
+# Verifica senza chiamate: python scripts/verifica_servizi_tac.py
+# Prova reale (consuma quota): python scripts/verifica_servizi_tac.py --live --tac 35135531
+
 # SE NE POSSONO METTERE FINO A TRE, provati in quest'ordine finché uno
 # risponde. Cento interrogazioni al mese sono poche e finiscono; e una
 # chiave che smette di funzionare non deve chiudere l'ultima strada

@@ -621,7 +621,7 @@ class TestUnServizioRottoLoDeveDire(unittest.TestCase):
     def test_un_no_del_servizio_resta_un_no(self):
         """La distinzione che regge tutto: «non lo conosco» è una
         risposta e si conserva, un guasto no."""
-        self._servizio_che_risponde(404)
+        self._servizio_che_risponde(404, {"found": False})
         self.assertEqual(imeicheck.cerca_tac_online_esito("35692411"),
                          ("assente", None))
         self.assertEqual(imeicheck.ultimo_esito_servizio()["esito"], "assente")
@@ -1117,10 +1117,9 @@ class TestPiuDiUnFornitoreDiTac(unittest.TestCase):
             imeicheck.TAC_API_URL: (200, {"found": False}),
             "https://secondo.example/tac": (500, {}),
         })
-        # Uno ha detto no, l'altro ha taciuto: resta un no, perché una
-        # risposta c'è stata.
+        # Il secondo può conoscere il TAC quando il servizio si riprende.
         self.assertEqual(imeicheck.cerca_tac_online_esito("35139740"),
-                         ("assente", None))
+                         ("errore", None))
 
     def test_se_tacciono_tutti_e_un_errore_non_un_no(self):
         os.environ["TAC_API_KEY"] = "abc"

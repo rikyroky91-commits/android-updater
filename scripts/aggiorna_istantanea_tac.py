@@ -31,6 +31,7 @@ prodotto va committato.
 from __future__ import annotations
 
 import csv
+import argparse
 import gzip
 import io
 import os
@@ -46,6 +47,10 @@ DESTINAZIONE = os.path.join(imeicheck.CARTELLA_DATI, "tac_era_android.csv.gz")
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--completa", action="store_true",
+                        help="conserva tutti i TAC per le ricerche offline fuori indice")
+    args = parser.parse_args()
     storage.init_db()
     grezzo = imeicheck._cached_bytes()
     if not grezzo:
@@ -59,8 +64,11 @@ def main() -> int:
         return 1
 
     tenute = [r for r in righe
-              if imeicheck._dell_era_android(r.get("SPECS") or r.get("specs") or "")
+              if (args.completa or imeicheck._dell_era_android(r.get("SPECS") or r.get("specs") or ""))
               and imeicheck._tac_normalizzato(r.get("TAC") or r.get("tac"))]
+    if args.completa and len(tenute) < 200_000:
+        print("copia completa sospettosamente piccola: file non sostituito")
+        return 1
     if len(tenute) < len(righe) // 10:
         # Una caduta simile significa che il formato è cambiato e il
         # criterio non riconosce più niente. Meglio non sovrascrivere una
@@ -85,11 +93,14 @@ def main() -> int:
             "SPECS": r.get("SPECS") or r.get("specs") or "",
         })
 
-    dati = gzip.compress(buffer.getvalue().encode("utf-8"), 9)
-    with open(DESTINAZIONE, "wb") as f:
+    dati = gzip.compress(buffer.getvalue().encode("utf-8"), 9, mtime=0)
+    destinazione = (os.path.join(imeicheck.CARTELLA_DATI, "tac_completo.csv.gz")
+                    if args.completa else DESTINAZIONE)
+    with open(destinazione + ".tmp", "wb") as f:
         f.write(dati)
+    os.replace(destinazione + ".tmp", destinazione)
     print(f"istantanea aggiornata: {len(tenute)} TAC su {len(righe)}, "
-          f"{len(dati) / 1e6:.1f} MB compressi in {DESTINAZIONE}")
+          f"{len(dati) / 1e6:.1f} MB compressi in {destinazione}")
     return 0
 
 

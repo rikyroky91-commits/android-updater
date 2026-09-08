@@ -2,8 +2,18 @@
 from __future__ import annotations
 
 import unittest
+import pytest
 
 from core import config as C, extract, imeicheck, soc, storage
+
+
+@pytest.fixture(autouse=True)
+def _quota_non_pertinente(monkeypatch):
+    # Questi test collaudano il protocollo, non i tetti (coperti altrove).
+    # I contatori persistiti da test precedenti non devono impedirgli
+    # di raggiungere il client HTTP finto.
+    monkeypatch.setenv("TAC_API_MAX_GIORNO", "0")
+    monkeypatch.setenv("TAC_API_MAX_MESE", "0")
 
 
 class TestNomeCommercialeScrittoInPiuModi(unittest.TestCase):

@@ -34,31 +34,12 @@ RUN pip install --no-cache-dir -r requirements-web.txt
 COPY --chown=app core ./core
 COPY --chown=app data ./data
 COPY --chown=app scripts/preload_cataloghi.py ./scripts/preload_cataloghi.py
+COPY --chown=app scripts/verifica_servizi_tac.py ./scripts/verifica_servizi_tac.py
 
-# L'ARCHIVIO DI PARTENZA SI COSTRUISCE DURANTE LA BUILD.
-#
-# Il disco qui è effimero (vedi la nota su DB_PATH più sotto), quindi a
-# ogni risveglio l'applicazione ripartiva da zero dispositivi e restava
-# così finché una scansione intera non fosse finita — riscaricando nel
-# frattempo una ventina di megabyte di cataloghi che in questo file ci
-# sono già dentro. Chi apriva il sito in quella finestra vedeva un
-# archivio vuoto.
-#
-# Il file lo aggiorna ogni ora il workflow di GitHub Actions, quindi al
-# momento della build è vecchio al massimo di un'ora. Non sostituisce il
-# salvataggio su Gist: `web/main._semina_archivio()` lo usa SOLO quando
-# non c'è già un archivio, e mai sopra uno esistente.
-#
-# `tracker.db*` (CON L'ASTERISCO), non `tracker.db`: il file è normale
-# che manchi — non viaggia negli zip di consegna (contiene dati veri di
-# produzione, non c'entra col codice), e lo stesso vale la prima volta
-# che il repository viene ricreato da zero, prima che il workflow orario
-# lo committi. Un `COPY` sul nome esatto fa fallire l'intera build se il
-# file non c'è ("not found"), portando giù il sito per un file che
-# `_semina_archivio()` sopra sa già gestire da solo (vedi il suo
-# docstring: "nessuna copia nell'immagine" non è un errore, è un ramo
-# previsto). Con l'asterisco il file si copia se c'è e non succede
-# niente se non c'è — mai un build che fallisce per questo.
+# L'archivio iniziale viene generato dai cataloghi pubblici durante la
+# build. Non si copia il database di produzione e non esiste più un
+# workflow che lo committi ogni ora. Account e parco si ripristinano
+# dal backup configurato; `_semina_archivio` prepara solo un DB assente.
 RUN PYTHONPATH=/home/app DB_PATH=/home/app/tracker.db \
     python /home/app/scripts/preload_cataloghi.py \
  && chown app:app /home/app/tracker.db

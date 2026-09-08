@@ -24,6 +24,7 @@ import gzip
 import io
 import json
 import os
+import threading
 from datetime import datetime, timezone
 
 try:
@@ -386,10 +387,13 @@ def _ricorda_tac_assente(tac: str) -> None:
     tac = "".join(c for c in (tac or "") if c.isdigit())[:8]
     if len(tac) != 8:
         return
-    voci = tac_assenti()
+    firma = _firma_fornitori()
+    chiave_config = _META_TAC_ASSENTI + "_config_v2"
+    voci = (tac_assenti() if storage.get_meta(chiave_config) == firma else {})
     voci[tac] = datetime.now(timezone.utc).isoformat()
     try:
         storage.set_meta(_META_TAC_ASSENTI, json.dumps(voci, ensure_ascii=False))
+        storage.set_meta(chiave_config, firma)
     except Exception:      # un archivio non scrivibile non deve far fallire una ricerca
         pass
 
@@ -397,6 +401,10 @@ def _ricorda_tac_assente(tac: str) -> None:
 def tac_gia_chiesto_invano(tac: str) -> bool:
     """True se il servizio esterno ha gia' detto di non conoscere questo TAC,
     abbastanza di recente da non valere la pena richiederlo."""
+    # Le vecchie assenze potevano essere errori HTTP/JSON. Inoltre un
+    # nuovo fornitore o una chiave corretta devono poter riprovare subito.
+    if storage.get_meta(_META_TAC_ASSENTI + "_config_v2") != _firma_fornitori():
+        return False
     tac = "".join(c for c in (tac or "") if c.isdigit())[:8]
     quando = tac_assenti().get(tac)
     if not quando:
@@ -409,6 +417,14 @@ def tac_gia_chiesto_invano(tac: str) -> bool:
         chiesto = chiesto.replace(tzinfo=timezone.utc)
     eta = (datetime.now(timezone.utc) - chiesto).days
     return eta < GIORNI_VALIDITA_TAC_ASSENTE
+
+
+def _firma_fornitori() -> str:
+    import hashlib
+
+    configurati = [{k: f.get(k) for k in ("url", "chiave", "intestazione")}
+                  for f in fornitori_tac()]
+    return hashlib.sha256(json.dumps(configurati, sort_keys=True).encode()).hexdigest()
 
 
 def dimentica_tac_assente(tac: str) -> None:
@@ -668,6 +684,21 @@ def _voci_principali():
         if indice:
             _status += " (dal foglio di calcolo, il CSV non era disponibile)"
     if not indice:
+        # La copia completa conserva anche i TAC senza anno/codice,
+        # compresi telefoni recenti esclusi dall'euristica dell'indice.
+        # Si legge in flusso: il filtro della RAM resta in _build_index.
+        try:
+            with gzip.open(os.path.join(CARTELLA_DATI, "tac_completo.csv.gz"),
+                           "rt", encoding="utf-8", errors="replace") as flusso:
+                trovata = False
+                for voce in _righe_principali(flusso):
+                    trovata = True
+                    yield voce
+                if trovata:
+                    _status += " — copia completa nel repository"
+                    return
+        except (OSError, EOFError, csv.Error):
+            pass
         indice = _istantanea_locale()
         if indice:
             _status += (f" — nessuna fonte in rete disponibile, si usa la copia "
@@ -1215,6 +1246,13 @@ _FORNITORI_PREDEFINITI = [
     ("_3", "terzo servizio", "", "X-Api-Key"),
 ]
 
+_PROFILI_TAC = {
+    "hicelltek": ("HiCellTek", TAC_API_URL, "X-Api-Key", 0),
+    "imeicheckpro": ("IMEI Check Pro", "https://imeicheckpro.com/api/tac/{tac}",
+                     "X-API-Key", 3),
+}
+_LOCK_QUOTA_TAC = threading.Lock()
+
 # ======================================================================
 # COME CI SI PRESENTA A UN SERVIZIO TAC
 # ======================================================================
@@ -1250,6 +1288,12 @@ def fornitori_tac() -> list[dict]:
     """
     elenco = []
     for suffisso, nome, url_base, intestazione in _FORNITORI_PREDEFINITI:
+        profilo = C.env("TAC_API_PROVIDER" + suffisso).strip().lower()
+        max_ora = 0
+        if profilo:
+            if profilo not in _PROFILI_TAC:
+                continue
+            nome, url_base, intestazione, max_ora = _PROFILI_TAC[profilo]
         # Il primo passa da `_chiave_api()` invece che dall'ambiente
         # diretto, e non e' un dettaglio: quella funzione e' il punto in
         # cui la chiave si legge da sempre, ed e' l'aggancio che le prove
@@ -1265,6 +1309,7 @@ def fornitori_tac() -> list[dict]:
             "nome": C.env("TAC_API_NOME" + suffisso, nome).strip() or nome,
             "url": url,
             "chiave": chiave,
+            "max_ora": max_ora,
             "intestazione": (C.env("TAC_API_HEADER" + suffisso,
                                    intestazione).strip() or intestazione),
             "agente": (C.env("TAC_API_USER_AGENT" + suffisso,
@@ -1652,6 +1697,31 @@ def _segna_chiamata(nome: str) -> None:
         pass
 
 
+def _prenota_chiamata(fornitore: dict) -> str:
+    """Controllo e incremento indivisibili tra richieste dello stesso processo.
+
+    IMEI Check Pro ammette tre richieste nell'ultima ora. I timestamp
+    persistono con gli altri contatori e non si azzerano al riavvio.
+    """
+    with _LOCK_QUOTA_TAC:
+        nome = fornitore["nome"]
+        fermo = tetto_raggiunto(nome)
+        if fermo:
+            return fermo
+        limite = fornitore.get("max_ora", 0)
+        if limite:
+            adesso = datetime.now(timezone.utc).timestamp()
+            voce = _quota_di(nome)
+            recenti = [t for t in voce.get("chiamate_ora", [])
+                       if isinstance(t, (int, float)) and t > adesso - 3600]
+            if len(recenti) >= limite:
+                return f"tetto orario raggiunto ({limite})"
+            voce["chiamate_ora"] = recenti + [adesso]
+            consumo_tac()[nome] = voce
+        _segna_chiamata(nome)
+        return ""
+
+
 def riassunto_consumo(carica: bool = True) -> str:
     """«HiCellTek: 2 oggi su 10, 2 questo mese su 100»."""
     tutti = consumo_tac(carica=carica)
@@ -1883,13 +1953,9 @@ def _interroga_fornitore(fornitore: dict, tac: str) -> tuple[str, tuple[str, str
         return ("errore", None)
 
     stato = getattr(risposta, "status_code", 0)
-    # 404 E' UNA RISPOSTA, NON UN GUASTO. Alcuni fornitori dicono «non ce
-    # l'ho» con il codice HTTP invece che nel corpo: trattarlo come un
-    # errore di rete significherebbe richiederlo — e pagarlo — per sempre.
-    if stato == 404:
-        _ricorda_esito_servizio("assente", "HTTP 404: TAC non in catalogo", nome)
-        return ("assente", None)
-    if stato != 200:
+    # Un 404 può essere una rotta sbagliata: solo il JSON esplicito
+    # permette di distinguerlo da un TAC assente.
+    if stato not in (200, 404):
         # Non solo il numero: anche chi l'ha detto. Vedi `_chi_ha_risposto`.
         dettaglio = _spiega_stato(stato)
         testimone = _chi_ha_risposto(risposta)
@@ -1911,25 +1977,50 @@ def _interroga_fornitore(fornitore: dict, tac: str) -> tuple[str, tuple[str, str
     try:
         dati = risposta.json()
     except Exception:
-        _ricorda_esito_servizio("errore", "HTTP 200 ma risposta illeggibile", nome)
+        _ricorda_esito_servizio("errore", f"HTTP {stato} ma risposta illeggibile", nome)
         return ("errore", None)
     if not isinstance(dati, dict):
         _ricorda_esito_servizio("errore",
                                 "HTTP 200 ma risposta di forma inattesa", nome)
         return ("errore", None)
 
-    corpo = dati.get("data") if isinstance(dati.get("data"), dict) else dati
-    if not isinstance(corpo, dict):
-        _ricorda_esito_servizio("errore",
-                                "HTTP 200 ma risposta di forma inattesa", nome)
+    errore_api = dati.get("error")
+    codice_errore = (errore_api.get("code") if isinstance(errore_api, dict)
+                     else dati.get("code"))
+    if codice_errore == "TAC_NOT_FOUND":
+        _ricorda_esito_servizio("assente", "non conosce questo TAC", nome)
+        return ("assente", None)
+    if dati.get("success") is False or errore_api:
+        # Non copiare messaggi arbitrari del server: possono ripetere
+        # credenziali o query. Il codice numerico è sufficiente.
+        dettaglio = (_spiega_stato(int(codice_errore))
+                     if str(codice_errore).isdigit()
+                     else "errore dichiarato dal servizio nel JSON")
+        _ricorda_esito_servizio("errore", dettaglio, nome)
         return ("errore", None)
+
+    corpo = dati
+    for campo in ("data", "object"):
+        if isinstance(dati.get(campo), dict):
+            corpo = dati[campo]
+            break
 
     # Il servizio dichiara esplicitamente l'esito con `found`: quando c'è,
     # va creduto. Un `found: false` con i campi vuoti non è una risposta
     # da interpretare, è un no.
-    if corpo.get("found") is False:
+    if dati.get("found") is False or corpo.get("found") is False:
         _ricorda_esito_servizio("assente", "non conosce questo TAC", nome)
         return ("assente", None)
+
+    if stato != 200 or corpo.get("success") is False or corpo.get("error"):
+        _ricorda_esito_servizio("errore", f"HTTP {stato}: risposta non valida", nome)
+        return ("errore", None)
+
+    # Un proxy/cache difettoso non deve insegnarci il modello di un altro TAC.
+    ricevuto = corpo.get("tac", dati.get("tac"))
+    if ricevuto is not None and _tac_normalizzato(ricevuto) != tac:
+        _ricorda_esito_servizio("errore", "TAC della risposta diverso da quello richiesto", nome)
+        return ("errore", None)
 
     # I NOMI DEI CAMPI CAMBIANO DA UN FORNITORE ALL'ALTRO, e sono
     # l'unica cosa che impedisce a una chiave nuova di funzionare
@@ -1940,11 +2031,9 @@ def _interroga_fornitore(fornitore: dict, tac: str) -> tuple[str, tuple[str, str
                           or corpo.get("marca") or corpo.get("vendor"))
     modello = _testo_o_nome(corpo.get("model") or corpo.get("modello")
                             or corpo.get("device") or corpo.get("name"))
-    if not marca and not modello:
-        # Il servizio ha risposto 200 senza dire che telefono e': per
-        # questo TAC non ha niente. E' un no, non un guasto.
-        _ricorda_esito_servizio("assente", "non conosce questo TAC", nome)
-        return ("assente", None)
+    if not modello or _solo_la_marca(modello, marca):
+        _ricorda_esito_servizio("errore", "risposta senza un modello identificabile", nome)
+        return ("errore", None)
 
     # Il chipset arriva solo con i piani a pagamento, ma se c'è si prende:
     # è esattamente il dato che manca altrove, e viene da chi identifica il
@@ -1974,8 +2063,8 @@ def cerca_tac_online_esito(tac: str) -> tuple[str, tuple[str, str] | None]:
     fornitore che non conosce un TAC non chiude la questione: quello dopo
     puo' conoscerlo, ed e' esattamente il motivo per cui ce n'e' piu'
     d'uno. Si va avanti finche' uno risponde, e si conserva un «assente»
-    solo se ALMENO UNO ha detto no e NESSUNO ha detto sì. Se hanno taciuto
-    tutti e' un errore, e un errore non si conserva.
+    solo se TUTTI hanno detto no. Un servizio guasto, in pausa o senza
+    quota rende la ricerca incompleta: non si conserva come assenza.
     """
     if requests is None:
         return ("errore", None)
@@ -1984,27 +2073,35 @@ def cerca_tac_online_esito(tac: str) -> tuple[str, tuple[str, str] | None]:
         return ("errore", None)
 
     qualcuno_ha_detto_no = False
+    incompleto = False
     for fornitore in fornitori_tac():
         # OGNI STRADA DA QUI IN GIU' LASCIA DETTO COM'E' ANDATA. Prima
         # finivano tutte nello stesso `("errore", None)` muto: vedi il
         # commento in `stato_servizio_esterno`.
         if servizio_in_pausa(fornitore["nome"]):
+            incompleto = True
             continue
         # IL TETTO SI GUARDA PRIMA DI USCIRE IN RETE, e la chiamata si
         # conta prima di farla: se si contasse dopo, un errore a meta'
         # (timeout, processo ucciso) lascerebbe una chiamata fatta e non
         # contata — cioe' esattamente il buco da cui un loop scappa.
-        fermo = tetto_raggiunto(fornitore["nome"])
+        fermo = _prenota_chiamata(fornitore)
         if fermo:
+            incompleto = True
             _ricorda_esito_servizio("errore", fermo, fornitore["nome"])
             continue
-        _segna_chiamata(fornitore["nome"])
         esito, risposta = _interroga_fornitore(fornitore, tac)
         if esito == "trovato":
             return (esito, risposta)
         if esito == "assente":
             qualcuno_ha_detto_no = True
-    return ("assente", None) if qualcuno_ha_detto_no else ("errore", None)
+        else:
+            incompleto = True
+    if incompleto and ultimo_esito_servizio().get("esito") != "errore":
+        _ricorda_esito_servizio(
+            "errore", "ricerca incompleta: almeno un fornitore non ha potuto rispondere")
+    return (("assente", None) if qualcuno_ha_detto_no and not incompleto
+            else ("errore", None))
 
 
 # Un nome in codice Motorola come lo scrive il database TAC: il codename

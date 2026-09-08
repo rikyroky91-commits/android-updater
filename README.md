@@ -9,7 +9,7 @@ i test.
 uvicorn web.main:app --reload           # il sito, su http://127.0.0.1:8000
 python worker.py --once                 # una scansione sola (cron / GitHub Actions)
 python worker.py                        # ciclo continuo, senza sito
-python -m unittest discover -s tests    # 824 test
+python -m pytest tests/ -q             # fixture offline e isolamento dei test
 ```
 
 Regola di collaudo delle fonti: ogni modifica deve mantenere i casi di
@@ -266,21 +266,27 @@ loro significato.
 Il piano gratuito di Render addormenta il servizio dopo quindici minuti
 senza visite e azzera il disco a ogni riavvio: lo
 storico per dispositivo — che è il cuore di questa app — si perde.
-`core/backup.py` sincronizza il file SQLite su un Gist privato; **si
+`core/backup.py` sincronizza il file SQLite su un Gist non elencato; **si
 configura dalla scheda Diagnostica**, l'app crea il Gist da sé e serve solo
-un token GitHub con permesso `gist`.
+un token GitHub con permesso `gist`. Impostare anche `BACKUP_ENCRYPTION_KEY`:
+un Gist non elencato è accessibile a chi ne conosce l'URL.
 
 > I dataset scaricati (codici modello, database TAC, chip) vivono dentro lo
 > stesso file, quindi il suo peso non è un dettaglio: vengono conservati
 > **compressi** con `storage.set_blob()`. In esadecimale — la forma usata
 > fino alla v39 — occupavano 63 MB invece di 16, in un file che viene
-> caricato ogni mezz'ora e committato ogni ora.
+> caricato dal sistema di backup.
 
-In alternativa: un worker su una macchina sempre accesa con `TRACKER_DB` su
-volume persistente, oppure il workflow GitHub Actions in
-`.github/workflows/scan.yml`, che esegue `python worker.py --once` ogni ora
-e committa `tracker.db` nel repo.
+In alternativa: un worker su una macchina sempre accesa con `TRACKER_DB`
+su volume persistente. Il vecchio workflow `scan.yml` è stato rimosso:
+non pubblicare `tracker.db`, che può contenere account e dati del parco.
+`sveglia.yml` controlla solo `/health`; non esegue scansioni o backup.
+Il nuovo `tests.yml` esegue la suite su Linux per push e pull request.
 
-> Il workflow orario installa solo `requests feedparser pyyaml openpyxl`, di
-> proposito: se aggiungi una dipendenza a una fonte, aggiornalo o la
-> scansione automatica smette **in silenzio** di coprire quella fonte.
+## Revisione IMEI — 8 settembre 2026
+
+Configurazione dei servizi gratuiti, prova reale e limiti verificati:
+[guida servizi TAC](guida-servizi-tac.md).
+La copia completa `data/tac_completo.csv.gz` conserva anche i TAC esclusi
+dall'indice in memoria; si aggiorna con
+`python scripts/aggiorna_istantanea_tac.py --completa`.

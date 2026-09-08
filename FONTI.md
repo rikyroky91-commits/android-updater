@@ -807,8 +807,9 @@ errori.
   chiusa. E cento interrogazioni al mese finiscono comunque. Da
   `TAC_API_KEY`, `TAC_API_KEY_2`, `TAC_API_KEY_3` — piu' `_URL`, `_HEADER`
   e `_NOME` per ognuno — si configurano tre servizi provati in ordine.
-  Un «non lo conosco» si conserva solo se **almeno uno ha risposto** e
-  nessuno ha detto sì: darlo perche' uno dei tre non conosce il TAC
+  Un «non lo conosco» si conserva solo se **tutti hanno risposto assente**:
+  un errore, una pausa o una quota esaurita lasciano l'esito incompleto.
+  Darlo perche' uno dei tre non conosce il TAC
   renderebbe ignoto per un mese un telefono che gli altri conoscono.
 - **GSMA (l'autorita' che assegna i TAC)**: database ufficiale, a
   pagamento e sotto contratto.
