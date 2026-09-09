@@ -56,6 +56,7 @@ from core.util import (alleggerisci_se_serve, fmt_date, libera_memoria,
                        registra_da_svuotare, stato_alleggerimento)
 
 from . import account, auth_web, presenters as P
+from . import imei_status, tac_admin
 from .cache import CacheATempo
 from .contesto import RADICE, contesto as _contesto, rendi as _rendi
 
@@ -96,6 +97,7 @@ app = FastAPI(title=C.APP_TITLE, docs_url=None, redoc_url=None,
               lifespan=ciclo_di_vita)
 app.mount("/static", StaticFiles(directory=RADICE / "static"), name="static")
 app.include_router(account.router)
+app.include_router(tac_admin.router)
 
 
 # La cache delle ricerche è la prima cosa che l'alleggerimento può
@@ -397,6 +399,9 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
     else:
         risultato = _esito_ricerca(domanda, senza_rete=_in_due_tempi(completo))
 
+    if imei:
+        imei_status.annota(imei, conteggia=not saved and not completo)
+
     # IL SECONDO TEMPO DEVE RICHIEDERE LA DOMANDA ORIGINALE, non
     # `risultato.query`. Per un IMEI quei due campi sono cose diverse:
     # `query` è il modello GIÀ risolto dal TAC, e rimandarlo indietro da
@@ -455,6 +460,7 @@ def frammento_firmware(request: Request, q: str = Query(default="")):
     if imeicheck.is_imei_like(domanda):
         imei = _esito_imei(domanda)
         if not imei.get("modello_cercato"):
+            imei_status.annota(imei, conteggia=False)
             # NIENTE IDENTITA' NEMMENO DOPO AVER CHIESTO FUORI.
             #
             # Qui il frammento non puo' essere quello generico: la pagina
@@ -466,18 +472,10 @@ def frammento_firmware(request: Request, q: str = Query(default="")):
             # del piano gratuito. Il marcatore `data-identita="ignota"`
             # e' il segnale che ferma quella ricarica; il testo e' la
             # risposta onesta al posto dell'attesa.
-            tac = _html.escape(imei.get("tac") or "")
-            return HTMLResponse(
-                "<span data-identita=\"ignota\" hidden></span>"
-                f"<h2>TAC {tac}: modello sconosciuto</h2>"
-                "<p class=\"riga-esito\">Nessun database conosce questo TAC: "
-                "ne\u2019 quelli locali, ne\u2019 l\u2019archivio esterno, "
-                "a cui l\u2019ho appena chiesto.</p>"
-                "<p class=\"nota\">Non \u00e8 un errore dell\u2019IMEI "
-                "ne\u2019 un\u2019attesa ancora in corso. Se sai che "
-                "telefono \u00e8, scrivilo nel riquadro qui sotto: resta "
-                "salvato e da quel momento viene riconosciuto subito.</p>")
+            return _rendi(request, "_imei_non_risolto.html", {"imei": imei})
         risultato = _ancora_esito_imei(_esito_ricerca(imei["modello_cercato"]), imei)
+        imei = _identita_da_mostrare(imei, risultato.get("nome") or "")
+        imei_status.annota(imei, conteggia=False)
     else:
         risultato = _esito_ricerca(domanda)
     return _rendi(request, "_esito_firmware.html", {"risultato": risultato})
@@ -937,6 +935,9 @@ def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
             # aspetti, ogni altra riga di questa pagina descrive il
             # codice di prima, e leggerla porta a conclusioni sbagliate.
             ("Versione in produzione", C.versione_distribuita()),
+            ("Immagine costruita (UTC)", C.dettagli_versione().get("build_utc") or "non disponibile in locale"),
+            ("Processo avviato (UTC)", C.dettagli_versione()["avvio_utc"]),
+            ("Catalogo TAC", imeicheck.status()),
             ("Invio email (richieste account)", mail.stato()),
             ("Cifratura del salvataggio", cifratura.stato()),
             ("Allegati del parco", allegati.stato()),
@@ -1578,6 +1579,7 @@ def health(dettaglio: str = Query(default="")):
                 "tac_esterno": "configurato" if imeicheck._chiave_api() else "non configurato",
                 "memoria_mb": memoria_mb(),
                 "memoria_picco_mb": memoria_picco_mb()}
+    risposta["versione"] = C.dettagli_versione()
     # L'ALLEGGERIMENTO SI VEDE DA FUORI, e sta qui e non in `?dettaglio=1`
     # perché costa una lettura di due contatori in memoria. Zero interventi
     # con la memoria alta e zero interventi con la memoria bassa sono due
@@ -1836,7 +1838,7 @@ def _esito_imei(imei: str, solo_locale: bool = False) -> dict:
         # conclude che il telefono non è in nessun catalogo, mentre il
         # problema è a monte e si risolve in un minuto. Il quarto silenzio
         # della serie, e il più fuorviante dei quattro.
-        "servizio_esterno_guasto": _guasto_esterno_recente(),
+        "servizio_esterno_guasto": "" if chiesto_invano else _guasto_esterno_recente(),
         # SE IL SERVIZIO ESTERNO NON È ATTIVO, VA DETTO DOVE SI VEDE.
         #
         # Un TAC che nessun database locale conosce viene chiesto fuori, ma

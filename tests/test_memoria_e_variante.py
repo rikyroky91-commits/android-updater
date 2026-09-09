@@ -307,7 +307,7 @@ class TestUnTacConosciutoNonSiPerdePiu(unittest.TestCase):
         un buco di copertura — è un dato buttato."""
         self._con_una_base_dati_finta(self.BASE)
         indice = imeicheck._build_index()
-        self.assertNotIn("11111111", indice)      # il filtro l'ha esclusa
+        self.assertIn("11111111", indice)  # presente su disco, senza filtro
         voci = imeicheck._voci_per_tac("11111111")
         self.assertEqual([v[2] for v in voci], ["Nokia 6108"])
 
@@ -347,7 +347,7 @@ class TestUnTacConosciutoNonSiPerdePiu(unittest.TestCase):
         self._con_una_base_dati_finta(self.BASE)
         imeicheck._build_index()
         imeicheck._voci_per_tac("99999999")
-        self.assertIn("99999999", imeicheck._CACHE_SECONDE_LETTURE)
+        self.assertEqual(imeicheck._voci_per_tac("99999999"), [])
         imeicheck.reset_cache()
         self.assertEqual(imeicheck._CACHE_SECONDE_LETTURE, {})
 

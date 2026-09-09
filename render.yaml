@@ -19,6 +19,7 @@ services:
   - type: web
     name: mobile-update-tracker
     runtime: docker
+    autoDeployTrigger: checksPass
     plan: free
     region: frankfurt          # il più vicino all'Italia fra quelli gratuiti
     healthCheckPath: /health

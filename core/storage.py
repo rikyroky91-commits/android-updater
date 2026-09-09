@@ -137,6 +137,15 @@ CREATE TABLE IF NOT EXISTS meta (
     value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS tac_da_verificare (
+    tac TEXT PRIMARY KEY CHECK(length(tac)=8 AND tac NOT GLOB '*[^0-9]*'),
+    conteggio INTEGER NOT NULL DEFAULT 1,
+    prima TEXT NOT NULL,
+    ultima TEXT NOT NULL,
+    motivo TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tac_da_verificare_ultima ON tac_da_verificare(ultima);
+
 -- Cronologia delle ricerche di modello: un rigo per ogni ricerca live che ha
 -- trovato qualcosa, condensato a modello + firmware, per un riepilogo veloce
 -- senza dover riaprire la scheda dispositivo completa.

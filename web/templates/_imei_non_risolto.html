@@ -1,0 +1,12 @@
+<span data-identita="ignota" hidden></span>
+{% if imei.stato_identita == 'servizio_indisponibile' %}
+<h2>Servizio esterno indisponibile</h2>
+<p class="riga-esito">Il TAC {{ imei.tac }} non è nei cataloghi locali. La verifica esterna non è riuscita: il modello resta da identificare.</p>
+{% elif imei.chiesto_invano %}
+<h2>TAC {{ imei.tac }}: modello sconosciuto</h2>
+<p class="riga-esito">I cataloghi consultati non hanno identificato questo TAC.</p>
+{% else %}
+<h2>TAC {{ imei.tac }}: modello sconosciuto</h2>
+<p class="riga-esito">Il TAC non è presente nei cataloghi disponibili. Non è stata ottenuta una risposta esterna utile.</p>
+{% endif %}
+<p class="nota">La ricerca è terminata. Se conosci il modello, puoi correggerlo nel riquadro della pagina.</p>

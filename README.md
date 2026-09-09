@@ -5,6 +5,10 @@ sicurezza) su più brand Android e su iOS, e dice **per ogni modello di
 telefono** quale versione è arrivata e quando — così sai su cosa rilanciare
 i test.
 
+La revisione v76 sposta l'indice TAC su SQLite, aggiunge il registro
+amministratore dei TAC da verificare e rende visibili i metadati del rilascio.
+Configurazione e verifiche in [passaggio-consegne-v76.md](passaggio-consegne-v76.md).
+
 ```bash
 uvicorn web.main:app --reload           # il sito, su http://127.0.0.1:8000
 python worker.py --once                 # una scansione sola (cron / GitHub Actions)

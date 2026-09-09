@@ -6,6 +6,7 @@
    servizio» — una con i numeri dell'archivio, l'altra con lo stato delle
    fonti. Le due tabelle di dettaglio restano raggiungibili da qui. #}
 <p class="proposte">
+  {% if utente and utente.admin %}<a class="proposta" href="/admin/tac">TAC da verificare</a>{% endif %}
   <a class="proposta" href="/dispositivi">Elenco dei dispositivi</a>
   <a class="proposta" href="/dispositivi-elenco">Copertura per marca</a>
 </p>

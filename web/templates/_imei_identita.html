@@ -2,7 +2,9 @@
    riquadro del risultato — non un riquadro suo. Il nome e il codice del
    telefono li dice già `risultato.nome`/`risultato.riga` qui sotto: questa
    riga aggiunge solo il TAC, che altrove non compare. #}
-{% if imei.riconosciuto %}
+{% if imei.stato_identita == 'nome_da_verificare' %}
+<p class="etichetta-imei etichetta-imei-incerta"><strong>Nome o variante da verificare</strong> · TAC <code>{{ imei.tac }}</code>. Le fonti riportano {{ imei.descrizione }}. Controlla il codice nelle impostazioni del telefono.</p>
+{% elif imei.riconosciuto %}
 {# QUANDO IL DATABASE CONOSCE SOLO IL CODICE si dicono tutt'e due. Il TAC
    risponde «Oppo Cph2781» dove il telefono si chiama «Oppo A6 Pro»: la
    riga contraddiceva il titolo qui sopra. Il nome commerciale sta davanti
@@ -18,7 +20,7 @@
   · TAC <code>{{ imei.tac }}</code></p>
 {% endif %}
 {% else %}
-<p class="etichetta-imei etichetta-imei-incerta">IMEI valido, modello sconosciuto
+<p class="etichetta-imei etichetta-imei-incerta">{% if imei.servizio_esterno_guasto %}Servizio esterno indisponibile{% elif imei.cerco_fuori %}Identificazione in corso{% else %}Modello sconosciuto{% endif %}
   · TAC <code>{{ imei.tac }}</code></p>
 {# DUE SILENZI DIVERSI NON DEVONO SUONARE UGUALI. Un TAC che i database
    locali non hanno viene chiesto a un servizio esterno, ma solo se una
@@ -42,6 +44,7 @@
   telefono è, scrivilo nel riquadro qui sotto: resta salvato e da quel
   momento l'IMEI lo riconosce subito. Altrimenti riprovo fra un mese.</p>
 {% endif %}
+
 {# QUARTO SILENZIO, E IL PIU' FUORVIANTE: il servizio c'è ma è rotto.
    Prima questa pagina era identica a quella di un TAC che nessuno
    conosce, e portava alla conclusione sbagliata — «questo telefono non è
@@ -61,6 +64,10 @@
   <code>TAC_API_KEY</code> — e fino a tre, in <code>TAC_API_KEY_2</code> e
   <code>TAC_API_KEY_3</code>, provate in ordine finché una risponde.</p>
 {% endif %}
+{% endif %}
+
+{% if imei.riconosciuto and risultato is defined and not risultato.scheda.trovata %}
+<p class="nota">Scheda tecnica non disponibile per questo modello. Il riconoscimento del TAC e la disponibilità delle specifiche sono risultati distinti.</p>
 {% endif %}
 
 {# TRE FORME, TRE MESSAGGI DIVERSI. Il controllo Luhn riguarda la

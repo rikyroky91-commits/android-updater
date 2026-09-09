@@ -191,6 +191,27 @@ def versione_distribuita() -> str:
     return f"{commit[:7]}{f' (ramo {ramo})' if ramo else ''}"
 
 
+from datetime import datetime, timezone
+from pathlib import Path
+import json
+
+_AVVIO_UTC = datetime.now(timezone.utc).isoformat(timespec="seconds")
+try:
+    _BUILD_INFO = json.loads((Path(__file__).resolve().parent.parent / "release.json").read_text())
+    if not isinstance(_BUILD_INFO, dict):
+        _BUILD_INFO = {}
+except (OSError, ValueError):
+    _BUILD_INFO = {}
+
+
+def dettagli_versione() -> dict:
+    """Identità del rilascio senza accedere al DB o lanciare git."""
+    return {"commit": env("RENDER_GIT_COMMIT") or _BUILD_INFO.get("commit"),
+            "ramo": env("RENDER_GIT_BRANCH") or None,
+            "build_utc": _BUILD_INFO.get("build_utc"),
+            "avvio_utc": _AVVIO_UTC}
+
+
 def chiave_cifratura_backup() -> str:
     """Passphrase con cui si cifra il salvataggio esterno.
 

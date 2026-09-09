@@ -123,7 +123,7 @@ FONTE_ESTERNA = "servizio esterno"
 # volte il testo che conteneva.
 _CAMPO = "\x1f"
 _VOCE = "\x1e"
-_memory_index: dict[str, str] | None = None
+_memory_index: object | None = None
 _status = "non ancora caricato"
 
 
@@ -445,34 +445,30 @@ def dimentica_tac_assente(tac: str) -> None:
 
 
 def aggiungi_tac(tac: str, marca: str, modello: str) -> bool:
-    """Salva un TAC verificato a mano. False se i dati non bastano.
+    """Salva una correzione manuale e invalida l'indice nello stesso lock."""
+    with _LOCK_INDICE:
+        tac = "".join(c for c in (tac or "") if c.isdigit())[:8]
+        marca = (marca or "").strip()
+        modello = (modello or "").strip()
+        if len(tac) != 8 or not (marca or modello):
+            return False
 
-    Non c'è nessuna validazione del *contenuto*: se qualcuno scrive un
-    modello sbagliato, l'app lo mostrerà. È accettabile perché è un dato
-    inserito deliberatamente da chi lo sta verificando in quel momento —
-    ed è comunque meglio di un dato inventato da un'euristica.
-    """
-    tac = "".join(c for c in (tac or "") if c.isdigit())[:8]
-    marca = (marca or "").strip()
-    modello = (modello or "").strip()
-    if len(tac) != 8 or not (marca or modello):
-        return False
-
-    voci = tac_inseriti()
-    voci[tac] = (marca or "Sconosciuto", modello)
-    storage.set_meta(_META_TAC_UTENTE, json.dumps(voci, ensure_ascii=False))
-    reset_cache()
-    return True
+        voci = tac_inseriti()
+        voci[tac] = (marca or "Sconosciuto", modello)
+        storage.set_meta(_META_TAC_UTENTE, json.dumps(voci, ensure_ascii=False))
+        reset_cache()
+        return True
 
 
 def rimuovi_tac(tac: str) -> bool:
-    voci = tac_inseriti()
-    if tac not in voci:
-        return False
-    del voci[tac]
-    storage.set_meta(_META_TAC_UTENTE, json.dumps(voci, ensure_ascii=False))
-    reset_cache()
-    return True
+    with _LOCK_INDICE:
+        voci = tac_inseriti()
+        if tac not in voci:
+            return False
+        del voci[tac]
+        storage.set_meta(_META_TAC_UTENTE, json.dumps(voci, ensure_ascii=False))
+        reset_cache()
+        return True
 
 
 def riga_csv(tac: str, marca: str = "Marca", modello: str = "Nome del modello") -> str:
@@ -960,121 +956,68 @@ def _anno_appiccicato(specs: str) -> str | None:
     return trovato.group(1) if trovato else None
 
 
-def _build_index() -> dict[str, list[tuple[str, str, str]]]:
-    """Indice completo dei TAC: per ogni TAC, TUTTE le risposte trovate.
+_LOCK_INDICE = threading.RLock()
+_indice_da_ricostruire = False
 
-    ATTENZIONE ALL'ORDINE DELLE USCITE ANTICIPATE. Prima, se il database
-    scaricato non era disponibile, questa funzione usciva subito — e con
-    lei sparivano anche la tabella verificata a mano e i TAC inseriti
-    dentro l'app, che non c'entrano niente col download. Bastava un'ora
-    senza rete perché l'app dimenticasse dati che aveva in casa.
 
-    Ora le fonti locali si aggiungono SEMPRE, qualunque cosa faccia il
-    download.
+def _firma_indice() -> str:
+    import hashlib
 
-    **E NESSUNA RISPOSTA VIENE PIÙ BUTTATA.** Prima le fonti venivano fuse
-    in un dizionario solo: chi arrivava dopo perdeva, e il disaccordo
-    spariva senza lasciare traccia. Ma è proprio il disaccordo il dato che
-    serve a chi controlla un IMEI — «questo numero dà un modello su un sito
-    e un altro modello su un altro» è la situazione normale, non
-    l'eccezione. L'ordine di questo elenco resta la precedenza: chi è primo
-    è la risposta dell'app, gli altri sono il confronto.
+    meta = [storage.get_meta(k) for k in (
+        _META_FETCHED_KEY, _META_IMEIDB_FETCHED, _META_FALLBACK_FETCHED,
+        _META_TAC_UTENTE, _META_TAC_ESTERNI)]
+    file = []
+    for nome in ("tac_completo.csv.gz", "tac_era_android.csv.gz", "tac_modelli.csv"):
+        try:
+            stat = os.stat(os.path.join(CARTELLA_DATI, nome))
+            file.append((nome, stat.st_size, stat.st_mtime_ns))
+        except OSError:
+            file.append((nome, None))
+    # La scadenza segue la data reale del download. Se la rete fallisce,
+    # il catalogo su disco resta utile e il prossimo riuso ritenta dopo un'ora.
+    adesso = datetime.now(timezone.utc)
+    scadenze = []
+    for data in meta[:3]:
+        try:
+            scaduto = (adesso - datetime.fromisoformat(data)).total_seconds() >= _REFRESH_HOURS * 3600
+        except (TypeError, ValueError):
+            scaduto = True
+        scadenze.append(int(adesso.timestamp() // 3600) if scaduto else None)
+    return hashlib.sha256(json.dumps(
+        ["sqlite-v1", scadenze, meta, file],
+        sort_keys=True).encode()).hexdigest()
 
-    IL VALORE È UNA STRINGA SOLA, NON UNA LISTA DI TUPLE. Le risposte di un
-    TAC stanno una dietro l'altra separate da caratteri di controllo, e si
-    srotolano in `_voci_per_tac` — cioè per il TAC che qualcuno ha cercato,
-    non per i 77.000 che nessuno cercherà. Vedi il commento lungo sopra
-    `_flusso_di_testo` per i numeri: è la differenza fra 165 MB e 89.
 
-    ANCHE L'ORDINAMENTO PER AFFIDABILITÀ È RIMANDATO ALLA LETTURA. Il
-    punteggio di una risposta dipende SOLO dalle altre risposte dello
-    stesso TAC (vedi `_punteggio_affidabilita`), quindi calcolarlo per
-    tutti all'avvio dava lo stesso risultato di calcolarlo per quello
-    cercato — pagando all'avvio, ogni avvio, 77.000 ordinamenti e altrettanti
-    insiemi di parole che nessuno guardava.
+def _build_index():
+    """Indicizza tutti i TAC su SQLite, senza un dizionario bulk in RAM.
+
+    Il vecchio filtro dell'era Android serviva a contenere il dizionario.
+    Sul disco tutti i TAC restano indicizzati, compresi quelli senza anno.
+    Le fonti e il ranking delle correzioni manuali restano gli stessi.
     """
-    global _status
-    index: dict[str, str] = {}
+    from .tac_index import TacIndex
 
-    scartati = 0
-    conteggi: dict[str, int] = {}
-    nuovi: dict[str, int] = {}
-
-    def aggiungi(fonte: str, voci, filtrabile: bool = True) -> None:
-        nonlocal scartati
-        taglia = filtrabile and C.TAC_SOLO_ERA_ANDROID
-        quante = 0
-        inediti = 0
-        for tac, marca, specs in voci:
-            # LE CORREZIONI UMANE NON SI FILTRANO MAI. Se qualcuno ha
-            # inserito un TAC a mano, o è stato verificato nel repository,
-            # quel dato è lì apposta: nessun criterio automatico può
-            # decidere che non serviva.
-            gia_noto = tac in index
-            if taglia and not gia_noto and not _dell_era_android(specs):
-                scartati += 1
-                continue
-            quante += 1
-            if not gia_noto:
-                inediti += 1
-            voce = fonte + _CAMPO + marca + _CAMPO + specs
-            precedente = index.get(tac)
-            index[tac] = precedente + _VOCE + voce if precedente else voce
-        conteggi[fonte] = quante
-        nuovi[fonte] = inediti
-
-    def coppie(dizionario) -> list[tuple[str, str, str]]:
-        return [(tac, marca, specs)
-                for tac, (marca, specs) in dizionario.items()]
-
-    # L'ordine delle chiamate È l'ordine di precedenza.
-    inseriti = tac_inseriti()
-    curati = _indice_curato()
-
-    aggiungi(FONTE_UTENTE, coppie(inseriti), filtrabile=False)
-    aggiungi(FONTE_CURATA, coppie(curati), filtrabile=False)
-    # Le risposte comprate al servizio esterno stanno sotto le verifiche
-    # umane e sopra i database scaricati: sono puntuali e recenti, ma
-    # restano di una fonte automatica. Non si filtrano per età — si sono
-    # pagate proprio perché nessun altro conosceva quel TAC.
-    aggiungi(FONTE_ESTERNA, coppie(tac_esterni()), filtrabile=False)
-    # LE TRE BASI DATI SI LEGGONO UNA ALLA VOLTA, IN FLUSSO. Prima si
-    # costruivano tutti e tre i dizionari e poi si copiavano nell'indice:
-    # per un attimo la stessa informazione stava in memoria due volte, ed è
-    # quell'attimo che faceva toccare i 217 MB di picco.
-    aggiungi(FONTE_PRINCIPALE, _voci_principali())
-    aggiungi(FONTE_IMEIDB, _voci_imeidb())
-    aggiungi(FONTE_OSMOCOM, _voci_storiche())
-
-    if not index:
-        _status = "file interpretato ma nessuna riga valida trovata (formato cambiato?)"
-    else:
-        _status += f" — {len(index)} codici TAC indicizzati"
-        # I conteggi sono ora le righe DAVVERO indicizzate, non la
-        # dimensione del file: prima si dichiarava «base principale
-        # 248359» e poi se ne tenevano 76737, e i due numeri sulla stessa
-        # pagina non tornavano.
-        _status += f" · base principale {conteggi.get(FONTE_PRINCIPALE, 0)}"
-        if conteggi.get(FONTE_IMEIDB):
-            _status += (f" · IMEIDB {conteggi[FONTE_IMEIDB]}"
-                        f" (+{nuovi.get(FONTE_IMEIDB, 0)} nuovi)")
-        if conteggi.get(FONTE_OSMOCOM):
-            _status += (f" · storica {conteggi[FONTE_OSMOCOM]}"
-                        f" (+{nuovi.get(FONTE_OSMOCOM, 0)} nuovi)")
-        if curati:
-            _status += f" · {len(curati)} verificati a mano"
-        if inseriti:
-            _status += f" · {len(inseriti)} inseriti da te"
-        if scartati:
-            # «FUORI DALL'INDICE» NON VUOL PIÙ DIRE «PERDUTI», e la
-            # differenza va scritta qui: era la riga che faceva sembrare
-            # normale non rispondere su un TAC che l'applicazione ha in
-            # casa. Dal 31/08/2026 quelle righe si cercano nei file al
-            # momento del bisogno (vedi `_seconda_lettura`).
-            _status += (f" · {scartati} fuori dall'indice perché anteriori ad "
-                        f"Android 8 e senza codice modello — restano "
-                        f"cercabili nei file, una riga alla volta")
-    return index
+    global _status, _indice_da_ricostruire
+    with _LOCK_INDICE:
+        indice = TacIndex(os.path.abspath(C.DB_PATH) + ".tac.sqlite3")
+        if _indice_da_ricostruire or not indice.current(_firma_indice()):
+            def righe():
+                for fonte, catalogo in (
+                    (FONTE_UTENTE, lambda: ((t, *v) for t, v in tac_inseriti().items())),
+                    (FONTE_CURATA, lambda: ((t, *v) for t, v in _indice_curato().items())),
+                    (FONTE_ESTERNA, lambda: ((t, *v) for t, v in tac_esterni().items())),
+                    (FONTE_PRINCIPALE, _voci_principali),
+                    (FONTE_IMEIDB, _voci_imeidb),
+                    (FONTE_OSMOCOM, _voci_storiche),
+                ):
+                    for tac, marca, specs in catalogo():
+                        yield tac, _CAMPO.join((fonte, marca, specs))
+            indice.rebuild(righe(), _firma_indice)
+            _indice_da_ricostruire = False
+        _status = (f"{len(indice)} codici TAC indicizzati su SQLite · "
+                   f"{len(tac_inseriti())} inseriti da te · "
+                   "catalogo completo su disco, lettura puntuale")
+        return indice
 
 
 # Le fonti pubbliche sono utili ma non autorevoli: il loro ordine di
@@ -2345,49 +2288,53 @@ def tac_di(imei: str) -> str:
 
 
 def _voci_per_tac(tac: str) -> list[tuple[str, str, str]]:
-    global _memory_index
-    if _memory_index is None:
-        # Prima del catalogo bulk si controllano le correzioni locali. Sono
-        # dati piu' affidabili e, soprattutto, permettono alla ricerca IMEI
-        # appena dopo un deploy di rispondere senza scaricare e indicizzare
-        # centinaia di migliaia di TAC che non c'entrano con questa domanda.
-        # L'indice completo viene comunque caricato appena serve un TAC non
-        # presente qui: la copertura generale non si restringe.
-        locali: list[tuple[str, str, str]] = []
-        inserito = tac_inseriti().get(tac)
-        curato = _indice_curato().get(tac)
-        if inserito:
-            locali.append((FONTE_UTENTE, inserito[0], inserito[1]))
-        if curato:
-            locali.append((FONTE_CURATA, curato[0], curato[1]))
-        if locali:
-            # Il percorso rapido evita il download/indice completo al primo
-            # IMEI dopo un deploy, ma Diagnostica deve continuare a dire se
-            # la risposta include un TAC inserito dall'utente. Altrimenti
-            # sembra che il salvataggio non sia mai avvenuto, pur essendo
-            # proprio il dato che ha fatto evitare il download pesante.
-            dettaglio = []
-            if curato:
-                dettaglio.append("verificato a mano")
+    with _LOCK_INDICE:
+        global _memory_index
+        if _memory_index is None:
+            # Prima del catalogo bulk si controllano le correzioni locali. Sono
+            # dati piu' affidabili e, soprattutto, permettono alla ricerca IMEI
+            # appena dopo un deploy di rispondere senza scaricare e indicizzare
+            # centinaia di migliaia di TAC che non c'entrano con questa domanda.
+            # L'indice completo viene comunque caricato appena serve un TAC non
+            # presente qui: la copertura generale non si restringe.
+            locali: list[tuple[str, str, str]] = []
+            inserito = tac_inseriti().get(tac)
+            curato = _indice_curato().get(tac)
             if inserito:
-                dettaglio.append("1 inserito da te")
-            globals()["_status"] = (
-                "risposta dal catalogo locale " + " · ".join(dettaglio)
-            )
-            return _ordina_per_affidabilita(locali)
-        _memory_index = _build_index()
-    # L'INDICE SI LEGGE UNA VOLTA SOLA, IN UNA LOCALE. Fra il controllo
-    # `is None` qui sopra e la lettura qui sotto c'era una finestra, e
-    # questa cache viene azzerata DA PRODUZIONE: `aggiungi_tac` e
-    # `rimuovi_tac` chiamano `reset_cache()`, cioè la rotta `/tac/salva`.
-    # Bastava che qualcuno salvasse un TAC dalla pagina mentre un altro
-    # cercava un IMEI perché la seconda richiesta trovasse `None` e
-    # rispondesse 500. Lo stesso schema è stato corretto in
-    # `core/modelcodes.py`, dove un ciclo di sforzo con thread paralleli
-    # l'ha fatto scattare davvero.
-    indice = _memory_index
-    voci = _voci_dalla_cella((indice or {}).get(tac))
-    return voci or _seconda_lettura(tac)
+                locali.append((FONTE_UTENTE, inserito[0], inserito[1]))
+            if curato:
+                locali.append((FONTE_CURATA, curato[0], curato[1]))
+            if locali:
+                # Il percorso rapido evita il download/indice completo al primo
+                # IMEI dopo un deploy, ma Diagnostica deve continuare a dire se
+                # la risposta include un TAC inserito dall'utente. Altrimenti
+                # sembra che il salvataggio non sia mai avvenuto, pur essendo
+                # proprio il dato che ha fatto evitare il download pesante.
+                dettaglio = []
+                if curato:
+                    dettaglio.append("verificato a mano")
+                if inserito:
+                    dettaglio.append("1 inserito da te")
+                globals()["_status"] = (
+                    "risposta dal catalogo locale " + " · ".join(dettaglio)
+                )
+                return _ordina_per_affidabilita(locali)
+            _memory_index = _build_index()
+        # L'INDICE SI LEGGE UNA VOLTA SOLA, IN UNA LOCALE. Fra il controllo
+        # `is None` qui sopra e la lettura qui sotto c'era una finestra, e
+        # questa cache viene azzerata DA PRODUZIONE: `aggiungi_tac` e
+        # `rimuovi_tac` chiamano `reset_cache()`, cioè la rotta `/tac/salva`.
+        # Bastava che qualcuno salvasse un TAC dalla pagina mentre un altro
+        # cercava un IMEI perché la seconda richiesta trovasse `None` e
+        # rispondesse 500. Lo stesso schema è stato corretto in
+        # `core/modelcodes.py`, dove un ciclo di sforzo con thread paralleli
+        # l'ha fatto scattare davvero.
+        indice = _memory_index
+        voci = _voci_dalla_cella((indice or {}).get(tac))
+        from .tac_index import TacIndex
+        if isinstance(indice, TacIndex):
+            return voci
+        return voci or _seconda_lettura(tac)
 
 
 # ======================================================================
@@ -2535,12 +2482,13 @@ def identify(imei: str, solo_locale: bool = False) -> tuple[str, str] | None:
 
     esito, esterno = cerca_tac_online_esito(tac)
     if esito == "trovato" and esterno:
-        if _memory_index is not None:
-            voce = FONTE_ESTERNA + _CAMPO + esterno[0] + _CAMPO + esterno[1]
-            precedente = _memory_index.get(tac)
-            _memory_index[tac] = (precedente + _VOCE + voce if precedente
-                                  else voce)
-        _ricorda_tac_esterno(tac, esterno[0], esterno[1])
+        with _LOCK_INDICE:
+            indice = _memory_index
+            if indice is not None:
+                voce = FONTE_ESTERNA + _CAMPO + esterno[0] + _CAMPO + esterno[1]
+                precedente = indice.get(tac)
+                indice[tac] = (precedente + _VOCE + voce if precedente else voce)
+            _ricorda_tac_esterno(tac, esterno[0], esterno[1])
         return esterno
     if esito == "assente":
         _ricorda_tac_assente(tac)
@@ -2829,41 +2777,32 @@ def describe(brand: str, specs: str) -> str:
 
 
 def libera_indice() -> bool:
-    """Butta SOLO l'indice TAC in memoria, e dice se c'era qualcosa da buttare.
-
-    Serve all'alleggerimento automatico (`core/util.alleggerisci_se_serve`),
-    che sopra i 450 MB deve poter restituire i 22 MB dell'indice senza
-    effetti collaterali. `reset_cache()` non andava bene: azzera anche la
-    pausa del servizio esterno e l'ultimo esito, cioè roba che con la
-    memoria non c'entra — e rimettere in gioco un fornitore appena andato
-    in errore, ogni volta che il processo è sotto pressione, vuol dire
-    proprio martellarlo nel momento peggiore.
-
-    L'indice si rifà da solo alla prossima ricerca, dai byte che stanno
-    già in archivio: nessuna rete, qualche decimo di secondo.
-    """
+    """Rilascia il riferimento in RAM, conservando indice su disco e quote."""
     global _memory_index, _status
-    c_era = _memory_index is not None
-    _memory_index = None
-    _CACHE_SECONDE_LETTURE.clear()
-    if c_era:
-        _status = "indice liberato per memoria, si ricostruisce alla prossima ricerca"
-    return c_era
+    with _LOCK_INDICE:
+        c_era = _memory_index is not None
+        _memory_index = None
+        _CACHE_SECONDE_LETTURE.clear()
+        if c_era:
+            _status = "riferimento in RAM rilasciato; indice SQLite riutilizzabile alla prossima ricerca"
+        return c_era
 
 
 def reset_cache() -> None:
-    global _memory_index, _status, _pausa_servizio, _ultimo_esito, _storico
-    global _consumo
-    _memory_index = None
-    _status = "non ancora caricato"
-    _ultimo_esito = None
-    _storico = None
-    _consumo = None
-    # Anche la pausa del servizio esterno: chi azzera le cache sta
-    # rimettendo le cose in ordine, e una pausa presa cinque minuti fa non
-    # deve far sembrare spento un servizio che magari è appena tornato.
-    _pausa_servizio = {}
-    # Anche la memoria delle seconde letture: chi azzera la cache lo fa
-    # perché un dato è cambiato (`/tac/salva`), e un «non c'è» ricordato da
-    # prima risponderebbe al posto del dato nuovo.
-    _CACHE_SECONDE_LETTURE.clear()
+    with _LOCK_INDICE:
+        global _memory_index, _status, _pausa_servizio, _ultimo_esito, _storico
+        global _consumo, _indice_da_ricostruire
+        _indice_da_ricostruire = True
+        _memory_index = None
+        _status = "non ancora caricato"
+        _ultimo_esito = None
+        _storico = None
+        _consumo = None
+        # Anche la pausa del servizio esterno: chi azzera le cache sta
+        # rimettendo le cose in ordine, e una pausa presa cinque minuti fa non
+        # deve far sembrare spento un servizio che magari è appena tornato.
+        _pausa_servizio = {}
+        # Anche la memoria delle seconde letture: chi azzera la cache lo fa
+        # perché un dato è cambiato (`/tac/salva`), e un «non c'è» ricordato da
+        # prima risponderebbe al posto del dato nuovo.
+        _CACHE_SECONDE_LETTURE.clear()

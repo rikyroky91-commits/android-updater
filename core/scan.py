@@ -13,7 +13,7 @@ import time
 import traceback
 
 from . import backup, classify, config as C, extract, modelcodes, notify, skinmap, soc, sources, storage
-from .util import (libera_memoria, memoria_mb, now_iso, short_hash, slug,
+from .util import (libera_memoria, memoria_mb, memoria_dei_cataloghi, now_iso, short_hash, slug,
                    utcnow)
 
 _scan_lock = threading.Lock()
@@ -460,10 +460,23 @@ def run_scan(auto_notify: bool = True, only_sources: list | None = None) -> dict
     # segue. Se il servizio riparte non resta niente da leggere — Render
     # registra un avvio, non una causa — quindi qui si annota quanto costa
     # OGNI fase, e il conto finisce in `/health?dettaglio=1`.
-    memoria: dict[str, float | None] = {"avvio": memoria_mb()}
+    memoria: dict = {"avvio": memoria_mb()}
+    def fotografia_cataloghi():
+        try:
+            return memoria_dei_cataloghi()
+        except Exception:
+            return {}
+    prima_cataloghi = fotografia_cataloghi()
     try:
         items, status = collect(only_sources)
         memoria["dopo la raccolta"] = memoria_mb()
+        dopo_cataloghi = fotografia_cataloghi()
+        memoria["cataloghi_dopo_raccolta"] = dopo_cataloghi
+        memoria["variazione_cataloghi"] = {
+            nome: round(valore - (prima_cataloghi.get(nome, 0)
+                        if isinstance(prima_cataloghi.get(nome, 0), (float, int)) else 0), 2)
+            for nome, valore in dopo_cataloghi.items()
+            if isinstance(valore, (float, int))}
         for item in items:
             if storage.upsert_update(item):
                 new_items.append(item)
@@ -590,6 +603,8 @@ def _annota_storico_memoria(memoria: dict) -> None:
         "fine": memoria.get("dopo il salvataggio"),
         "restituiti": memoria.get("restituiti"),
         "cataloghi buttati": memoria.get("cataloghi lasciati andare"),
+        "cataloghi_dopo_raccolta": memoria.get("cataloghi_dopo_raccolta"),
+        "variazione_cataloghi": memoria.get("variazione_cataloghi"),
     })
     storage.set_meta(_STORICO_MEMORIA,
                      json.dumps(storico[-_QUANTE_SCANSIONI_RICORDATE:]))

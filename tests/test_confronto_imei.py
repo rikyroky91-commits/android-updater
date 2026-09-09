@@ -109,24 +109,12 @@ class TestTerzaBaseDati(BaseImei):
         self.assertTrue(voci)
         self.assertEqual(voci[0]["fonte"], imeicheck.FONTE_IMEIDB)
 
-    def test_una_voce_senza_anno_ne_codice_non_entra_nell_indice(self):
-        """`3GNET G Series G528` non finisce in RAM — è il prezzo dei
-        MB risparmiati dal taglio — ma da oggi RISPONDE lo stesso.
-
-        QUESTO TEST DICEVA IL CONTRARIO, e diceva bene fino al
-        31/08/2026: «fuori dall'indice» e «non risponde» erano la stessa
-        cosa, dichiarata a testa alta come prezzo del taglio. Poi
-        l'utente ha segnalato che «trovare gli imei sta diventando
-        difficile» su un TAC che la base dati conosce benissimo, ed è
-        diventato chiaro che quel prezzo non andava pagato: le righe
-        fuori dall'indice si cercano nei file al momento del bisogno
-        (`_seconda_lettura`), che costa 0,24 secondi e nessun megabyte.
-
-        Quello che resta vero, ed è quello che questo test misura ancora,
-        è che quella riga NON sta in memoria.
-        """
+    def test_una_voce_senza_anno_ne_codice_resta_indicizzata_su_disco(self):
+        """La copertura completa non richiede un dizionario bulk in RAM."""
+        from core.tac_index import TacIndex
         indice = imeicheck._build_index()
-        self.assertNotIn("35913201", indice)
+        self.assertIsInstance(indice, TacIndex)
+        self.assertIn("35913201", indice)
         voci = imeicheck.confronto("359132010000000")["voci"]
         self.assertEqual([v["modello"] for v in voci], ["G Series G528"])
 

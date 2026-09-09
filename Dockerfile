@@ -49,6 +49,9 @@ RUN PYTHONPATH=/home/app DB_PATH=/home/app/tracker.db \
 # cosi' il limite Render da 512 MB non deve assorbire download e parsing
 # concorrenti prima della prima ricerca.
 COPY --chown=app web ./web
+COPY --chown=app scripts/scrivi_versione.py ./scripts/scrivi_versione.py
+ARG RENDER_GIT_COMMIT
+RUN python scripts/scrivi_versione.py
 
 USER app
 ENV PYTHONUNBUFFERED=1 \
