@@ -6,6 +6,35 @@ import pytest
 from core import config as C, sources
 
 
+def test_build_alone_does_not_stop_android_and_release_date_search():
+    incomplete = sources.RawItem(title="test", device="OPPO A74", brand=C.OPPO, build="C.42")
+    complete = sources.RawItem(title="test", device="OPPO A74", brand=C.OPPO, build="F.67",
+                               android_version=13, published="2023-04-01")
+    lookups = [sources.StructuredLookup(C.OPPO, lambda q: [incomplete], "basso", "prima"),
+               sources.StructuredLookup(C.OPPO, lambda q: [complete], "basso", "seconda")]
+    with patch.object(sources, "_lookup_order", return_value=lookups), \
+         patch.object(sources, "expand_query", return_value=["OPPO A74"]), \
+         patch.object(sources, "_scalda_fonti"):
+        found, error = sources.lookup_model_structured("OPPO A74", C.OPPO)
+    assert error is None
+    assert found == [complete]
+    assert incomplete.android_version is None  # niente metadati trasferiti fra build
+
+
+def test_partial_firmware_survives_failed_later_source():
+    incomplete = sources.RawItem(title="test", device="OPPO A74", brand=C.OPPO, build="C.42")
+    def failure(q):
+        raise RuntimeError("timeout")
+    lookups = [sources.StructuredLookup(C.OPPO, lambda q: [incomplete], "basso", "prima"),
+               sources.StructuredLookup(C.OPPO, failure, "basso", "seconda")]
+    with patch.object(sources, "_lookup_order", return_value=lookups), \
+         patch.object(sources, "expand_query", return_value=["OPPO A74"]), \
+         patch.object(sources, "_scalda_fonti"):
+        found, error = sources.lookup_model_structured("OPPO A74", C.OPPO)
+    assert found == [incomplete]
+    assert error is None
+
+
 def test_redmi_stable_and_markets_survive_newer_beta():
     def record(version, date, branch="Stable"):
         return dict(name="Redmi Note 13", version=version, date=date,

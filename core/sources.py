@@ -5541,6 +5541,7 @@ def lookup_model_structured(model_name: str, brand: str | None = None):
     scadenza = time.monotonic() + C.SEARCH_BUDGET_SECONDS
     tentate, fallite = [], []
     ripiego = None      # risultato che conferma il modello ma senza versione
+    firmware_parziale = None  # build nota, Android/data ancora da cercare
     raccolti: list = []  # usato solo quando la ricerca è ambigua
     scaldate = False
     for posizione, voce in enumerate(ordinati):
@@ -5612,7 +5613,18 @@ def lookup_model_structured(model_name: str, brand: str | None = None):
             if (voce.firmware_kind in (C.FW_CURRENT, C.FW_REPORTED)
                     and _ha_versione(items[0])):
                 if not ambigua:
-                    return items, None
+                    if items[0].brand == C.APPLE:
+                        return items, None
+                    if (firmware_parziale is None or
+                            _completezza_firmware(items[0]) >
+                            _completezza_firmware(firmware_parziale[0])):
+                        firmware_parziale = items
+                    if items[0].android_version and items[0].published:
+                        return firmware_parziale, None
+                    # C.42 da sola non risponde alla domanda su Android.
+                    # Conservare il risultato senza interrompere le fonti
+                    # successive; non unire metadati di build differenti.
+                    break
                 raccolti.extend(items)
                 break
             # Se un firmware corrente non c'è, una scheda di fabbrica più
@@ -5641,6 +5653,8 @@ def lookup_model_structured(model_name: str, brand: str | None = None):
 
     # Nessuna fonte aveva la versione: si restituisce comunque quello che
     # si è trovato, ma il chiamante potrà dire che manca il firmware.
+    if firmware_parziale:
+        return firmware_parziale, None
     if ripiego:
         return ripiego, None
 
@@ -5653,6 +5667,10 @@ def lookup_model_structured(model_name: str, brand: str | None = None):
 
     provate = ", ".join(tentate[:4]) or "nessuna"
     return [], f"nessuna fonte ufficiale conosce «{model_name}» (provate: {provate})"
+
+
+def _completezza_firmware(item) -> tuple[bool, bool]:
+    return bool(item.android_version), bool(item.published)
 
 
 def _ha_versione(item) -> bool:

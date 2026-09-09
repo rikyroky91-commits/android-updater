@@ -948,6 +948,21 @@ class TestRicerca(_Sito):
             type(self).RISPOSTA_RICERCA = staticmethod(
                 lambda q: {"items": [], "error": None})
 
+    def test_build_sola_dichiara_android_e_data_non_verificati(self):
+        type(self).RISPOSTA_RICERCA = staticmethod(lambda q: {"items": [{
+            "source": "official_lookup", "source_label": "Archivio firmware",
+            "brand": "Oppo / Realme / OnePlus", "device_model": "A74",
+            "model_code": "CPH2219", "build": "C.42",
+            "title": "", "severity": "", "color": "#00CC66",
+        }], "error": None})
+        try:
+            pagina = self.client.get("/", params={"q": "oppo a74"}).text
+            self.assertIn("Versione Android della build: non verificata", pagina)
+            self.assertIn("data di rilascio non verificata", pagina)
+        finally:
+            type(self).RISPOSTA_RICERCA = staticmethod(
+                lambda q: {"items": [], "error": None})
+
     def test_la_fonte_del_firmware_e_apribile_senza_ai(self):
         type(self).RISPOSTA_RICERCA = staticmethod(lambda q: {"items": [{
             "source": "official_lookup", "source_label": "Endpoint FOTA ufficiale",

@@ -3012,9 +3012,9 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
     pezzi = []
     tipo_versione = ""
     if versione_certa:
-        versione = versione_certa.get("os_version") or (
+        versione = (
             f"Android {versione_certa['android_version']}"
-            if versione_certa.get("android_version") else "")
+            if versione_certa.get("android_version") else versione_certa.get("os_version") or "")
         if versione:
             if versione_certa is base_android:
                 etichetta = ("Versione Android verificata"
@@ -3034,6 +3034,9 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
                              else "Ultima versione verificata")
                 pezzi.append(f"{etichetta}: {versione}")
                 tipo_versione = C.FW_CURRENT
+        if (not versione_certa.get("android_version")
+                and not versione.lower().startswith("android ") and marca != C.APPLE):
+            pezzi.append("Versione Android della build: non verificata")
         if versione_certa.get("build"):
             pezzi.append(f"build {versione_certa['build']}")
         if versione_certa.get("patch_level"):
@@ -3042,6 +3045,7 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
             if versione_certa.get("published"):
                 pezzi.append(f"uscito il {fmt_date(versione_certa['published'])}")
             else:
+                pezzi.append("data di rilascio non verificata")
                 mese = extract.mese_leggibile(versione_certa.get("build") or "")
                 if mese:
                     pezzi.append(f"build di {mese}")

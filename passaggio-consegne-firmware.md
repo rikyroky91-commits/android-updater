@@ -5,6 +5,16 @@ Priorità richiesta: OPPO, realme, Honor, Redmi. Nessuna chiave API richiesta.
 
 ## Cambiamenti
 
+Correzione successiva, richiesta sul caso «OPPO A74 → C.42»: una sola build
+non interrompe più la ricerca. Entro il budget esistente si cercano Android
+e data; prevale un risultato con Android dichiarato e poi con data, senza
+trasferire campi fra build diverse. Se mancano, la pagina scrive
+«Versione Android della build: non verificata» e «data di rilascio non
+verificata». Android numerico precede la versione della personalizzazione.
+Questa modifica non introduce una conversione universale C.xx → Android:
+non esiste evidenza sufficiente per associare la C.42 segnalata dall'utente
+a una specifica variante A74 e a una data di rollout.
+
 - OPPO/realme: GBFirmware aggiunto alle ricerche strutturate per codice
   verificato, affiancando HalabTech. Una pagina per codice, cache dei soli
   risultati per un'ora, condivisa con gli altri archivi e limitata a 32 chiavi.
