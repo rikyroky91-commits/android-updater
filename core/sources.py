@@ -4947,7 +4947,7 @@ _STRUCTURED_LOOKUPS_LIST = [
                      "archivio tecnico realme (build per codice)",
                      trust=C.TRUST_CURATED, firmware_kind=C.FW_REPORTED),
     StructuredLookup(C.OPPO, _lookup_gbfirmware, "basso",
-                     "GBFirmware OPPO/realme (build per codice)",
+                     "archivio tecnico GBFirmware OPPO/realme (build per codice)",
                      trust=C.TRUST_CURATED, firmware_kind=C.FW_REPORTED),
     # `oplus_telegram` tolta di qui l'11/08/2026 insieme al resto della
     # fonte — vedi il commento sopra `RETIRED_SOURCES` per il motivo e come
