@@ -5,6 +5,10 @@ sicurezza) su più brand Android e su iOS, e dice **per ogni modello di
 telefono** quale versione è arrivata e quando — così sai su cosa rilanciare
 i test.
 
+La revisione firmware aggiunge archivi per OPPO, realme e Honor e corregge
+la selezione delle versioni stabili Redmi/Xiaomi. Limiti e verifiche in
+[passaggio-consegne-firmware.md](passaggio-consegne-firmware.md).
+
 La revisione v76 sposta l'indice TAC su SQLite, aggiunge il registro
 amministratore dei TAC da verificare e rende visibili i metadati del rilascio.
 Configurazione e verifiche in [passaggio-consegne-v76.md](passaggio-consegne-v76.md).

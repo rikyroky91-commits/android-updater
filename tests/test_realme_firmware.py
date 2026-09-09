@@ -88,13 +88,12 @@ class TestArchivioTecnicoRealme(unittest.TestCase):
         self.assertEqual(sources._lookup_realme_firmware_archive("RMX9999"), [])
         self.assertEqual(self.calls, [])
 
-    def test_assenza_verificata_viene_memorizzata_per_codice(self):
-        """Un RMX senza pacchetto non deve fare quattro GET per ognuna delle
-        sue forme regionali; un errore HTTP, invece, non sarebbe cachabile."""
-        self.CATALOGO = "nessun pacchetto RMX3939 in questa pagina"
+    def test_http_200_senza_pacchetti_non_diventa_assenza_in_cache(self):
+        """Un challenge HTTP 200 deve consentire un nuovo tentativo."""
+        self.CATALOGO = "<title>Just a moment...</title>Verifying your browser"
         self.assertEqual(sources._lookup_realme_firmware_archive("RMX3939"), [])
         self.assertEqual(sources._lookup_realme_firmware_archive("realme C63"), [])
-        self.assertEqual(len(self.calls), sources._REALME_FIRMWARE_SEARCH_PAGES)
+        self.assertEqual(len(self.calls), 2 * sources._REALME_FIRMWARE_SEARCH_PAGES)
 
     def test_formati_moderni_leggono_build_android_e_regione_europea(self):
         """Il formato 2025+ non contiene più il vecchio ``_15_C.14``.

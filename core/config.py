@@ -527,7 +527,9 @@ MAX_PLAUSIBLE_IOS = env_int("MAX_PLAUSIBLE_IOS", 30)
 #       versione Android certa più recente disponibile: un dato di fabbrica
 #       resta dichiarato come tale, invece di sparire lasciando la pagina
 #       senza alcuna versione.
-DATA_LOGIC_VERSION = env_int("DATA_LOGIC_VERSION", 33)
+#  34 → Xiaomi esclude beta dal catalogo stabile e separa i mercati;
+#       ricostruire i dati evita di conservare beta etichettate correnti.
+DATA_LOGIC_VERSION = env_int("DATA_LOGIC_VERSION", 34)
 
 
 # --- Tempo massimo di una ricerca interattiva ---------------------------

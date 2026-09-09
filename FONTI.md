@@ -1,5 +1,17 @@
 # Fonti dati — indagine completa e verdetti
 
+## Aggiornamento 9 settembre 2026: marchi prioritari
+
+Le verifiche storiche sotto non descrivono tutte le integrazioni attuali.
+La ricerca per dispositivo ora include GBFirmware per OPPO/realme e
+HalabTech per Honor. Sono metadati pubblici di archivi tecnici, classificati
+`REPORTED`, non una verifica OTA. Codici sconosciuti o ambigui non vengono
+associati a un modello per tentativi. Dettagli e collaudi nel
+[passaggio di consegne firmware](passaggio-consegne-firmware.md).
+
+Il catalogo Xiaomi esistente viene filtrato sulle sole release `Stable`,
+con rami regionali separati: `Stable Beta` e `Public Beta` sono esclusi.
+
 Verificato il 2026-08-02. Ogni riga qui sotto è stata **provata davvero**,
 non dedotta dalla documentazione. Dove ho scritto «non funziona» ho la
 risposta del server.

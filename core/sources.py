@@ -532,24 +532,34 @@ def _fetch_xiaomi_scarica() -> tuple[list[RawItem], str | None]:
     # aggiornato di recente (es. Redmi 12) resta comunque nel catalogo
     # invece di sparire perché tagliato fuori da un limite pensato per un
     # feed di notizie, non per un catalogo di ~1300 device distinti.
-    latest_by_device: dict[str, dict] = {}
+    latest_by_device: dict[tuple[str, str], dict] = {}
     for record in data:
         if not isinstance(record, dict):
             continue
         device = clean_text(_pick(record, "name", "device", "codename", default=""))
         if not device:
             continue
+        # Stable Beta/Mi Pilot e Developer non sono rollout stabili.
+        branch = clean_text(_pick(record, "branch", "type", default="Stable"))
+        if branch.casefold() != "stable":
+            continue
+        version = clean_text(_pick(record, "version", "versionName", default=""))
+        if not version or version.upper().endswith(".DEV"):
+            continue
+        # Lo stesso nome commerciale può comparire per mercati diversi.
+        market = re.search(r"([A-Z]{2})XM$", version.upper())
+        key = (device, market.group(1) if market else clean_text(record.get("codename", "")))
         published = iso(_pick(record, "date", "release_date", "updated"))
-        current = latest_by_device.get(device)
+        current = latest_by_device.get(key)
         if current is None or (published or "") > (current.get("_published") or ""):
             record = dict(record)
             record["_published"] = published
-            latest_by_device[device] = record
+            latest_by_device[key] = record
 
     ordered = sorted(latest_by_device.items(), key=lambda kv: kv[1].get("_published") or "", reverse=True)
 
     items = []
-    for device, record in ordered[: C.XIAOMI_MAX_DEVICES]:
+    for (device, _market), record in ordered[: C.XIAOMI_MAX_DEVICES]:
         version = clean_text(_pick(record, "version", "versionName", default=""))
         android = _pick(record, "android", "android_version")
         try:
@@ -2292,7 +2302,7 @@ REALME_FIRMWARE_ARCHIVE_URL = (
     "https://support.halabtech.com/index.php?a=downloads&b=search&keyword={codice}&p_start={pagina}"
 )
 _REALME_FIRMWARE_RE = re.compile(
-    r"\b(?P<codice>RMX\d{4}[A-Z]*)(?P<regione>GDPR|export)_"
+    r"\b(?P<codice>(?:RMX|CPH)\d{4}[A-Z]*?)(?P<regione>GDPR|export)_"
     r"(?P<android>\d{2})_(?P<ramo>[A-Z])\.(?P<revisione>\d+)_"
     r"(?P<data>\d{14})",
     re.IGNORECASE,
@@ -2769,6 +2779,7 @@ def _pacchetti_realme_da_testo(testo: str) -> list[_PacchettoRealme]:
     La funzione è separata dalla rete per poterla testare con i nomi reali
     di pacchetto: la regressione era nel parser, non nel download.
     """
+    testo = html.unescape(testo)
     pacchetti: list[_PacchettoRealme] = []
     visti: set[tuple[str, str, str]] = set()
 
@@ -2785,7 +2796,8 @@ def _pacchetti_realme_da_testo(testo: str) -> list[_PacchettoRealme]:
             codice=match.group("codice").upper(),
             regione=match.group("regione").upper(),
             build=f"{match.group('ramo').upper()}.{match.group('revisione')}",
-            android=android,
+            # Nei vecchi CPH `_11_` è il formato service, non Android 11.
+            android=android if match.group("codice").upper().startswith("RMX") else None,
             data=match.group("data"),
             filename=filename,
         ))
@@ -2817,13 +2829,17 @@ def _chiave_pacchetto_realme(pacchetto: _PacchettoRealme) -> tuple:
     """
     moderno = bool(re.match(r"^\d+\.", pacchetto.build))
     numeri = tuple(int(x) for x in re.findall(r"\d+", pacchetto.build))
+    if not moderno:
+        return (pacchetto.android or 0, moderno, pacchetto.data or "", pacchetto.build)
     return (pacchetto.android or 0, moderno, numeri, pacchetto.data or "")
 
 
 def _lookup_realme_firmware_archive(model_name: str,
                                     _verificato: tuple[str, str] | None = None,
                                     _nome_fonte: str = "realme",
-                                    _verifica: str = "confermato da realme") -> list[RawItem]:
+                                    _verifica: str = "confermato da realme",
+                                    _archive_url: str = REALME_FIRMWARE_ARCHIVE_URL,
+                                    _pages: int = _REALME_FIRMWARE_SEARCH_PAGES) -> list[RawItem]:
     """Build realme riportate da archivio tecnico, ordinate Europa → globale.
 
     La fonte non conosce lo stato OTA di uno specifico telefono e può
@@ -2836,9 +2852,10 @@ def _lookup_realme_firmware_archive(model_name: str,
     if not trovato:
         return []
     codice, nome_composto = trovato
+    cache_key = _archive_url + "|" + codice
     ora = time.monotonic()
     with _realme_firmware_cache_lock:
-        in_cache = _realme_firmware_cache.get(codice)
+        in_cache = _realme_firmware_cache.get(cache_key)
         if in_cache and ora - in_cache[0] < _REALME_FIRMWARE_TTL:
             return list(in_cache[1])
 
@@ -2849,12 +2866,14 @@ def _lookup_realme_firmware_archive(model_name: str,
     # di presentazione, non un confronto arbitrario fra le loro revisioni.
     per_regione: dict[str, _PacchettoRealme] = {}
     urls = [
-        REALME_FIRMWARE_ARCHIVE_URL.format(codice=codice, pagina=pagina)
-        for pagina in range(1, _REALME_FIRMWARE_SEARCH_PAGES + 1)
+        _archive_url.format(codice=codice.lower() if "gbfirmware.com" in _archive_url else codice, pagina=pagina)
+        for pagina in range(1, _pages + 1)
     ]
 
     def scarica(url: str) -> tuple[str, bool]:
         try:
+            if "gbfirmware.com" in url:
+                return _archive_metadata(url), True
             risposta = http_get(url, timeout=C.SEARCH_HTTP_TIMEOUT)
         except Exception:
             return "", False
@@ -2865,9 +2884,8 @@ def _lookup_realme_firmware_archive(model_name: str,
     # Quattro pagine da ~160 KB in quattro worker sono un picco sotto 1 MB;
     # il contenuto è interpretato subito e non entra nella cache. In serie,
     # invece, quattro timeout da 5 s basterebbero a svuotare il budget di 12 s.
-    with ThreadPoolExecutor(max_workers=_REALME_FIRMWARE_SEARCH_PAGES) as pool:
+    with ThreadPoolExecutor(max_workers=_pages) as pool:
         pagine = list(pool.map(scarica, urls))
-    tutte_risposte_ok = all(ok for _testo, ok in pagine)
     for testo, _ok in pagine:
         for pacchetto in _pacchetti_realme_da_testo(testo):
             if pacchetto.codice != codice:
@@ -2898,7 +2916,7 @@ def _lookup_realme_firmware_archive(model_name: str,
         )
         items.append(RawItem(
             title=f"{device} — {record.filename}",
-            link=REALME_FIRMWARE_ARCHIVE_URL.format(codice=codice, pagina=1),
+            link=urls[0],
             brand=C.OPPO,
             device=device,
             model_code=codice,
@@ -2913,17 +2931,104 @@ def _lookup_realme_firmware_archive(model_name: str,
             firmware_kind=C.FW_REPORTED,
         ))
 
-    # Anche «nessuna build trovata» è un esito utile se tutte le pagine hanno
-    # risposto: per le forme equivalenti dello stesso RMX evita di ripetere
-    # quattro GET senza alcuna possibilità di ottenere un dato diverso. Un
-    # guasto di rete, invece, NON entra in cache e sarà ritentato.
-    if items or tutte_risposte_ok:
+    # HTTP 200 può essere un challenge o un layout non più riconosciuto.
+    # Senza un contratto di assenza documentato, memorizziamo solo build.
+    if items:
         with _realme_firmware_cache_lock:
             # Il limite impedisce che una raffica di codici diversi trasformi
             # una cache di comodità in memoria trattenuta sul piano da 512 MB.
             if len(_realme_firmware_cache) >= 32:
                 _realme_firmware_cache.pop(next(iter(_realme_firmware_cache)))
-            _realme_firmware_cache[codice] = (ora, list(items))
+            _realme_firmware_cache[cache_key] = (ora, list(items))
+    return items
+
+
+def _archive_metadata(url: str) -> str:
+    """Legge solo metadati, con un limite sul corpo decompresso di 1 MiB."""
+    with requests.get(url, headers=_headers(), timeout=C.SEARCH_HTTP_TIMEOUT,
+                      stream=True) as response:
+        response.raise_for_status()
+        body = bytearray()
+        for chunk in response.iter_content(16384):
+            if len(body) + len(chunk) > 1024 * 1024:
+                raise ValueError("Archivio: pagina oltre 1 MiB")
+            body.extend(chunk)
+        return body.decode("utf-8", errors="replace")
+
+
+def _lookup_gbfirmware(model_name: str) -> list[RawItem]:
+    """Secondo archivio per codici OPPO/realme verificati; mai OTA ufficiale."""
+    found = _realme_codice_verificato(model_name)
+    brand = "realme"
+    if not found:
+        found = _oppo_codice_verificato(model_name)
+        brand = "OPPO"
+    if not found:
+        return []
+    return _lookup_realme_firmware_archive(
+        model_name, _verificato=found, _nome_fonte=brand,
+        _verifica="verificato nel catalogo modelli; metadati GBFirmware",
+        _archive_url="https://gbfirmware.com/folder/{codice}", _pages=1,
+    )
+
+
+_HONOR_ARCHIVE_CODE_RE = re.compile(r"[A-Z]{3}-[A-Z0-9]{3,5}")
+
+
+def _lookup_honor_firmware_archive(model_name: str) -> list[RawItem]:
+    """Cerca un solo codice Honor verificato, conservando il ramo Cxxx."""
+    direct = model_name.strip().upper()
+    codes = ([direct] if _HONOR_ARCHIVE_CODE_RE.fullmatch(direct)
+             else modelcodes.codes_for_name(model_name))
+    verified = {}
+    for code in codes:
+        if not _HONOR_ARCHIVE_CODE_RE.fullmatch(code):
+            continue
+        names = [n for n in modelcodes.resolve(code) if n.lower().startswith("honor ")]
+        if len(names) == 1:
+            verified[code] = names[0]
+    if len(verified) != 1:
+        return []
+    code, name = next(iter(verified.items()))
+    key = "honor|" + code
+    now = time.monotonic()
+    with _realme_firmware_cache_lock:
+        cached = _realme_firmware_cache.get(key)
+        if cached and now - cached[0] < _REALME_FIRMWARE_TTL:
+            return list(cached[1])
+    url = REALME_FIRMWARE_ARCHIVE_URL.format(codice=code, pagina=1)
+    try:
+        body = _archive_metadata(url)
+    except Exception:
+        return []
+    # Solo nomi di firmware completi: esclude dump, FRP e pacchetti repair.
+    pattern = re.compile(
+        rf"(?<![\w-]){re.escape(code)}\s+(\d+\.\d+\.\d+\.\d+)"
+        r"\((C\d+E\d+R\d+P\d+)\)_Firmware_(?:general_)?Magic\s?OS\s+\d+\.\d+_\w+\.zip",
+        re.IGNORECASE,
+    )
+    variants = {}
+    for match in pattern.finditer(html.unescape(body)):
+        version, variant = match.groups()
+        variant = variant.upper()
+        market = re.match(r"C\d+", variant).group(0)
+        rank = tuple(map(int, version.split(".")))
+        if market not in variants or rank > variants[market][0]:
+            variants[market] = (rank, version, variant)
+    items = [RawItem(
+        title=f"{name} — {version}({variant})", device=name,
+        model_code=code, brand=C.HUAWEI, link=url,
+        build=f"{version}({variant})", trust=C.TRUST_CURATED,
+        firmware_kind=C.FW_REPORTED,
+        size_info=f"Archivio tecnico Honor · variante {variant} · build riportata",
+        summary="Pacchetto indicizzato da HalabTech; disponibilità OTA non verificata. "
+                "La versione MagicOS non viene convertita automaticamente in Android.",
+    ) for _market, (_rank, version, variant) in sorted(variants.items())][:12]
+    if items:
+        with _realme_firmware_cache_lock:
+            if len(_realme_firmware_cache) >= 32:
+                _realme_firmware_cache.pop(next(iter(_realme_firmware_cache)))
+            _realme_firmware_cache[key] = (now, list(items))
     return items
 
 
@@ -4795,6 +4900,9 @@ _STRUCTURED_LOOKUPS_LIST = [
     StructuredLookup(C.XIAOMI, _lookup_xiaomi, "basso", "catalogo Xiaomi", fetch_xiaomi),
     StructuredLookup(C.HUAWEI, _lookup_honor, "basso", "piano ufficiale Honor",
                      fetch_honor_aer, firmware_kind=C.FW_FACTORY),
+    StructuredLookup(C.HUAWEI, _lookup_honor_firmware_archive, "basso",
+                     "archivio tecnico Honor (codice e variante)",
+                     trust=C.TRUST_CURATED, firmware_kind=C.FW_REPORTED),
     StructuredLookup(C.HUAWEI, _lookup_honor_security, "basso",
                      "bollettino sicurezza ufficiale Honor Italia",
                      fetch_honor_security_bulletin, firmware_kind=C.FW_SUPPORT),
@@ -4837,6 +4945,9 @@ _STRUCTURED_LOOKUPS_LIST = [
     # codice sul sito realme e ordinata GDPR/Europa prima del ramo Export.
     StructuredLookup(C.OPPO, _lookup_realme_firmware_archive, "basso",
                      "archivio tecnico realme (build per codice)",
+                     trust=C.TRUST_CURATED, firmware_kind=C.FW_REPORTED),
+    StructuredLookup(C.OPPO, _lookup_gbfirmware, "basso",
+                     "GBFirmware OPPO/realme (build per codice)",
                      trust=C.TRUST_CURATED, firmware_kind=C.FW_REPORTED),
     # `oplus_telegram` tolta di qui l'11/08/2026 insieme al resto della
     # fonte — vedi il commento sopra `RETIRED_SOURCES` per il motivo e come
