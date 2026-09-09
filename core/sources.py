@@ -5547,6 +5547,10 @@ def lookup_model_structured(model_name: str, brand: str | None = None):
     for posizione, voce in enumerate(ordinati):
         if time.monotonic() >= scadenza:
             break
+        if firmware_parziale and brand and voce.brand != brand:
+            # Arricchire un firmware già identificato non richiede i
+            # cataloghi di altri marchi (né il loro picco di memoria).
+            continue
         # I CATALOGHI FREDDI DELLE FONTI RIMANENTI PARTONO INSIEME, e solo
         # da qui in poi: dopo che la prima fonte — quella del brand dedotto,
         # cioè la più probabile — non ha risposto.
@@ -5565,7 +5569,10 @@ def lookup_model_structured(model_name: str, brand: str | None = None):
         # `_scalda_fonti` per i numeri.
         if posizione and not scaldate:
             scaldate = True
-            _scalda_fonti(ordinati[posizione:])
+            da_scaldare = ordinati[posizione:]
+            if firmware_parziale and brand:
+                da_scaldare = [v for v in da_scaldare if v.brand == brand]
+            _scalda_fonti(da_scaldare)
         tentate.append(voce.etichetta)
         for forma in forme:
             if time.monotonic() >= scadenza:
