@@ -2961,7 +2961,7 @@ def _lookup_gbfirmware(model_name: str) -> list[RawItem]:
     found = _realme_codice_verificato(model_name)
     brand = "realme"
     if not found:
-        found = _oppo_codice_verificato(model_name)
+        found = _oppo_codice_archivio_verificato(model_name)
         brand = "OPPO"
     if not found:
         return []

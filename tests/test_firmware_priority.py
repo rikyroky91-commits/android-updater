@@ -69,6 +69,22 @@ def test_honor_keeps_variant_without_inventing_android():
     sources.reset_realme_firmware_cache()
 
 
+def test_gbfirmware_oppo_dispatch_and_unknown_code():
+    sources.reset_realme_firmware_cache()
+    with patch.object(sources, "_realme_codice_verificato", return_value=None), \
+         patch.object(sources, "_oppo_codice_archivio_verificato", return_value=("CPH2333", "OPPO A96")) as verify, \
+         patch.object(sources, "_archive_metadata", return_value="CPH2333export_11_F.73_2024110419020000.zip") as get:
+        items = sources._lookup_gbfirmware("CPH2333")
+        assert len(items) == 1
+        assert items[0].device == "OPPO A96"
+        assert items[0].build == "F.73"
+        assert items[0].android_version is None
+        verify.return_value = None
+        assert sources._lookup_gbfirmware("CPH9999") == []
+        assert get.call_count == 1
+    sources.reset_realme_firmware_cache()
+
+
 def test_honor_ambiguous_name_does_not_query_archive():
     with patch.object(sources.modelcodes, "codes_for_name", return_value=["ELI-N39", "ELI-NX9"]), \
          patch.object(sources.modelcodes, "resolve", return_value=["HONOR 200"]), \
