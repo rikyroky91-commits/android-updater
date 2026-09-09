@@ -5676,8 +5676,13 @@ def lookup_model_structured(model_name: str, brand: str | None = None):
     return [], f"nessuna fonte ufficiale conosce «{model_name}» (provate: {provate})"
 
 
-def _completezza_firmware(item) -> tuple[bool, bool]:
-    return bool(item.android_version), bool(item.published)
+def _completezza_firmware(item) -> tuple[int, bool]:
+    # Una data disponibile non deve far retrocedere Android 16 ad Android 14.
+    try:
+        android = int(item.android_version or 0)
+    except (ValueError, TypeError):
+        android = 0
+    return android, bool(item.published)
 
 
 def _ha_versione(item) -> bool:

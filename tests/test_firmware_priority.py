@@ -35,6 +35,12 @@ def test_partial_firmware_survives_failed_later_source():
     assert error is None
 
 
+def test_release_date_does_not_make_older_android_preferable():
+    newer = sources.RawItem(title="test", android_version=16)
+    older = sources.RawItem(title="test", android_version=14, published="2026-01-01")
+    assert sources._completezza_firmware(newer) > sources._completezza_firmware(older)
+
+
 def test_redmi_stable_and_markets_survive_newer_beta():
     def record(version, date, branch="Stable"):
         return dict(name="Redmi Note 13", version=version, date=date,
