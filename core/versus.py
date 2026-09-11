@@ -172,7 +172,9 @@ _RE_CONNETTIVITA = re.compile(r"\s*\b(?:4G|5G|LTE)\b\s*$", re.I)
 
 def chiave(nome: str) -> str:
     """«Honor Magic 7 Pro» e «HONOR Magic7 Pro» → `honormagic7pro`."""
-    testo = _RE_PARENTESI.sub(" ", nome or "").lower().replace("+", " plus ")
+    # Le parentesi possono contenere il modello stesso, non solo il taglio RAM.
+    from .soc import normalizza_parentesi_numeriche
+    testo = _RE_PARENTESI.sub(" ", normalizza_parentesi_numeriche(nome)).lower().replace("+", " plus ")
     return _RE_NON_UTILE.sub("", testo)
 
 

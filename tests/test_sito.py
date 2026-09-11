@@ -1072,6 +1072,26 @@ class TestSoccorsoAI(_Sito):
 
         self.assertIsNone(main._soccorso_ai("qualcosa di illeggibile"))
 
+    def test_ai_non_sostituisce_un_modello_riconosciuto_senza_firmware(self):
+        from unittest.mock import patch
+        from web import main
+
+        originale = {"trovato": True, "senza_firmware": True,
+                     "nome": "Motorola Moto G(30)"}
+        altro = {"trovato": True, "senza_firmware": False,
+                 "nome": "Motorola Edge 50 Neo"}
+        main.RICERCHE.svuota()
+        with patch.object(main, "_cerca_davvero", return_value=originale), \
+             patch.object(main, "_soccorso_ai", return_value=altro):
+            self.assertEqual(main._esito_ricerca("MOTO G(30)")["nome"],
+                             originale["nome"])
+        main.RICERCHE.svuota()
+        stesso = dict(altro, nome="Motorola Moto G30")
+        with patch.object(main, "_cerca_davvero", return_value=originale), \
+             patch.object(main, "_soccorso_ai", return_value=stesso):
+            self.assertFalse(main._esito_ricerca("MOTO G(30)")["senza_firmware"])
+        main.RICERCHE.svuota()
+
     def test_uninterpretazione_che_non_migliora_viene_scartata(self):
         """Se l'AI porta a un altro buco, resta la risposta onesta sulla
         domanda originale invece di una domanda diversa e altrettanto

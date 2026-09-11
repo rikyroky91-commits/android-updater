@@ -303,6 +303,11 @@ _MARCHE = ("SAMSUNG", "XIAOMI", "OPPO", "REALME", "ONEPLUS", "VIVO",
            "MOTOROLA", "HONOR", "HUAWEI", "GOOGLE", "APPLE", "NOTHING")
 
 
+def normalizza_parentesi_numeriche(nome: str) -> str:
+    """Conserva il numero del modello: G(30) è G30, Phone (2) è Phone 2."""
+    return re.sub(r"\(\s*(\d+)\s*\)", r"\1", nome or "")
+
+
 def varianti_nome(nome: str) -> list[str]:
     """Tutti i modi in cui la gente scrive lo stesso nome commerciale.
 
@@ -312,7 +317,7 @@ def varianti_nome(nome: str) -> list[str]:
     grafia esatta del CSV — che è il motivo per cui cercando «samsung s24
     ultra» non compariva nessun processore.
     """
-    pulito = re.sub(r"\s+", " ", (nome or "")).strip().upper()
+    pulito = re.sub(r"\s+", " ", normalizza_parentesi_numeriche(nome)).strip().upper()
     if not pulito:
         return []
 

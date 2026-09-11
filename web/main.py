@@ -2504,7 +2504,12 @@ def _esito_ricerca(query: str, senza_rete: bool = False) -> dict:
     if _ricerca_debole(esito):
         migliore = _soccorso_ai(query)
         if migliore is not None:
-            esito = migliore
+            # Un firmware disponibile non autorizza l'AI a cambiare un telefono
+            # già identificato. Moto G30 senza aggiornamenti resta Moto G30.
+            identificato = esito.get("trovato") or esito.get("scheda", {}).get("trovata")
+            if not identificato or modelcodes.stesso_telefono(
+                    esito.get("nome") or query, migliore.get("nome") or ""):
+                esito = migliore
     RICERCHE.scrivi(chiave, esito)
     return esito
 

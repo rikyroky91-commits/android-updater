@@ -190,7 +190,8 @@ def _name_key(value: str) -> str:
     eliminano invece parole di gamma (``power``, ``5g``...) perche' quelle
     identificano modelli diversi.
     """
-    words = [w.lower() for w in _NAME_WORD_RE.findall(value or "")]
+    from .soc import normalizza_parentesi_numeriche
+    words = [w.lower() for w in _NAME_WORD_RE.findall(normalizza_parentesi_numeriche(value))]
     return " ".join(w for w in words if w not in {"motorola", "moto"})
 
 

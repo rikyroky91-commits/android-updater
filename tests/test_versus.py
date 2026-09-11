@@ -87,6 +87,37 @@ class TestMarcaScoperta(unittest.TestCase):
 
 
 class TestChiaviDiConfronto(unittest.TestCase):
+    def test_parentesi_numeriche_conservano_il_modello(self):
+        from core import soc, motorola_catalog, modelcodes
+        for nome in ("Moto G(30)", "Moto G( 30 )"):
+            self.assertEqual(versus.chiave(nome), versus.chiave("Moto G30"))
+            self.assertNotEqual(versus.chiave(nome), versus.chiave("Moto G"))
+            self.assertIn("MOTOROLA MOTO G30", soc.varianti_nome(nome))
+            self.assertEqual(motorola_catalog._name_key(nome), "g30")
+            self.assertEqual(modelcodes._normalize_name(nome), "moto g30")
+        self.assertNotEqual(versus.chiave("Nothing Phone (2)"),
+                            versus.chiave("Nothing Phone (1)"))
+
+    def test_g30_non_accetta_la_scheda_del_moto_g_generico(self):
+        risultati = [{"name": "Motorola Moto G", "name_url": "motorola-moto-g"},
+                     {"name": "Motorola Moto G30", "name_url": "motorola-moto-g30"},
+                     {"name": "Motorola Edge 50 Neo", "name_url": "motorola-edge-50-neo"}]
+        for riga in risultati:
+            riga["categories"] = ["phone"]
+        scelto = versus.scegli_candidato("Motorola Moto G(30)", risultati, "Motorola")
+        self.assertEqual(scelto["name_url"], "motorola-moto-g30")
+        self.assertIsNone(versus.scegli_candidato(
+            "Motorola Moto G(30)", [risultati[0], risultati[2]], "Motorola"))
+
+    def test_catalogo_specifiche_ritrova_g30_con_parentesi(self):
+        from core import specs
+        _, indice = specs.indicizza([{"nome": "Motorola Moto G30"},
+                                    {"nome": "Motorola Edge 50 Neo"}])
+        self.assertEqual(indice["MOTO G30"]["nome"], "Motorola Moto G30")
+        for forma in specs._forme_nome("MOTO G(30)"):
+            if forma in indice:
+                self.assertEqual(indice[forma]["nome"], "Motorola Moto G30")
+
     def test_le_due_grafie_dello_stesso_telefono(self):
         """La pagina AER scrive «HONOR Magic7 Pro», versus «Honor Magic 7
         Pro»: senza questo non si troverebbero mai."""

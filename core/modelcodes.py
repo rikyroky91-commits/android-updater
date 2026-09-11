@@ -919,7 +919,8 @@ def _normalize_name(name: str) -> str:
     dati già in archivio, dove un nome decorato impediva ogni
     corrispondenza con il catalogo delle fonti ufficiali.
     """
-    senza_parentesi = _RE_PARENTESI_CODICE.sub(" ", name or "")
+    from .soc import normalizza_parentesi_numeriche
+    senza_parentesi = _RE_PARENTESI_CODICE.sub(" ", normalizza_parentesi_numeriche(name))
     text = re.sub(r"[^a-z0-9+]+", " ", senza_parentesi.lower()).strip()
     for prefix in ("samsung ", "xiaomi ", "honor ", "huawei ", "motorola ",
                    "oneplus ", "oppo ", "realme ", "vivo ", "google "):
