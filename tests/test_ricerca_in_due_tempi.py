@@ -175,8 +175,14 @@ class TestSecondoTempo(BaseDueTempi):
         stesso telefono, senza che nessuno se ne accorga."""
         for q in ("SM-A546B", "CPH2781", "codice-che-non-esiste"):
             with self.subTest(q=q):
-                pezzo = _testo(self.client.get(f"/ricerca/firmware?q={q}").text)
+                frammento = self.client.get(f"/ricerca/firmware?q={q}").text
+                # Il nome ora precede la scheda, mentre il firmware viene dopo.
+                # Confrontiamo i due contenuti senza imporne la contiguità.
+                intestazione = re.search(r"<header data-nome-risultato>(.*?)</header>", frammento, re.S)
+                pezzo = _testo(re.sub(r"<header data-nome-risultato>.*?</header>", "", frammento, flags=re.S))
                 intera = _testo(self.client.get(f"/?q={q}&completo=1").text)
+                if intestazione:
+                    self.assertIn(_testo(intestazione.group(1)), intera)
                 self.assertTrue(pezzo)
                 self.assertIn(pezzo[:60], intera)
 

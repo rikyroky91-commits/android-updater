@@ -76,6 +76,11 @@
         return;
       }
       blocco.innerHTML = html;
+      var nuovoNome = blocco.querySelector('[data-nome-risultato]');
+      var nome = document.querySelector('header[data-nome-risultato]');
+      if (nuovoNome && nome && nuovoNome !== nome) {
+        nome.replaceWith(nuovoNome);
+      }
       blocco.classList.remove("firmware-in-arrivo");
       blocco.classList.add("firmware-arrivato");
     })

@@ -85,20 +85,4 @@
   </div>
 </section>
 
-{% if scheda.sezioni %}
-<details class="completa">
-  <summary>Scheda tecnica completa</summary>
-  {% for titolo, campi in scheda.sezioni.items() %}
-  <table class="tabella minuta">
-    <caption>{{ titolo }}</caption>
-    <tbody>
-      {% for voce, valore in campi.items() %}
-      <tr><th scope="row">{{ voce }}</th><td>{{ valore }}</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endfor %}
-  <p class="nota">Fonte delle specifiche: {{ scheda.fonte }}. Il firmware
-    attuale viene invece dalle fonti ufficiali del produttore, non da qui.</p>
-</details>
-{% endif %}
+{% if not solo_sintesi %}{% include "_scheda_completa.html" %}{% endif %}

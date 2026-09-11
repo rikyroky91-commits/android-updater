@@ -1,33 +1,4 @@
-{# LA PARTE DELLA PAGINA CHE COSTA LA RETE.
-
-   Sta in un file suo perché viene resa DUE volte da due strade diverse:
-   dentro la pagina, quando la risposta completa è già in memoria, e da
-   sola — come frammento — quando il secondo caricamento la va a
-   prendere. Averne una copia sola è ciò che impedisce alle due strade di
-   dire cose diverse sullo stesso telefono.
-
-   IL TITOLO STA QUI DENTRO, e ci è dovuto arrivare a forza. Prima era
-   fuori, nella pagina, perché il nome si sa subito senza rete — ma «si sa
-   subito» non vuol dire «si sa sempre»: per «cph 2695», scritto con uno
-   spazio, il primo tempo non risolve niente e il titolo diventava
-   «Nessun firmware per «cph 2695»», mentre il secondo tempo trovava
-   eccome Oppo A5 Pro 5G con la sua build. Risultato: un titolo che
-   smentiva le righe sotto di sé, congelato sul verdetto di prima.
-   Il titolo dipende dall'esito della ricerca, quindi va sostituito
-   insieme all'esito. #}
-{# 4G O 5G ACCANTO AL NOME, non sepolto in fondo alla scheda tecnica.
-   Chiesto dall'utente il 31/08/2026, ed è la richiesta di chi prepara un
-   test: A54 4G e A54 5G sono due telefoni con chip diversi, build diverse
-   e date di rilascio diverse. La fonte è scritta accanto perché il dato
-   non è sempre della stessa qualità — dal nome del modello è una
-   dichiarazione del produttore, dalla scheda tecnica è la riga «Network»
-   del catalogo — e questo progetto dice sempre da dove viene una
-   risposta. Quando nessuna fonte lo dichiara non si scrive niente:
-   dedurlo dal processore sarebbe indovinarlo. #}
-<h2>{% if risultato.trovato or risultato.senza_firmware or (risultato.nome and risultato.nome != risultato.query) %}{{ risultato.nome }}{% else %}Nessun firmware per «{{ risultato.query }}»{% endif %}
-{%- if risultato.rete and not risultato.rete.nel_nome %} <span class="pastiglia-rete" title="Rete {{ risultato.rete.sigla }} · {{ risultato.rete.fonte }}{% if risultato.rete.dettaglio %} — {{ risultato.rete.dettaglio }}{% endif %}">{{ risultato.rete.sigla }}</span>{% endif %}</h2>
-{% if risultato.rete and not risultato.rete.nel_nome %}<p class="nota">Rete mobile: <strong>{{ risultato.rete.sigla }}</strong> · {{ risultato.rete.fonte }}</p>{% endif %}
-
+{% if not senza_nome %}{% include "_nome_risultato.html" %}{% endif %}
 {% if risultato.trovato and not risultato.senza_firmware %}
   <p class="riga-esito">{{ risultato.riga }}</p>
   <p class="nota">{{ risultato.fonte }}</p>
@@ -47,5 +18,5 @@
   <p>Il modello è riconosciuto dalla scheda tecnica, ma nessuna fonte
      firmware conosce il codice «{{ risultato.query }}».</p>
 {% else %}
-  <p>Nessuna fonte conosce il firmware di «{{ risultato.query }}».</p>
+  <p>Nessun firmware per «{{ risultato.query }}»: nessuna fonte disponibile lo conosce.</p>
 {% endif %}

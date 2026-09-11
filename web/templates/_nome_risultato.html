@@ -1,0 +1,3 @@
+<header data-nome-risultato>
+  <h2>{{ risultato.nome or risultato.query }}{% if risultato.rete and not risultato.rete.nel_nome %} <span class="pastiglia-rete">{{ risultato.rete.sigla }}</span>{% endif %}</h2>
+</header>

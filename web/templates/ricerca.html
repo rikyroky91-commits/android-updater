@@ -46,7 +46,12 @@
   dettaglio da aprire, non un secondo risultato.
 #}
 <section class="esito {{ 'trovato' if risultato.trovato and not risultato.senza_firmware else 'incerto' }}{{ ' esito-con-scheda' if risultato.scheda.trovata or risultato.trovato }}">
+  {% include "_nome_risultato.html" %}
+  {% if risultato.scheda.trovata or risultato.trovato %}
+  {% with scheda = risultato.scheda, senza_intestazione = true, solo_sintesi = true %}{% include "_scheda.html" %}{% endwith %}
+  {% endif %}
   {% if imei %}{% include "_imei_identita.html" %}{% endif %}
+  <h3 class="titolo-firmware">Firmware</h3>
 
   {# IL NOME PRIMA DI TUTTO. Si sa senza toccare la rete — dal codice
      modello e dalla scheda tecnica — mentre il firmware costa fino a
@@ -73,14 +78,6 @@
        trova il modello». Qui il titolo si scrive se lo si conosce, e non
        si scrive MAI «Nessun firmware»: la ricerca è ancora in corso, e
        dichiarare un esito che non c'è ancora è peggio del silenzio. #}
-    {% if risultato.nome and risultato.nome != risultato.query %}
-    {# La pastiglia 4G/5G compare già in questo primo tempo: il modello e la
-       scheda tecnica sono definitivi, è il firmware che si sta ancora
-       cercando. Vedi la nota in `_esito_firmware.html`. #}
-    <h2>{{ risultato.nome }}
-      {%- if risultato.rete and not risultato.rete.nel_nome %} <span class="pastiglia-rete" title="Rete {{ risultato.rete.sigla }} · {{ risultato.rete.fonte }}{% if risultato.rete.dettaglio %} — {{ risultato.rete.dettaglio }}{% endif %}">{{ risultato.rete.sigla }}</span>{% endif %}</h2>
-    {% if risultato.rete and not risultato.rete.nel_nome %}<p class="nota">Rete mobile: <strong>{{ risultato.rete.sigla }}</strong> · {{ risultato.rete.fonte }}</p>{% endif %}
-    {% endif %}
     {# DUE ATTESE DIVERSE, DETTE IN MODO DIVERSO. Cercare il firmware di un
        telefono già riconosciuto è la normalità; interrogare un archivio
        esterno perché nessun database locale conosce quel TAC è un'altra
@@ -103,8 +100,7 @@
       <span>Cerco il firmware più recente…</span>
     </p>
     <p class="nota attesa-nota">Le fonti ufficiali e le notizie rispondono
-      in qualche secondo. Il modello e la scheda tecnica qui sotto sono
-      già definitivi.</p>
+      in qualche secondo. Il nome e le specifiche disponibili sono già mostrati qui sopra.</p>
     {% endif %}
     <noscript>
       <p class="nota"><a href="/?q={{ (risultato.domanda_originale or risultato.query) | urlencode }}&amp;completo=1">Carica
@@ -112,7 +108,7 @@
     </noscript>
   </div>
   {% else %}
-  {% include "_esito_firmware.html" %}
+  {% with senza_nome = true %}{% include "_esito_firmware.html" %}{% endwith %}
   {% endif %}
 
   {% if risultato.chiave_parco %}
@@ -277,7 +273,7 @@
    pagina doveva togliere — qui la scheda entra a dare solo quello che
    non c'è ancora: la foto e le misure, processore per primo. #}
 {% if risultato.scheda.trovata or risultato.trovato %}
-{% with scheda = risultato.scheda, senza_intestazione = true %}{% include "_scheda.html" %}{% endwith %}
+{% with scheda = risultato.scheda %}{% include "_scheda_completa.html" %}{% endwith %}
 {% endif %}
 
 {% if imei %}{% include "_imei_confronto.html" %}{% endif %}
