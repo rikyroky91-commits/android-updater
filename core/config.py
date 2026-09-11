@@ -76,7 +76,7 @@ MEMORIA_MASSIMA_MB = env_int("MEMORIA_MASSIMA_MB", 420)
 # cataloghi caldi insieme stanno in 120 MB dei 512 disponibili. Prima erano
 # ~200 e il rischio di riavvio per memoria era reale, quindi conveniva far
 # aspettare il primo visitatore; ora non conviene più.
-PRERISCALDA_CATALOGHI = env_bool("PRERISCALDA_CATALOGHI", True)
+PRERISCALDA_CATALOGHI = env_bool("PRERISCALDA_CATALOGHI", False)
 PRERISCALDA_ATTESA_SECONDI = env_int("PRERISCALDA_ATTESA_SECONDI", 8)
 # L'INDICE TAC TIENE SOLO L'ERA ANDROID. Il database dei TAC copre
 # trent'anni di telefonia — Motorola StarTAC, Nokia a tasti, moduli per

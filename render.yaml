@@ -28,13 +28,11 @@ services:
         value: 8000
       - key: DB_PATH
         value: /tmp/tracker.db
-      # I cataloghi si scaldano in sottofondo appena il sito e' su. Restava
-      # spento finche' l'indice TAC costava 114 MB da solo; ora che tiene
-      # la sola era Android ne costa 34, e tutti i cataloghi caldi insieme
-      # stanno in 120 MB dei 512. Spegnerlo significa far pagare a chi
-      # cerca per primo, dopo ogni risveglio, l'attesa di tutti.
+      # Niente caricamenti speculativi sul piano da 512 MiB.
       - key: PRERISCALDA_CATALOGHI
-        value: "true"
+        value: "false"
+      - key: PRERISCALDA_FONTI_RICERCA
+        value: "false"
       # Indice TAC: solo dall'era Android 8 in poi (piu' tutto cio' che ha
       # un codice modello). "false" rimette i trent'anni completi.
       - key: TAC_SOLO_ERA_ANDROID
@@ -47,12 +45,10 @@ services:
       # cresce, non i cataloghi), poi — se non basta — butta gli indici
       # che sanno rifarsi da soli senza rete.
       #
-      # 450 su 512 e non piu' in alto di proposito: il 04/09/2026 il
-      # picco misurato era 457, cioe' il margine e' gia' stato consumato
-      # una volta. Intervenire a 480 vorrebbe dire intervenire dopo.
+      # Margine per i picchi temporanei: il monitor controlla anche senza visite.
       # A "0" si spegne.
       - key: MEMORIA_SOGLIA_MB
-        value: "450"
+        value: "380"
       # I TAC che nessun database locale conosce si chiedono a un servizio
       # esterno. Se ne possono configurare fino a tre, provati in ordine:
       # cento interrogazioni al mese finiscono, e una chiave che smette di

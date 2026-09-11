@@ -21,6 +21,7 @@ from __future__ import annotations
 import gzip
 
 import html
+import io
 import re
 import threading
 import time
@@ -229,6 +230,37 @@ def fetch_json(urls: list[str]) -> tuple[object | None, str | None]:
     return None, last_error
 
 
+def _yaml_catalogo_a_blocchi(testo: str) -> list[dict]:
+    """Il tracker Xiaomi pubblica record YAML indipendenti a livello zero.
+
+    Evita l'albero YAML dell'intero storico in RAM: compone un solo record
+    per volta. Riferimenti/ancore fra record non fanno parte del contratto.
+    """
+    records, block = [], []
+    size = 0
+
+    def flush():
+        if not block:
+            return
+        parsed = yaml.safe_load("".join(block))
+        if not isinstance(parsed, list) or len(parsed) != 1 or not isinstance(parsed[0], dict):
+            raise ValueError("catalogo YAML: atteso un record per blocco")
+        records.append(parsed[0])
+
+    for line in io.StringIO(testo):
+        if line.startswith("- "):
+            flush()
+            block, size = [], 0
+        elif not block and (not line.strip() or line.lstrip().startswith("#") or line.strip() == "---"):
+            continue
+        size += len(line)
+        if size > 65536:
+            raise ValueError("catalogo YAML: record oltre 64 KiB")
+        block.append(line)
+    flush()
+    return records
+
+
 def fetch_yaml(urls: list[str]) -> tuple[object | None, str | None]:
     """Come `fetch_json`, ma per fonti che pubblicano YAML invece di JSON."""
     if yaml is None:  # pragma: no cover
@@ -244,8 +276,8 @@ def fetch_yaml(urls: list[str]) -> tuple[object | None, str | None]:
             last_error = f"{url} → HTTP {response.status_code}"
             continue
         try:
-            return yaml.safe_load(response.text), None
-        except yaml.YAMLError as exc:
+            return _yaml_catalogo_a_blocchi(response.text), None
+        except (yaml.YAMLError, ValueError) as exc:
             last_error = f"{url} → YAML non valido: {exc}"
     return None, last_error
 
@@ -5779,6 +5811,10 @@ def _scalda_fonti(voci: list) -> None:
     momento in cui si paga l'attesa a essere diverso.
     """
     global _scalda_pool
+    # Su 512 MiB il caricamento speculativo continua dopo la risposta e
+    # può sovrapporsi alla ricerca successiva o alla scansione periodica.
+    if not C.env_bool("PRERISCALDA_FONTI_RICERCA", False):
+        return
     da_scaldare = []
     for voce in voci:
         if voce.costo != "basso" or voce.fetch is None:

@@ -198,6 +198,13 @@ class TestSottomarcaDentroLoStessoGruppo(unittest.TestCase):
 class TestRiscaldamentoInParallelo(_ConContatore):
     """Scaldare non deve cambiare cosa si trova, solo quando lo si aspetta."""
 
+    def setUp(self):
+        from unittest.mock import patch
+        super().setUp()
+        env = patch.dict(os.environ, {"PRERISCALDA_FONTI_RICERCA": "true"})
+        env.start()
+        self.addCleanup(env.stop)
+
     def test_scalda_solo_le_fonti_fredde(self):
         sources.fetch_honor_aer()   # questa è già calda
         prima = self.quante("honor.com")

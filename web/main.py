@@ -82,8 +82,14 @@ PARCO_PER_PAGINA = C.env_int("PARCO_PER_PAGINA", 25)
 
 @asynccontextmanager
 async def ciclo_di_vita(app: FastAPI):
-    avvio()
-    yield
+    from .memory_monitor import MemoryMonitor
+    monitor = MemoryMonitor()
+    monitor.start()
+    try:
+        avvio()
+        yield
+    finally:
+        monitor.stop()
     # ALL'ARRESTO, NON SOLO ALL'AVVIO. Render manda un SIGTERM prima di
     # spegnere il servizio: è la finestra in cui una nota scritta pochi
     # secondi prima può ancora raggiungere l'archivio esterno invece di
