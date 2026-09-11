@@ -1,4 +1,6 @@
 model_code,nome_commerciale,soc_nome,produttore,soc_codice,nota
+# SM-G780G: scheda Samsung https://i2.cdscdn.com/usermanual/reparabilityindex/reparability-index-samsung-galaxy-s20-fe-128-go-4g-violet-SAMGALAS20FE128V.pdf
+SM-G780G,Galaxy S20 FE 4G (SM-G780G),Snapdragon 865,Qualcomm,SM8250,Variante SM-G780G verificata sulla scheda Samsung; non estendere alle altre varianti S20 FE
 # Tabella CURATA A MANO. Corta di proposito: contiene solo modelli per cui
 # l'abbinamento codice-chip e' verificato, non "plausibile". Chi legge un
 # risultato non puo' distinguere una riga giusta da una ricordata male, e un

@@ -25,6 +25,13 @@ class TestVariantiRegionali(unittest.TestCase):
         self.assertIn("Exynos 2400", europa.etichetta)
         self.assertIn("Snapdragon 8 Gen 3", usa.etichetta)
 
+    def test_s20_fe_g780g_risolve_la_variante_anche_dual_sim(self):
+        for codice in ('SM-G780G', 'SM-G780G/DS'):
+            chip = soc.per_modello(codice, 'Galaxy S20 FE')
+            self.assertIn('Snapdragon 865', chip.etichetta)
+            self.assertNotIn('oppure', chip.etichetta)
+            self.assertNotIn('Serve il codice', chip.nota)
+
     def test_la_nota_avverte_dell_altra_variante(self):
         europa = soc.per_modello("SM-S921B")
         self.assertIn("Snapdragon", europa.nota)

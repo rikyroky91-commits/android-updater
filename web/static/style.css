@@ -303,6 +303,7 @@ a { color: inherit; }
 .firmware-risultato .firmware-versione { font-size: clamp(1.1rem, 2vw, 1.4rem); font-weight: 600; line-height: 1.4; }
 .firmware-dettagli { margin: .6rem 0; line-height: 1.6; overflow-wrap: anywhere; }
 .esito .nota { font-size: .9rem; line-height: 1.55; }
+.esito .scheda .nota, .esito .sottotitolo, .firmware-risultato .nota { font-size: .95rem; color: #514f4e; line-height: 1.6; }
 .imei-avviso { background: #fff8e9; border-left: 3px solid #a66b10; padding: .7rem 1rem; margin: 1rem 0; border-radius: 6px; }
 .imei-avviso > p { margin: 0 0 .5rem; }
 .imei-avviso summary { cursor: pointer; font-size: .9rem; }

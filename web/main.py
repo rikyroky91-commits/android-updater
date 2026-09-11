@@ -3082,7 +3082,7 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
                 pezzi.append("data di rilascio non verificata")
                 mese = extract.mese_leggibile(versione_certa.get("build") or "")
                 if mese:
-                    pezzi.append(f"build di {mese}")
+                    pezzi.append(f"Periodo dedotto dal codice build: {mese} (non è la data di rilascio)")
 
     if not pezzi and supporto_senza_versione:
         # ``size_info`` viene arricchito più avanti con il SoC per la scheda
