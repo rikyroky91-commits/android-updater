@@ -2153,6 +2153,26 @@ class TestParcoDiTest(_SitoConLogin):
         self.assertEqual(risposta.headers["location"], "/parco?errore_test=data")
         self.assertIsNone(storage.get_test_baseline(chiave))
 
+    def test_salva_software_installato_ed_esito_senza_usare_la_fonte(self):
+        from core import storage
+        chiave = next(d["device_key"] for d in storage.get_devices() if "S24" in d["model"])
+        storage.add_to_watchlist(chiave, "Samsung", "Galaxy S24")
+        dati = {"chiave": chiave, "data_test": "2026-08-12", "manuale": "true",
+                "android_installato": "14", "build_installata": "BUILD-DEL-TELEFONO", "esito_test": "Fallito"}
+        self.assertEqual(self.client.post('/parco/segna-test', data=dati, follow_redirects=False).status_code, 303)
+        baseline = storage.get_test_baseline(chiave)
+        self.assertEqual(baseline['android_version'], 14)
+        self.assertEqual(baseline['build'], 'BUILD-DEL-TELEFONO')
+        import json
+        self.assertEqual(json.loads(baseline['note']), {'origine': 'telefono', 'esito': 'Fallito'})
+        self.assertIn('BUILD-DEL-TELEFONO', self.client.get('/parco').text)
+        self.assertEqual(self.client.post('/parco/segna-test', data=dict(dati, esito_test='altro'), follow_redirects=False).status_code, 422)
+        self.assertEqual(storage.get_test_baseline(chiave), baseline)
+        self.client.post('/parco/segna-test', data=dict(dati, android_installato='', build_installata=''), follow_redirects=False)
+        vuota = storage.get_test_baseline(chiave)
+        self.assertIsNone(vuota['android_version'])
+        self.assertFalse(vuota['build'])
+
     def test_la_ricerca_nel_parco_filtra_per_marca_o_modello(self):
         """Segnalato dall'utente: con più modelli nel parco serve poter
         cercare invece di scorrere tutta la tabella a occhio."""

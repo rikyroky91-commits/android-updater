@@ -313,6 +313,11 @@ a { color: inherit; }
 .esito [data-nome-risultato] h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); line-height: 1.2; }
 .esito > .scheda { margin: 1.2rem 0; padding: 1rem 0; border: 0; }
 .titolo-firmware { margin: 1.4rem 0 .6rem; }
+.confronto-installato { margin: 1rem 0; }
+.confronto-installato summary { cursor: pointer; font-weight: 600; }
+.confronto-installato label, .data-test-form label { display: block; margin: .6rem 0; }
+.confronto-installato input:not([type="checkbox"]), .data-test-form input:not([type="hidden"]), .data-test-form select { max-width: 100%; padding: .5rem; }
+.data-test-form { flex-wrap: wrap; }
 .riga-esito { margin: 0; font-size: 1rem; }
 .verifica-fonti {
   background: var(--paper); border: 1px solid var(--filo); border-radius: 8px;

@@ -25,7 +25,7 @@
 {% endif %}
 
 {% if righe %}
-{% if test_salvato %}<p class="conferma-azione">✓ Test registrato: salvata la data e la versione corrente.</p>{% endif %}
+{% if test_salvato %}<p class="conferma-azione">✓ Test registrato: salvati data, dati software ed esito.</p>{% endif %}
 {% if nota_salvata %}<p class="conferma-azione">✓ Nota salvata.</p>{% endif %}
 {% if allegato_salvato %}<p class="conferma-azione">✓ Allegato caricato.</p>{% endif %}
 {% if allegato_tolto %}<p class="conferma-azione">✓ Allegato rimosso.</p>{% endif %}
@@ -50,8 +50,20 @@
           <input type="hidden" name="chiave" value="{{ r.chiave }}">
           <label class="sr-only" for="test-{{ loop.index }}">Data del test per {{ r.modello }}</label>
           <input id="test-{{ loop.index }}" type="date" name="data_test" value="{{ r.data_test }}" required>
+          <input type="hidden" name="manuale" value="true">
+          <details class="software-test"><summary>Software installato ed esito</summary>
+          <label>Android installato <input name="android_installato" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" value="{{ r.installato.android_version or '' }}" placeholder="es. 15"></label>
+          <label>Build installata <input name="build_installata" maxlength="160" value="{{ r.installato.build or '' }}" placeholder="Letta nelle impostazioni"></label>
+          <label>Esito del test <select name="esito_test">
+            {% for esito in ['', 'Superato', 'Fallito', 'Da completare'] %}<option value="{{ esito }}"{% if r.esito_test == esito %} selected{% endif %}>{{ esito or 'Non indicato' }}</option>{% endfor %}
+          </select></label>
+          <p class="nota">Inserisci i dati letti sul telefono. I campi vuoti restano non verificati.</p>
+          {% if r.test_da_fonte %}<p class="nota">Il test precedente usava i dati della fonte, non una lettura dal telefono.</p>{% endif %}
+          </details>
           <button type="submit" class="secondario">Segna test</button>
         </form>
+        {% if r.esito_test %}<p class="nota">Esito: {{ r.esito_test }}</p>{% endif %}
+        <button type="button" class="secondario" data-copia-riepilogo="Modello: {{ r.modello }}&#10;Android installato: {{ r.installato.android_version or 'non indicato' }}&#10;Build installata: {{ r.installato.build or 'non indicata' }}&#10;Ultimo test: {{ r.provato_il or 'mai' }}&#10;Esito: {{ r.esito_test or 'non indicato' }}&#10;Note: {{ r.nota or '' }}">Copia riepilogo</button>
         <p class="nota">Ultimo test: {{ r.provato_il or "mai" }}{%
           if r.senza_dati_firmware %} · nessuna fonte pubblica il firmware
           di questo modello, quindi la colonna Stato resta vuota{% endif %}</p>

@@ -1,0 +1,13 @@
+{% if risultato.firmware_confronto %}
+<details class="confronto-installato">
+  <summary>Confronta con il software installato</summary>
+  <form data-confronto-installato='{{ risultato.firmware_confronto | tojson }}'>
+    <p class="nota">Leggi versione Android e build in Impostazioni → Informazioni sul telefono. Il confronto non installa aggiornamenti.</p>
+    <label>Android installato <input name="android" inputmode="numeric" maxlength="2" placeholder="es. 15"></label>
+    <label>Build installata <input name="build" maxlength="160" placeholder="Codice completo della build"></label>
+    <label><input type="checkbox" name="variante"> Ho verificato nella fonte che modello, variante e regione corrispondono al mio telefono.</label>
+    <button type="submit" class="secondario">Confronta versioni</button>
+    <p role="status" aria-live="polite"></p>
+  </form>
+</details>
+{% endif %}

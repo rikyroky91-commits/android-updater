@@ -662,11 +662,19 @@ def pagina_parco(request: Request, test_salvato: int = Query(default=0),
         # «aggiornato», che è peggio di non rispondere.
         confronto = retest.confronta(device, riferimento) if device else None
         tested_at_iso = riferimento.get("tested_at") if riferimento else None
+        try:
+            metadati_test = json.loads((riferimento or {}).get("note") or "{}")
+        except (ValueError, TypeError):
+            metadati_test = {}
+        manuale_test = isinstance(metadati_test, dict) and metadati_test.get("origine") == "telefono"
         righe.append({
             "chiave": chiave,
             "modello": voce.get("model") or device.get("model", ""),
             "brand": voce.get("brand") or device.get("brand", ""),
             "provato_il": fmt_date(tested_at_iso) if tested_at_iso else None,
+            "installato": (riferimento or {}) if manuale_test else {},
+            "esito_test": metadati_test.get("esito", "") if manuale_test else "",
+            "test_da_fonte": bool(riferimento) and not manuale_test,
             # Chiave grezza ISO per ordinare (vedi _ordina_righe_parco):
             # `provato_il` sopra è già formattato per l'utente («12/08/2026»)
             # e in quella forma NON si ordina correttamente come stringa.
@@ -1201,7 +1209,9 @@ def _istante_test(data_test: str) -> str | None:
 
 
 @app.post("/parco/segna-test")
-def parco_segna_test(request: Request, chiave: str = Form(...), data_test: str = Form("")):
+def parco_segna_test(request: Request, chiave: str = Form(...), data_test: str = Form(""),
+                    manuale: bool = Form(False), android_installato: str = Form(""),
+                    build_installata: str = Form(""), esito_test: str = Form("")):
     """Registra quando il telefono e' stato provato e la baseline attuale.
 
     La data da sola non basta al parco: il suo scopo e' capire *cosa* e'
@@ -1228,7 +1238,20 @@ def parco_segna_test(request: Request, chiave: str = Form(...), data_test: str =
     istante = _istante_test(data_test)
     if not istante:
         return RedirectResponse("/parco?errore_test=data", status_code=303)
-    storage.set_test_baseline(dispositivo, tested_at=istante)
+    precedente = storage.get_test_baseline(chiave) or {}
+    nota_test = precedente.get("note", "")
+    if manuale:
+        if (android_installato and not re.fullmatch(r"\d{1,2}", android_installato)) or len(build_installata) > 160:
+            return JSONResponse({"errore": "Versione Android o build non valida."}, status_code=422)
+        if esito_test not in ("", "Superato", "Fallito", "Da completare"):
+            return JSONResponse({"errore": "Esito test non valido."}, status_code=422)
+        dispositivo = dict(dispositivo, android_version=android_installato or None,
+                           os_version="",
+                           build=build_installata.strip(), patch_level="")
+        # Nel campo note della baseline: incluso nei backup già esistenti.
+        # Le note libere del parco restano nella watchlist.
+        nota_test = json.dumps({"origine": "telefono", "esito": esito_test}, ensure_ascii=False)
+    storage.set_test_baseline(dispositivo, note=nota_test, tested_at=istante)
     # La data del test e' un dato inserito a mano: va nel backup subito,
     # come le correzioni TAC, per non dipendere dalla prossima scansione.
     _backup_subito()
@@ -3258,6 +3281,11 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
         # nella riga distingue esplicitamente quel caso da un OTA corrente.
         "senza_firmware": bool(identita) and not bool(pezzi),
         "tipo_versione": tipo_versione,
+        "firmware_confronto": {
+            "android": (versione_certa or {}).get("android_version") or "",
+            "build": (versione_certa or {}).get("build") or "",
+            "tipo": tipo_versione,
+        },
         "scheda": scheda,
         # 4G o 5G: due varianti dello stesso nome sono due telefoni da
         # provare separatamente (vedi `P.rete_mobile`). Si calcola qui, sul
