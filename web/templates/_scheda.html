@@ -58,7 +58,9 @@
     {% if scheda.voci %}
     <dl class="specifiche">
       {% for nome, valore in scheda.voci %}
+      {% if not solo_sintesi or not scheda.sezioni or nome == 'Schermo' %}
       <div><dt>{{ nome }}</dt><dd>{{ valore }}</dd></div>
+      {% endif %}
       {% endfor %}
     </dl>
     {% endif %}

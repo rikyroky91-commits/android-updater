@@ -294,7 +294,21 @@ a { color: inherit; }
   box-shadow: 0 1px 3px rgba(32, 30, 29, .07);
   margin-bottom: 1.8rem;
 }
-.esito.trovato { border-left-color: var(--accent); }
+.esito.trovato { border-left-color: var(--filo); }
+.esito { border-left-color: var(--filo); }
+.firmware-risultato, .firmware-in-arrivo {
+  background: #f3f7f5; border: 1px solid #d7e3dd; border-radius: 12px;
+  padding: 1rem 1.2rem; margin-bottom: 1rem;
+}
+.firmware-risultato .firmware-versione { font-size: clamp(1.1rem, 2vw, 1.4rem); font-weight: 600; line-height: 1.4; }
+.firmware-dettagli { margin: .6rem 0; line-height: 1.6; overflow-wrap: anywhere; }
+.esito .nota { font-size: .9rem; line-height: 1.55; }
+.imei-avviso { background: #fff8e9; border-left: 3px solid #a66b10; padding: .7rem 1rem; margin: 1rem 0; border-radius: 6px; }
+.imei-avviso > p { margin: 0 0 .5rem; }
+.imei-avviso summary { cursor: pointer; font-size: .9rem; }
+.esito .proposta, .esito button.secondario { border-radius: 7px; padding: .5rem .75rem; }
+.esito .azione-parco button { background: #19795f; border-color: #19795f; color: white; }
+.esito .azione-parco button:hover { background: #125d49; }
 .esito h2 { margin: 0 0 .3rem; font-size: 1.2rem; }
 .esito [data-nome-risultato] h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); line-height: 1.2; }
 .esito > .scheda { margin: 1.2rem 0; padding: 1rem 0; border: 0; }

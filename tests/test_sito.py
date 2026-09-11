@@ -1741,7 +1741,10 @@ class TestRicercaPerImei(_Sito):
         # nessuna fonte di prova conosce.
         pagina = self.client.get("/", params={"q": "998877660000000"}).text
         self.assertIn("modello sconosciuto", pagina.lower())
-        prima_del_details = pagina.split("<details")[0]
+        # L'avviso Luhn ha ora un dettaglio espandibile prima del modulo.
+        # Verifichiamo che il modulo resti fuori dai dettagli chiusi.
+        import re
+        prima_del_details = re.sub(r"<details\b.*?</details>", "", pagina, flags=re.S)
         self.assertIn('action="/tac/salva"', prima_del_details,
                       "il campo per insegnare il TAC e' ancora sepolto "
                       "dentro il riquadro del confronto")

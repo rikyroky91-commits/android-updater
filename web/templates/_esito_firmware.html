@@ -1,6 +1,14 @@
 {% if not senza_nome %}{% include "_nome_risultato.html" %}{% endif %}
+<div class="firmware-risultato">
+{% if risultato.tipo_versione in ['factory', 'support'] %}
+<p class="nota"><strong>Dato di lancio o supporto.</strong> Non conferma l'ultimo aggiornamento disponibile per questo telefono.</p>
+{% elif risultato.tipo_versione == 'reported' %}
+<p class="nota"><strong>Versione riportata dalla fonte.</strong> Disponibilità sul dispositivo da verificare.</p>
+{% endif %}
 {% if risultato.trovato and not risultato.senza_firmware %}
-  <p class="riga-esito">{{ risultato.riga }}</p>
+  {% set parti = risultato.riga.split(' · ') %}
+  <p class="riga-esito firmware-versione">{{ parti[0] }}</p>
+  {% if parti | length > 1 %}<p class="firmware-dettagli">{{ parti[1:] | join(' · ') }}</p>{% endif %}
   <p class="nota">{{ risultato.fonte }}</p>
   {% if risultato.fonte_url %}<p class="nota"><a href="{{ risultato.fonte_url }}" target="_blank" rel="noopener">Apri la fonte del firmware →</a></p>{% endif %}
 {% elif risultato.senza_firmware %}
@@ -20,3 +28,4 @@
 {% else %}
   <p>Nessun firmware per «{{ risultato.query }}»: nessuna fonte disponibile lo conosce.</p>
 {% endif %}
+</div>
