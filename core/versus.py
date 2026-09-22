@@ -129,6 +129,24 @@ _MARCHE_SCOPERTE = (
     ("honor", "Honor"),
     ("huawei", "Huawei"),
     ("nothing", "Nothing"),
+    # 22/09/2026, segnalato dall'utente: un IMEI TCL 505 riconosciuto,
+    # con patch garantite da AER, ma senza scheda tecnica. Il mirror
+    # GSMArena ha solo Apple, Google, Motorola, Nokia, OnePlus, OPPO,
+    # Samsung, Sony, vivo e Xiaomi: per ogni altra marca la scheda poteva
+    # venire solo da qui, e qui la marca non passava. versus.com ha la
+    # pagina «TCL 505» (verificata a mano). Si aggiungono le marche che il
+    # mirror non ha e che si vedono nei parchi di test europei; il filtro
+    # di `scegli_candidato` resta lo stesso, quindi allargare le marche
+    # allarga cosa si cerca, non cosa si accetta.
+    ("tcl", "TCL"),
+    ("alcatel", "Alcatel"),
+    ("zte", "ZTE"),
+    ("nubia", "Nubia"),
+    ("asus", "Asus"),
+    ("fairphone", "Fairphone"),
+    ("tecno", "Tecno"),
+    ("infinix", "Infinix"),
+    ("lenovo", "Lenovo"),
 )
 
 

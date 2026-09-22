@@ -276,6 +276,26 @@ def marca_probabile(codice: str = "", nome: str = "", aer: dict | None = None) -
         except ImportError:  # pragma: no cover - stessa difesa di specs.py
             pass
 
+    # TERZO TENTATIVO (15/09/2026, RMX3623 → realme C30). `resolve()` può
+    # restituire solo «C30», senza marca in testa: 303 dei 346 codici
+    # RMX/RMP del dataset sono così. La marca però i dataset la dichiarano
+    # accanto al codice, ed è la stessa fonte che `scan.py` usa già per il
+    # titolo «realme C30»: qui non veniva mai consultata.
+    #
+    # PASSA DA `marca_scoperta`, NON SI USA GREZZA: i dataset scrivono la
+    # marca in molti modi («小米», «LGE», «三星») e `specs.cerca` usa la
+    # marca anche come FILTRO sulle schede del catalogo. Una marca grezza
+    # che `gruppo_marca` non riconosce scarterebbe la scheda giusta di un
+    # Xiaomi che prima, con marca None, passava. Qui serve solo la marca
+    # per versus.com, quindi si tiene solo se versus la copre.
+    if not marca and codice:
+        try:
+            from core import modelcodes, versus
+            dichiarata = modelcodes.marca_dichiarata(codice)
+            marca = versus.marca_scoperta(dichiarata) if dichiarata else None
+        except ImportError:  # pragma: no cover
+            pass
+
     return marca
 
 
@@ -499,15 +519,16 @@ def scheda_tecnica(nome: str, codice: str = "", brand: str = "",
                 "Scheda tecnica completa (RAM, storage, fotocamera) non "
                 "disponibile per questo modello: il processore sopra viene "
                 "dalla tabella verificata a mano del progetto. Le schede "
-                "arrivano dal catalogo GSMArena e, per HONOR, realme, Huawei "
-                "e Nothing, da versus.com; per HONOR si prova anche la pagina "
+                "arrivano dal catalogo GSMArena e, per HONOR, realme, Huawei, "
+                "Nothing, TCL e le altre marche che il catalogo non copre, da versus.com; per HONOR si prova anche la pagina "
                 "ufficiale italiana. Un modello assente da tutte è di solito "
                 "un tablet o una variante venduta in un solo mercato."
                 if chip else
                 "Specifiche hardware non disponibili per questo modello. Le "
                 "schede arrivano dal catalogo GSMArena (Samsung, Xiaomi, OPPO, "
                 "OnePlus, vivo, Motorola, Google, Apple, Sony, Nokia), da "
-                "versus.com per HONOR, realme, Huawei e Nothing e dalla pagina "
+                "versus.com per HONOR, realme, Huawei, Nothing, TCL e le altre "
+                "marche che il catalogo non copre, e dalla pagina "
                 "HONOR Italia quando disponibile: questo modello non è in nessuna fonte."
             )
         ),

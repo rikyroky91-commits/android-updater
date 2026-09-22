@@ -468,6 +468,12 @@ a { color: inherit; }
 }
 .correzione-libera summary { cursor: pointer; color: var(--neutral); }
 .correzione-libera summary:hover { color: var(--ink); }
+/* I dettagli tecnici di un IMEI non riconosciuto: chiusi, discreti, e la
+   risposta grezza del servizio va a capo invece di sfondare la colonna. */
+.dettagli-tecnici { margin: .4rem 0 .8rem; }
+.dettagli-tecnici summary { cursor: pointer; color: var(--neutral); font-size: .9em; }
+.dettagli-tecnici summary:hover { color: var(--ink); }
+.dettagli-tecnici .dettaglio-grezzo { white-space: normal; overflow-wrap: anywhere; }
 .correzione-libera .nota { margin: .4rem 0; }
 .correzione-libera button.secondario {
   font-size: .82rem; padding: .35rem .8rem; border-width: 1px;

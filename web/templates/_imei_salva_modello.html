@@ -12,10 +12,8 @@
    gratuiti ma imei.info lo dà come Samsung A16 — cioè la risposta era a
    un clic di distanza, e il modo di riportarla dentro l'app era chiuso
    in un riquadro che nessuno apre. #}
-<p class="nota">{{ introduzione }} Vale subito per il TAC
-  <code>{{ imei.tac }}</code>, cioè per tutti gli IMEI di quel modello. Ha
-  la precedenza su ogni database scaricato: se lo hai verificato tu, hai
-  ragione tu.</p>
+<p class="nota">{{ introduzione }} Vale per tutti gli IMEI con TAC
+  <code>{{ imei.tac }}</code> e ha la precedenza sui database scaricati.</p>
 {# UN CAMPO SOLO, perché è così che arriva la risposta. Chi ha appena
    letto «SAMSUNG GALAXY A56 5G» su uno dei siti qui sopra lo seleziona e
    lo copia in un gesto; con due caselle doveva spezzarlo in testa e
@@ -49,5 +47,8 @@
 {# Il salvataggio vive nell'archivio, quindi sopravvive ai riavvii ma non
    a un archivio ricostruito da zero. La riga nel file del progetto è la
    forma definitiva: le due strade non si escludono, si completano. #}
+{# Nota da sviluppatore: la vede solo chi amministra (22/09/2026). #}
+{% if utente and utente.admin %}
 <p class="nota">Per renderlo permanente, aggiungi la riga corrispondente a
   <code>data/tac_modelli.csv</code>.</p>
+{% endif %}

@@ -50,10 +50,19 @@ try:  # dipendenze opzionali: il core resta importabile senza rete
 except ImportError:  # pragma: no cover
     requests = None
 
-try:
-    import feedparser
-except ImportError:  # pragma: no cover
-    feedparser = None
+def _feedparser():
+    """La libreria dei feed RSS, importata al primo uso (14/09/2026).
+
+    Stesso schema di `imeicheck._openpyxl()`: serve a una sola funzione,
+    `fetch_feed`, chiamata solo dalla scansione oraria e mai da una
+    richiesta web. Importarla in cima al modulo la faceva pagare a ogni
+    avvio del processo, compreso il risveglio di Render dal sonno.
+    """
+    try:
+        import feedparser
+    except ImportError:  # pragma: no cover
+        return None
+    return feedparser
 
 
 # ======================================================================
@@ -322,6 +331,7 @@ def fetch_feed(urls: list[str], timeout: int | None = None):
     solo se non c'è di meglio. Nessuna richiesta in più quando il primo
     URL sta bene, che è il caso di quasi tutte le fonti.
     """
+    feedparser = _feedparser()
     if feedparser is None:  # pragma: no cover
         return None, "la libreria 'feedparser' non è installata"
     last_error = "nessun URL candidato"

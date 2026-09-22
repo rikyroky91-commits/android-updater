@@ -235,7 +235,11 @@
   </p>
   {% endif %}
 
-  {% if not risultato.trovato and ai_attiva %}
+  {# Non per un IMEI: il tasto AI traduce NOMI scritti a modo proprio, e
+     un numero di 15 cifre non è un nome. Stesso motivo per il confronto:
+     confrontare un IMEI non riconosciuto con un altro modello non ha
+     niente da confrontare (segnalato il 22/09/2026). #}
+  {% if not risultato.trovato and ai_attiva and not imei %}
   <p class="nota">Se il nome che cerchi è scritto a modo tuo, prova il
     tasto <strong>AI</strong> accanto a «Cerca»: traduce quello che hai
     scritto in un modello che l'app conosce.</p>
@@ -244,8 +248,10 @@
   {# L'INGRESSO AL CONFRONTO. Il primo modello è già scritto — quello che
      è stato appena cercato — e manca solo il secondo: un clic in meno
      rispetto a scrivere due nomi da zero sulla pagina di confronto. #}
+  {% if not (imei and not imei.riconosciuto) %}
   <p class="nota"><a href="/confronto?a={{ risultato.query | urlencode }}">Confronta
     con un altro modello →</a></p>
+  {% endif %}
 </section>
 
 {% if verifica_ai and verifica_ai.fonti %}

@@ -20,54 +20,68 @@
   · TAC <code>{{ imei.tac }}</code></p>
 {% endif %}
 {% else %}
-<p class="etichetta-imei etichetta-imei-incerta">{% if imei.servizio_esterno_guasto %}Servizio esterno indisponibile{% elif imei.cerco_fuori %}Identificazione in corso{% else %}Modello sconosciuto{% endif %}
+<p class="etichetta-imei etichetta-imei-incerta">{% if imei.cerco_fuori %}Identificazione in corso{% else %}Modello non riconosciuto{% endif %}
   · TAC <code>{{ imei.tac }}</code></p>
-{# DUE SILENZI DIVERSI NON DEVONO SUONARE UGUALI. Un TAC che i database
-   locali non hanno viene chiesto a un servizio esterno, ma solo se una
-   chiave è configurata. Senza questa riga la pagina era IDENTICA nei due
-   casi opposti — servizio spento, e servizio acceso che risponde «non lo
-   conosco» — e il primo si risolve mettendo una chiave, il secondo no.
-   Chi amministra il sito non aveva modo di distinguerli senza entrare in
-   Diagnostica col login, e un errore di configurazione lì non si vede
-   subito: si manifesta settimane dopo, e sembra un buco dei dati. #}
-{# TERZO SILENZIO, IL PIU' DEFINITIVO: chiesto fuori, e fuori non lo
-   sanno. Prima questa pagina era identica a quella di un TAC mai
-   chiesto a nessuno, e dava l'impressione che l'app non ci avesse
-   nemmeno provato. Dirlo cambia anche cosa conviene fare dopo: non
-   ricaricare sperando in una risposta diversa, ma scrivere il modello a
-   mano qui sotto se lo si conosce. #}
-{% if imei.chiesto_invano %}
-<p class="nota">Questo TAC l'ho già chiesto anche all'archivio esterno, e
-  non lo conosce nemmeno lui: non è un'attesa ancora in corso, è la
-  risposta. Succede con i modelli molto nuovi, con le varianti destinate a
-  un solo operatore e con i telefoni non venduti in Europa. Se sai che
-  telefono è, scrivilo nel riquadro qui sotto: resta salvato e da quel
-  momento l'IMEI lo riconosce subito. Altrimenti riprovo fra un mese.</p>
-{% endif %}
+{# UNA FRASE PER CHI HA IL TELEFONO IN MANO, I DETTAGLI PER CHI AMMINISTRA.
+   Segnalato dall'utente il 22/09/2026: la pagina di un IMEI sconosciuto
+   riportava in chiaro la risposta grezza del servizio esterno («server=
+   o2switch-PowerBoost-v3 · corpo: Test de sécurité…»), i nomi delle
+   variabili d'ambiente e `/health`. Per chi fa i test è rumore: gli
+   serve sapere se il telefono è identificato, perché no in parole
+   semplici, e cosa fare adesso. La causa tecnica resta, un clic più in
+   basso, dentro «Dettagli tecnici».
 
-{# QUARTO SILENZIO, E IL PIU' FUORVIANTE: il servizio c'è ma è rotto.
-   Prima questa pagina era identica a quella di un TAC che nessuno
-   conosce, e portava alla conclusione sbagliata — «questo telefono non è
-   in nessun catalogo» — mentre il guasto sta a monte e di solito si
-   risolve in un minuto. Segnalato dall'utente il 01/09/2026. #}
+   I QUATTRO CASI RESTANO DISTINTI — sono risposte diverse e portano ad
+   azioni diverse — ma ognuno è detto con una frase sola:
+   * servizio rotto: non si sa se il telefono è raro, la verifica online
+     non ha risposto;
+   * chiesto invano: la verifica online ha risposto «non lo conosco»;
+   * servizio spento: su questo sito la verifica online non c'è;
+   * nessuno dei tre: l'archivio locale non lo ha. #}
 {% if imei.servizio_esterno_guasto %}
-<p class="nota lacuna">Il servizio esterno è configurato ma in questo
-  momento non risponde: <strong>{{ imei.servizio_esterno_guasto }}</strong>.
-  Questo «non lo so» quindi non dice che il telefono è introvabile: dice
-  che l'ultima fonte rimasta non ha parlato. Lo stato completo è in
-  Diagnostica e, senza login, su <code>/health</code>.</p>
+<p class="nota lacuna"><strong>Non riesco a riconoscere questo IMEI.</strong>
+  Il suo TAC non è nel nostro archivio e la verifica online in questo
+  momento non risponde: non vuol dire che il telefono sia introvabile,
+  solo che adesso non posso chiederlo fuori.</p>
+{% elif imei.chiesto_invano %}
+<p class="nota lacuna"><strong>Non riesco a riconoscere questo IMEI.</strong>
+  Né il nostro archivio né la verifica online conoscono questo TAC. Capita
+  con i modelli appena usciti, con le varianti di un solo operatore e con
+  i telefoni non venduti in Europa.</p>
+{% elif imei.servizio_esterno_attivo is defined and not imei.servizio_esterno_attivo %}
+<p class="nota lacuna"><strong>Non riesco a riconoscere questo IMEI.</strong>
+  Il suo TAC non è nel nostro archivio e su questo sito la verifica online
+  non è attiva.</p>
+{% elif not imei.cerco_fuori %}
+<p class="nota lacuna"><strong>Non riesco a riconoscere questo IMEI.</strong>
+  Il suo TAC non è nel nostro archivio.</p>
 {% endif %}
-{% if imei.servizio_esterno_attivo is defined and not imei.servizio_esterno_attivo %}
-<p class="nota lacuna">Su questo sito il riconoscimento tramite servizio
-  esterno non è attivo: i TAC che i database locali non hanno restano
-  sconosciuti. Chi amministra il sito può attivarlo indicando una chiave in
-  <code>TAC_API_KEY</code> — e fino a tre, in <code>TAC_API_KEY_2</code> e
-  <code>TAC_API_KEY_3</code>, provate in ordine finché una risponde.</p>
+{% if not imei.cerco_fuori %}
+<p class="nota"><strong>Cosa fare:</strong> aprilo su uno dei siti qui
+  sotto, copia marca e modello e incollali nel riquadro. Da quel momento
+  l'app riconosce tutti gli IMEI di quel modello.</p>
+{% endif %}
+{% if imei.servizio_esterno_guasto or (imei.servizio_esterno_attivo is defined and not imei.servizio_esterno_attivo) %}
+<details class="dettagli-tecnici">
+  <summary>Dettagli tecnici</summary>
+  {% if imei.servizio_esterno_guasto %}
+  <p class="nota">Risposta del servizio esterno:
+    <code class="dettaglio-grezzo">{{ imei.servizio_esterno_guasto }}</code></p>
+  <p class="nota">Lo stato completo è in Diagnostica e, senza login, su
+    <code>/health</code>. Se il guasto persiste va segnalato al fornitore
+    oppure si configura un secondo fornitore in <code>TAC_API_KEY_2</code>.</p>
+  {% else %}
+  <p class="nota">Nessuna chiave configurata. Chi amministra il sito può
+    attivare la verifica indicando una chiave in <code>TAC_API_KEY</code> — e
+    fino a tre, in <code>TAC_API_KEY_2</code> e <code>TAC_API_KEY_3</code>,
+    provate in ordine finché una risponde.</p>
+  {% endif %}
+</details>
 {% endif %}
 {% endif %}
 
 {% if imei.riconosciuto and risultato is defined and not risultato.scheda.trovata %}
-<p class="nota">Scheda tecnica non disponibile per questo modello. Il riconoscimento del TAC e la disponibilità delle specifiche sono risultati distinti.</p>
+<p class="nota">Scheda tecnica non disponibile per questo modello: il telefono è identificato, mancano solo le specifiche hardware.</p>
 {% endif %}
 
 {# TRE FORME, TRE MESSAGGI DIVERSI. Il controllo Luhn riguarda la
@@ -136,7 +150,7 @@
    chiuso dentro il `<details>` del confronto fra le fonti, che è dove
    stava e dove nessuno lo apriva. #}
 {% if not imei.riconosciuto and imei.tac %}
-{% with introduzione = "Se sai che telefono è — anche solo perché l'hai appena letto su uno di questi siti — scrivilo qui e l'app lo impara." %}
+{% with introduzione = "Hai letto marca e modello su uno di questi siti? Incollali qui." %}
 {% include "_imei_salva_modello.html" %}
 {% endwith %}
 {% endif %}

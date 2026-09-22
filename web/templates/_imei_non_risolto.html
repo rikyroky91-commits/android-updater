@@ -1,12 +1,25 @@
 <span data-identita="ignota" hidden></span>
+{# Il secondo tempo di un IMEI non riconosciuto. Arriva al posto della
+   rotellina «lo sto chiedendo a un archivio esterno», quindi deve dire
+   da solo com'è finita: la riga in cima alla pagina è stata scritta
+   PRIMA della risposta e dice ancora «Identificazione in corso».
+
+   Parole semplici, la causa tecnica no (22/09/2026): chi fa i test deve
+   sapere che il telefono non è identificato e cosa fare, non leggere la
+   risposta grezza del servizio. Quella resta in Diagnostica e su /health. #}
+<h2>TAC {{ imei.tac }}: modello non riconosciuto</h2>
 {% if imei.stato_identita == 'servizio_indisponibile' %}
-<h2>Servizio esterno indisponibile</h2>
-<p class="riga-esito">Il TAC {{ imei.tac }} non è nei cataloghi locali. La verifica esterna non è riuscita: il modello resta da identificare.</p>
+<p class="riga-esito">Non è nel nostro archivio e la verifica online in
+  questo momento non risponde: non vuol dire che il telefono sia
+  introvabile, solo che adesso non posso chiederlo fuori.</p>
 {% elif imei.chiesto_invano %}
-<h2>TAC {{ imei.tac }}: modello sconosciuto</h2>
-<p class="riga-esito">I cataloghi consultati non hanno identificato questo TAC.</p>
+<p class="riga-esito">Né il nostro archivio né la verifica online conoscono
+  questo TAC. Capita con i modelli appena usciti e con le varianti di un
+  solo operatore.</p>
 {% else %}
-<h2>TAC {{ imei.tac }}: modello sconosciuto</h2>
-<p class="riga-esito">Il TAC non è presente nei cataloghi disponibili. Non è stata ottenuta una risposta esterna utile.</p>
+<p class="riga-esito">Non è nel nostro archivio e la verifica online non ha
+  dato una risposta utile.</p>
 {% endif %}
-<p class="nota">La ricerca è terminata. Se conosci il modello, puoi correggerlo nel riquadro della pagina.</p>
+<p class="nota">Senza sapere che telefono è non posso cercarne il firmware.
+  Aprilo su uno dei siti di verifica qui sopra, incolla marca e modello nel
+  riquadro e rifai la ricerca.</p>
