@@ -70,7 +70,9 @@ def test_scheda_mancante_non_nasconde_identificazione():
 def test_guasto_non_viene_presentato_come_assenza():
     testo = templates.env.get_template('_imei_non_risolto.html').render(
         imei={'tac': '35135531', 'stato_identita': 'servizio_indisponibile'})
-    assert 'Servizio esterno indisponibile' in testo
+    assert 'modello non riconosciuto' in testo
+    assert 'non risponde' in testo
+    assert '35135531' in testo
     assert 'nessun database' not in testo.lower()
     assert 'data-identita="ignota"' in testo
 
@@ -121,3 +123,33 @@ def test_secondo_tempo_risolve_il_nome_anche_nel_registro(archivio, monkeypatch)
     monkeypatch.setattr(main, '_rendi', lambda *args, **kwargs: None)
     main.frammento_firmware(Request({'type': 'http', 'headers': []}), q='351355315430630')
     assert tac_missing.elenco() == []
+
+
+def test_imei_ignoto_niente_gergo_tecnico_in_chiaro():
+    """Segnalato il 22/09/2026: la pagina di un IMEI sconosciuto mostrava
+    in chiaro la risposta grezza dell'antibot, i nomi delle variabili
+    d'ambiente e /health. Restano consultabili, ma dentro «Dettagli
+    tecnici»; in chiaro c'è una frase semplice e cosa fare."""
+    import re
+    grezzo = ("HiCellTek: la chiamata non arriva all'API — "
+              "server=o2switch-PowerBoost-v3 · corpo: Test de sécurité")
+    testo = templates.env.get_template('_imei_identita.html').render(
+        imei={'riconosciuto': False, 'tac': '35282458',
+              'servizio_esterno_guasto': grezzo, 'siti': []},
+        utente=None)
+    in_chiaro = re.sub(r"<details\b.*?</details>", "", testo, flags=re.S)
+    assert 'Non riesco a riconoscere questo IMEI' in in_chiaro
+    assert 'Cosa fare' in in_chiaro
+    for gergo in ('o2switch', 'TAC_API_KEY', '/health', 'Test de sécurité'):
+        assert gergo not in in_chiaro, gergo
+    assert 'o2switch' in testo  # la causa non sparisce: è nei dettagli
+
+
+def test_la_riga_csv_la_vede_solo_chi_amministra():
+    imei = {'riconosciuto': False, 'tac': '35282458', 'siti': []}
+    ospite = templates.env.get_template('_imei_identita.html').render(
+        imei=imei, utente=None)
+    admin = templates.env.get_template('_imei_identita.html').render(
+        imei=imei, utente={'admin': True, 'username': 'r'})
+    assert 'data/tac_modelli.csv' not in ospite
+    assert 'data/tac_modelli.csv' in admin

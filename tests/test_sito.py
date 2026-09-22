@@ -1740,7 +1740,7 @@ class TestRicercaPerImei(_Sito):
         # ramo. La storia resta nel docstring, il test usa un TAC che
         # nessuna fonte di prova conosce.
         pagina = self.client.get("/", params={"q": "998877660000000"}).text
-        self.assertIn("modello sconosciuto", pagina.lower())
+        self.assertIn("modello non riconosciuto", pagina.lower())
         # L'avviso Luhn ha ora un dettaglio espandibile prima del modulo.
         # Verifichiamo che il modulo resti fuori dai dettagli chiusi.
         import re
@@ -1763,9 +1763,14 @@ class TestRicercaPerImei(_Sito):
         imeicheck._ricorda_esito_servizio("errore", "HTTP 401: chiave rifiutata")
         self.addCleanup(imeicheck.reset_cache)
         pagina = self.client.get("/", params={"q": "998877660000000"}).text
-        self.assertIn("Servizio esterno indisponibile", pagina)
+        self.assertIn("la verifica online in questo", pagina)
+        self.assertIn("non vuol dire che il telefono sia introvabile", pagina)
+        # 22/09/2026: la risposta grezza resta, ma dentro «Dettagli
+        # tecnici» — non in chiaro davanti a chi fa i test.
         self.assertIn("HTTP 401: chiave rifiutata", pagina)
-        self.assertIn("non dice che il telefono è introvabile", pagina)
+        import re
+        in_chiaro = re.sub(r"<details\b.*?</details>", "", pagina, flags=re.S)
+        self.assertNotIn("HTTP 401: chiave rifiutata", in_chiaro)
 
     def test_un_guasto_vecchio_non_spiega_il_silenzio_di_oggi(self):
         """La finestra di sei ore: un guasto di tre giorni fa
@@ -1782,7 +1787,7 @@ class TestRicercaPerImei(_Sito):
         imeicheck.reset_cache()
         self.addCleanup(imeicheck.reset_cache)
         pagina = self.client.get("/", params={"q": "998877660000000"}).text
-        self.assertIn("modello sconosciuto", pagina.lower())
+        self.assertIn("modello non riconosciuto", pagina.lower())
         self.assertNotIn("HTTP 401", pagina)
 
     def test_per_un_tac_noto_la_correzione_resta_dove_stava(self):
@@ -1893,7 +1898,7 @@ class TestRicercaPerImei(_Sito):
 
         self.assertFalse(imeicheck.is_valid_imei("111111111111111"))
         pagina = self.client.get("/", params={"q": "111111111111111"}).text
-        self.assertIn("modello sconosciuto", pagina.lower())
+        self.assertIn("modello non riconosciuto", pagina.lower())
         self.assertNotIn("IMEI valido", pagina)
         self.assertIn("cifra di controllo", pagina)
         self.assertIn("imei.info", pagina)
@@ -1941,7 +1946,7 @@ class TestRicercaPerImei(_Sito):
                 break
         self.assertIsNotNone(candidato, "nessun IMEI di prova costruibile")
         pagina = self.client.get("/", params={"q": candidato}).text
-        self.assertIn("modello sconosciuto", pagina.lower())
+        self.assertIn("modello non riconosciuto", pagina.lower())
         # La frase di invito e' cambiata quando il modulo e' uscito dal
         # `<details>`: quello che il test difende non e' il testo, e' che
         # una via per insegnare il TAC all'app ci sia.

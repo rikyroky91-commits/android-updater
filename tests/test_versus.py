@@ -69,6 +69,22 @@ class TestMarcaScoperta(unittest.TestCase):
                      "Nothing Phone 2", "NARZO 70 5G"):
             self.assertIsNotNone(versus.marca_scoperta(nome), nome)
 
+    def test_tcl_e_le_marche_fuori_dal_mirror_passano_di_qui(self):
+        """22/09/2026: un IMEI TCL 505 riconosciuto restava senza scheda.
+        Il mirror GSMArena non ha cartelle TCL, Alcatel, ZTE, Asus...: per
+        queste marche versus.com è l'unica fonte di specifiche."""
+        attese = {"TCL 505": "TCL", "Tcl 505": "TCL",
+                  "Alcatel 1B": "Alcatel", "ZTE Blade A75": "ZTE",
+                  "nubia Neo 2": "Nubia", "Asus Zenfone 11 Ultra": "Asus",
+                  "Fairphone 5": "Fairphone", "Tecno Spark 20": "Tecno",
+                  "Infinix Hot 40": "Infinix", "Lenovo K14": "Lenovo"}
+        for nome, marca in attese.items():
+            self.assertEqual(versus.marca_scoperta(nome), marca, nome)
+
+    def test_la_marca_va_in_testa_non_in_mezzo(self):
+        """«Galaxy A15 custodia TCL» parla di un Samsung."""
+        self.assertIsNone(versus.marca_scoperta("Galaxy A15 custodia TCL"))
+
     def test_le_marche_coperte_non_passano_di_qui(self):
         """Per Samsung, Xiaomi, Oppo e OnePlus il mirror GSMArena è una
         fonte migliore: è indicizzato per codice modello e distingue le

@@ -152,6 +152,29 @@ class TestMarcaDaiNomiVeriQuandoLAerNonBasta(unittest.TestCase):
         P.scheda_tecnica("Note Test", codice="ZZ4321", brand="")
         self.assertEqual(self.chiamate_cerca, ["Realme"])
 
+    def test_la_marca_dichiarata_dal_dataset_quando_i_nomi_tacciono(self):
+        """15/09/2026, RMX3623: `resolve()` dà solo «C30», nessuna marca
+        in testa. I dataset però la dichiarano accanto al codice
+        (`modelcodes.marca_dichiarata`): 303 codici realme su 346 erano in
+        questa situazione e restavano senza scheda e senza foto."""
+        modelcodes._memory_cache["ZZ4321"] = ["C30"]
+        vecchia = modelcodes._marca_di_codice
+        modelcodes._marca_di_codice = dict(vecchia or {}, ZZ4321="realme")
+        self.addCleanup(setattr, modelcodes, "_marca_di_codice", vecchia)
+        P.scheda_tecnica("C30", codice="ZZ4321", brand="")
+        self.assertEqual(self.chiamate_cerca, ["Realme"])
+
+    def test_una_marca_dichiarata_non_riconosciuta_non_diventa_un_filtro(self):
+        """«小米» non è una grafia che `specs.gruppo_marca` conosce: passata
+        come marca, farebbe scartare la scheda giusta di uno Xiaomi che con
+        marca None passava. Si tiene solo se versus.com la copre."""
+        modelcodes._memory_cache["ZZ4321"] = ["14 Civi"]
+        vecchia = modelcodes._marca_di_codice
+        modelcodes._marca_di_codice = dict(vecchia or {}, ZZ4321="小米")
+        self.addCleanup(setattr, modelcodes, "_marca_di_codice", vecchia)
+        P.scheda_tecnica("14 Civi", codice="ZZ4321", brand="")
+        self.assertEqual(self.chiamate_cerca, [None])
+
     def test_nessun_nome_vero_con_marca_riconosciuta_resta_none(self):
         """Nessuna voce AER e nessuno dei nomi veri porta una marca che
         versus.com copre: `marca` resta `None`, non un valore inventato."""

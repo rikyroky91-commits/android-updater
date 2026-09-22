@@ -129,6 +129,23 @@ class TestIndiceTacNonSaturaLaMemoria(unittest.TestCase):
         """)
         self.assertEqual(uscita, "False")
 
+    def test_feedparser_non_si_importa_all_avvio(self):
+        """Stesso schema di openpyxl: serve solo alla scansione oraria
+        (`sources.fetch_feed`), mai a una richiesta web."""
+        uscita = _in_un_processo_nuovo("""
+            import sys
+            from core import sources  # noqa: F401
+            print("feedparser" in sys.modules)
+        """)
+        self.assertEqual(uscita, "False")
+
+    def test_feedparser_si_carica_ancora_al_primo_uso(self):
+        from core import sources
+        libreria = sources._feedparser()
+        if libreria is None:
+            self.skipTest("feedparser non disponibile")
+        self.assertTrue(hasattr(libreria, "parse"))
+
     def test_il_foglio_di_calcolo_si_legge_ancora(self):
         """Rimandare un import non è toglierlo: il ripiego deve funzionare."""
         try:
