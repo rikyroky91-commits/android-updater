@@ -8,6 +8,9 @@ diverse produce **un solo** item e **una sola** notifica.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 import threading
 import time
 import traceback
@@ -17,6 +20,51 @@ from .util import (libera_memoria, memoria_mb, memoria_dei_cataloghi, now_iso, s
                    utcnow)
 
 _scan_lock = threading.Lock()
+_figlio_lock = threading.Lock()
+
+# Una scansione che non finisce in venti minuti è bloccata, non lenta:
+# di solito dura mezzo minuto. Il figlio si ferma, il ciclo riprova all'ora
+# successiva, e il processo web non resta ad aspettare per sempre.
+_TIMEOUT_FIGLIO_SECONDI = 20 * 60
+_RADICE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def scansione_isolata_attiva() -> bool:
+    """`SCANSIONE_ISOLATA=false` rimette la scansione nel processo web."""
+    return C.env_bool("SCANSIONE_ISOLATA", True)
+
+
+def run_scan_isolata(auto_notify: bool = True) -> dict:
+    """La scansione in un processo figlio: vedi `core/scan_isolata.py`.
+
+    Se il figlio non parte affatto (Python non trovato, fork negato) si
+    ripiega sulla scansione nel processo: una scansione che pesa è meglio
+    di nessuna scansione. Se parte e fallisce, NON si ripete qui dentro —
+    rifarla nel processo web sarebbe proprio il picco da evitare.
+    """
+    if not scansione_isolata_attiva():
+        return run_scan(auto_notify=auto_notify)
+    if not _figlio_lock.acquire(blocking=False):
+        return {"skipped": True, "reason": "scansione già in corso"}
+    try:
+        comando = [sys.executable, "-m", "core.scan_isolata"]
+        if not auto_notify:
+            comando.append("--no-notify")
+        try:
+            esito = subprocess.run(comando, cwd=_RADICE,
+                                   timeout=_TIMEOUT_FIGLIO_SECONDI, check=False)
+        except subprocess.TimeoutExpired:
+            return {"skipped": False, "isolata": True,
+                    "error": f"scansione isolata oltre {_TIMEOUT_FIGLIO_SECONDI // 60} minuti"}
+        except OSError as errore:
+            print(f"scansione isolata non avviata ({errore}): ripiego nel processo",
+                  flush=True)
+            return run_scan(auto_notify=auto_notify)
+        return {"skipped": False, "isolata": True, "returncode": esito.returncode,
+                "error": None if esito.returncode == 0 else
+                f"il processo di scansione è uscito con codice {esito.returncode}"}
+    finally:
+        _figlio_lock.release()
 
 
 # ----------------------------------------------------------------------
@@ -1202,11 +1250,14 @@ def seconds_until_next_scan() -> int:
 # ----------------------------------------------------------------------
 # Worker di background
 # ----------------------------------------------------------------------
-def _loop(stop_event: threading.Event | None = None) -> None:
+def _loop(stop_event: threading.Event | None = None,
+          dopo_scansione=None) -> None:
     while True:
         try:
             if seconds_until_next_scan() == 0:
-                run_scan(auto_notify=True)
+                run_scan_isolata(auto_notify=True)
+                if dopo_scansione is not None:
+                    dopo_scansione()
         except Exception:  # pragma: no cover
             pass
         if stop_event is not None and stop_event.wait(60):
@@ -1215,7 +1266,7 @@ def _loop(stop_event: threading.Event | None = None) -> None:
             time.sleep(60)
 
 
-def start_background_worker() -> threading.Thread:
+def start_background_worker(dopo_scansione=None) -> threading.Thread:
     """Avvia il ciclo periodico in un thread daemon.
 
     Il ciclo si sveglia ogni minuto e scansiona solo se è passato
@@ -1223,6 +1274,7 @@ def start_background_worker() -> threading.Thread:
     riavvio del processo non provoca una scansione immediata e duplicata,
     perché lo stato vive nel database e non in memoria.
     """
-    thread = threading.Thread(target=_loop, name="tracker-worker", daemon=True)
+    thread = threading.Thread(target=_loop, kwargs={"dopo_scansione": dopo_scansione},
+                              name="tracker-worker", daemon=True)
     thread.start()
     return thread

@@ -52,7 +52,7 @@ from core import aer_catalog, aiquery, allegati, appledevices, cifratura, config
 from core import extract, imeicheck, mail, modelcodes, retest, scan, soc, sources, specs
 from core import storage, suggest, versus
 from core.util import (alleggerisci_se_serve, fmt_date, libera_memoria,
-                       memoria_dei_cataloghi, memoria_mb, memoria_picco_mb,
+                       memoria_dei_cataloghi, memoria_contenitore_mb, memoria_mb, memoria_picco_mb,
                        registra_da_svuotare, stato_alleggerimento)
 
 from . import account, auth_web, presenters as P
@@ -212,7 +212,9 @@ def avvio() -> None:
     except Exception as errore:  # pragma: no cover - percorso difensivo
         STATO_AVVIO["pulizia fonti"] = f"non riuscita: {errore}"
     if C.env_bool("AVVIA_WORKER", True):
-        scan.start_background_worker()
+        # La scansione oraria gira in un processo a sé (`core/scan_isolata.py`):
+        # a fine giro le risposte ricordate descrivono l'archivio di prima.
+        scan.start_background_worker(dopo_scansione=lambda: RICERCHE.svuota())
     # Il preriscaldamento tiene insieme in RAM cataloghi enormi mentre la
     # scansione può caricarne altri: sul piano Render da 512 MB è un picco
     # evitabile. È opt-in per chi dispone di memoria sufficiente.
@@ -1486,7 +1488,7 @@ def scansione():
 
     def scansiona_e_dimentica():
         try:
-            scan.run_scan(auto_notify=True)
+            scan.run_scan_isolata(auto_notify=True)
         finally:
             # A scansione finita l'archivio è cambiato: le risposte
             # ricordate descrivono lo stato di prima. Si buttano, così
@@ -1607,7 +1609,11 @@ def health(dettaglio: str = Query(default="")):
     risposta = {"ok": True, "app": C.APP_TITLE,
                 "tac_esterno": "configurato" if imeicheck._chiave_api() else "non configurato",
                 "memoria_mb": memoria_mb(),
-                "memoria_picco_mb": memoria_picco_mb()}
+                "memoria_picco_mb": memoria_picco_mb(),
+                # Processo web + scansione isolata: è questo che Render
+                # confronta con i 512 MB (vedi `util.memoria_contenitore_mb`).
+                "memoria_contenitore_mb": memoria_contenitore_mb(),
+                "scansione_isolata": scan.scansione_isolata_attiva()}
     risposta["versione"] = C.dettagli_versione()
     # L'ALLEGGERIMENTO SI VEDE DA FUORI, e sta qui e non in `?dettaglio=1`
     # perché costa una lettura di due contatori in memoria. Zero interventi

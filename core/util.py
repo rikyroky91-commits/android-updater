@@ -203,6 +203,25 @@ def memoria_mb() -> float | None:
     return round(pagine * os.sysconf("SC_PAGE_SIZE") / (1024 * 1024), 1)
 
 
+def memoria_contenitore_mb() -> float | None:
+    """La RAM di TUTTO il contenitore, figli compresi, in MB.
+
+    `memoria_mb` misura il solo processo web. Da quando la scansione gira
+    in un processo figlio (`core/scan_isolata.py`) i due numeri divergono
+    mentre la scansione è in corso, e il limite dei 512 MB di Render si
+    applica alla somma. Si legge dal cgroup (v2, poi v1); fuori da un
+    contenitore Linux si risponde None.
+    """
+    for percorso in ("/sys/fs/cgroup/memory.current",
+                     "/sys/fs/cgroup/memory/memory.usage_in_bytes"):
+        try:
+            with open(percorso, encoding="ascii") as f:
+                return round(int(f.read().strip()) / (1024 * 1024), 1)
+        except Exception:
+            continue
+    return None
+
+
 def memoria_picco_mb() -> float | None:
     """Il massimo di RAM toccato da questo processo dall'avvio.
 
