@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block titolo %}Hardware simile{% if simili %} a {{ simili.nome }}{% endif %} · {{ titolo_sito }}{% endblock %}
+
+{#
+  TELEFONI CON HARDWARE SIMILE.
+
+  Stessa marca e stesso processore sono obbligatori; lo stesso software
+  ordina la lista (e con il filtro la restringe). La logica e le sue
+  regole stanno in `core/simili.py`: qui si mostra solo, dicendo sempre
+  DA DOVE viene ogni versione Android — archivio o lancio — perché sono
+  due dati diversi e confonderli è il difetto che il progetto evita.
+#}
+{% macro riga(v) %}
+<tr>
+  <td>
+    <a href="/?q={{ v.nome | urlencode }}">{{ v.nome }}</a>
+    {% if v.in_parco %}<span class="tag tag-accent">nel parco</span>{% endif %}
+    {% if v.in_archivio and not v.in_parco %}<span class="tag tag-outline">in archivio</span>{% endif %}
+  </td>
+  <td class="tenue">
+    {{ v.chip_comune }}
+    {% if v.solo_una_variante %}<br><span class="nota">Solo alcune varianti: {{ v.chip | replace("\n", " · ") }}. Controlla il codice del telefono.</span>{% endif %}
+  </td>
+  <td>
+    {% if v.android_archivio %}Android {{ v.android_archivio }} <span class="nota">archivio</span><br>{% endif %}
+    {% if v.android_lancio %}<span class="tenue">Android {{ v.android_lancio }} al lancio</span>{% elif not v.android_archivio %}—{% endif %}
+  </td>
+  <td>
+    {% if v.stesso_software == "archivio" %}<span class="tag tag-accent">stesso Android</span>
+    {% elif v.stesso_software == "lancio" %}<span class="tag tag-outline">stesso Android al lancio</span>
+    {% else %}<span class="tenue">—</span>{% endif %}
+  </td>
+  <td class="tenue">{{ v.anno or "—" }}</td>
+  {% if simili.loggato %}
+  <td>
+    {% if not v.in_parco and v.chiave %}
+    <form method="post" action="/parco/aggiungi">
+      <input type="hidden" name="chiave" value="{{ v.chiave }}">
+      <input type="hidden" name="brand" value="{{ v.marca_gruppo }}">
+      <input type="hidden" name="modello" value="{{ v.nome }}">
+      <input type="hidden" name="ritorno" value="/simili?q={{ query | urlencode }}{% if solo_software %}&amp;software=1{% endif %}">
+      <button type="submit" class="secondario">Aggiungi al parco</button>
+    </form>
+    {% endif %}
+  </td>
+  {% endif %}
+</tr>
+{% endmacro %}
+
+{% macro tabella(voci) %}
+<table class="tabella">
+  <thead>
+    <tr><th>Modello</th><th>Processore</th><th>Android</th><th>Software</th><th>Anno</th>
+        {% if simili.loggato %}<th></th>{% endif %}</tr>
+  </thead>
+  <tbody>
+    {% for v in voci %}{{ riga(v) }}{% endfor %}
+  </tbody>
+</table>
+{% endmacro %}
+
+{% block corpo %}
+<h3 class="occhiello">Trova un telefono con hardware simile</h3>
+
+<form class="confronto-form" method="get" action="/simili">
+  <label class="sr-only" for="simili-q">Modello</label>
+  <input id="simili-q" name="q" type="search" autocomplete="off"
+         value="{{ query }}" placeholder="Modello, codice o IMEI, es. Galaxy A55">
+  <label class="simili-filtro"><input type="checkbox" name="software" value="1"
+         {% if solo_software %}checked{% endif %}> solo con lo stesso Android</label>
+  <button type="submit">Cerca simili</button>
+</form>
+
+{% if not query %}
+<p class="vuoto">Scrivi un modello: la pagina propone telefoni della stessa
+  marca con lo stesso processore, prima quelli con lo stesso Android. Serve
+  quando il modello segnalato non è nel parco di test e ne cerchi uno che
+  riproduca lo stesso comportamento.</p>
+{% elif simili %}
+
+<section class="riquadro">
+  <p><strong><a href="/?q={{ query | urlencode }}">{{ simili.nome }}</a></strong>
+    {% if imei %}<span class="tenue">(dall'IMEI {{ imei }})</span>{% endif %}</p>
+  <div class="misure">
+    <div><span class="etichetta">Marca</span><strong>{{ simili.marca_mostrata or "—" }}</strong></div>
+    <div><span class="etichetta">Processore</span><strong>{{ simili.chip_mostrato or "non noto" }}</strong></div>
+    <div><span class="etichetta">Android in archivio</span><strong>{{ ("Android " ~ simili.android_archivio) if simili.android_archivio else "—" }}</strong></div>
+    <div><span class="etichetta">Sistema di lancio</span><strong>{{ simili.os_lancio or "—" }}</strong></div>
+  </div>
+  {% if simili.chip_chiavi and not simili.chip_certo %}
+  <p class="nota">Il processore esatto dipende dalla variante: sono proposti
+    i telefoni con <em>uno qualsiasi</em> dei chip possibili. Cerca per codice
+    modello (es. SM-S921B) per restringere a quello giusto.</p>
+  {% endif %}
+</section>
+
+{% if simili.motivo_vuoto %}
+<p class="vuoto">{{ simili.motivo_vuoto }}</p>
+{% else %}
+
+<h3 class="occhiello">Stessa marca, stesso processore
+  {% if simili.simili %}<span class="tenue">({{ simili.simili | length }}{% if simili.quanti_simili > simili.simili | length and not solo_software %} di {{ simili.quanti_simili }}{% endif %})</span>{% endif %}</h3>
+{% if simili.simili %}
+{{ tabella(simili.simili) }}
+<p class="nota">Ordine: prima lo stesso Android in archivio, poi lo stesso
+  Android di lancio; a parità, i telefoni già nel parco o in archivio e quelli
+  usciti nello stesso periodo. «Al lancio» è la versione con cui il telefono
+  è uscito, non quella che ha oggi.</p>
+{% elif simili.marca_non_coperta %}
+<p class="vuoto">Il catalogo specifiche non copre {{ simili.marca_mostrata }}: per
+  questa marca ci sono solo le poche schede curate a mano, e nessuna monta
+  lo stesso processore. È un buco di copertura, non l'assenza di telefoni
+  simili.</p>
+{% elif solo_software %}
+<p class="vuoto">Nessun telefono {{ simili.marca_mostrata }} con questo processore ha
+  anche lo stesso Android. <a href="/simili?q={{ query | urlencode }}">Togli il
+  filtro</a> per vederli tutti.</p>
+{% else %}
+<p class="vuoto">Nessun altro telefono {{ simili.marca_mostrata }} nel catalogo monta
+  questo processore.</p>
+{% endif %}
+
+{% if simili.altre_marche %}
+<details class="riquadro"{% if not simili.simili %} open{% endif %}>
+  <summary>Stesso processore, altre marche ({{ simili.altre_marche | length }}{% if simili.quante_altre > simili.altre_marche | length and not solo_software %} di {{ simili.quante_altre }}{% endif %})</summary>
+  <p class="nota">Fuori dal criterio «stessa marca»: stesso chip, ma skin,
+    driver e aggiornamenti diversi. Utili per un difetto del chip, meno per
+    uno del software.</p>
+  {{ tabella(simili.altre_marche) }}
+</details>
+{% endif %}
+{% endif %}
+
+{% else %}
+<p class="vuoto">Nessun modello trovato per «{{ query }}».</p>
+{% endif %}
+{% endblock %}

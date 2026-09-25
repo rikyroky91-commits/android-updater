@@ -1,0 +1,3543 @@
+"""Il sito: FastAPI più pagine HTML, sopra lo stesso `core` di sempre.
+
+## Cosa cambia rispetto alla versione Streamlit, e cosa no
+
+**Non cambia niente sotto.** Le fonti, i livelli di fiducia, il database,
+la logica di retest, i test: tutto identico. `core/` non importa questo
+modulo e non sa che esiste, esattamente come non sapeva di Streamlit — era
+già una scelta presa (sta scritta in `core/config.py`), e qui si incassa.
+
+**Cambia chi scrive l'HTML.** Con Streamlit il DOM lo generava lui e per
+dargli una forma bisognava indovinare dall'esterno come aveva annidato i
+suoi `div`, con che nomi, in quella versione: ogni errore non dava un
+errore, dava un pezzo di pagina rimasto indietro in silenzio. Qui l'HTML
+è nei template, il CSS è nostro, e il file consegnato dal disegno smette
+di essere un riferimento da reinterpretare e diventa il modello.
+
+## Come sono divise le cose
+
+    core/            i dati e le fonti          — non tocca il web
+    web/presenters   dati → testo leggibile     — nessuna rete, si collauda
+    web/templates    testo → HTML               — nessuna decisione
+    web/main         le rotte                   — nessuna formattazione
+
+Un template che decide quando una data si scrive «rilevato 3 giorni fa» è
+codice, solo scritto in un posto dove non si può collaudare. Per questo
+qui i template ricevono dizionari già pronti.
+
+## Il lavoro di sfondo
+
+La scansione periodica continua a girare in un thread, come prima. Su un
+host che addormenta il servizio quando nessuno lo visita, quel thread
+dorme con lui: è la stessa condizione di Streamlit Community Cloud, ed è
+il motivo per cui il salvataggio su Gist esiste già.
+"""
+from __future__ import annotations
+
+import html as _html
+import json
+import os
+import re
+import shutil
+from contextlib import asynccontextmanager
+from datetime import date, datetime, timezone
+from urllib.parse import quote
+
+from fastapi import FastAPI, File, Form, Query, Request, UploadFile
+from fastapi.responses import (HTMLResponse, JSONResponse, PlainTextResponse,
+                               RedirectResponse, Response)
+from fastapi.staticfiles import StaticFiles
+
+from core import aer_catalog, aiquery, allegati, appledevices, cifratura, config as C
+from core import extract, imeicheck, mail, modelcodes, retest, scan, soc, sources, specs
+from core import storage, suggest, versus
+from core.util import (alleggerisci_se_serve, fmt_date, libera_memoria,
+                       memoria_dei_cataloghi, memoria_contenitore_mb, memoria_mb, memoria_picco_mb,
+                       registra_da_svuotare, stato_alleggerimento)
+
+from . import account, auth_web, presenters as P
+from . import imei_status, tac_admin
+from .cache import CacheATempo
+from .contesto import RADICE, contesto as _contesto, rendi as _rendi
+
+# La memoria corta delle ricerche. Vedi `web/cache.py` per i numeri che
+# l'hanno motivata: una ricerca costa fino a tredici secondi di rete, e
+# due ricerche identiche ne costavano ventisei.
+RICERCHE = CacheATempo(C.SEARCH_CACHE_SECONDS, C.SEARCH_CACHE_MAX)
+
+# Quante righe finiscono nella tabella dei dispositivi. Il taglio vive
+# QUI e non nel template, perché è il taglio a decidere quante righe si
+# costruiscono: nel template arrivava dopo, a lavoro già fatto.
+IN_PAGINA = 200
+
+# QUANTE RIGHE DEL PARCO PER PAGINA. Chiesto dall'utente il 07/09/2026,
+# guardando una tabella diventata lunghissima: «magari potresti mettere
+# 20-30 risultati per pagina».
+#
+# Non è solo comodità di lettura. Ogni riga del parco porta con sé un
+# modulo con il calendario, un `<details>` per la nota e uno per ogni
+# allegato: su cento modelli sono centinaia di controlli in una pagina
+# sola, che il browser costruisce tutti prima di mostrarne uno.
+PARCO_PER_PAGINA = C.env_int("PARCO_PER_PAGINA", 25)
+
+@asynccontextmanager
+async def ciclo_di_vita(app: FastAPI):
+    from .memory_monitor import MemoryMonitor
+    monitor = MemoryMonitor()
+    monitor.start()
+    try:
+        avvio()
+        yield
+    finally:
+        monitor.stop()
+    # ALL'ARRESTO, NON SOLO ALL'AVVIO. Render manda un SIGTERM prima di
+    # spegnere il servizio: è la finestra in cui una nota scritta pochi
+    # secondi prima può ancora raggiungere l'archivio esterno invece di
+    # sparire con il disco effimero.
+    from core import backup
+
+    backup.ferma_salvataggio_continuo()
+
+
+app = FastAPI(title=C.APP_TITLE, docs_url=None, redoc_url=None,
+              lifespan=ciclo_di_vita)
+app.mount("/static", StaticFiles(directory=RADICE / "static"), name="static")
+app.include_router(account.router)
+app.include_router(tac_admin.router)
+
+
+# La cache delle ricerche è la prima cosa che l'alleggerimento può
+# buttare: si rifà da sola alla ricerca successiva e non contiene niente
+# che non stia già altrove. Si dichiara qui perché `core/util.py` non può
+# importare `web/` — vedi `registra_da_svuotare`.
+registra_da_svuotare("ricerche recenti", RICERCHE.svuota)
+
+
+@app.middleware("http")
+async def guarda_la_memoria(request: Request, call_next):
+    """Dopo ogni risposta, un'occhiata al contatore della memoria.
+
+    PERCHÉ QUI E NON NELLA SCANSIONE. `libera_memoria()` esisteva già ed
+    è la cura giusta, ma la chiamavano solo la scansione (ogni ora), il
+    salvataggio (ogni mezz'ora) e un tasto in Diagnostica. Fra due
+    scansioni ci stanno sessanta minuti di ricerche, e ogni ricerca è una
+    manciata di richieste HTTP con il loro transito: se il pavimento
+    arriva a 500 MB dentro quell'ora, nessuno se ne accorge finché Render
+    non uccide il contenitore. Segnalato dall'utente il 04/09/2026 con
+    423 MB usati e 457 di picco su 512.
+
+    QUANTO COSTA, nel caso normale: la lettura di `/proc/self/statm`, un
+    file piccolo che sta in memoria. Sotto soglia finisce lì. Sopra
+    soglia c'è comunque una pausa di trenta secondi fra un intervento e
+    l'altro, quindi una raffica di richieste non paga il `malloc_trim`
+    a ognuna.
+
+    Si guarda DOPO la risposta di proposito: la richiesta che scopre la
+    soglia superata non deve anche aspettare la pulizia. E si ingoia
+    qualunque errore, perché una misura che fallisce non deve mai
+    trasformare una pagina buona in un 500.
+    """
+    risposta = await call_next(request)
+    try:
+        alleggerisci_se_serve()
+    except Exception:  # pragma: no cover - la pulizia non rompe le pagine
+        pass
+    return risposta
+
+
+# ======================================================================
+# Avvio
+# ======================================================================
+STATO_AVVIO: dict = {}
+
+
+def avvio() -> None:
+    """L'ORDINE QUI DENTRO NON È INDIFFERENTE.
+
+    Il ripristino deve precedere `init_db`, che crea un database vuoto se
+    il file non c'è: a quel punto il ripristino non avverrebbe più —
+    vedrebbe un archivio «già presente» e si asterrebbe per non
+    sovrascrivere dati locali con una copia più vecchia. Ed è la stessa
+    sequenza della versione Streamlit, perché il problema è dell'archivio,
+    non dell'interfaccia.
+
+    ## Due difetti trovati qui il 2026-08-10
+
+    **Il ripristino non è mai avvenuto.** Questa funzione chiamava
+    `backup.ripristina_se_serve()`, che in `core/backup.py` NON ESISTE:
+    la funzione si chiama `ripristina()`. L'`AttributeError` finiva in un
+    `except Exception: pass` e spariva. Su un host con il disco effimero
+    l'effetto è preciso e invisibile: a ogni risveglio l'archivio
+    ripartiva vuoto, e il salvataggio su Gist — che esiste apposta per
+    questo — non veniva letto nemmeno una volta.
+
+    **Due manutenzioni giravano solo altrove.** `migra_chiavi_dispositivo`
+    e `purge_retired_sources` erano nella dashboard e nel worker, non
+    qui. È l'errore 41 del passaggio consegne — «ciò che gira in un
+    percorso d'avvio e non nell'altro vale a metà» — ripetuto sul terzo
+    percorso, che nel frattempo è diventato quello principale.
+
+    Nulla di tutto questo è più silenzioso: ogni passo lascia scritto
+    cosa ha fatto in `STATO_AVVIO`, che la Diagnostica mostra.
+    """
+    from core import backup
+
+    STATO_AVVIO.clear()
+    corrotto = storage.ripara_se_corrotto()
+    if corrotto:
+        STATO_AVVIO["archivio riparato"] = f"copia guasta messa da parte in {corrotto}"
+
+    # L'ARCHIVIO ESTERNO PER PRIMO: è la copia più recente che esista.
+    if backup.configurato():
+        try:
+            ok, nota = backup.ripristina(solo_se_mancante=True)
+            STATO_AVVIO["archivio esterno"] = nota
+        except Exception as errore:      # una fonte esterna non deve bloccare l'avvio
+            STATO_AVVIO["archivio esterno"] = f"non riuscito: {errore}"
+    else:
+        STATO_AVVIO["archivio esterno"] = "non configurato"
+
+    STATO_AVVIO["copia di partenza"] = _semina_archivio()
+
+    storage.init_db()
+    STATO_AVVIO["amministratore parco di test"] = account.assicura_admin()
+    STATO_AVVIO["salvataggio continuo"] = backup.avvia_salvataggio_continuo()
+    rimossi = storage.rebuild_if_logic_changed()
+    if rimossi:
+        STATO_AVVIO["ricostruzione"] = (
+            f"{rimossi} aggiornamenti riletti con la logica {C.DATA_LOGIC_VERSION}")
+    storage.migra_chiavi_dispositivo()
+    try:
+        storage.purge_retired_sources([s.key for s in sources.all_sources()])
+    except Exception as errore:  # pragma: no cover - percorso difensivo
+        STATO_AVVIO["pulizia fonti"] = f"non riuscita: {errore}"
+    if C.env_bool("AVVIA_WORKER", True):
+        # La scansione oraria gira in un processo a sé (`core/scan_isolata.py`):
+        # a fine giro le risposte ricordate descrivono l'archivio di prima.
+        scan.start_background_worker(dopo_scansione=lambda: RICERCHE.svuota())
+    # Il preriscaldamento tiene insieme in RAM cataloghi enormi mentre la
+    # scansione può caricarne altri: sul piano Render da 512 MB è un picco
+    # evitabile. È opt-in per chi dispone di memoria sufficiente.
+    if C.PRERISCALDA_CATALOGHI:
+        _scalda_i_cataloghi()
+
+
+def _scalda_i_cataloghi() -> None:
+    """Carica i cataloghi pesanti in sottofondo, prima che serva.
+
+    QUARANTOTTO SECONDI, misurati sul sito vero dopo un deploy: è quanto
+    ha impiegato la PRIMA visita a `/dispositivi`. Non era la pagina —
+    era il catalogo delle specifiche che si scaricava e si analizzava
+    (1,6 MB compressi, 4766 schede) mentre qualcuno aspettava, perché la
+    tabella risolve il processore di ogni riga e il processore passa di
+    lì. Chi apriva per primo pagava per tutti, e concludeva che il sito
+    era rotto.
+    """
+    import threading
+
+    def scalda():
+        # L'ordine è quello del costo: prima il più caro, che è anche
+        # quello che la tabella dei dispositivi aspetta.
+        # Il worker ha appena avviato le sue fonti: lasciargli qualche
+        # secondo evita i picchi di RAM/rete che su Render portavano al
+        # riavvio. Il sito intanto e' gia' disponibile per schede curate e
+        # TAC locali, che non aspettano questo thread.
+        import time
+        time.sleep(max(0, C.PRERISCALDA_ATTESA_SECONDI))
+        passi = (
+            ("schede tecniche", specs.carica),
+            # L'INDICE TAC MANCAVA DA QUESTO ELENCO, ed è il catalogo che
+            # la ricerca per IMEI aspetta: chi cercava quindici cifre
+            # pagava l'attesa per intero anche a preriscaldamento acceso.
+            ("indice IMEI", lambda: imeicheck.identify("000000000000000")),
+            ("codici modello", lambda: modelcodes.resolve("SM-S921B")),
+            ("processori", lambda: soc.per_modello("SM-S921B")),
+            ("catalogo aziendale", aer_catalog.carica),
+        )
+        for nome, carica in passi:
+            try:
+                carica()
+                STATO_AVVIO[f"catalogo «{nome}»"] = "pronto"
+            except Exception as errore:  # un catalogo in meno, non un guasto
+                STATO_AVVIO[f"catalogo «{nome}»"] = f"non caricato: {errore}"
+        # Scaldare un catalogo vuol dire scaricare qualche megabyte,
+        # decomprimerlo e attraversarlo: il risultato è piccolo, il
+        # passaggio no. Senza questa riga tutto quel transito resta al
+        # processo per sempre — vedi `core/util.libera_memoria`.
+        # E SI SCALDA ANCHE L'ESITO DEL SERVIZIO TAC. Non è un catalogo,
+        # è mezzo kilobyte: sta qui perché `/health` lo mostra e ha
+        # promesso di non aprire l'archivio (vedi `carica=False` là). Il
+        # posto giusto per pagare quella lettura è questo, una volta, in
+        # un thread che nessuno sta aspettando.
+        try:
+            imeicheck.ultimo_esito_servizio()
+            imeicheck.storico_servizio()
+            imeicheck.consumo_tac()
+        except Exception as errore:  # pragma: no cover - non blocca l'avvio
+            STATO_AVVIO["esito del servizio TAC"] = f"non letto: {errore}"
+        STATO_AVVIO["memoria restituita dopo il preriscaldamento"] = (
+            f"{libera_memoria()} MB")
+
+    # `daemon` perché non deve trattenere la chiusura del processo, e in
+    # un thread perché l'avvio non deve aspettarlo: se la prima visita
+    # arriva mentre sta ancora scaldando, paga come prima — ma è la
+    # prima visita dopo un deploy, non tutte.
+    threading.Thread(target=scalda, name="scalda-cataloghi", daemon=True).start()
+
+
+# La copia dell'archivio che viaggia dentro l'immagine. La aggiorna ogni
+# ora il workflow di GitHub Actions, che esegue una scansione e committa
+# `tracker.db`: al momento della build è quindi vecchia al massimo di
+# un'ora.
+COPIA_DI_PARTENZA = RADICE.parent / "tracker.db"
+
+# Sotto questa soglia un file non è un archivio popolato ma lo scheletro
+# vuoto che SQLite crea da sé.
+_ARCHIVIO_MINIMO = 64 * 1024
+
+
+def _semina_archivio() -> str:
+    """Se non c'è nessun archivio, si parte da quello del repository.
+
+    PERCHÉ SERVE. Su Render il disco è effimero e `DB_PATH` sta in
+    `/tmp`: a ogni risveglio l'applicazione ripartiva da zero
+    dispositivi, e restava così finché una scansione intera non fosse
+    finita — mezzo minuto buono — riscaricando nel frattempo una
+    ventina di megabyte di cataloghi che nel file committato ci sono
+    già. Chi apriva il sito in quella finestra vedeva un archivio vuoto
+    e concludeva che il sito era rotto.
+
+    Non è un ripiego del salvataggio su Gist, che resta la persistenza
+    vera: questo interviene solo quando quello non c'è o non ha
+    risposto, e non sovrascrive mai un archivio esistente.
+    """
+    percorso = C.DB_PATH
+    if os.path.exists(percorso) and os.path.getsize(percorso) > _ARCHIVIO_MINIMO:
+        return "non serviva: un archivio c'era già"
+    if not COPIA_DI_PARTENZA.exists():
+        return "nessuna copia nell'immagine"
+    # SI CONTROLLA PRIMA DI INSTALLARE, come fa il ripristino esterno: una
+    # copia illeggibile installata all'avvio fa fallire ogni pagina.
+    guasto = storage.integrita_file(str(COPIA_DI_PARTENZA))
+    if guasto:
+        return f"copia del repository illeggibile ({guasto}): ignorata"
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(percorso)) or ".", exist_ok=True)
+        shutil.copyfile(COPIA_DI_PARTENZA, percorso)
+    except OSError as errore:
+        return f"copia non riuscita: {errore}"
+    return (f"partito dalla copia del repository "
+            f"({os.path.getsize(percorso) // 1024} KB)")
+
+
+# ======================================================================
+# Pagine
+# ======================================================================
+@app.head("/")
+def radice_head():
+    """Un controllo di vita, non una pagina.
+
+    Ha una funzione TUTTA SUA invece di stare sulla rotta `GET`, e la
+    ragione è nel corpo che non ha: `HEAD` chiede solo se il servizio
+    risponde. Appenderlo alla rotta normale vorrebbe dire interrogare
+    l'archivio e costruire duecento righe per poi buttare via l'HTML —
+    una scansione del database ogni pochi minuti, per sempre.
+    """
+    return Response(status_code=200)
+
+
+@app.get("/", response_class=HTMLResponse)
+def pagina_ricerca(request: Request, q: str = Query(default=""),
+                    ai: str = Query(default=""),
+                    alt: list[str] = Query(default=[]),
+                    perche: str = Query(default=""),
+                    verifica_ai: str = Query(default=""),
+                    parco: int = Query(default=0),
+                    saved: int = Query(default=0),
+                    completo: int = Query(default=0)):
+    """La home, e la pagina di un modello cercato.
+
+    SENZA DOMANDA È LA SOLA BARRA DI RICERCA. Prima qui c'era anche
+    l'elenco di millecinquecento dispositivi, e le due cose si davano
+    fastidio: la ricerca — che è il motivo per cui si apre il sito —
+    stava schiacciata sopra una tabella che nessuno aveva chiesto, e la
+    tabella si faceva pagare anche da chi voleva solo digitare un
+    modello. L'elenco ora ha una pagina sua.
+
+    CON UNA DOMANDA è la pagina di quel telefono: cosa dicono le fonti
+    adesso, la scheda tecnica, gli aggiornamenti che ha ricevuto.
+    """
+    stats = storage.stats()
+    domanda = q.strip()
+    if not domanda:
+        return _rendi(request, "home.html", _contesto(
+            request, attiva="cerca", query="", stats=stats,
+            archivio_vuoto=not stats.get("devices"),
+        ))
+
+    # L'IMEI PRIMA DI TUTTO. Un numero di quattordici, quindici o sedici
+    # cifre non è né un nome né un codice modello: passarlo a
+    # `search_model` significa cercare un telefono che si chiama
+    # «867051060315467», e trovarne zero. Va prima riconosciuto, ridotto
+    # al TAC (le prime otto cifre) e tradotto in un modello; solo allora
+    # si cerca il firmware.
+    imei = None
+    if imeicheck.is_imei_like(domanda):
+        imei = (_esito_imei_salvato(domanda) if saved
+                else _esito_imei(domanda, solo_locale=_in_due_tempi(completo)))
+        if imei["modello_cercato"]:
+            # Un IMEI ha già risolto un'identità precisa dal TAC. La ricerca
+            # firmware è informazione aggiuntiva e non può rinominare il
+            # telefono con un alias regionale o con una voce errata di una
+            # fonte news. Dopo un salvataggio manuale non la avviamo proprio:
+            # la conferma deve tornare subito, senza aspettare la rete.
+            risultato = (_esito_solo_identita(imei["modello_cercato"])
+                         if saved
+                         else _esito_ricerca(imei["modello_cercato"],
+                                             senza_rete=_in_due_tempi(completo)))
+            risultato = _ancora_esito_imei(risultato, imei)
+            imei = _identita_da_mostrare(imei, risultato.get("nome") or "")
+        else:
+            risultato = _esito_vuoto(domanda)
+            # Il TAC non è nei database locali e il servizio esterno è
+            # configurato: la pagina esce subito dicendo che la ricerca
+            # continua fuori, invece di far aspettare in silenzio.
+            if imei.get("cerco_fuori"):
+                risultato["firmware_in_arrivo"] = True
+    else:
+        risultato = _esito_ricerca(domanda, senza_rete=_in_due_tempi(completo))
+
+    if imei:
+        imei_status.annota(imei, conteggia=not saved and not completo)
+
+    # IL SECONDO TEMPO DEVE RICHIEDERE LA DOMANDA ORIGINALE, non
+    # `risultato.query`. Per un IMEI quei due campi sono cose diverse:
+    # `query` è il modello GIÀ risolto dal TAC, e rimandarlo indietro da
+    # solo perde l'ancoraggio all'IMEI. Segnalato dall'utente il
+    # 17/08/2026 con l'IMEI 861206074094914: il TAC risponde «Note 50»,
+    # che cercato per nome — senza sapere che veniva da quell'IMEI —
+    # risolve su «realme C60», un altro telefono. La pagina finiva per
+    # mostrare la scheda tecnica sbagliata dopo il secondo caricamento.
+    if risultato.get("firmware_in_arrivo"):
+        risultato["domanda_originale"] = domanda
+
+    verifica = None
+    if verifica_ai == "1" and aiquery.fornitore() and aiquery.fornitore()[0] == "Gemini":
+        contesto = " · ".join(x for x in (
+            risultato.get("riga"), risultato.get("fonte"),
+            (risultato.get("scheda") or {}).get("fonte"),
+        ) if x)
+        verifica = aiquery.verifica(risultato.get("nome") or domanda, contesto)
+
+    return _rendi(request, "ricerca.html", _contesto(
+        request, attiva="cerca", query=q, stats=stats,
+        risultato=risultato, imei=imei, verifica_ai=verifica,
+        aggiunto_al_parco=bool(parco),
+        # L'INTERPRETAZIONE SI DICHIARA. Se l'AI ha tradotto «quel samsung
+        # nero» in «Galaxy A56 5G», chi guarda deve vedere che cosa è
+        # stato cercato al posto suo — altrimenti la pagina risponde a una
+        # domanda che non ricorda di aver fatto.
+        # Due sorgenti, uno striscione solo. `ai=` nell'indirizzo resta
+        # per i link «Oppure:» qui sotto, che ricercano un'alternativa
+        # dichiarando da dove veniva; `ai_da` lo mette invece il soccorso
+        # automatico del server (`_soccorso_ai`), che nessuno ha
+        # premuto. Per chi guarda e' la stessa informazione — «hai
+        # scritto X, ho cercato Y» — e va detta allo stesso modo.
+        interpretato_da=ai.strip() or risultato.get("ai_da", ""),
+        interpretato_perche=perche.strip() or risultato.get("ai_perche", ""),
+        alternative=[a for a in alt if a and a != q][:3],
+    ))
+
+
+@app.get("/ricerca/firmware", response_class=HTMLResponse)
+def frammento_firmware(request: Request, q: str = Query(default="")):
+    """Il secondo tempo della ricerca: solo le righe del firmware.
+
+    Restituisce un pezzo di HTML, non una pagina: lo va a prendere la
+    pagina già aperta e lo mette al posto della rotellina. È la STESSA
+    `_esito_ricerca` di sempre — stessa cache, stesse fonti — perché due
+    strade diverse per la stessa domanda finirebbero prima o poi per
+    rispondere due cose diverse sullo stesso telefono.
+
+    Il risultato completo entra in cache: chi ricarica la pagina la vede
+    già intera, senza rotellina e senza rifare la ricerca.
+    """
+    domanda = (q or "").strip()
+    if not domanda:
+        return HTMLResponse("")
+    if imeicheck.is_imei_like(domanda):
+        imei = _esito_imei(domanda)
+        if not imei.get("modello_cercato"):
+            imei_status.annota(imei, conteggia=False)
+            # NIENTE IDENTITA' NEMMENO DOPO AVER CHIESTO FUORI.
+            #
+            # Qui il frammento non puo' essere quello generico: la pagina
+            # che lo aspetta ha una rotellina che dice «lo sto chiedendo a
+            # un archivio esterno», e la sua istruzione e' di ricaricare
+            # appena il modello arriva. Se non arriva, ricaricare rimette
+            # in piedi la stessa pagina con la stessa rotellina — un ciclo
+            # che non finisce e che a ogni giro spende un'interrogazione
+            # del piano gratuito. Il marcatore `data-identita="ignota"`
+            # e' il segnale che ferma quella ricarica; il testo e' la
+            # risposta onesta al posto dell'attesa.
+            return _rendi(request, "_imei_non_risolto.html", {"imei": imei})
+        risultato = _ancora_esito_imei(_esito_ricerca(imei["modello_cercato"]), imei)
+        imei = _identita_da_mostrare(imei, risultato.get("nome") or "")
+        imei_status.annota(imei, conteggia=False)
+    else:
+        risultato = _esito_ricerca(domanda)
+    return _rendi(request, "_esito_firmware.html", {"risultato": risultato})
+
+
+@app.get("/confronto", response_class=HTMLResponse)
+def pagina_confronto(request: Request, a: str = Query(default=""),
+                     b: str = Query(default="")):
+    """Due modelli, fianco a fianco.
+
+    NASCE DA UN BUG, non da un capriccio estetico. La domanda "questi due
+    nomi sono davvero lo stesso telefono, o due telefoni diversi che si
+    somigliano nel nome" è esattamente quella dietro il bug «realme c63
+    rispondeva C61» (vedi FONTI.md): lì la confusione veniva dal codice,
+    qui la si dà in mano a chi guarda, con un modello alla volta messo
+    accanto all'altro invece che indovinato dal sistema.
+
+    Riusa `_esito_ricerca` — la STESSA funzione, la STESSA cache, la
+    STESSA ricerca di sempre, chiamata due volte. Nessuna scorciatoia
+    parallela che potrebbe rispondere diversamente da una ricerca singola:
+    se «RMX3939» risponde una cosa cercato da solo, risponde la stessa
+    cosa anche qui.
+    """
+    confronto = _confronta(a.strip(), b.strip())
+    return _rendi(request, "confronto.html", _contesto(
+        request, attiva="cerca", query_a=a, query_b=b, confronto=confronto,
+    ))
+
+
+@app.get("/simili", response_class=HTMLResponse)
+def pagina_simili(request: Request, q: str = Query(default=""),
+                  software: int = Query(default=0)):
+    """Telefoni con hardware simile: stessa marca, stesso processore.
+
+    Riusa `_esito_ricerca` come il confronto, e per la stessa ragione:
+    il telefono di partenza deve essere ESATTAMENTE quello che la ricerca
+    ha appena mostrato, non una seconda risoluzione del nome che potrebbe
+    finire su un altro modello. `senza_rete=True`: serve identità e
+    scheda, non il firmware — e se la ricerca completa è ancora nella
+    memoria corta, torna quella.
+    """
+    query, imei = _modello_da_imei((q or "").strip())
+    esito = _esito_ricerca(query, senza_rete=True) if query else None
+    simili_esito = _simili_di(request, esito, bool(software)) if esito else None
+    return _rendi(request, "simili.html", _contesto(
+        request, attiva="cerca", query=q, imei=imei, esito=esito,
+        simili=simili_esito, solo_software=bool(software),
+    ))
+
+
+def _android_intero(valore) -> int | None:
+    try:
+        return int(str(valore).strip().split(".")[0])
+    except (TypeError, ValueError):
+        return None
+
+
+def _simili_di(request: Request, esito: dict, solo_stesso_software: bool) -> dict:
+    """Prepara `core.simili.trova` a partire da un risultato di ricerca."""
+    from core import simili
+
+    scheda = esito.get("scheda") or {}
+    voci = dict(scheda.get("voci") or [])
+    nome = esito.get("nome") or scheda.get("titolo") or esito.get("query") or ""
+    marca_gruppo = esito.get("brand") or scheda.get("marca") or ""
+
+    archivio = {d["device_key"]: d for d in storage.get_devices()
+                if d.get("device_key")}
+    chiave_rif = esito.get("chiave") or esito.get("chiave_parco") or ""
+
+    # IL SOFTWARE DI PARTENZA, con la sua provenienza. Un Android appena
+    # verificato dalla ricerca completa vale più dell'archivio; l'Android
+    # di lancio si tiene a parte e si confronta solo con altri Android di
+    # lancio (vedi `core/simili.py`).
+    android_archivio = None
+    fw = esito.get("firmware_confronto") or {}
+    if fw.get("tipo") == C.FW_CURRENT:
+        android_archivio = _android_intero(fw.get("android"))
+    if android_archivio is None and chiave_rif in archivio:
+        android_archivio = _android_intero(archivio[chiave_rif].get("android_version"))
+    os_lancio = voci.get("Sistema di lancio")
+
+    # IL PARCO SI MOSTRA SOLO A CHI PUÒ VEDERLO: è l'unica parte del sito
+    # dietro login, e questa pagina no.
+    loggato = bool(auth_web.utente_da_richiesta(request))
+    esito_simili = simili.trova(
+        nome=nome, chip=scheda.get("cpu"), marca=marca_gruppo,
+        android_archivio=android_archivio,
+        android_lancio=simili.android_di_lancio(os_lancio),
+        rilascio=scheda.get("rilascio"),
+        archivio=archivio, chiave_di=extract.device_key,
+        in_parco=storage.watched_keys() if loggato else set(),
+    )
+    if solo_stesso_software:
+        esito_simili["simili"] = [v for v in esito_simili["simili"] if v["stesso_software"]]
+        esito_simili["altre_marche"] = [v for v in esito_simili["altre_marche"]
+                                        if v["stesso_software"]]
+    esito_simili.update({
+        "nome": nome,
+        "chip_mostrato": scheda.get("cpu"),
+        "android_archivio": android_archivio,
+        "os_lancio": os_lancio,
+        "loggato": loggato,
+    })
+    return esito_simili
+
+
+@app.get("/dispositivi", response_class=HTMLResponse)
+def pagina_dispositivi(request: Request,
+                       filtro: str = Query(default=""),
+                       brand: str = Query(default=""),
+                       parco: int = Query(default=0),
+                       scansione: str = Query(default="")):
+    """L'archivio: una riga per telefono, senza interrogare nessuna fonte.
+
+    Il campo `filtro` NON si chiama `q` di proposito. `q` è la ricerca —
+    quella che esce in rete e può metterci qualche secondo — e questa
+    pagina non la fa: qui si filtra soltanto ciò che è già in archivio.
+    Due cose diverse con lo stesso nome finiscono per essere scambiate,
+    e la prima volta che succede è nel collegamento di qualcun altro.
+
+    Dietro login dal 16/08/2026 insieme al Catalogo: e' l'ARCHIVIO, e chi
+    arriva senza account cerca le novita' o un modello preciso, non
+    millecinquecento righe da sfogliare.
+    """
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
+    marche = [brand] if brand else None
+    devices = storage.get_devices(brands=marche, search=filtro or None)
+    if parco:
+        devices = [d for d in devices if d.get("watched")]
+
+    # SI COSTRUISCONO SOLO LE RIGHE CHE FINISCONO IN PAGINA.
+    #
+    # La tabella ne mostra duecento da sempre, ma il taglio stava nel
+    # template: le righe si costruivano tutte e millecinquecento, e
+    # milletrecento venivano buttate dopo essere state calcolate. Non era
+    # lavoro gratis — ogni riga risolve il processore, che è la parte
+    # cara: 50 ms contro 5 ms, misurati su questo archivio, su una
+    # macchina molto più veloce di quella che serve il sito.
+    righe = [P.riga_dispositivo(d) for d in devices[:IN_PAGINA]]
+    stats = storage.stats()
+
+    return _rendi(request, "dispositivi.html", _contesto(
+        request, attiva="dispositivi", filtro=filtro, brand=brand, parco=parco,
+        righe=righe, marche=sorted({d["brand"] for d in devices if d.get("brand")}),
+        totale=len(devices), in_pagina=IN_PAGINA, stats=stats,
+        scansione_avviata=(scansione == "avviata"),
+        archivio_vuoto=not stats.get("devices"),
+    ))
+
+
+@app.get("/novita", response_class=HTMLResponse)
+def pagina_novita(request: Request, giorni: int = Query(default=30),
+                  marca: str = Query(default="")):
+    """Le ultime notizie sugli aggiornamenti, in forma di feed.
+
+    SOSTITUISCE «Dispositivi» E «Aggiornamenti». Erano due tabelle: una
+    elencava 1500 telefoni, l'altra 300 righe su sette colonne. Nessuna
+    delle due rispondeva alla domanda con cui si apre questa pagina —
+    «cosa è successo, e mi riguarda?» — perché per rispondere serve il
+    TESTO della notizia, e in una griglia non ci stava.
+
+    L'elenco completo dei dispositivi non è sparito: è finito in
+    «Catalogo», che è il posto dove si va quando si vuole guardare
+    l'archivio invece delle novità.
+    """
+    voci = storage.get_updates(only_relevant=True, since_days=giorni, limit=300)
+    # Le marche si ricavano da ciò che c'è DAVVERO in questo intervallo,
+    # non da un elenco fisso: un filtro che porta a zero risultati è
+    # peggio di un filtro assente.
+    marche = sorted({v.get("brand") for v in voci if v.get("brand")})
+    if marca:
+        voci = [v for v in voci if v.get("brand") == marca]
+    return _rendi(request, "novita.html", _contesto(
+        request, attiva="novita", giorni=giorni, marca=marca, marche=marche,
+        voci=[P.voce_feed(v) for v in voci],
+    ))
+
+
+@app.get("/aggiornamenti")
+def aggiornamenti_spostati(giorni: int = Query(default=30)):
+    """Il vecchio indirizzo continua a funzionare: era nella navigazione
+    per mesi, e i segnalibri di chi lo usava non devono rompersi."""
+    return RedirectResponse(f"/novita?giorni={giorni}", status_code=301)
+
+
+def _accesso_parco_richiesto(request: Request):
+    """Il parco di test è l'unica parte del sito dietro login (richiesta
+    dell'utente): chi non ha una sessione valida e approvata torna al
+    modulo di accesso invece di vedere la pagina. Vedi `web/account.py`
+    per registrazione e approvazione degli account."""
+    utente = auth_web.utente_da_richiesta(request)
+    if not utente:
+        return None, RedirectResponse("/login?next=/parco", status_code=303)
+    return utente, None
+
+
+ORDINAMENTI_PARCO = {
+    # etichetta mostrata nel <select> del template, vedi _ordina_righe_parco
+    "meno_recente": "Test meno recente prima",
+    "piu_recente": "Test più recente prima",
+}
+
+
+def _ordina_righe_parco(righe: list[dict], ordina: str) -> list[dict]:
+    """Riordina le righe del parco per quando sono state provate l'ultima
+    volta, invece del solo ordine marca/modello di `get_watchlist`.
+
+    I MAI TESTATI non hanno una data con cui confrontarsi: infilarli in
+    mezzo agli altri per confronto di stringhe (una stringa vuota è
+    "minore" di qualunque data) li farebbe sembrare i più vecchi in un
+    ordinamento e sparire in fondo nell'altro, per un effetto collaterale
+    dell'ordinamento invece che per una scelta. Restano un gruppo a
+    parte: in cima quando si cerca cosa manca da testare (sono la cosa
+    più urgente), in fondo quando si cerca cosa ritestare per primo fra
+    ciò che è STATO testato.
+    """
+    testati = [r for r in righe if r["tested_at_iso"]]
+    mai_testati = [r for r in righe if not r["tested_at_iso"]]
+    if ordina == "piu_recente":
+        return sorted(testati, key=lambda r: r["tested_at_iso"], reverse=True) + mai_testati
+    if ordina == "meno_recente":
+        return mai_testati + sorted(testati, key=lambda r: r["tested_at_iso"])
+    return righe
+
+
+@app.get("/parco", response_class=HTMLResponse)
+def pagina_parco(request: Request, test_salvato: int = Query(default=0),
+                 errore_test: str = Query(default=""), q: str = Query(default=""),
+                 ordina: str = Query(default=""), nota_salvata: int = Query(default=0),
+                 allegato_salvato: int = Query(default=0),
+                 allegato_tolto: int = Query(default=0),
+                 errore_allegato: str = Query(default=""),
+                 pagina: int = Query(default=1)):
+    utente, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
+    parco = storage.get_watchlist()
+    baseline = storage.get_test_baselines()
+    devices = {d["device_key"]: d for d in storage.get_devices()}
+    # Una query sola per TUTTI gli allegati, non una per riga: il parco
+    # disegna molte righe e una query dentro il ciclo è il solito
+    # moltiplicatore che non si vede finché le righe sono tre.
+    allegati_per_device = storage.get_allegati_per_device()
+
+    righe = []
+    for voce in parco:
+        chiave = voce["device_key"]
+        device = devices.get(chiave, {})
+        riferimento = baseline.get(chiave)
+        # L'ORDINE DEGLI ARGOMENTI CONTA: prima lo stato ATTUALE, poi la
+        # fotografia di riferimento. Invertirli non dà errore, dà un
+        # confronto capovolto — «tornato indietro» al posto di
+        # «aggiornato», che è peggio di non rispondere.
+        confronto = retest.confronta(device, riferimento) if device else None
+        tested_at_iso = riferimento.get("tested_at") if riferimento else None
+        try:
+            metadati_test = json.loads((riferimento or {}).get("note") or "{}")
+        except (ValueError, TypeError):
+            metadati_test = {}
+        manuale_test = isinstance(metadati_test, dict) and metadati_test.get("origine") == "telefono"
+        righe.append({
+            "chiave": chiave,
+            "modello": voce.get("model") or device.get("model", ""),
+            "brand": voce.get("brand") or device.get("brand", ""),
+            "provato_il": fmt_date(tested_at_iso) if tested_at_iso else None,
+            "installato": (riferimento or {}) if manuale_test else {},
+            "esito_test": metadati_test.get("esito", "") if manuale_test else "",
+            "test_da_fonte": bool(riferimento) and not manuale_test,
+            # Chiave grezza ISO per ordinare (vedi _ordina_righe_parco):
+            # `provato_il` sopra è già formattato per l'utente («12/08/2026»)
+            # e in quella forma NON si ordina correttamente come stringa.
+            "tested_at_iso": tested_at_iso,
+            # Il controllo nativo ``date`` vuole YYYY-MM-DD; la baseline
+            # conserva invece un istante ISO completo. Tenerli distinti
+            # rende modificabile la data senza esporre un orario inutile.
+            "data_test": (tested_at_iso[:10] if tested_at_iso else date.today().isoformat()),
+            # LA DATA E' TUA, LA FOTOGRAFIA E' UN DI PIU'.
+            #
+            # Segnalato dall'utente il 07/09/2026 guardando la pagina:
+            # «dopo un certo numero di test scompare "Segna test" con il
+            # calendario». Non era una questione di numero — spariva sulle
+            # righe che dicono «Dati firmware non disponibili», cioè sui
+            # modelli che nessuna fonte pubblica.
+            #
+            # Il ragionamento di prima: «Segna test» salva la data INSIEME
+            # alla versione/build/patch del momento, e senza dati firmware
+            # non c'è niente da fotografare — quindi niente pulsante. Ma
+            # mette il secondo scopo davanti al primo: la data del test è
+            # un dato di chi il telefono l'ha provato, e non dipende da
+            # cosa pubblica il produttore. Un parco di test che rifiuta di
+            # registrare una prova perché una fonte tace serve a meta'.
+            #
+            # Ora la data si registra sempre. La fotografia si salva se
+            # c'è (`test_baseline` ha tutti i campi tranne `tested_at`
+            # opzionali), e la colonna Stato resta «—», che è la verità:
+            # non c'è niente da confrontare.
+            "puo_segnare_test": True,
+            "senza_dati_firmware": not device,
+            "confronto": confronto,
+            # La nota vive nella colonna `note` di `watchlist`, che
+            # esisteva da sempre ma non era mostrata da nessuna pagina.
+            "nota": voce.get("note") or "",
+            "nota_html": P.nota_con_link(voce.get("note")),
+            "allegati": allegati_per_device.get(chiave, []),
+            "puo_allegare": (len(allegati_per_device.get(chiave, []))
+                             < C.ALLEGATI_MAX_PER_MODELLO),
+        })
+
+    totale_parco = len(righe)
+    # FILTRO IN PYTHON, NON IN SQL. Il parco è la lista di modelli che
+    # QUALCUNO ha scelto di seguire, non l'intero catalogo (che può
+    # avere migliaia di righe): resta piccolo per costruzione, quindi
+    # filtrarlo dopo averlo già caricato non pesa né in tempo né in
+    # memoria, ed evita una seconda query per un caso che non lo
+    # giustifica. Stessa tokenizzazione della ricerca dispositivi
+    # (`storage.parole_di_ricerca`), per coerenza con il resto del sito.
+    parole = storage.parole_di_ricerca(q)
+    if parole:
+        righe = [r for r in righe
+                if all(p in f"{r['brand']} {r['modello']}".lower() for p in parole)]
+
+    righe = _ordina_righe_parco(righe, ordina)
+
+    # L'IMPAGINAZIONE VIENE DOPO IL FILTRO E DOPO L'ORDINAMENTO, e
+    # l'ordine conta: impaginare prima vorrebbe dire ordinare una fetta
+    # invece dell'insieme, cioè mostrare «i primi 25 per data» scegliendoli
+    # fra 25 qualunque.
+    trovate = len(righe)
+    pagine = max(1, (trovate + PARCO_PER_PAGINA - 1) // PARCO_PER_PAGINA)
+    # Una pagina fuori intervallo si riporta dentro invece di dare una
+    # tabella vuota: succede tornando indietro dopo aver tolto un modello.
+    pagina = min(max(1, pagina), pagine)
+    inizio = (pagina - 1) * PARCO_PER_PAGINA
+    righe = righe[inizio:inizio + PARCO_PER_PAGINA]
+
+    messaggi_errore = {
+        "data": "Inserisci una data valida per il test.",
+        "dispositivo": "Questo modello non ha ancora dati firmware da salvare come riferimento.",
+        "parco": "Il modello non risulta piu nel parco di test.",
+        "troppi_allegati": (f"Questo modello ha già {C.ALLEGATI_MAX_PER_MODELLO} allegati: "
+                            "togline uno prima di aggiungerne un altro."),
+    }
+    return _rendi(request, "parco.html", _contesto(
+        request, attiva="parco", righe=righe,
+        totale_parco=totale_parco, q=q, ordina=ordina,
+        pagina=pagina, pagine=pagine, trovate=trovate,
+        primo=inizio + 1 if trovate else 0,
+        ultimo=min(inizio + PARCO_PER_PAGINA, trovate),
+        ordinamenti=ORDINAMENTI_PARCO,
+        test_salvato=bool(test_salvato),
+        errore_test=messaggi_errore.get(errore_test, ""),
+        nota_salvata=bool(nota_salvata),
+        allegato_salvato=bool(allegato_salvato),
+        allegato_tolto=bool(allegato_tolto),
+        # Il motivo del rifiuto arriva già scritto per esteso da
+        # `core/allegati.controlla`, non come codice da tradurre qui:
+        # dice il peso vero e il limite, che è quello che serve sapere.
+        errore_allegato=errore_allegato,
+        allegati_attivi=allegati.configurato(),
+    ))
+
+
+def _accesso_catalogo_richiesto(request: Request):
+    """Catalogo e Diagnostica sono una pagina sola e stanno dietro login
+    (richiesta dell'utente il 16/08/2026).
+
+    Non e' solo una scelta di ordine: quella pagina dice quali fonti
+    stanno fallendo, come e' configurato il salvataggio esterno e quanti
+    record ci sono. Sono informazioni su COME e' fatto il servizio, utili
+    a chi lo amministra e a nessun altro.
+
+    E le due azioni di backup che vivono li' — creare l'archivio da un
+    token GitHub incollato nel modulo, forzare un salvataggio — erano
+    raggiungibili DA CHIUNQUE. Non era mai stato notato perche' la pagina
+    che le contiene sembrava di servizio, ma una POST non ha bisogno
+    della pagina per essere chiamata.
+    """
+    utente = auth_web.utente_da_richiesta(request)
+    if not utente:
+        return None, RedirectResponse("/login?next=/catalogo", status_code=303)
+    return utente, None
+
+
+@app.get("/catalogo", response_class=HTMLResponse)
+def pagina_catalogo(request: Request):
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
+    return _pagina_diagnostica(request)
+
+
+@app.get("/dispositivi-elenco", response_class=HTMLResponse)
+def pagina_marche(request: Request):
+    """La copertura per marca, che era la vecchia pagina «Catalogo»."""
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
+    devices = storage.get_devices()
+    per_marca: dict[str, int] = {}
+    for d in devices:
+        if d.get("brand"):
+            per_marca[d["brand"]] = per_marca.get(d["brand"], 0) + 1
+    righe = [{"marca": marca, "modelli": quanti,
+              "nota": sources.nota_copertura(marca) or ""}
+             for marca, quanti in sorted(per_marca.items(),
+                                         key=lambda kv: -kv[1])]
+    return _rendi(request, "catalogo.html", _contesto(
+        request, attiva="catalogo", righe=righe,
+    ))
+
+
+@app.post("/catalogo/email/prova", response_class=HTMLResponse)
+def prova_invio_email(request: Request):
+    """Manda un'email di prova e MOSTRA l'errore vero.
+
+    PERCHE' SERVE. Il recupero password ignora di proposito l'esito
+    dell'invio: dire «fallito» per un indirizzo e «fatto» per un altro
+    rivelerebbe quali indirizzi hanno un account. Ma cosi' un errore
+    vero — la password per le app sbagliata, Gmail che rifiuta — non lo
+    vedeva nessuno, e da fuori restava solo «non arriva la mail».
+
+    Qui non c'e' niente da proteggere: chi preme questo tasto e' gia'
+    collegato, e il destinatario e' l'indirizzo dell'amministratore, non
+    quello di un utente. L'errore si puo' mostrare per intero.
+    """
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
+    ok, messaggio = mail.invia(
+        C.ADMIN_APPROVAL_EMAIL,
+        "Prova di invio — Mobile Update Tracker",
+        "Se stai leggendo questo messaggio, l'invio delle email funziona. "
+        "L'ha chiesto qualcuno dalla pagina Catalogo del sito.",
+    )
+    return _pagina_diagnostica(request, prova_email={
+        "fatta": True, "ok": ok,
+        "messaggio": messaggio or f"inviata a {C.ADMIN_APPROVAL_EMAIL}",
+    })
+
+
+@app.get("/diagnostica")
+def diagnostica_spostata():
+    """Catalogo e Diagnostica sono la stessa pagina da oggi. Il vecchio
+    indirizzo resta valido: era in navigazione da mesi."""
+    return RedirectResponse("/catalogo", status_code=301)
+
+
+def _riga_memoria() -> str:
+    """«148,2 MB adesso · 210,4 MB di picco · limite del piano 512 MB»."""
+    adesso = memoria_mb()
+    picco = memoria_picco_mb()
+    if adesso is None:
+        return "non misurabile su questo sistema"
+    pezzi = [f"{adesso} MB adesso"]
+    if picco is not None:
+        pezzi.append(f"{picco} MB di picco dall'avvio")
+    # Il limite non si legge da nessuna parte dentro il contenitore: è una
+    # proprietà del piano, quindi si dichiara qui e si dice che è
+    # dichiarato, invece di far credere che sia misurato.
+    pezzi.append("il piano gratuito di Render ne concede 512")
+    # E QUANTE VOLTE È GIÀ SERVITO INTERVENIRE. Un alleggerimento che non
+    # scatta mai e uno che scatta ogni due minuti sono due diagnosi
+    # diverse: il primo dice che la soglia è larga, il secondo che il
+    # processo è al limite e sta solo galleggiando.
+    stato = stato_alleggerimento()
+    if stato["quanti"]:
+        pezzi.append(f"alleggerito {stato['quanti']} volte sopra i "
+                     f"{stato['soglia_mb']:g} MB, restituiti in tutto "
+                     f"{stato['restituiti_mb']} MB (ultimo: {stato['ultimo']})")
+    else:
+        pezzi.append(f"mai stato sopra i {stato['soglia_mb']:g} MB, "
+                     f"la soglia oltre cui si alleggerisce da solo")
+    return " · ".join(pezzi)
+
+
+def _riga_tac_inseriti() -> str:
+    """«3 inseriti, 1 già nel repository · esportali da /tac/esporta»."""
+    inseriti = imeicheck.tac_inseriti()
+    if not inseriti:
+        return ("nessuno — si aggiungono dalla pagina di un IMEI che l'app "
+                "non riconosce, e valgono per tutti gli IMEI di quel modello")
+    gia_salvi = len(imeicheck.tac_inseriti_gia_curati())
+    pezzi = [f"{len(inseriti)} inseriti"]
+    # DA SALVARE e GIÀ SALVI non devono leggersi uguali: i primi vivono
+    # solo in `tracker.db`, che su Render sta in `/tmp`.
+    if gia_salvi:
+        pezzi.append(f"{gia_salvi} già in data/tac_modelli.csv")
+    da_salvare = len(inseriti) - gia_salvi
+    if da_salvare:
+        pezzi.append(f"{da_salvare} ancora solo in archivio — scaricali da "
+                     f"/tac/esporta e uniscili al file per renderli permanenti")
+    else:
+        pezzi.append("tutti già permanenti nel repository")
+    return " · ".join(pezzi)
+
+
+def _pagina_diagnostica(request: Request, **extra) -> HTMLResponse:
+    """Il corpo comune della pagina Diagnostica — estratto perché le
+    rotte del backup (sotto) devono ririsegnare la STESSA pagina con in
+    più l'esito dell'azione appena fatta (creazione dell'archivio,
+    salvataggio di prova), non un'altra pagina o un semplice redirect
+    che perderebbe quel messaggio."""
+    stati = storage.get_source_status()
+    stats = storage.stats()
+    return _rendi(request, "diagnostica.html", _contesto(
+        request, attiva="catalogo",
+        righe=[P.riga_fonte(s) for s in stati],
+        stats=stats,
+        cataloghi=[
+            ("Codici modello", modelcodes.status()),
+            ("Dispositivi Apple", appledevices.status()),
+            ("Catalogo aziendale (AER)", aer_catalog.status()),
+            ("Processori", soc.status()),
+            ("Specifiche hardware", specs.status()),
+            ("Servizio TAC esterno", imeicheck.stato_servizio_esterno()),
+            # I TAC INSEGNATI A MANO, e dove sono adesso. È l'unica fonte
+            # di copertura che non dipende da un servizio esterno, da una
+            # quota o da un antibot — e finché resta solo in `tracker.db`
+            # (che su Render vive in `/tmp`) è anche l'unica che si può
+            # perdere del tutto.
+            ("TAC inseriti a mano", _riga_tac_inseriti()),
+            ("Interprete AI della ricerca", aiquery.status()),
+            # LA MEMORIA, ACCANTO AI CATALOGHI CHE LA CONSUMANO.
+            #
+            # È la riga da leggere quando il servizio riparte da solo: su
+            # Render un riavvio per memoria esaurita non lascia altro
+            # segno che un avvio nel registro. Il picco conta più del
+            # valore corrente, perché a far riavviare il contenitore è
+            # l'istante peggiore, non la media — e un picco già passato si
+            # vede solo qui.
+            ("Memoria del processo", _riga_memoria()),
+            # Non uno "stato" interrogato al volo come gli altri sopra: è
+            # quello che l'avvio ha scritto in STATO_AVVIO una volta sola
+            # (vedi avvio()). Serve a rispondere da qui, senza dover
+            # provare a fare login, alla domanda «ADMIN_USERNAME/EMAIL/
+            # PASSWORD sono state lette bene su Render?».
+            ("Amministratore parco di test",
+             STATO_AVVIO.get("amministratore parco di test", "avvio non ancora completato")),
+            # PRIMA DI TUTTO IL RESTO: se il commit non è quello che ti
+            # aspetti, ogni altra riga di questa pagina descrive il
+            # codice di prima, e leggerla porta a conclusioni sbagliate.
+            ("Versione in produzione", C.versione_distribuita()),
+            ("Immagine costruita (UTC)", C.dettagli_versione().get("build_utc") or "non disponibile in locale"),
+            ("Processo avviato (UTC)", C.dettagli_versione()["avvio_utc"]),
+            ("Catalogo TAC", imeicheck.status()),
+            ("Invio email (richieste account)", mail.stato()),
+            ("Cifratura del salvataggio", cifratura.stato()),
+            ("Allegati del parco", allegati.stato()),
+            ("Salvataggio continuo",
+             STATO_AVVIO.get("salvataggio continuo", "avvio non ancora completato")),
+        ],
+        backup=P.stato_backup(),
+        logica=C.DATA_LOGIC_VERSION,
+        **extra,
+    ))
+
+
+@app.get("/diagnostica", response_class=HTMLResponse)
+def pagina_diagnostica(request: Request):
+    return _pagina_diagnostica(request)
+
+
+@app.get("/tac/esporta")
+def tac_esporta():
+    """I TAC inseriti a mano, pronti da unire a `data/tac_modelli.csv`.
+
+    PERCHÉ ESISTE. Un TAC insegnato all'app dalla pagina dell'IMEI finisce
+    in `tracker.db`, che su Render vive in `/tmp`: sopravvive solo finché
+    regge il backup su Gist. `imeicheck.riga_csv` era scritta apposta per
+    riportare quel lavoro nel repository — dove diventa permanente e
+    viaggia con il codice — ma non la chiamava nessuno, e la promessa nel
+    commento di `_META_TAC_UTENTE` («l'app mostra comunque la riga da
+    incollare nel CSV») non era mantenuta.
+
+    È l'unica fonte di copertura TAC che non dipende da un servizio
+    esterno, da una quota o da un antibot: cresce solo se qualcuno la
+    alimenta, e non deve perdersi al primo riavvio.
+    """
+    testo = imeicheck.esporta_tac_inseriti()
+    if not testo:
+        # Un file con la sola intestazione sembrerebbe un'esportazione
+        # riuscita e vuota, che è un'altra cosa da «non c'era niente».
+        return PlainTextResponse(
+            "Nessun TAC inserito a mano da esportare.\n\n"
+            "Se ne aggiungono dalla pagina di un IMEI che l'app non "
+            "riconosce, con il campo «Salva il modello».\n",
+            status_code=404)
+    return PlainTextResponse(testo, headers={
+        "Content-Disposition": 'attachment; filename="tac_inseriti.csv"'})
+
+
+@app.post("/catalogo/backup/crea", response_class=HTMLResponse)
+def diagnostica_backup_crea(request: Request, token: str = Form(...)):
+    """Crea da zero l'archivio (Gist privato) per il backup, a partire da
+    un token GitHub incollato qui — invece dei passaggi manuali (creare
+    il Gist a mano, copiarne l'id dall'indirizzo, capire se il token ha
+    il permesso giusto solo quando qualcosa fallisce) che sono il modo
+    più facile di sbagliare la configurazione.
+
+    Segnalato dall'utente: aveva seguito le istruzioni passo passo per
+    la via manuale e la pagina continuava a dire «Non configurato» — il
+    sospetto più concreto è che il valore incollato su Render non fosse
+    ancora arrivato a questo processo (serve un riavvio del servizio,
+    che Render fa da solo dopo il salvataggio, ma non è istantaneo), non
+    un errore nella configurazione in sé. Restare in balìa di tre pagine
+    diverse (GitHub per il token, GitHub per il Gist, Render per le
+    variabili) moltiplica le occasioni di un passaggio saltato o
+    frainteso: qui bastano il token e un clic.
+
+    NON PUÒ CONFIGURARE RENDER DA SOLA — l'app non ha né deve avere
+    accesso al pannello Render (servirebbe una API key con permessi ben
+    più ampi, ingiustificati solo per questo): verifica che il token
+    funzioni, crea l'archivio, e lo dice; il passaggio finale — incollare
+    i due valori su Render — resta all'utente, con l'identificativo già
+    pronto da copiare invece che da andare a cercare nell'indirizzo del
+    Gist.
+
+    Il token non si salva da nessuna parte (non nel database, non nei
+    log): serve solo per questa chiamata, e passa in un campo
+    `type="password"` nel modulo — comunque in chiaro nella richiesta
+    HTTP, come qualunque modulo su qualunque sito, ma mai scritto su
+    disco da questa funzione.
+    """
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
+    from core import backup
+
+    risultato_backup = {"token_valido": None, "gist_creato": None,
+                        "prova_riuscita": None, "gist_id": None, "messaggio": ""}
+    token_pulito = (token or "").strip()
+
+    ok_token, msg_token = backup.verifica_token(token_pulito)
+    risultato_backup["token_valido"] = ok_token
+    risultato_backup["messaggio"] = msg_token
+
+    if ok_token:
+        ok_gist, msg_gist, gist_id = backup.crea_archivio(token_pulito)
+        risultato_backup["gist_creato"] = ok_gist
+        risultato_backup["messaggio"] = msg_gist
+        risultato_backup["gist_id"] = gist_id
+
+        if ok_gist:
+            ok_prova, msg_prova = backup.prova_completa(gist_id, token_pulito)
+            risultato_backup["prova_riuscita"] = ok_prova
+            risultato_backup["messaggio"] = msg_prova
+
+    return _pagina_diagnostica(request, risultato_backup=risultato_backup)
+
+
+@app.post("/catalogo/backup/salva", response_class=HTMLResponse)
+def diagnostica_backup_salva(request: Request):
+    """«Salva adesso»: forza un salvataggio vero con la configurazione
+    ATTUALE (le variabili d'ambiente già impostate), invece di aspettare
+    la prossima scansione o correzione — la verifica più diretta per
+    sapere se quello che è stato messo su Render funziona davvero, senza
+    aspettare un'ora o dover correggere un nome apposta per scoprirlo.
+    """
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
+    from core import backup
+
+    # `forza=True` PERCHE' QUI C'E' UNA PERSONA. Il salvataggio
+    # automatico si ferma quando l'archivio da caricare e' molto piu'
+    # piccolo di quello gia' salvato (vedi `backup._crollo_sospetto`):
+    # e' la protezione contro il caso in cui l'app riparte senza dati e
+    # seppellisce la copia buona. Chi preme questo tasto invece ha appena
+    # guardato la pagina e sa cosa sta salvando.
+    ok, messaggio = backup.salva(forza=True)
+    return _pagina_diagnostica(request, risultato_salva={"ok": ok, "messaggio": messaggio})
+
+
+@app.post("/catalogo/backup/versioni", response_class=HTMLResponse)
+def diagnostica_backup_versioni(request: Request):
+    """Le versioni precedenti del salvataggio, per riconoscere quella buona.
+
+    NASCE DA UNA PERDITA DI DATI, il 07/09/2026: «il parco test è vuoto,
+    settimane fa era pieno di roba, come si è perso tutto?». L'archivio
+    vive in `/tmp` su Render e sopravvive solo grazie al backup; se un
+    ripristino all'avvio non riesce, l'app riparte vuota e il salvataggio
+    periodico scrive nel Gist il database VUOTO, seppellendo la copia
+    buona.
+
+    Seppellendo, non cancellando: ogni salvataggio è una revisione e
+    GitHub le conserva tutte. Mancava solo il modo di guardarle e di
+    sceglierne una — e senza quel modo, una perdita di dati era
+    definitiva pur avendo la copia a un clic di distanza.
+    """
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
+    from core import backup
+
+    elenco, errore = backup.revisioni()
+    return _pagina_diagnostica(request,
+                               versioni_backup=elenco, versioni_errore=errore)
+
+
+@app.post("/catalogo/backup/ripristina", response_class=HTMLResponse)
+def diagnostica_backup_ripristina(request: Request, sha: str = Form(""),
+                                  conferma: str = Form("")):
+    """Rimette una versione precedente al posto dell'archivio attuale.
+
+    CHIEDE UNA CONFERMA SCRITTA, e non è burocrazia: questa è l'unica
+    rotta del sito che sovrascrive l'archivio intero. Un clic per sbaglio
+    qui costa quanto il guasto che questa pagina serve a riparare.
+
+    Quello che c'è viene comunque messo da parte in
+    `tracker.db.prima-del-ripristino` (vedi `backup.ripristina`): una
+    revisione scelta male non deve diventare un secondo disastro sopra il
+    primo.
+    """
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
+    from core import backup
+
+    if conferma.strip().upper() != "RIPRISTINA":
+        return _pagina_diagnostica(request, risultato_ripristino={
+            "ok": False,
+            "messaggio": "per procedere scrivi RIPRISTINA nella casella di "
+                         "conferma: questa azione sovrascrive l'archivio intero"})
+    ok, messaggio = backup.ripristina(solo_se_mancante=False,
+                                      revisione=sha.strip())
+    if ok:
+        # I cataloghi in memoria puntavano al database di prima: senza
+        # questo, la pagina continuerebbe a mostrare i dati vecchi e
+        # sembrerebbe che il ripristino non abbia fatto niente.
+        imeicheck.reset_cache()
+    return _pagina_diagnostica(request,
+                               risultato_ripristino={"ok": ok, "messaggio": messaggio})
+
+
+# LA CHIAVE VA IN QUERY, NON NEL PERCORSO. Le chiavi dispositivo hanno
+# dentro barre e barre verticali (`vivo / iqoo / motorola|v29`): in un
+# segmento di percorso la barra è un separatore, e l'indirizzo non
+# corrisponderebbe mai — un 404 su ogni scheda. Codificarla non basta,
+# perché il server decodifica prima di instradare.
+@app.get("/dispositivo", response_class=HTMLResponse)
+def pagina_dispositivo(request: Request, k: str = Query(default="")):
+    chiave = k
+    device = next((d for d in storage.get_devices()
+                   if d.get("device_key") == chiave), None)
+    if device is None:
+        return RedirectResponse("/", status_code=303)
+    return _rendi(request, "dispositivo.html", _contesto(
+        request, attiva="dispositivi",
+        device=P.riga_dispositivo(device),
+        scheda=P.scheda_tecnica(device["model"],
+                                codice=device.get("model_code") or "",
+                                brand=device["brand"], device=device),
+        storico=[P.riga_aggiornamento(v)
+                 for v in storage.get_device_history(chiave)],
+    ))
+
+
+# ======================================================================
+# Azioni
+# ======================================================================
+@app.post("/parco/aggiungi")
+def parco_aggiungi(request: Request, chiave: str = Form(...), brand: str = Form(""),
+                   modello: str = Form(""), ritorno: str = Form("")):
+    _, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
+    storage.add_to_watchlist(chiave, brand, modello)
+    # Il risultato appena visto e' nella cache corta: se non la si svuota,
+    # tornando dalla form il pulsante resterebbe «Aggiungi» anche se il
+    # telefono e' gia' entrato nel parco.
+    RICERCHE.svuota()
+    # Il parametro viene dal nostro template, ma non deve mai diventare un
+    # redirect verso un dominio esterno se qualcuno costruisce una POST a
+    # mano. Accettiamo solo la ricerca locale con la query gia' compilata.
+    # Anche la pagina dei telefoni simili, che ha lo stesso tasto riga per
+    # riga: stessa regola, solo percorsi locali scritti da noi.
+    if (ritorno.startswith("/?") or ritorno.startswith("/simili?")) and not ritorno.startswith("//"):
+        return RedirectResponse(f"{ritorno}&parco=1", status_code=303)
+    return RedirectResponse(f"/dispositivo?k={quote(chiave)}", status_code=303)
+
+
+@app.post("/parco/togli")
+def parco_togli(request: Request, chiave: str = Form(...)):
+    _, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
+    storage.remove_from_watchlist(chiave)
+    return RedirectResponse(f"/dispositivo?k={quote(chiave)}", status_code=303)
+
+
+def _istante_test(data_test: str) -> str | None:
+    """Converte la sola data scelta nel parco in un istante ISO stabile.
+
+    A mezzogiorno UTC, non a mezzanotte: una data di test non deve slittare
+    al giorno precedente/successivo quando viene letta in un fuso diverso.
+    """
+    try:
+        scelta = date.fromisoformat((data_test or "").strip())
+    except ValueError:
+        return None
+    return f"{scelta.isoformat()}T12:00:00+00:00"
+
+
+@app.post("/parco/segna-test")
+def parco_segna_test(request: Request, chiave: str = Form(...), data_test: str = Form(""),
+                    manuale: bool = Form(False), android_installato: str = Form(""),
+                    build_installata: str = Form(""), esito_test: str = Form("")):
+    """Registra quando il telefono e' stato provato e la baseline attuale.
+
+    La data da sola non basta al parco: il suo scopo e' capire *cosa* e'
+    cambiato dal test. PerciÃ² il click salva insieme la versione/build/patch
+    che il tracker conosce in quel momento, senza chiedere una seconda form.
+    """
+    _, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
+    if chiave not in storage.watched_keys():
+        return RedirectResponse("/parco?errore_test=parco", status_code=303)
+    dispositivo = next((d for d in storage.get_devices()
+                        if d.get("device_key") == chiave), None)
+    if not dispositivo:
+        # NESSUNA FONTE PUBBLICA QUESTO MODELLO, e non è un motivo per
+        # rifiutare la data: vedi il commento su `puo_segnare_test`. Si
+        # costruisce il minimo indispensabile da quello che il parco sa —
+        # marca e nome — e la fotografia resta vuota, che è la verità.
+        voce = next((v for v in storage.get_watchlist()
+                     if v.get("device_key") == chiave), {})
+        dispositivo = {"device_key": chiave,
+                       "brand": voce.get("brand") or "",
+                       "model": voce.get("model") or ""}
+    istante = _istante_test(data_test)
+    if not istante:
+        return RedirectResponse("/parco?errore_test=data", status_code=303)
+    precedente = storage.get_test_baseline(chiave) or {}
+    nota_test = precedente.get("note", "")
+    if manuale:
+        if (android_installato and not re.fullmatch(r"\d{1,2}", android_installato)) or len(build_installata) > 160:
+            return JSONResponse({"errore": "Versione Android o build non valida."}, status_code=422)
+        if esito_test not in ("", "Superato", "Fallito", "Da completare"):
+            return JSONResponse({"errore": "Esito test non valido."}, status_code=422)
+        dispositivo = dict(dispositivo, android_version=android_installato or None,
+                           os_version="",
+                           build=build_installata.strip(), patch_level="")
+        # Nel campo note della baseline: incluso nei backup già esistenti.
+        # Le note libere del parco restano nella watchlist.
+        nota_test = json.dumps({"origine": "telefono", "esito": esito_test}, ensure_ascii=False)
+    storage.set_test_baseline(dispositivo, note=nota_test, tested_at=istante)
+    # La data del test e' un dato inserito a mano: va nel backup subito,
+    # come le correzioni TAC, per non dipendere dalla prossima scansione.
+    _backup_subito()
+    return RedirectResponse("/parco?test_salvato=1", status_code=303)
+
+
+# ----------------------------------------------------------------------
+# La nota e gli allegati di una riga del parco
+# ----------------------------------------------------------------------
+def _ritorno_parco(request: Request, **extra) -> RedirectResponse:
+    """Torna al parco mantenendo ricerca e ordinamento: chi stava
+    guardando `?q=galaxy&ordina=meno_recente` e salva una nota deve
+    ritrovarsi dove era, non su un elenco intero da riordinare a mano."""
+    parametri = {}
+    for nome in ("q", "ordina"):
+        valore = request.query_params.get(nome) or ""
+        if valore:
+            parametri[nome] = valore
+    parametri.update({k: v for k, v in extra.items() if v})
+    coda = "&".join(f"{k}={quote(str(v))}" for k, v in parametri.items())
+    return RedirectResponse(f"/parco{'?' + coda if coda else ''}", status_code=303)
+
+
+@app.post("/parco/nota")
+def parco_nota(request: Request, chiave: str = Form(...), nota: str = Form("")):
+    """La nota libera della riga. Sostituisce la colonna «Cosa fare», che
+    diceva sempre la stessa frase generica calcolata dal confronto: quello
+    che serve sapere su un telefono provato a mano lo sa solo chi lo ha
+    provato."""
+    _, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
+    if chiave not in storage.watched_keys():
+        return _ritorno_parco(request, errore_test="parco")
+    # Il testo si salva com'è scritto, senza ripulirlo: diventa HTML solo
+    # al momento di mostrarlo, con l'escape di `P.nota_con_link`.
+    storage.imposta_nota_parco(chiave, nota.strip())
+    _backup_subito()
+    return _ritorno_parco(request, nota_salvata=1)
+
+
+@app.post("/parco/allegato")
+async def parco_allegato_carica(request: Request, chiave: str = Form(...),
+                                file: UploadFile = File(...)):
+    _, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
+    if chiave not in storage.watched_keys():
+        return _ritorno_parco(request, errore_test="parco")
+    esistenti = storage.get_allegati_per_device().get(chiave, [])
+    if len(esistenti) >= C.ALLEGATI_MAX_PER_MODELLO:
+        return _ritorno_parco(request, errore_test="troppi_allegati")
+
+    contenuto = await file.read()
+    motivo = allegati.controlla(file.filename or "", file.content_type or "", contenuto)
+    if motivo:
+        return _ritorno_parco(request, errore_allegato=motivo)
+
+    ok, messaggio, impronta = allegati.salva(contenuto)
+    if not ok:
+        return _ritorno_parco(request, errore_allegato=messaggio)
+    storage.aggiungi_allegato(chiave, os.path.basename(file.filename or "allegato"),
+                              file.content_type or "", len(contenuto), impronta)
+    _backup_subito()
+    return _ritorno_parco(request, allegato_salvato=1)
+
+
+@app.get("/parco/allegato/{allegato_id}")
+def parco_allegato_scarica(request: Request, allegato_id: int):
+    """Dietro login come il resto del parco: un allegato è materiale di
+    lavoro, non una pagina pubblica."""
+    _, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
+    riga = storage.get_allegato(allegato_id)
+    if not riga:
+        return _ritorno_parco(request, errore_allegato="Allegato non trovato.")
+    contenuto = allegati.leggi(riga["impronta"])
+    if contenuto is None:
+        return _ritorno_parco(
+            request,
+            errore_allegato=("Il contenuto dell'allegato non è raggiungibile "
+                             "nell'archivio esterno."))
+    return Response(
+        content=contenuto, media_type=riga["tipo"] or "application/octet-stream",
+        # `inline`: una foto dello schermo si guarda, non si scarica. Il
+        # nome resta quello originale per quando invece la si salva.
+        headers={"Content-Disposition":
+                 f'inline; filename="{quote(riga["nome"])}"'},
+    )
+
+
+@app.post("/parco/allegato/{allegato_id}/elimina")
+def parco_allegato_elimina(request: Request, allegato_id: int):
+    _, redirect = _accesso_parco_richiesto(request)
+    if redirect:
+        return redirect
+    riga = storage.elimina_allegato(allegato_id)
+    # Il contenuto si toglie dall'archivio esterno solo se NESSUN'ALTRA
+    # riga lo nomina: lo stesso file può essere allegato a due modelli, e
+    # cancellarlo dal primo non deve svuotare il secondo.
+    if riga and not storage.impronta_ancora_usata(riga["impronta"]):
+        allegati.elimina(riga["impronta"])
+    _backup_subito()
+    return _ritorno_parco(request, allegato_tolto=1)
+
+
+def _backup_subito() -> None:
+    """Manda SUBITO al Gist esterno una correzione fatta a mano da una
+    persona, invece di aspettare il prossimo giro di scansione.
+
+    IL BUG SEGNALATO: «assicurati che quando correggo il nome il
+    risultato si salvi perché sembra che non lo faccia». Il salvataggio
+    in sé funzionava — la correzione finiva nella tabella `nomi_modello`
+    di `tracker.db` — ma quel database vive in `/tmp` (`Dockerfile`,
+    `DB_PATH=/tmp/tracker.db`, disco effimero per scelta) e la SOLA copia
+    duratura è il backup su Gist, caricato da `backup.salva_se_serve()`
+    SOLO a fine di ogni scansione periodica, non più spesso di
+    `BACKUP_EVERY_MINUTES` (30 di default — vedi `core/backup.py`). Sul
+    piano gratuito il servizio si addormenta dopo ~15 minuti senza
+    visite, e il thread di scansione dorme con lui: una correzione fatta
+    poco dopo l'ultimo backup periodico può restare SOLO nel database
+    locale, e sparire al primo riavvio — che su questo piano è la norma,
+    non l'eccezione. Da fuori sembra un salvataggio che «non ha
+    funzionato», ma il salvataggio non era mai stato il problema: lo era
+    il tempismo del backup.
+
+    Una correzione verificata da una persona è rara e piccola: vale la
+    pena caricarla subito, ignorando l'intervallo minimo pensato per i
+    backup automatici dopo ogni scansione oraria.
+
+    ## Come lo fa adesso (cambiato il 16/08/2026)
+
+    Prima questa funzione lanciava un thread che salvava SUBITO, uno per
+    click. Andava bene finché i click erano rari — una correzione di nome
+    modello ogni tanto. Da quando il parco ha note e allegati i click
+    diventano tanti e ravvicinati, e ogni salvataggio ricarica l'INTERO
+    database (5,7 MB compressi, ~7,6 MB in base64): dieci modifiche di
+    fila erano dieci invii da 7,6 MB.
+
+    Ora alza solo una bandierina (`backup.segna_modificato`), e il thread
+    di `backup` la raccoglie entro un minuto unendo le modifiche
+    ravvicinate in un invio solo. Per chi usa il sito non cambia niente —
+    non aspettava comunque la risposta di GitHub — e la modifica più
+    vecchia della raffica ha aspettato meno di sessanta secondi invece
+    dei trenta minuti del backup periodico.
+
+    Se il backup non è configurato (`BACKUP_GIST_ID`/`BACKUP_GITHUB_TOKEN`
+    assenti), la bandierina non fa succedere niente: qui non c'è nulla da
+    controllare prima, e nessun errore da mostrare per una funzione che
+    l'utente non ha attivato.
+    """
+    from core import backup
+
+    backup.segna_modificato()
+
+
+@app.post("/tac/salva")
+def tac_salva(tac: str = Form(...), marca: str = Form(""),
+              modello: str = Form(""), imei: str = Form(""),
+              incollato: str = Form("")):
+    """Il modello verificato a mano, salvato dentro l'app.
+
+    È la via d'uscita quando i database TAC non conoscono un telefono, e
+    ha la precedenza su ogni database scaricato: se lo hai verificato tu,
+    hai ragione tu. Vale per tutti gli IMEI di quel modello, non solo per
+    quello digitato.
+
+    `incollato` È LA STESSA COSA IN UN GESTO SOLO. Chi ha appena letto la
+    risposta su un altro sito la seleziona e la copia intera —
+    «SAMSUNG GALAXY A56 5G» — e doveva spezzarla in testa per riscriverla
+    in due caselle. Ora la incolla e basta: la persona fa la
+    consultazione, che è lecita e che i collegamenti in pagina servono a
+    fare; l'app fa il lavoro meccanico di separare marca e modello.
+
+    I due campi espliciti restano e VINCONO su quello incollato: chi
+    scrive a mano sta correggendo, e una correzione non si reinterpreta.
+    """
+    if incollato.strip() and not (marca.strip() and modello.strip()):
+        letta_marca, letto_modello = imeicheck.interpreta_incollato(incollato)
+        marca = marca.strip() or letta_marca
+        modello = modello.strip() or letto_modello
+    imeicheck.aggiungi_tac(tac, marca, modello)
+    # E ANCHE IL «NO» DELL'ARCHIVIO ESTERNO va tolto: era vero finche'
+    # nessuno sapeva che telefono fosse, adesso lo sappiamo. Lasciarlo
+    # non cambierebbe la risposta — la tabella scritta a mano ha la
+    # precedenza su tutto — ma terrebbe in archivio un dato che dice il
+    # contrario di quello mostrato, ed e' il genere di incoerenza che
+    # confonde chi legge la Diagnostica sei mesi dopo.
+    imeicheck.dimentica_tac_assente(tac)
+    # LA MEMORIA CORTA VA DIMENTICATA QUI. Hai appena corretto a mano il
+    # modello di quel TAC: se la ricerca rispondesse dalla cache, ti
+    # rimanderebbe indietro la risposta sbagliata che sei venuto a
+    # correggere — e sembrerebbe che il salvataggio non abbia funzionato.
+    RICERCHE.svuota()
+    # E VA MESSA AL SICURO SUBITO — vedi il docstring di `_backup_subito`.
+    _backup_subito()
+    return RedirectResponse(f"/?q={quote(imei or tac)}&saved=1", status_code=303)
+
+
+@app.post("/modello/correggi")
+def modello_correggi(codice: str = Form(...), nome: str = Form(""),
+                     query: str = Form("")):
+    """Il nome commerciale scelto a mano per un codice, salvato dentro l'app.
+
+    Stessa logica di `tac_salva`, applicata al nome invece che al modello
+    di un TAC: vedi il commento in `_cerca_davvero` per il perché esiste.
+    Un `nome` vuoto cancella la correzione — `storage.set_nome_modello`
+    torna alla scelta automatica invece di salvarne una vuota.
+    """
+    storage.set_nome_modello(codice, nome)
+    # STESSA RAGIONE DI `tac_salva`: senza svuotare la memoria corta la
+    # ricerca risponderebbe dalla cache col nome di prima, e sembrerebbe
+    # che il salvataggio non abbia funzionato.
+    RICERCHE.svuota()
+    # E VA MESSA AL SICURO SUBITO — vedi il docstring di `_backup_subito`.
+    _backup_subito()
+    return RedirectResponse(f"/?q={quote(query or codice)}", status_code=303)
+
+
+@app.post("/scansione")
+def scansione():
+    """Lancia una scansione e torna subito all'elenco.
+
+    NON SI ASPETTA LA FINE. Una scansione completa dura una trentina di
+    secondi: tenere aperta la richiesta HTTP per tutto quel tempo la
+    espone al timeout dell'host, e a quel punto l'utente vede un errore
+    mentre in realtà la scansione sta andando a buon fine. Parte in un
+    thread e la pagina lo dice.
+    """
+    import threading
+
+    def scansiona_e_dimentica():
+        try:
+            scan.run_scan_isolata(auto_notify=True)
+        finally:
+            # A scansione finita l'archivio è cambiato: le risposte
+            # ricordate descrivono lo stato di prima. Si buttano, così
+            # chi ha appena premuto «Scansiona adesso» vede il risultato
+            # di quella scansione e non quello che c'era un minuto fa.
+            RICERCHE.svuota()
+
+    threading.Thread(target=scansiona_e_dimentica, daemon=True).start()
+    return RedirectResponse("/dispositivi?scansione=avviata", status_code=303)
+
+
+@app.post("/api/interpreta")
+def api_interpreta(q: str = Form(...)):
+    """L'interprete AI: restituisce CHIAVI DI RICERCA, non risposte.
+
+    Vale qui la stessa regola del resto del progetto, e sta nel codice non
+    nel prompt: il modello sceglie fra candidati che gli passiamo noi, e
+    quello che propone viene ricontrollato contro i nostri cataloghi e
+    scartato se non c'è. Da questa rotta non esce mai un dato tecnico.
+
+    IL TASTO AI NON DEVE MAI RISPONDERE PEGGIO DI «CERCA» sullo stesso
+    testo — un tasto «potenziato» che a volte trova di meno di quello
+    semplice non è potenziato, è rotto. Due casi lo tradivano:
+
+    1. **Un IMEI.** Quindici cifre non somigliano a nessun nome di
+       catalogo: `candidati_per` tornava vuoto e l'interprete rispondeva
+       «nessun candidato da sottoporre al modello» — un vicolo cieco su
+       un input che «Cerca» riconosce e risolve da sempre. Qui non c'è
+       niente da interpretare: si passa il numero così com'è, e la
+       pagina del risultato lo riconosce da sola (stessa `pagina_ricerca`
+       di sempre, con lo stesso confronto fra i database TAC).
+    2. **Nessuna corrispondenza utile.** Prima finiva in un messaggio
+       d'errore nel pannello AI, punto — mentre «Cerca» sullo stesso
+       testo avrebbe comunque prodotto una pagina (anche se «nessun
+       firmware trovato», che è un'informazione, non un buco). Ora si
+       ripiega sul testo digitato: il motivo dell'interpretazione mancata
+       resta scritto, onestamente, ma la ricerca parte comunque.
+    """
+    domanda = q.strip()
+
+    if imeicheck.is_imei_like(domanda):
+        return JSONResponse({
+            "proposte": [domanda],
+            "motivo": "un IMEI si cerca così com'è: qui non c'è niente da "
+                      "interpretare.",
+            "errore": None,
+            "scartate": [],
+        })
+
+    esito = aiquery.interpreta(domanda)
+    if esito.riuscita:
+        return JSONResponse({
+            "proposte": list(esito.proposte),
+            "motivo": esito.motivo,
+            "errore": None,
+            "scartate": list(esito.scartate),
+        })
+
+    return JSONResponse({
+        "proposte": [domanda] if domanda else [],
+        "motivo": (f"l'AI non ha trovato un'interpretazione migliore "
+                  f"({esito.errore}): si cerca il testo così com'è."
+                  if esito.errore else
+                  "l'AI non ha trovato un'interpretazione migliore: si "
+                  "cerca il testo così com'è."),
+        "errore": None,
+        "scartate": list(esito.scartate),
+    })
+
+
+@app.get("/api/suggerimenti")
+def api_suggerimenti(q: str = Query(default="")):
+    return JSONResponse({"voci": suggest.suggest(q, limit=8)})
+
+
+@app.get("/health")
+@app.head("/health")
+def health(dettaglio: str = Query(default="")):
+    """Per il servizio che tiene sveglio l'host.
+
+    Deliberatamente leggerissima: non tocca il database. Un controllo di
+    salute che interroga l'archivio ogni cinque minuti è un carico
+    costante che nessuno ha chiesto, e per giunta fallirebbe proprio
+    quando l'archivio è in riparazione — cioè quando l'host non deve
+    riavviare il servizio.
+
+    **RISPONDE ANCHE A `HEAD`, e non è una rifinitura.** Gli host e i
+    servizi che tengono sveglio un sito controllano quasi sempre con
+    `HEAD`, che costa una risposta senza corpo. FastAPI — a differenza di
+    Starlette sotto di lui — non aggiunge `HEAD` da solo a una rotta
+    dichiarata `GET`: rispondeva **405**, il controllo lo leggeva come
+    «servizio giù» e faceva riavviare il contenitore. Ogni pochi minuti,
+    all'infinito, e ogni riavvio è un avvio a freddo da mezzo minuto.
+    Da fuori non si vede nessun errore: si vede un sito lento.
+    """
+    # IL SERVIZIO TAC ESTERNO, DICHIARATO QUI E NON SOLO IN DIAGNOSTICA.
+    #
+    # Sapere se la chiave è stata letta richiedeva di entrare col login, e
+    # una configurazione che si può verificare solo dall'interno è una
+    # configurazione che nessuno verifica: il difetto si manifesta molto
+    # dopo, come un buco nei dati, e non sembra affatto una chiave
+    # mancante. Qui c'è il solo SÌ/NO — mai la chiave, mai un pezzo di
+    # chiave — e non costa niente, perché è una variabile d'ambiente:
+    # questa rotta resta leggerissima come deve, senza toccare l'archivio.
+    # E LA MEMORIA, per lo stesso motivo.
+    #
+    # Il 31/08/2026 l'utente ha segnalato che il servizio «crasha
+    # continuamente per saturamento della memoria». Su Render un riavvio
+    # per OOM non lascia nessun messaggio leggibile: il registro mostra un
+    # avvio, non una causa, e da fuori si vede solo un sito che ogni tanto
+    # riparte. Questi due numeri — quanto sta usando adesso e il massimo
+    # toccato dall'avvio — si leggono senza login e senza toccare
+    # l'archivio, e trasformano «ogni tanto va giù» in un numero da
+    # confrontare con i 512 MB del piano.
+    #
+    # Non sono un dato sensibile: dicono quanta RAM usa un processo, non
+    # cosa contiene.
+    risposta = {"ok": True, "app": C.APP_TITLE,
+                "tac_esterno": "configurato" if imeicheck._chiave_api() else "non configurato",
+                "memoria_mb": memoria_mb(),
+                "memoria_picco_mb": memoria_picco_mb(),
+                # Processo web + scansione isolata: è questo che Render
+                # confronta con i 512 MB (vedi `util.memoria_contenitore_mb`).
+                "memoria_contenitore_mb": memoria_contenitore_mb(),
+                "scansione_isolata": scan.scansione_isolata_attiva()}
+    risposta["versione"] = C.dettagli_versione()
+    # L'ALLEGGERIMENTO SI VEDE DA FUORI, e sta qui e non in `?dettaglio=1`
+    # perché costa una lettura di due contatori in memoria. Zero interventi
+    # con la memoria alta e zero interventi con la memoria bassa sono due
+    # situazioni opposte che senza questo numero si leggono uguali.
+    alleggerimento = stato_alleggerimento()
+    risposta["memoria_soglia_mb"] = alleggerimento["soglia_mb"]
+    risposta["alleggerimenti"] = alleggerimento["quanti"]
+    if alleggerimento["quanti"]:
+        risposta["alleggerimento_restituiti_mb"] = alleggerimento["restituiti_mb"]
+        risposta["alleggerimento_ultimo"] = alleggerimento["ultimo"]
+        risposta["alleggerimento_quando"] = alleggerimento["quando"]
+    # «CONFIGURATO» NON VUOL DIRE «FUNZIONA», e per due settimane le due
+    # cose sono state raccontate con la stessa parola.
+    #
+    # Segnalato dall'utente il 01/09/2026: «il servizio esterno non
+    # funziona». Qui c'era scritto «configurato», che è vero — la chiave
+    # c'è — e non dice niente su cosa succede quando la si usa. Ora
+    # accanto compare com'è andata l'ultima chiamata vera: chiave
+    # rifiutata, quota finita, servizio giù, o una risposta ricevuta.
+    # Si legge senza login, che è il punto: Diagnostica sta dietro
+    # l'accesso, e una configurazione che si controlla solo da dentro è
+    # una configurazione che nessuno controlla.
+    # `carica=False` NON È UN DETTAGLIO: il docstring di questa rotta
+    # promette di non toccare l'archivio, e l'host la interroga ogni
+    # minuto. Con il caricamento pigro acceso, la prima chiamata dopo ogni
+    # riavvio apriva il database — e da quando qui sotto c'è anche
+    # l'andamento delle ultime dieci, sarebbe stata una lettura in più a
+    # ogni battito. I valori li mette in memoria il preriscaldamento
+    # all'avvio, che l'archivio lo apre una volta sola e nel suo thread.
+    ultimo = imeicheck.ultimo_esito_servizio(carica=False)
+    if ultimo.get("dettaglio"):
+        risposta["tac_esterno_ultima_chiamata"] = ultimo["dettaglio"]
+        risposta["tac_esterno_quando"] = ultimo.get("quando")
+    elif imeicheck._chiave_api():
+        risposta["tac_esterno_ultima_chiamata"] = "mai chiamato dall'ultimo riavvio"
+    # E SE SUCCEDE SEMPRE O SOLO STAVOLTA. Un 503 isolato passa da solo e
+    # si aspetta; un 503 a ogni chiamata da tre giorni vuol dire che quel
+    # fornitore non torna e che bisogna prenderne un altro. Sono decisioni
+    # opposte, e l'ultima chiamata da sola non le distingue.
+    riassunto = imeicheck.riassunto_servizio(carica=False)
+    if riassunto:
+        risposta["tac_esterno_andamento"] = riassunto
+    # QUANTE NE SONO STATE SPESE, e quante ne restano. È la riga che
+    # rende innocuo mettere online il portale: un bug in loop non può
+    # andare oltre il tetto giornaliero, e qui si vede subito se ci è
+    # andato a sbattere.
+    consumo = imeicheck.riassunto_consumo(carica=False)
+    if consumo:
+        risposta["tac_esterno_consumo"] = consumo
+    # COM'E' ANDATO IL RIPRISTINO ALL'AVVIO, e si legge senza login.
+    #
+    # È il primo anello della catena che il 07/09/2026 ha fatto sparire
+    # il parco di test: il contenitore riparte, `/tmp` è vuoto, e se il
+    # ripristino non riesce l'app parte senza i suoi dati. Finora quella
+    # riga stava solo in Diagnostica, dietro l'accesso — cioè si vedeva
+    # solo entrando apposta, che è esattamente quello che nessuno fa
+    # finché non si accorge che manca qualcosa.
+    #
+    # Viene da STATO_AVVIO, scritto una volta sola all'avvio: non tocca
+    # l'archivio, che questa rotta promette di non aprire.
+    avvio = STATO_AVVIO.get("archivio esterno")
+    if avvio:
+        risposta["archivio_esterno_allavvio"] = avvio
+    # IL DETTAGLIO SI CHIEDE, non si calcola a ogni battito.
+    #
+    # Pesare i cataloghi voce per voce costa qualche decimo di secondo su
+    # centomila voci, e questa rotta la interroga l'host ogni minuto: farlo
+    # sempre significherebbe spendere per un dato che serve quando qualcosa
+    # non va. Con `?dettaglio=1` invece si vede quale catalogo occupa cosa —
+    # ed è la domanda a cui il 01/09/2026 non si sapeva rispondere, con il
+    # servizio a 432 MB su 512 e l'indice TAC ormai innocente.
+    if dettaglio:
+        # Le dieci chiamate per esteso, con l'ora: il riassunto qui sopra
+        # dice quante sono andate male, questo dice quando.
+        risposta["tac_esterno_storico"] = imeicheck.storico_servizio()
+        pesi = memoria_dei_cataloghi()
+        risposta["cataloghi_mb"] = pesi
+        # «SECONDO ME NON SONO TUTTI CATALOGHI», 04/09/2026. Aveva ragione,
+        # ed era una cosa che questa rotta faceva calcolare a mano: dava i
+        # pesi uno per uno e lasciava a chi legge il compito di sommarli e
+        # sottrarli dal totale. Le due righe qui sotto rispondono alla
+        # domanda vera — quanto di questo processo è catalogo e quanto no.
+        #
+        # Il resto NON è memoria sprecata: è l'interprete Python, le
+        # librerie caricate, i buffer delle connessioni e — la parte che
+        # cresce — le arene che l'allocatore non ha ancora restituito.
+        # È esattamente ciò su cui lavora `alleggerisci_se_serve`.
+        somma = round(sum(v for v in pesi.values() if isinstance(v, (int, float))), 1)
+        adesso = memoria_mb()
+        risposta["cataloghi_totale_mb"] = somma
+        risposta["non_cataloghi_mb"] = (round(adesso - somma, 1)
+                                        if adesso is not None else None)
+        # QUANTO PESA L'ARCHIVIO, che è il moltiplicatore del salvataggio:
+        # ogni invio ne tiene in memoria la copia intera, quella compressa,
+        # quella in base64 e il corpo della richiesta.
+        try:
+            risposta["archivio_mb"] = round(
+                os.path.getsize(C.DB_PATH) / (1024 * 1024), 1)
+        except OSError:
+            risposta["archivio_mb"] = None
+        # E LA MEMORIA DELL'ULTIMA SCANSIONE, fase per fase. È il lavoro
+        # che gira di notte, quando non c'è nessuno a guardare e il
+        # servizio riparte senza lasciare detto perché.
+        try:
+            risposta["ultima_scansione"] = json.loads(
+                storage.get_meta("ultima_scansione_memoria") or "{}")
+        except Exception:
+            risposta["ultima_scansione"] = {}
+        # E LE ULTIME OTTO, perché una fotografia sola non distingue «i
+        # cataloghi si stanno ancora scaldando» da «ogni giro lascia
+        # qualcosa»: sono due storie diverse con lo stesso numero. Otto
+        # righe lo dicono a colpo d'occhio.
+        try:
+            risposta["storico_scansioni"] = json.loads(
+                storage.get_meta(scan._STORICO_MEMORIA) or "[]")
+        except Exception:
+            risposta["storico_scansioni"] = []
+    return risposta
+
+
+# ======================================================================
+# IMEI
+# ======================================================================
+def _guasto_esterno_recente(entro_ore: int = 6) -> str:
+    """Il guasto del servizio esterno, se è di poco fa.
+
+    LA FINESTRA SERVE. Questo messaggio compare accanto a un «modello
+    sconosciuto» per spiegarlo, e un guasto di tre giorni fa non spiega
+    niente: spiegherebbe una cosa diversa da quella che sta succedendo,
+    che è il modo peggiore di aiutare. Sei ore sono abbastanza da coprire
+    il guasto che si sta guardando adesso e poche abbastanza da non
+    raccontare la storia di ieri.
+
+    Fuori dalla finestra il dato non sparisce: resta in Diagnostica e in
+    `/health`, che sono i posti dove si va a guardare la storia.
+    """
+    ultimo = imeicheck.ultimo_esito_servizio()
+    if ultimo.get("esito") != "errore" or not ultimo.get("dettaglio"):
+        return ""
+    quando = ultimo.get("quando") or ""
+    try:
+        istante = datetime.fromisoformat(quando)
+    except (TypeError, ValueError):
+        return ""
+    if istante.tzinfo is None:
+        istante = istante.replace(tzinfo=timezone.utc)
+    eta = (datetime.now(timezone.utc) - istante).total_seconds()
+    return ultimo["dettaglio"] if 0 <= eta <= entro_ore * 3600 else ""
+
+
+def _esito_imei(imei: str, solo_locale: bool = False) -> dict:
+    """Da un IMEI a un modello, dicendo da dove arriva la risposta.
+
+    «Un IMEI» sono quattordici, quindici o sedici cifre — l'IMEI senza
+    cifra di controllo, l'IMEI intero, l'IMEISV (vedi `is_imei_like`). Qui
+    non cambia niente: tutto passa da `tac_di`, e le prime otto cifre sono
+    le stesse in tutte e tre.
+
+    **Il confronto fra le fonti si mostra sempre, anche quando l'IMEI è
+    stato riconosciuto.** I database TAC sono alimentati dalla community,
+    si contraddicono fra loro e nessuno è autorevole: lo stesso numero dà
+    spesso un modello su un sito e un altro modello su un altro. Mostrare
+    una risposta sola come se fosse LA risposta è il modo più efficace di
+    far preparare un test sul telefono sbagliato.
+    """
+    trovato = imeicheck.identify(imei, solo_locale=solo_locale)
+    raffronto = imeicheck.confronto(imei)
+
+    # QUANDO NON LO CONOSCE NESSUNO, QUI, E FUORI C'È DA CHIEDERE.
+    # La prima risposta della pagina non esce mai in rete: chiederlo qui
+    # significherebbe far aspettare senza poterlo nemmeno dire, perché la
+    # pagina non è ancora partita. Si dichiara che la ricerca continua
+    # fuori, e ci pensa il secondo tempo.
+    #
+    # ...MA UNA VOLTA SOLA. Se il servizio esterno ha gia' risposto «non
+    # lo conosco» per questo TAC, non c'e' niente da aspettare: la
+    # pagina che promette «lo sto chiedendo fuori» manderebbe il secondo
+    # tempo a ricomprare lo stesso no, e — visto che il secondo tempo
+    # ricarica la pagina quando il modello arriva da fuori — la pagina
+    # ricaricata ripartirebbe da capo con la stessa rotellina. Un ciclo
+    # infinito che consuma il piano gratuito a ogni giro. Segnalato
+    # dall'utente il 26/08/2026 con il TAC 35286149.
+    tac_imei = imeicheck.tac_di(imei)
+    chiesto_invano = bool(tac_imei
+                          and imeicheck.tac_gia_chiesto_invano(tac_imei))
+    cerco_fuori = bool(solo_locale and not trovato
+                       and tac_imei
+                       and imeicheck._chiave_api()
+                       and not chiesto_invano)
+
+    modello_cercato = ""
+    descrizione = ""
+    codice = ""
+    if trovato:
+        marca, dettagli_grezzi = trovato
+        dettagli = imeicheck.parse_specs(marca, dettagli_grezzi)
+        descrizione = imeicheck.describe(marca, dettagli_grezzi)
+        codice = dettagli.get("code") or ""
+        # SI CERCA PER CODICE, NON PER NOME, quando il database TAC lo
+        # contiene — e lo contiene quasi sempre. Il nome è ambiguo fra le
+        # varianti di mercato, che montano firmware e perfino chip
+        # diversi, e arriva in forme incoerenti; il codice è esatto ed è
+        # la chiave che le fonti ufficiali accettano. È la differenza fra
+        # «trova qualcosa» e «trova quel telefono».
+        # ...MA SOLO SE QUEL CODICE LO CONOSCE QUALCUNO.
+        #
+        # Segnalato dall'utente il 17/08/2026: «cercando un IMEI mi trova
+        # il codice modello ma non quello commerciale ed e' scollegato
+        # dalla scheda tecnica; se cerco il modello a mano trovo scheda e
+        # foto». Ecco il perche': il database TAC dava ENTRAMBI — codice e
+        # nome — e qui il codice vinceva sempre. Quando quel codice non e'
+        # nei cataloghi (MobileModels, Google Play) non risolve niente, e
+        # la pagina restava con il codice grezzo come titolo e nessuna
+        # scheda — buttando via il nome commerciale che avevamo gia' in
+        # mano e che avrebbe trovato tutto.
+        #
+        # Il codice resta la prima scelta quando serve davvero, cioe'
+        # quando qualcuno sa tradurlo: e' piu' preciso del nome, che e'
+        # ambiguo fra le varianti di mercato. Se non lo sa nessuno, un
+        # nome che trova il telefono vale piu' di un codice che non trova
+        # niente.
+        modello = dettagli.get("model") or ""
+        codice_utile = bool(codice) and bool(modelcodes.resolve(codice))
+        modello_cercato = (codice if codice_utile else (modello or codice)) or ""
+
+    return {
+        "imei": imei,
+        "tac": raffronto.get("tac") or "",
+        "luhn_valid": imeicheck.is_valid_imei(imei),
+        "forma_imei": imeicheck.forma_imei(imei),
+        "imei_corretto": imeicheck.imei_con_cifra_di_controllo(imei),
+        "riconosciuto": bool(trovato),
+        "descrizione": descrizione,
+        "marca": (marca if trovato else ""),
+        # «model» è il nome da mostrare; «modello_cercato» è invece la
+        # chiave precisa (codice, quando presente) da passare alle fonti.
+        # Tenerli separati evita che il codice sostituisca il modello nella UI.
+        "modello": dettagli.get("model") if trovato else "",
+        "codice": codice,
+        "modello_cercato": modello_cercato,
+        "voci": raffronto.get("voci") or [],
+        "discordi": bool(raffronto.get("discordi")),
+        "stato_database": imeicheck.status(),
+        "cerco_fuori": cerco_fuori,
+        # Gia' chiesto fuori, e fuori non lo sanno: e' un esito, non
+        # un'attesa, e va detto con parole sue invece di lasciare la
+        # stessa pagina di un TAC mai chiesto a nessuno.
+        "chiesto_invano": chiesto_invano,
+        # E SE IL SERVIZIO ESTERNO È ROTTO, VA DETTO QUI, NON IN
+        # DIAGNOSTICA.
+        #
+        # Segnalato dall'utente il 01/09/2026: «il servizio esterno non
+        # funziona». Fino a ieri un guasto — chiave rifiutata, quota
+        # finita, servizio giù — produceva la stessa identica pagina di un
+        # TAC che nessuno conosce: «modello sconosciuto», e chi guarda
+        # conclude che il telefono non è in nessun catalogo, mentre il
+        # problema è a monte e si risolve in un minuto. Il quarto silenzio
+        # della serie, e il più fuorviante dei quattro.
+        "servizio_esterno_guasto": "" if chiesto_invano else _guasto_esterno_recente(),
+        # SE IL SERVIZIO ESTERNO NON È ATTIVO, VA DETTO DOVE SI VEDE.
+        #
+        # Un TAC che nessun database locale conosce viene chiesto fuori, ma
+        # solo se una chiave è configurata. Quando non lo è, la pagina
+        # diceva soltanto «modello sconosciuto»: identico a quello che
+        # direbbe con il servizio acceso e la risposta negativa. Due
+        # situazioni opposte — una si risolve mettendo una chiave, l'altra
+        # no — raccontate con la stessa frase, e chi gestisce il sito non
+        # aveva modo di distinguerle senza entrare in Diagnostica.
+        "servizio_esterno_attivo": bool(imeicheck._chiave_api()),
+        "siti": list(imeicheck.link_verifica(imei)),
+    }
+
+
+def _esito_imei_salvato(imei: str) -> dict:
+    """Risposta immediata dopo un salvataggio manuale, senza ricreare l'indice TAC.
+
+    Il redirect successivo a «Salva» deve confermare il dato appena scritto,
+    non scaricare/indicizzare centinaia di migliaia di TAC prima di rendere
+    la pagina. Al prossimo caricamento normale torna il confronto completo
+    fra tutte le fonti.
+    """
+    tac = imeicheck.tac_di(imei)
+    marca, dettagli_grezzi = imeicheck.tac_inseriti().get(tac, ("", ""))
+    dettagli = imeicheck.parse_specs(marca, dettagli_grezzi) if dettagli_grezzi else {}
+    modello = dettagli.get("model") or dettagli_grezzi
+    return {
+        "imei": imei, "tac": tac, "luhn_valid": imeicheck.is_valid_imei(imei),
+        "forma_imei": imeicheck.forma_imei(imei),
+        "imei_corretto": imeicheck.imei_con_cifra_di_controllo(imei),
+        "riconosciuto": bool(modello),
+        "descrizione": imeicheck.describe(marca, dettagli_grezzi) if modello else "",
+        "marca": marca, "modello": modello,
+        "codice": dettagli.get("code") or "",
+        "modello_cercato": (dettagli.get("code") or modello or ""),
+        "voci": ([{"fonte": imeicheck.FONTE_UTENTE, "marca": marca,
+                   "modello": modello, "codice": dettagli.get("code"),
+                   "anno": dettagli.get("year"), "raw": dettagli.get("raw", "")}]
+                 if modello else []),
+        "discordi": False, "stato_database": "conferma appena salvata",
+        "siti": list(imeicheck.link_verifica(imei)),
+    }
+
+
+def _modello_con_marca(marca: str, modello: str, codice: str = "") -> str:
+    """Nome commerciale leggibile, senza perdere la marca lungo la ricerca.
+
+    Le fonti firmware spesso restituiscono solo il codice o il nome corto;
+    il TAC invece tiene marca e modello separati. Questa è l'unica
+    composizione del nome usata dal risultato, così una ricerca per IMEI e
+    una per codice non possono più mostrare «A-16 4G» o «C63» nudi.
+    """
+    modello = " ".join(str(modello or "").split())
+    marca = " ".join(str(marca or "").split())
+    if not modello:
+        return ""
+
+    basso = modello.lower()
+    # Un nome che dichiara già la sua marca non va prefissato di nuovo.
+    marchi_nel_nome = ("samsung", "redmi", "xiaomi", "poco",
+                       "realme", "oppo", "oneplus", "motorola", "moto",
+                       "google", "honor", "huawei", "apple",
+                       "vivo", "iqoo", "nothing", "nokia", "sony")
+    if basso.startswith(marchi_nel_nome):
+        return modello
+
+    # Alcuni moduli usano il gruppo tecnico del tracker per realme/Oppo/
+    # OnePlus o Redmi/Xiaomi/POCO. Per la UI serve il marchio che l'utente
+    # riconosce; il codice modello dà questa distinzione senza euristiche.
+    gruppo = marca.lower()
+    codice = (codice or "").strip().upper()
+    if "realme" in gruppo and codice.startswith(("RMX", "RMP")):
+        marca = "realme"
+    elif "oppo" in gruppo and codice.startswith("CPH"):
+        marca = "OPPO"
+    elif "xiaomi" in gruppo and codice:
+        marca = "Xiaomi"
+    elif "vivo" in gruppo:
+        # Motorola e iQOO arrivano gia' con il marchio nel nome; per un
+        # nome nudo del gruppo (V60, X200...) la forma commerciale e vivo.
+        marca = "vivo"
+    elif "/" in marca:
+        marca = ""
+
+    if not marca or marca.lower() in ("sconosciuto", "other", "altri brand"):
+        return modello
+    if basso.startswith(marca.lower() + " "):
+        return modello
+    return f"{marca} {modello}"
+
+
+def _android_da_scheda(scheda: dict) -> str:
+    """Versione Android di lancio come ultimo ripiego esplicito.
+
+    Non la promuove mai a OTA corrente: serve a evitare una scheda tecnica
+    corretta con una pagina che afferma di non sapere nemmeno Android.
+    """
+    for etichetta, valore in scheda.get("voci") or []:
+        if etichetta == "Sistema di lancio" and valore:
+            return " ".join(str(valore).split())
+    return ""
+
+
+def _semplifica_nome(testo: str) -> str:
+    """Solo lettere e cifre minuscole: serve a confrontare due grafie."""
+    return "".join(c for c in (testo or "").lower() if c.isalnum())
+
+
+def _identita_da_mostrare(imei: dict, nome_pagina: str) -> dict:
+    """Il nome commerciale davanti, la risposta grezza del database dietro.
+
+    La riga «IMEI riconosciuto» riporta di proposito quello che ha detto la
+    fonte, alla lettera: è la stessa onestà per cui più sotto si mostra il
+    confronto fra database TAC discordi. Ma quando quel database conosce
+    solo il codice — risponde «Oppo Cph2781», «Motorola Webb25» — la riga
+    finiva per contraddire il titolo appena sopra («Oppo A6 Pro»), e chi
+    legge non poteva sapere quale delle due credere.
+
+    Si mostrano quindi entrambi, ma soltanto quando dicono cose diverse:
+    ripetere lo stesso nome due volte nella stessa riga sarebbe rumore. Un
+    nome contenuto nell'altro («A6 Pro» dentro «Oppo A6 Pro») è la stessa
+    cosa detta più corta, non un disaccordo.
+
+    Qui non si tocca `modello_cercato`: è la chiave con cui si interrogano
+    le fonti, ed è quella che porta scheda tecnica e foto.
+    """
+    if not imei or not imei.get("riconosciuto"):
+        return imei
+
+    annotato = dict(imei)
+    nome = (nome_pagina or "").strip()
+    dal_database = (imei.get("modello") or "").strip()
+    annotato["nome_mostrato"] = nome or dal_database
+
+    a, b = _semplifica_nome(nome), _semplifica_nome(dal_database)
+    annotato["nome_diverso_dal_database"] = bool(
+        a and b and a not in b and b not in a)
+    return annotato
+
+
+def _nome_appartiene_al_codice(nome: str, codice: str) -> bool:
+    """Se quel nome è uno dei nomi con cui quel codice viene venduto.
+
+    Serve a distinguere due cose che si somigliano soltanto: una variante
+    regionale dello stesso telefono («OnePlus 10R» e «一加 10R» per
+    CPH2423) e un nome che appartiene a un telefono diverso («realme C65»,
+    che è RMX3910, appiccicato a RMX3997).
+
+    L'ESEMPIO QUI SOPRA È STATO CORRETTO: diceva «realme C65 5G», e con il
+    5G è falso — quello è uno dei nomi VERI di RMX3997 (vedi il commento
+    lungo in `_ancora_esito_imei`, stesso sbaglio preso e già raddrizzato
+    lì). Senza il 5G il nome è di RMX3910, ed è il caso che questa
+    funzione deve fermare.
+
+    Il confronto è generoso su come è scritto — maiuscole, spazi e
+    trattini non contano, e un nome contenuto nell'altro basta, perché le
+    fonti aggiungono e tolgono la parola della marca a piacere.
+
+    MA IL CONTENUTO DEVE COMINCIARE E FINIRE DOVE FINISCE UNA PAROLA.
+    Prima il confronto avveniva sulle stringhe appiattite, senza spazi, e
+    «Mi Note 10» risultava contenuto in «Redmi Note 10» — `minote10` sta
+    dentro `redminote10` per tre lettere di distanza. Sono due telefoni
+    diversi, e il freno che doveva accorgersene diceva di sì.
+    Segnalato dal banco di prova (`M1910F4G`, che è un Mi Note 10) mentre
+    la fonte Xiaomi rispondeva «Redmi Note 10 EEA»: nome accettato,
+    scheda tecnica di un altro telefono, e nessun modo di accorgersene.
+
+    «Galaxy A54 5G» dentro «Samsung Galaxy A54 5G» continua a valere:
+    lì il pezzo in più è una parola intera.
+    """
+    if not nome or not codice:
+        return True
+    try:
+        noti = modelcodes.resolve(codice)
+    except Exception:
+        return True
+    if not noti:
+        # Nessuno conosce quel codice: non c'è niente con cui smentire il
+        # nome, e un nome vale più del nulla.
+        return True
+    if not _semplifica_nome(nome):
+        return True
+    return any(_uno_dentro_l_altro(nome, n) for n in noti)
+
+
+def _parole_e_confini(nome: str) -> tuple[str, set[int]]:
+    """La forma appiattita di un nome e le posizioni in cui, dentro quella
+    forma, comincia (o finisce) una parola.
+
+    Le parole si tagliano su tutto ciò che non è una lettera o una cifra —
+    ideogrammi COMPRESI, che sono lettere. Buttarli via, come faceva la
+    versione appiattita di prima, riduce «小米 Note 10» a «note10», che poi
+    risulta contenuto in mezzo mondo: era la seconda strada per cui «Redmi
+    Note 10» passava per un «Mi Note 10».
+    """
+    parole = [p for p in re.split(r"[\W_]+", (nome or "").lower()) if p]
+    confini = {0}
+    posizione = 0
+    for parola in parole:
+        posizione += len(parola)
+        confini.add(posizione)
+    return "".join(parole), confini
+
+
+def _uno_dentro_l_altro(uno: str, altro: str) -> bool:
+    """Se uno dei due nomi è l'altro con parole intere in più."""
+    a, confini_a = _parole_e_confini(uno)
+    b, confini_b = _parole_e_confini(altro)
+    if not a or not b:
+        return False
+    for piccolo, grande, confini in ((a, b, confini_b), (b, a, confini_a)):
+        inizio = grande.find(piccolo)
+        while inizio != -1:
+            if inizio in confini and inizio + len(piccolo) in confini:
+                return True
+            inizio = grande.find(piccolo, inizio + 1)
+    return False
+
+
+def _con_rete(scheda: dict | None, nome: str, grezzo: str = "") -> dict | None:
+    """Calcola 4G/5G una volta sola e lo lascia anche dentro la scheda.
+
+    Due punti della stessa pagina lo mostrano — la pastiglia accanto al
+    nome e la scheda tecnica — e in questo progetto due punti che
+    calcolano lo stesso dato per conto loro sono due punti che prima o poi
+    dicono cose diverse (è già successo con il processore).
+    """
+    rete = P.rete_mobile(scheda, nome, grezzo)
+    if isinstance(scheda, dict):
+        scheda["rete"] = rete
+    return rete
+
+
+def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
+    """Il TAC stabilisce l'identità; il firmware può solo arricchirla.
+
+    In precedenza qui veniva copiato ``modello_cercato`` nel titolo. Poiché
+    quel campo è volutamente il codice da inviare alle fonti (SM-A165F,
+    RMX3939…), la UI perdeva sistematicamente brand e nome commerciale.
+    """
+    identita = imei.get("modello_cercato") or ""
+    if not identita:
+        return risultato
+
+    ancorato = dict(risultato)
+    codice = imei.get("codice") or ancorato.get("codice", "")
+    modello = imei.get("modello") or identita
+    marca = imei.get("marca", "")
+
+    # IL NOME CANONICO DEL CODICE VIENE PRIMA DI QUELLO DEL TAC.
+    #
+    # Mancava del tutto da questa catena: il nome poteva arrivare solo
+    # dal titolo della scheda o dal database TAC. Ma il TAC scrive spesso
+    # il codice travestito da nome — «POCO 25028pc03y», «Redmi
+    # 25057rn09g», «Oppo Cph2785» — e in quei casi la pagina mostrava
+    # quello, mentre `modelcodes` sapeva benissimo che sono «POCO C71»,
+    # «REDMI 15 5G» e «OPPO A6». La risposta era in casa e non veniva
+    # chiesta a nessuno.
+    #
+    # E il danno non era solo il titolo: con un nome finto in mano anche
+    # la scheda tecnica veniva cercata per quel nome, quindi sparivano
+    # insieme specifiche e foto. È lo stesso guasto a cascata segnalato
+    # dall'utente su CPH2781, per un'altra strada.
+    #
+    # QUANDO IL TAC DÀ UN NOME CHE NON APPARTIENE A QUEL CODICE, VINCE IL
+    # CODICE. Il primo freno guardava la FORMA del nome — si correggeva
+    # solo un nome a forma di codice — e lasciava passare il caso
+    # peggiore, che è un nome commerciale plausibile ma di un altro
+    # telefono. Segnalato dall'utente il 17/08/2026 con l'IMEI
+    # 865229072199770:
+    #
+    #     il TAC dice        «Realme C65 5G (RMX3997)»
+    #     l'utente ha in mano realme 12x 5G
+    #
+    # ATTENZIONE, QUI MI ERO SBAGLIATO UNA PRIMA VOLTA: avevo concluso
+    # che «C65 5G» fosse un altro telefono, leggendo un catalogo caricato
+    # a metà. Con il catalogo intero quel codice risulta venduto sotto
+    # TRE nomi — C65 5G, NARZO N65, 12x 5G — tutti veri, in mercati
+    # diversi. Non c'era nessun nome sbagliato da scartare: c'era da
+    # SCEGLIERE, e la scelta è quella europea, perché è il nome sotto cui
+    # il telefono riceve gli aggiornamenti che si devono provare.
+    #
+    # Sceglie `nome_canonico`, che applica anche le righe curate di
+    # `data/nomi_modello.csv` — e quelle righe non inventano niente:
+    # valgono solo per scegliere fra nomi che il dataset già conosce.
+    # Il nome del TAC, che è community, non le scavalca.
+    #
+    # Il codice resta comunque la parte esatta — è la chiave che le fonti
+    # ufficiali accettano, ed è il motivo per cui tutta questa
+    # applicazione cerca per codice e non per nome.
+    #
+    # Il freno buono non è la forma del nome ma la sua APPARTENENZA: se
+    # il nome del TAC è fra quelli noti per quel codice, è una variante
+    # regionale legittima e non si tocca — «Galaxy A54 5G» per SM-A546B
+    # resta «Galaxy A54 5G». Se non c'è, quel nome parla di un altro
+    # telefono.
+    #
+    # Restano DUE condizioni, non una: certi cataloghi elencano fra i nomi
+    # di un codice il codice stesso, quindi «POCO 25028pc03y» risulta
+    # appartenergli e il solo controllo di appartenenza lo lascerebbe
+    # passare. Un nome che contiene il codice non è mai un nome
+    # commerciale, qualunque catalogo lo elenchi.
+    #
+    # E VINCE SOLO LA RIGA CURATA, non il nome canonico in generale.
+    # Provato a farlo vincere sempre: si perdeva «Galaxy A16 4G», che è
+    # la grafia completa conservata dal catalogo tecnico, sostituita dal
+    # più corto «Galaxy A16». Un nome scelto automaticamente non è più
+    # informato di una scheda verificata; una riga scritta a mano sì.
+    #
+    # «CURATO» SIGNIFICA «LA RIGA HA AVUTO EFFETTO», non «la riga esiste».
+    # `nome_canonico` applica una riga di `nomi_modello.csv` solo se quel
+    # nome compare già fra quelli noti per il codice — è la garanzia che
+    # una riga scelga fra nomi verificati invece di inventarne uno. Quando
+    # quella condizione non è soddisfatta la riga non fa nulla, e trattarla
+    # ugualmente come una decisione presa faceva perdere «Redmi A7 Pro»
+    # del catalogo tecnico in favore del «REDMI A7 Pro» tutto maiuscolo.
+    canonico = _nome_del_codice(codice) if codice else None
+    if canonico and (not _nome_appartiene_al_codice(modello, codice)
+                     or _semplifica_nome(codice) in _semplifica_nome(modello)):
+        modello = canonico
+
+    nome_della_scheda = modello
+    marca_della_scheda = marca
+    ancorato["scheda"] = P.scheda_tecnica(
+        modello, codice=codice or identita, brand=marca)
+    # Il catalogo tecnico curato conserva la grafia commerciale completa
+    # (es. «Galaxy A16 4G»). Il TAC puÃ² invece avere un nome abbreviato o
+    # tutto maiuscolo: per la UI si privilegia quindi il titolo della scheda
+    # che Ã¨ stata appena trovata per lo stesso codice, senza permettere alla
+    # ricerca firmware di rinominare l'identitÃ .
+    #
+    # ...ma NON sopra il nome canonico del codice, quando c'è. Anche il
+    # titolo della scheda è uno dei nomi di mercato («Realme C65 5G» per
+    # RMX3997), e lasciarlo vincere rimetteva la pagina dell'IMEI in
+    # disaccordo con la stessa ricerca fatta per codice: lo stesso
+    # telefono con due nomi a seconda di come lo si è cercato.
+    #
+    # E QUESTA REGOLA, SCRITTA QUI SOPRA, NON ERA IMPLEMENTATA. Il commento
+    # diceva «non sopra il nome canonico del codice», il codice invece
+    # assegnava il titolo della scheda senza guardare niente. Segnalato
+    # dall'utente il 31/08/2026 con l'IMEI 866068054131131: il database TAC
+    # risponde «OPPO A74, Oppo CPH2219» — il nome giusto, quello europeo —
+    # e la pagina mostrava «Oppo F19», che è il nome indiano dello stesso
+    # telefono, perché è così che il catalogo GSMArena indicizza CPH2219.
+    # L'app aveva la risposta esatta in mano e la buttava all'ultimo passo.
+    #
+    # La distinzione che serviva è fra CORREGGERE UNA GRAFIA e CAMBIARE
+    # TELEFONO:
+    #
+    #     «Galaxy A16»  → «Galaxy A16 4G»   la scheda completa la grafia, e
+    #                                        deve vincere (è il caso che ha
+    #                                        motivato la regola originale)
+    #     «OPPO A74»    → «Oppo F19»         la scheda cambia nome di
+    #                                        mercato, e non è affare suo
+    #
+    # `modelcodes.stesso_telefono` è la stessa regola di famiglia che
+    # `nome_canonico` usa già per scegliere fra i nomi di un codice: se i
+    # due nomi sono della stessa famiglia il titolo della scheda passa,
+    # altrimenti resta il nome canonico del codice — che è l'unico posto
+    # dove le righe verificate di `data/nomi_modello.csv` hanno voce.
+    titolo_scheda = (ancorato["scheda"].get("titolo") or "").strip()
+    scheda_rinomina = bool(
+        canonico and titolo_scheda
+        and not modelcodes.stesso_telefono(titolo_scheda, canonico))
+    if ancorato["scheda"].get("trovata") and titolo_scheda and not scheda_rinomina:
+        modello = titolo_scheda
+        marca = ancorato["scheda"].get("marca") or marca
+        # Il nome è cambiato perché l'ha dettato LA SCHEDA STESSA: quella
+        # che c'è già è sua, e la seconda lettura in fondo alla funzione
+        # non deve scattare. Senza questa riga «Galaxy A54 5G» faceva
+        # ricercare la scheda sotto il proprio titolo «Samsung Galaxy
+        # A54»: un giro in più per riottenere quello che si aveva, con il
+        # rischio di non ritrovarlo.
+        nome_della_scheda = modello
+
+    # ULTIMA PAROLA ALLA RIGA SCRITTA A MANO, e solo quando cambia
+    # davvero telefono.
+    #
+    # RMX3997 è venduto come «C65 5G», «NARZO N65» e «realme 12x 5G»:
+    # tutti nomi veri, e sia il TAC sia il catalogo tecnico ne
+    # restituiscono uno qualsiasi. In Europa serve l'ultimo, perché è il
+    # nome sotto cui quel telefono riceve gli aggiornamenti da provare, e
+    # nessun automatismo può saperlo: lo sa `data/nomi_modello.csv`.
+    #
+    # La condizione «cambia davvero telefono» è ciò che ha reso questa
+    # regola innocua dopo due tentativi sbagliati. Le prime due versioni
+    # facevano vincere il nome curato anche quando differiva solo nella
+    # grafia, e così «Redmi A7 Pro» del catalogo tecnico diventava
+    # «REDMI A7 Pro»: una regola nata per dare il nome giusto che
+    # peggiorava quello che era già giusto.
+    #
+    # «CAMBIA DAVVERO TELEFONO» SI CHIEDE ALLA FAMIGLIA DEL NOME, non al
+    # confronto fra due stringhe. Con il confronto secco, la riga curata
+    # `CPH2219 → OPPO A74` accorciava «OPPO A74 4G» — la grafia completa
+    # che il catalogo tecnico conserva — in «OPPO A74»: un nome più
+    # preciso non è un nome diverso, ed è esattamente la regressione che
+    # questa condizione era nata per evitare (il «REDMI A7 Pro» del
+    # commento qui sopra), ricomparsa da un'altra porta appena una riga
+    # curata ha coperto un codice che il catalogo descrive più in
+    # dettaglio del dataset dei nomi.
+    scritto_a_mano = modelcodes.nome_scelto_a_mano(codice) if codice else None
+    if (scritto_a_mano and canonico
+            and _semplifica_nome(scritto_a_mano) == _semplifica_nome(canonico)
+            and not modelcodes.stesso_telefono(modello, canonico)):
+        modello = canonico
+        marca = ""       # il nome curato è già completo di marca
+
+    # E SOPRA TUTTO, LA CORREZIONE SCRITTA A MANO.
+    #
+    # Questa catena non l'ha mai consultata: chi correggeva il nome dalla
+    # pagina lo vedeva cambiare cercando il codice e tornare quello di
+    # prima cercando l'IMEI dello stesso telefono. Una correzione che vale
+    # su tre strade su quattro non è una correzione, è una trappola — e
+    # l'IMEI è proprio la strada di chi ha il telefono in mano e sa come
+    # si chiama.
+    corretto_a_mano = _correzione_salvata(codice, identita)
+    if corretto_a_mano:
+        modello = corretto_a_mano
+        marca = ""                # la correzione è già completa di marca
+
+    # LA SCHEDA DEVE ESSERE QUELLA DEL NOME CHE SI MOSTRA.
+    #
+    # Difetto misurato in produzione il 18/08/2026 su RMX3997: la stessa
+    # ricerca dava DUE SCHEDE DIVERSE a seconda della strada.
+    #
+    #     cercando il codice   Dimensity 6100 Plus, 8 GB
+    #     partendo dall'IMEI   Dimensity 6300,      6 GB
+    #
+    # con lo stesso titolo, «realme 12x 5G», sopra tutte e due. Non e' un
+    # dettaglio: chi ha il telefono in mano legge le specifiche di un
+    # altro telefono, e non ha modo di accorgersene.
+    #
+    # La causa e' l'ORDINE di questa funzione, non il contenuto dei
+    # cataloghi. La scheda si cerca qui sopra, con il nome che il TAC ha
+    # dato («Realme C65 5G»); il nome definitivo viene deciso DOPO, dalla
+    # riga curata di `data/nomi_modello.csv` che sceglie il nome europeo.
+    # Restava appesa alla pagina la scheda di una variante di un altro
+    # mercato, che monta un chip diverso.
+    #
+    # Il codice da solo non basta a evitarlo: `specs.cerca("RMX3997")` non
+    # risponde — quel catalogo indicizza per nome molto piu' spesso che
+    # per codice — quindi e' il nome a decidere, ed e' il nome che deve
+    # essere quello giusto.
+    #
+    # SI RIFA' SOLO SE IL NOME E' CAMBIATO DAVVERO, e nel caso normale
+    # (nome del TAC gia' corretto) non costa niente. La riscrittura
+    # dell'ordine intero e' stata scartata: le due correzioni a mano in
+    # fondo devono restare le ultime a parlare, e il titolo della scheda
+    # deve poter correggere la grafia del TAC — sono vincoli opposti che
+    # solo una seconda lettura concilia.
+    #
+    # E SE PER IL NOME GIUSTO NON C'E' SCHEDA, NON SI RESTA A MANI VUOTE.
+    # Si tiene quella che c'era e le si mette accanto l'avvertenza: sono
+    # le specifiche della variante che il TAC ha nominato, e le varianti
+    # di mercati diversi possono montare hardware diverso. Chiesto
+    # dall'utente il 18/08/2026, e ha ragione: chi ha il telefono in mano
+    # vuole un numero da confrontare con la scatola, e un dato dichiarato
+    # incerto e' utile, mentre un riquadro vuoto non serve a nessuno. La
+    # regola del progetto — non riempire le lacune in silenzio — resta
+    # intatta, perche' qui la lacuna viene DETTA.
+    if _semplifica_nome(modello) != _semplifica_nome(nome_della_scheda):
+        rifatta = P.scheda_tecnica(
+            modello, codice=codice or identita,
+            brand=marca or marca_della_scheda)
+        if rifatta.get("trovata") or not ancorato["scheda"].get("trovata"):
+            ancorato["scheda"] = rifatta
+        else:
+            ancorato["scheda"] = dict(ancorato["scheda"])
+            ancorato["scheda"]["nota_mercato"] = (
+                f"Attenzione: queste specifiche sono quelle di "
+                f"«{nome_della_scheda}», il nome con cui i database TAC "
+                f"conoscono questo codice. Per «{modello}» il catalogo "
+                f"tecnico non ha una scheda propria. Lo stesso codice viene "
+                f"venduto in mercati diversi con nomi diversi, e le varianti "
+                f"possono montare memoria, processore o batteria differenti: "
+                f"potrebbe non essere il modello europeo. Verifica sulla "
+                f"scatola o in Impostazioni prima di darle per certe.")
+
+    # E IL TITOLO DELLA SCHEDA SEGUE IL NOME MOSTRATO, quando parlano
+    # dello stesso telefono con due nomi di mercato diversi.
+    #
+    # Il catalogo tecnico indicizza `CPH2219` come «Oppo F19»: è la stessa
+    # scheda, lo stesso hardware, un altro nome commerciale. Poco sopra si
+    # è deciso che il nome è «OPPO A74» — quello europeo — ma la scheda
+    # restava intestata all'altro, e la pagina del dispositivo in archivio
+    # (che mostra l'intestazione della scheda) sarebbe tornata a dire
+    # «Oppo F19» sotto un titolo «OPPO A74». Due nomi per lo stesso
+    # telefono nella stessa pagina è il difetto che questa funzione esiste
+    # per chiudere.
+    #
+    # NON tocca il caso della `nota_mercato` qui sopra: là la scheda è
+    # davvero di un'altra variante, la differenza è dichiarata a parole, e
+    # cambiarle il titolo cancellerebbe proprio l'avvertenza.
+    titolo_finale = (ancorato["scheda"].get("titolo") or "").strip()
+    if (ancorato["scheda"].get("trovata") and titolo_finale and modello
+            and not ancorato["scheda"].get("nota_mercato")
+            and not modelcodes.stesso_telefono(titolo_finale, modello)):
+        ancorato["scheda"] = dict(ancorato["scheda"], titolo=modello)
+
+    ancorato["query"] = identita
+    ancorato["nome"] = _modello_con_marca(marca, modello, codice) or modello
+    ancorato["codice"] = codice
+    ancorato["codice_per_correzione"] = codice
+    ancorato["trovato"] = True
+    # 4G o 5G. Qui si passa anche la riga GREZZA del database TAC («SAMSUNG
+    # GALAXY A54 5G, SM-A546B»): è il TAC ad aver identificato l'esemplare
+    # che qualcuno ha in mano, e a volte la sigla della variante sopravvive
+    # lì mentre il nome canonico del codice l'ha già persa.
+    ancorato["rete"] = _con_rete(
+        ancorato.get("scheda"), ancorato["nome"],
+        imei.get("descrizione") or imei.get("modello") or "")
+
+    # Se nessuna fonte OTA è interrogabile, la versione Android della scheda
+    # è comunque un dato tecnico utile. Viene etichettata come versione di
+    # lancio, non falsamente come l'ultimo firmware.
+    if not ancorato.get("riga"):
+        android = _android_da_scheda(ancorato["scheda"])
+        if android:
+            ancorato["riga"] = f"Versione Android verificata: {android} (di lancio)"
+            ancorato["fonte"] = (ancorato["scheda"].get("fonte")
+                                  or "scheda tecnica verificata")
+            ancorato["senza_firmware"] = False
+            ancorato["tipo_versione"] = C.FW_FACTORY
+
+    # Per un'identità TAC non si propongono modelli con un nome simile:
+    # sarebbero candidati per una domanda testuale, non alternative allo
+    # stesso dispositivo fisico.
+    ancorato["forse"] = []
+    ancorato["gemelli"] = []
+    ancorato["opzioni_correzione"] = []
+    return ancorato
+
+
+def _esito_solo_identita(query: str) -> dict:
+    """Risposta immediata dopo un salvataggio TAC, senza rete o cataloghi."""
+    return {
+        "query": query, "trovato": False, "nome": query, "codice": "",
+        "codice_per_correzione": "", "corretto_a_mano": False,
+        "riga": "", "fonte": "", "senza_firmware": False,
+        "scheda": {"trovata": False}, "notizie": [], "quante_notizie": 0,
+        "forse": [], "gemelli": [], "opzioni_correzione": [],
+        "storico": [], "chiave": "", "nota_fonte": None, "errore": None,
+    }
+
+
+# ======================================================================
+# La ricerca
+# ======================================================================
+def _chiave_ricerca(query: str) -> str:
+    """«  SM-A075F » e «sm-a075f» sono la stessa domanda.
+
+    Senza questa riduzione la cache risponderebbe solo a chi ridigita
+    esattamente gli stessi spazi e le stesse maiuscole, cioè quasi a
+    nessuno — e una cache che non risponde è solo memoria occupata.
+    """
+    return " ".join(str(query or "").split()).lower()
+
+
+def _ricerca_debole(esito: dict) -> bool:
+    """Questa risposta lascia la domanda senza risposta?
+
+    Sono i due casi che una persona vede come «non ha funzionato»: non
+    ho trovato il telefono, oppure l'ho trovato ma non so dirti a che
+    versione sta.
+    """
+    return bool(esito) and (not esito.get("trovato") or esito.get("senza_firmware"))
+
+
+def _soccorso_ai(query: str) -> dict | None:
+    """Riprova la ricerca con quello che l'AI ha capito, e torna il
+    risultato migliore — oppure None se non c'è niente di meglio.
+
+    ## Perché l'AI non è più un tasto (16/08/2026)
+
+    Richiesta dell'utente: «vista l'attuale inutilità del tasto AI la
+    integrerei nella ricerca normale, migliorando le ricerche
+    attualmente critiche come quelle che hanno fonti peggiori».
+
+    Aveva ragione, e il motivo è nel codice: la correzione automatica dei
+    refusi e dei codici gira SEMPRE e per prima. Quando la ricerca
+    normale bastava, il tasto non aggiungeva niente; quando non bastava,
+    toccava accorgersene e premerlo — cioè proprio nel momento in cui una
+    persona conclude che il sito non sa rispondere e se ne va.
+
+    Ora parte da solo, ma SOLO sulla strada debole: se la ricerca normale
+    ha già una versione, l'AI non viene nemmeno interpellata. Costa una
+    chiamata al modello e una seconda ricerca, e le paga solo chi
+    altrimenti non avrebbe avuto niente.
+
+    Il risultato si tiene solo se è MIGLIORE: un'interpretazione che
+    porta a un altro buco viene scartata, e resta la risposta onesta
+    sulla domanda originale.
+    """
+    if not aiquery.disponibile():
+        return None
+    try:
+        interpretazione = aiquery.interpreta(query)
+    except Exception:      # pragma: no cover - l'AI non deve far cadere la ricerca
+        return None
+    if not interpretazione.riuscita:
+        return None
+
+    # Due tentativi al massimo: ognuno è una ricerca vera, e la pagina
+    # deve restare una pagina, non un'attesa.
+    for proposta in list(interpretazione.proposte)[:2]:
+        if not proposta or proposta.strip().lower() == query.strip().lower():
+            continue
+        candidato = _cerca_davvero(proposta)
+        if _ricerca_debole(candidato):
+            continue
+        candidato = dict(candidato)
+        candidato["ai_da"] = query
+        candidato["ai_a"] = proposta
+        candidato["ai_perche"] = interpretazione.motivo
+        return candidato
+    return None
+
+
+def _in_due_tempi(completo: int = 0) -> bool:
+    """Se la pagina deve rispondere subito e chiedere il firmware dopo.
+
+    `completo=1` la disattiva: è la via d'uscita del `<noscript>` e serve
+    a chi non ha JavaScript, che altrimenti resterebbe con la rotellina
+    per sempre. È anche l'interruttore per capire, davanti a una pagina
+    strana, se il problema è nel secondo caricamento o nella ricerca.
+    """
+    return not completo and C.RICERCA_IN_DUE_TEMPI
+
+
+def _esito_ricerca(query: str, senza_rete: bool = False) -> dict:
+    """Cosa dicono le fonti su quello che è stato digitato.
+
+    La stessa domanda posta due volte di seguito non ripaga tredici
+    secondi di rete: la seconda risposta viene dalla memoria corta. La
+    durata è in `SEARCH_CACHE_SECONDS`, e a zero questo ramo non esiste.
+
+    Se la risposta resta debole, ci prova l'AI — vedi `_soccorso_ai`.
+    Sta QUI e non nella rotta della ricerca di proposito: così vale anche
+    per il confronto fra due modelli, che condivide questa funzione, e
+    non si crea la seconda strada che questo file evita ovunque.
+    """
+    chiave = _chiave_ricerca(query)
+    pronto = RICERCHE.leggi(chiave)
+    if pronto is not None:
+        return pronto
+    if senza_rete:
+        # NON SI SCRIVE IN CACHE. Questa è una risposta volutamente
+        # parziale — identità e scheda, firmware ancora da chiedere — e
+        # metterla in memoria significherebbe servirla come se fosse
+        # completa a chiunque cerchi lo stesso modello nei minuti
+        # successivi, compreso il secondo caricamento che sta per
+        # arrivare. Il risultato sarebbe una pagina ferma sulla rotellina.
+        esito = _cerca_davvero(query, senza_rete=True)
+        esito["firmware_in_arrivo"] = True
+        return esito
+    esito = _cerca_davvero(query)
+    if _ricerca_debole(esito):
+        migliore = _soccorso_ai(query)
+        if migliore is not None:
+            # Un firmware disponibile non autorizza l'AI a cambiare un telefono
+            # già identificato. Moto G30 senza aggiornamenti resta Moto G30.
+            identificato = esito.get("trovato") or esito.get("scheda", {}).get("trovata")
+            if not identificato or modelcodes.stesso_telefono(
+                    esito.get("nome") or query, migliore.get("nome") or ""):
+                esito = migliore
+    RICERCHE.scrivi(chiave, esito)
+    return esito
+
+
+def _esito_vuoto(query: str) -> dict:
+    """La forma di un risultato quando non c'è niente da dire.
+
+    Serve al ramo dell'IMEI riconosciuto come valido ma di modello
+    ignoto: senza, il template riceveva `None` e mezza pagina spariva,
+    compreso il riquadro che spiega come salvare il modello a mano.
+    """
+    return {
+        "query": query, "trovato": False, "nome": query, "codice": "",
+        "riga": "", "fonte": "", "senza_firmware": False,
+        "scheda": P.scheda_tecnica(query), "notizie": [], "quante_notizie": 0,
+        "forse": _forse_cercavi(query, query, "", False),
+        "gemelli": [],
+        "storico": [], "chiave": "", "nota_fonte": None, "errore": None,
+    }
+
+
+def _codici_del_risultato(query: str, nome: str) -> list[str]:
+    """Il codice che questa ricerca ha in mano — quello scritto, o quello
+    che il nome trovato porta con sé — per guardare cos'altro il dataset
+    sa su di lui. Non deduce niente: guarda solo cosa c'è già scritto o
+    già risolto altrove nella stessa ricerca.
+
+    IL CODICE SCRITTO VINCE SEMPRE SU QUELLO DEL NOME TROVATO, quando
+    c'è. «realme RMX3933» risolve al nome «C61» (il nome canonico del
+    codice, scelto perché il più corto — vedi `nome_canonico`), ma il
+    codice DAVVERO cercato è RMX3933, non RMX3930 (il codice che «C61» da
+    solo risolverebbe tramite `codes_for_name`). Confondere i due
+    significherebbe mostrare i gemelli del codice sbagliato — misurato:
+    senza questo passaggio, cercare «realme RMX3933» faceva vedere i
+    gemelli di RMX3930, che non è quello scritto.
+
+    `_code_candidates` riconosce solo un testo che HA GIÀ la forma di un
+    codice: con la marca davanti («realme RMX3933») non ce l'ha più, va
+    tolta prima di riprovare — stessa correzione già fatta in
+    `expand_query` per la stessa ragione.
+    """
+    codici = list(sources._code_candidates(query))
+    if not codici:
+        senza_marca = sources._RE_MARCA_DAVANTI.sub("", query or "").strip()
+        if senza_marca and senza_marca != query:
+            codici = list(sources._code_candidates(senza_marca))
+    if not codici and nome:
+        codici = modelcodes.codes_for_name(nome)
+    return codici
+
+
+def _nomi_gemelli(query: str, nome: str) -> list[str]:
+    """Altri nomi commerciali VERI dello stesso codice modello — non
+    somiglianze di stringa come `_forse_cercavi`, ma la stessa riga del
+    dataset.
+
+    PERCHÉ SERVE. `modelcodes.nome_canonico` sceglie UN nome per codice,
+    sempre allo stesso modo (il più corto), perché l'archivio ha bisogno
+    di una chiave sola per dispositivo. Ma quando un codice ha più nomi
+    commerciali VERI — `RMX3933` è insieme «C61», «Note 60», «Note 60s»
+    e «NARZO N61», la stessa piattaforma venduta con nomi diversi in
+    mercati diversi — quella scelta è ARBITRARIA dal punto di vista di
+    chi ha in mano uno di quei telefoni: chi ha un «Note 60» vede la sua
+    ricerca rispondere «C61» senza nessun segnale che non è l'unico nome
+    possibile. Misurato: `RMX3933` e `CPH2781` (quest'ultimo «OPPO F31»
+    / «OPPO A6 Pro» / «OPPO A6 Pro 5G» / «OPPO F31 5G») lo mostrano
+    entrambi.
+
+    Mostrare questi nomi — dichiarati come certi, non come un «forse» —
+    è più onesto che tacere l'ambiguità: chi riconosce il proprio
+    telefono in uno di essi sa di essere nel posto giusto anche se il
+    titolo della pagina dice un nome diverso dal suo.
+
+    UNA FORMA E «MARCA + QUELLA STESSA FORMA» NON SONO DUE GEMELLI.
+    Segnalato dall'utente: `RMX3933` risolve anche a «realme Note 60»,
+    che è «Note 60» col produttore scritto davanti — non un telefono in
+    più, la stessa identica forma commerciale. Mostrarle come due voci
+    separate fa sembrare che siano due cose diverse da scegliere, quando
+    ce n'è solo una. Si tiene una forma sola per gruppo — la più corta,
+    stessa preferenza di `modelcodes.nome_canonico` — confrontando le
+    forme con `modelcodes._normalize_name`, che toglie il prefisso di
+    marca proprio per questo motivo (vedi il suo docstring). «Note 60» e
+    «Note 60s» restano invece due voci distinte: sono due telefoni
+    regionali diversi, non la stessa forma scritta in due modi.
+    """
+    scritto = (query or "").strip().lower()
+    for codice in _codici_del_risultato(query, nome)[:1]:
+        nomi_reali = [n for n in modelcodes.resolve(codice)
+                     if not modelcodes._e_il_codice(n, codice)]
+
+        forma_per_chiave: dict[str, str] = {}
+        ordine: list[str] = []
+        for n in nomi_reali:
+            chiave = modelcodes._normalize_name(n)
+            if chiave not in forma_per_chiave:
+                forma_per_chiave[chiave] = n
+                ordine.append(chiave)
+            elif len(n) < len(forma_per_chiave[chiave]):
+                forma_per_chiave[chiave] = n
+
+        chiave_nome = modelcodes._normalize_name(nome)
+        gemelli = []
+        for chiave in ordine:
+            if chiave == chiave_nome:
+                continue
+            n = forma_per_chiave[chiave]
+            if n.lower() == scritto or n in gemelli:
+                continue
+            gemelli.append(n)
+        return gemelli[:6]
+    return []
+
+
+def _opzioni_correzione(nome: str, gemelli: list[str], codice: str) -> list[str]:
+    """Le forme fra cui scegliere nella correzione a mano del nome — non
+    sempre le stesse di `_nomi_gemelli`.
+
+    Segnalato dall'utente su RMX3933: nessuno dei nomi VERI di quel codice
+    scrive «realme» per esteso nel dataset (solo «NARZO N61», riconosciuto
+    come sinonimo — vedi `core/versus.py::_MARCHE_SCOPERTE` e il docstring
+    di `P.marca_probabile`), quindi «realme Note 60» non può comparire fra
+    i «gemelli»: non è una forma che il dataset ha mai scritto, e mostrarla
+    lì — dove sono presentati come fatto verificato, vedi il docstring di
+    `_nomi_gemelli` — significherebbe spacciare un nome non verificato per
+    uno che lo è.
+
+    Qui invece — SOLO per il menu della correzione — si aggiunge anche la
+    forma con la marca scritta davanti, quando la si conosce
+    (`P.marca_probabile`: la STESSA marca che decide se la scheda tecnica
+    si trova, non una indovinata apposta per l'occasione). Non è un rischio
+    in più: qualunque forma si scelga qui resta collegata alla stessa
+    identica scheda tecnica delle altre, perché `P.scheda_tecnica` calcola
+    la marca dal CODICE, non dal nome mostrato — quindi anche la forma
+    sintetica è comunque collegabile a una scheda, non solo quella scritta
+    a mano.
+
+    UNA FORMA SINTETICA PER OGNI NOME VERO, non solo per il più corto.
+    Segnalato di nuovo dall'utente: con un unico «base» scelto per
+    lunghezza (`min(..., key=len)`), su RMX3933 usciva «Realme C61» — «C61»
+    è il più corto dei nomi veri, ma non è quello con cui l'utente
+    riconosce il telefono, che voleva «Realme Note 60». Non c'è un modo
+    di indovinare QUALE dei nomi veri sia quello «giusto» da vestire con
+    la marca — è esattamente il problema che questa funzionalità esiste
+    per risolvere — quindi si genera una forma sintetica per ciascuno
+    (nome mostrato compreso), scartando solo i doppioni: chi cerca la
+    riconosce comunque, qualunque sia la forma di partenza che aveva in
+    mente.
+    """
+    opzioni = list(gemelli)
+    if not codice:
+        return opzioni
+    marca = P.marca_probabile(codice, nome)
+    if not marca:
+        return opzioni
+    presenti = {(f or "").strip().lower() for f in (nome, *gemelli)}
+    for forma in (nome, *gemelli):
+        sintetica = versus.con_marca(forma, marca)
+        chiave = sintetica.strip().lower()
+        if chiave in presenti:
+            continue
+        presenti.add(chiave)
+        opzioni.append(sintetica)
+    return opzioni
+
+
+def _forse_cercavi(query: str, nome: str, brand: str, trovato: bool) -> list[str]:
+    """«Forse cercavi», con la strada giusta per ciascuno dei due casi.
+
+    SONO DUE DOMANDE DIVERSE, e usare lo stesso attrezzo per entrambe
+    era il difetto. Guardando la pagina vera:
+
+        «s 24»       → «荣耀手表 GS 4»   (un orologio Honor)
+        «samsung s24» → «Samsung Z240, Samsung T249, Samsung S200…»
+
+    Sono le risposte di `did_you_mean`, che confronta la somiglianza
+    fra stringhe. È l'attrezzo giusto per **correggere un refuso** — chi
+    ha scritto «galaxi s24» non trova niente e va rimesso in strada — ed
+    è quello sbagliato quando una risposta è arrivata: lì la domanda non
+    è «cosa volevi scrivere» ma «forse volevi il fratello di questo», e
+    la risposta sono le varianti dello stesso modello.
+
+        «Galaxy S24» → S24+, S24 FE, S24 Ultra
+
+    Le grafie dello stesso telefono («Samsung Galaxy S24») si tolgono
+    confrontando la radice del modello, cioè lo stesso criterio con cui
+    l'archivio decide che due nomi sono un dispositivo solo: proporre lo
+    stesso telefono con un altro nome non è un suggerimento.
+    """
+    scritto = (query or "").strip().lower()
+    if not trovato:
+        # PRIMA I CODICI CON LE STESSE CIFRE. Segnalato il 16/08/2026:
+        # cercando «cph 3939» il sito rispondeva «niente trovato» mentre
+        # `RMX3939` (realme C63) e' nei cataloghi — chi cerca ricorda il
+        # numero e sbaglia la sigla. `did_you_mean` confronta le stringhe
+        # intere e proponeva `CPH2399`: teneva il prefisso sbagliato e
+        # storpiava le cifre giuste, cioe' dava meno peso alla parte
+        # ricordata meglio.
+        cifre_cercate = re.sub(r"[^0-9]", "", query or "")
+        per_cifre = [modelcodes.nome_canonico(c) or c
+                     for c in modelcodes.codici_con_le_stesse_cifre(query)]
+        somiglianti = [voce for voce in suggest.did_you_mean(query, limit=6)
+                       if voce.lower() != scritto]
+        # CHI COMBACIA SU CIFRE **E** LETTERE VIENE PRIMA DI TUTTI.
+        # Mettere le sole cifre davanti a tutto scavalcava la correzione
+        # dei refusi: «SMA075F» ha come risposta giusta «SM-A075F», che
+        # combacia su entrambi i fronti, e finiva dietro a codici che
+        # avevano in comune solo il «075».
+        forti = [v for v in somiglianti
+                 if cifre_cercate and re.sub(r"[^0-9]", "", v) == cifre_cercate]
+        deboli = [v for v in somiglianti if v not in forti]
+        visti: set[str] = set()
+        proposte: list[str] = []
+        for voce in forti + per_cifre + deboli:
+            chiave = (voce or "").strip().lower()
+            if voce and chiave != scritto and chiave not in visti:
+                visti.add(chiave)
+                proposte.append(voce)
+        return proposte[:5]
+
+    radice = extract.radice_modello(brand, nome) if nome else ""
+    varianti: list[str] = []
+    for voce in suggest.suggest(nome, limit=14):
+        if voce.lower() == scritto:
+            continue
+        if radice and extract.radice_modello(brand, voce) == radice:
+            continue          # è lo stesso telefono, scritto in un altro modo
+        if voce not in varianti:
+            varianti.append(voce)
+    return varianti[:5]
+
+
+def _storico_del_modello(nome: str, brand: str) -> tuple[list[dict], str, str]:
+    """Gli aggiornamenti che QUEL telefono ha ricevuto, se è in archivio.
+
+    È la seconda metà della domanda. «A che versione sta» la risponde la
+    riga dell'esito; «cosa gli è arrivato, e quando» la risponde questa —
+    ed era l'unica delle due che il sito sapeva mostrare soltanto
+    entrando nella scheda del dispositivo, cioè dopo aver capito che
+    quella scheda esisteva.
+
+    Si prova prima la chiave costruita dal nome, che è quella giusta nel
+    caso normale; se non risponde si guarda l'archivio per nome, perché
+    la marca dedotta dalla ricerca può non coincidere con quella con cui
+    il telefono è stato salvato.
+    """
+    if not nome:
+        return [], "", ""
+    # `chiavi` in ordine di fiducia, e accanto il nome con cui l'archivio
+    # conosce quel telefono: è quello che poi si mostra, così due forme
+    # della stessa domanda non danno due nomi diversi.
+    chiavi: list[str] = []
+    nomi: dict[str, str] = {}
+    if brand:
+        chiave = extract.device_key(brand, nome)
+        if chiave:
+            chiavi.append(chiave)
+    atteso = extract.device_key(brand, nome) if brand else ""
+    try:
+        for device in storage.get_devices(search=nome)[:3]:
+            chiave = device.get("device_key")
+            if not chiave:
+                continue
+            # IL NOME DELL'ARCHIVIO SI ADOTTA SOLO SE È LO STESSO TELEFONO.
+            #
+            # La ricerca per nome è tollerante di proposito, quindi
+            # «Pixel 9» riporta anche il **Pixel 9a**: adottarne il nome
+            # significava rispondere «Google Pixel 9a» a chi aveva
+            # chiesto il 9 — un telefono diverso, con un altro chip.
+            # Coerente e sbagliato, che è il modo peggiore di essere
+            # coerenti. Il confronto è sulla chiave di dispositivo, cioè
+            # la stessa regola con cui l'archivio decide che due nomi
+            # sono un telefono solo.
+            if not atteso or chiave == atteso:
+                nomi.setdefault(chiave, device.get("model") or "")
+            if chiave not in chiavi:
+                chiavi.append(chiave)
+    except Exception:  # pragma: no cover - l'archivio non deve fermare la ricerca
+        pass
+
+    for chiave in chiavi:
+        voci = storage.get_device_history(chiave, limit=30)
+        # SOLO LE RIGHE CHE DICONO QUALCOSA.
+        #
+        # Guardando la pagina vera: dodici righe con versione, build e
+        # patch tutte a trattino. Erano notizie senza numero di build —
+        # legittime in archivio, e infatti compaiono più sotto fra le
+        # notizie — ma in una tabella intitolata «aggiornamenti» sono
+        # dodici righe vuote che fanno sembrare rotta la pagina. È la
+        # stessa regola che `scan._ha_firmware` applica alla scelta del
+        # risultato: se non c'è né versione, né build, né livello di
+        # patch, non è un aggiornamento osservato.
+        con_dato = [v for v in voci
+                    if v.get("os_version") or v.get("build") or v.get("patch_level")]
+        if con_dato:
+            return ([P.riga_aggiornamento(v) for v in con_dato[:12]],
+                    chiave, nomi.get(chiave, ""))
+
+
+    # Nessuno storico utile, ma il telefono può essere in archivio lo
+    # stesso: il nome canonico serve comunque a far convergere le forme.
+    for chiave in chiavi:
+        if nomi.get(chiave):
+            return [], "", nomi[chiave]
+    return [], "", ""
+
+
+
+def _nome_del_codice(codice: str) -> str | None:
+    """Il nome canonico di un codice, scritto in modo leggibile.
+
+    LE MAIUSCOLE SI SISTEMANO SOLO SE MANCANO DEL TUTTO. Il catalogo
+    ufficiale Motorola scrive i suoi modelli tutti minuscoli — «motorola
+    razr 60» — e mostrarlo cosi' sembra un errore dell'app. Ma passare
+    OGNI nome dal correttore di maiuscole ne romperebbe altri: «OPPO A74»
+    diventerebbe «Oppo A74» e «realme C63» diventerebbe «Realme C63»,
+    mentre quelle due grafie sono volute e i rispettivi produttori le
+    scrivono cosi'.
+    """
+    if not codice:
+        return None
+    try:
+        nome = modelcodes.nome_canonico(codice)
+    except Exception:      # pragma: no cover - percorso difensivo
+        return None
+    if not nome:
+        return None
+    # Nessuna maiuscola da nessuna parte: e' lo stile della fonte, non una
+    # scelta editoriale del produttore.
+    if nome == nome.lower():
+        return extract.canonical_device(nome)
+    return nome
+
+
+def _codice_con_gli_spazi(query: str) -> str:
+    """«cph 2695» → «CPH2695», ma solo se quella forma risolve davvero.
+
+    Segnalato dall'utente il 17/08/2026: cercando «cph 2695» la pagina
+    rispondeva «Nessun firmware», senza nome, senza scheda e senza foto,
+    mentre «CPH2695» dà Oppo A5 Pro 5G con tutto quanto — e la pagina
+    stessa lo suggeriva sotto, in «Forse cercavi». Sapeva la risposta e
+    la metteva in fondo invece di usarla.
+
+    Chi copia un codice da un'etichetta, da una scatola o da una scheda
+    tecnica se lo porta dietro come è scritto lì, spazi compresi, e non
+    ha modo di sapere che questa applicazione li vuole attaccati.
+
+    La condizione «solo se risolve davvero» è ciò che rende sicura la
+    sostituzione: un nome commerciale che somigli a un codice non viene
+    toccato, perché attaccarne le parole non produce niente di noto.
+    """
+    grezzo = " ".join((query or "").split())
+    if " " not in grezzo:
+        return query
+    for variante in modelcodes._varianti_senza_spazi(grezzo.upper()):
+        if modelcodes.resolve(variante):
+            return variante
+    return query
+
+
+def _correzione_salvata(*codici: str) -> str | None:
+    """Il nome corretto a mano, cercato su più codici in ordine.
+
+    Un telefono ha spesso più codici, e il nome mostrato può cambiare
+    durante il calcolo della pagina: cercare la correzione sotto UN codice
+    solo — per giunta dedotto dal nome appena cambiato — significava non
+    trovarla, cioè un tasto «Non è il nome giusto?» che non faceva niente.
+    Chi lo usa crede di aver sistemato il dato, ed è il modo peggiore di
+    fallire.
+    """
+    visti = set()
+    for codice in codici:
+        codice = (codice or "").strip()
+        if not codice or codice in visti:
+            continue
+        visti.add(codice)
+        try:
+            nome = storage.get_nome_modello(codice)
+        except Exception:
+            nome = None
+        if nome:
+            return nome
+    return None
+
+
+def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
+    query = _codice_con_gli_spazi(query)
+    risultato = scan.search_model(query, senza_rete=senza_rete)
+    fonti_dirette = [i for i in risultato.get("items", [])
+                     if i.get("source") in ("official_lookup", "curated_lookup")]
+    notizie = [i for i in risultato.get("items", [])
+               if i.get("source") not in ("official_lookup", "curated_lookup")]
+
+    # UNA RISPOSTA CHE PARLA DI UN ALTRO TELEFONO NON È UNA RISPOSTA.
+    #
+    # Cercando `M1910F4G` (Xiaomi Mi Note 10) il catalogo Xiaomi rispondeva
+    # con TRE ROM diverse — «Redmi Note 10 EEA», «Mi Note 10 / Note 10 Pro
+    # EEA», «Redmi Note 10 Global» — tutte marcate con il codice che era
+    # stato cercato, perché è la ricerca stessa a incollarglielo. Vinceva la
+    # prima, e la pagina mostrava nome e build di un telefono diverso.
+    #
+    # Qui si tengono solo le risposte il cui nome è uno dei nomi di quel
+    # codice. La rete di sicurezza è la condizione `if pertinenti`: se
+    # NESSUNA passa il controllo non si butta via tutto — quando il
+    # catalogo dei codici non conosce il modello,
+    # `_nome_appartiene_al_codice` risponde comunque «sì», quindi restare
+    # senza candidati significa che il dato non c'è, non che è sbagliato.
+    pertinenti = [i for i in fonti_dirette
+                  if _nome_appartiene_al_codice(i.get("device_model") or "",
+                                                i.get("model_code") or "")]
+    if pertinenti:
+        fonti_dirette = pertinenti
+
+    def tipo(item: dict) -> str:
+        # Le vecchie righe in archivio e i test precedenti alla distinzione
+        # semantica non portano ancora il campo: una lookup ufficiale con
+        # versione resta comunque una fonte corrente, non un buco UI.
+        return (item.get("firmware_kind") or
+                (C.FW_CURRENT if item.get("source") == "official_lookup"
+                 else C.FW_REPORTED))
+
+    def ha_versione(item: dict) -> bool:
+        return bool(item and (item.get("os_version")
+                              or item.get("android_version")
+                              or item.get("build")
+                              or item.get("patch_level")))
+
+    # Primo risultato: una build/OTA realmente corrente. Secondo: una
+    # versione riportata da una fonte controllata. Solo dopo vengono i
+    # dati di lancio/supporto, che sono utili ma non vengono mai venduti
+    # come «ultimo firmware».
+    corrente = next((i for i in fonti_dirette
+                     if tipo(i) == C.FW_CURRENT and ha_versione(i)), None)
+    riportata = next((i for i in fonti_dirette
+                       if tipo(i) == C.FW_REPORTED and ha_versione(i)), None)
+    base_android = next((i for i in fonti_dirette
+                          if tipo(i) in (C.FW_FACTORY, C.FW_SUPPORT)
+                          and ha_versione(i)), None)
+    # Alcuni produttori — HONOR in particolare — pubblicano una cadenza di
+    # sicurezza per modello ma non il numero dell'OTA. Non è un firmware
+    # corrente, ma è comunque un esito concreto e verificabile: lasciarlo
+    # cadere produceva una scheda apparentemente vuota benché la fonte
+    # ufficiale avesse risposto. La riga resta esplicita sul limite, così il
+    # supporto non viene mai confuso con una build installata.
+    supporto_senza_versione = next((i for i in fonti_dirette
+                                    if tipo(i) == C.FW_SUPPORT and not ha_versione(i)
+                                    # Il riconoscimento da catalogo identifica il
+                                    # telefono, non e' un servizio firmware. Non
+                                    # deve mai comparire come «Supporto ufficiale».
+                                    and "riconoscimento del codice" not in
+                                    (i.get("source_label") or "").lower()), None)
+    versione_certa = corrente or riportata or base_android
+    identita = versione_certa or (fonti_dirette[0] if fonti_dirette else {})
+
+    # IL CODICE PUÒ ESSERE QUELLO CHE È STATO DIGITATO. Prima si prendeva
+    # solo da chi aveva risposto, e le righe più vecchie dell'archivio non
+    # lo portano: cercando «RMX3997» il codice risultava sconosciuto
+    # proprio mentre era scritto nella barra di ricerca, e tutto ciò che
+    # dipende dal codice — a partire dal nome curato — restava spento.
+    codice = identita.get("model_code") or ""
+    if not codice and sources.looks_like_model_code(query):
+        codice = " ".join((query or "").split()).upper()
+    nome = identita.get("device_model") or query
+    marca = identita.get("brand", "")
+
+    # Un codice è più specifico di un alias restituito dalla fonte. Quando
+    # il catalogo ne conosce il nome commerciale verificato lo preferiamo:
+    # è ciò che impedisce a RMX3939 di ricadere su C61 e rende uguali la
+    # ricerca per codice, per modello e per IMEI.
+    # `scan.normalize` conserva il nome fornito da una fonte strutturata
+    # quando è più preciso del dataset community dei codici (CPH2781 è A6
+    # Pro in Europa, F31 in India). Qui non si deve annullare quella scelta.
+    #
+    # UNA RIGA CURATA A MANO BATTE ANCHE LA FONTE. La condizione qui sopra
+    # protegge la scelta di una fonte strutturata, che conosce il mercato
+    # meglio del dataset community: giusto. Ma `data/nomi_modello.csv` non
+    # è il dataset community — è una decisione presa dopo aver verificato,
+    # e su un codice con più nomi veri è l'unica cosa che sappia quale
+    # serve qui. RMX3997 è insieme «C65 5G», «NARZO N65» e «realme 12x
+    # 5G»: la fonte ne restituisce uno qualsiasi, e chi prova il telefono
+    # in Europa ha bisogno dell'ultimo. Senza questa eccezione la ricerca
+    # per IMEI e quella per codice davano due nomi diversi per lo stesso
+    # telefono, che è il difetto che l'utente ha segnalato.
+    # E UN NOME CHE NON APPARTIENE AL CODICE NON È UNA VARIANTE REGIONALE:
+    # È UN ALTRO TELEFONO.
+    #
+    # La regola qui sopra protegge il nome di una fonte strutturata, che
+    # conosce i mercati meglio del dataset community, e resta giusta —
+    # finché quel nome è UNO DEI NOMI di quel codice. Cercando `M1910F4G`
+    # (Xiaomi Mi Note 10) una fonte rispondeva «Redmi Note 10 EEA», che di
+    # quel codice non è un nome di nessun mercato, e la pagina lo metteva
+    # per titolo: un telefono diverso, con la sua scheda tecnica, sotto il
+    # codice che qualcuno aveva scritto.
+    #
+    # `_nome_appartiene_al_codice` è lo stesso freno che la pagina
+    # dell'IMEI usa da agosto, e vale la stessa cautela: se il catalogo
+    # dei codici non conosce quel codice risponde «sì», perché senza prove
+    # non si smentisce nessuno.
+    nome_estraneo = bool(codice and identita.get("device_model")
+                         and not _nome_appartiene_al_codice(nome, codice))
+    scelto_a_mano = modelcodes.nome_scelto_a_mano(codice) if codice else None
+    if codice and (scelto_a_mano or nome_estraneo
+                   or not identita.get("device_model")):
+        try:
+            canonico = modelcodes.nome_canonico(codice)
+        except Exception:
+            canonico = None
+        if canonico:
+            nome = canonico
+    nome = _modello_con_marca(marca, nome, codice) or nome
+
+    pezzi = []
+    tipo_versione = ""
+    if versione_certa:
+        versione = (
+            f"Android {versione_certa['android_version']}"
+            if versione_certa.get("android_version") else versione_certa.get("os_version") or "")
+        if versione:
+            if versione_certa is base_android:
+                etichetta = ("Versione Android verificata"
+                             if versione.lower().startswith("android")
+                             else "Versione di sistema verificata")
+                pezzi.append(f"{etichetta}: {versione} (di lancio/supporto)")
+                tipo_versione = tipo(versione_certa)
+            elif versione_certa is riportata:
+                etichetta = ("Versione Android riportata"
+                             if versione.lower().startswith("android")
+                             else "Versione di sistema riportata")
+                pezzi.append(f"{etichetta}: {versione}")
+                tipo_versione = C.FW_REPORTED
+            else:
+                etichetta = ("Ultimo Android verificato"
+                             if versione.lower().startswith("android")
+                             else "Ultima versione verificata")
+                pezzi.append(f"{etichetta}: {versione}")
+                tipo_versione = C.FW_CURRENT
+        if (not versione_certa.get("android_version")
+                and not versione.lower().startswith("android ") and marca != C.APPLE):
+            pezzi.append("Versione Android della build: non verificata")
+        if versione_certa.get("build"):
+            pezzi.append(f"build {versione_certa['build']}")
+        if versione_certa.get("patch_level"):
+            pezzi.append(f"patch {versione_certa['patch_level']}")
+        if pezzi and versione_certa is not base_android:
+            if versione_certa.get("published"):
+                pezzi.append(f"uscito il {fmt_date(versione_certa['published'])}")
+            else:
+                pezzi.append("data di rilascio non verificata")
+                mese = extract.mese_leggibile(versione_certa.get("build") or "")
+                if mese:
+                    pezzi.append(f"Periodo dedotto dal codice build: {mese} (non è la data di rilascio)")
+
+    if not pezzi and supporto_senza_versione:
+        # ``size_info`` viene arricchito più avanti con il SoC per la scheda
+        # tecnica. La riga di supporto deve invece descrivere SOLO la policy
+        # firmware, quindi preferisce l'etichetta della fonte costruita prima
+        # di quell'arricchimento.
+        dettaglio_supporto = (supporto_senza_versione.get("source_label")
+                              or supporto_senza_versione.get("size_info") or "").strip()
+        dettaglio_supporto = dettaglio_supporto.removesuffix(" (ricerca diretta)")
+        if dettaglio_supporto:
+            pezzi.append(f"Supporto ufficiale: {dettaglio_supporto}")
+        else:
+            pezzi.append(
+                "Supporto ufficiale confermato; il produttore non pubblica una build OTA per modello"
+            )
+        tipo_versione = C.FW_SUPPORT
+
+    storico, chiave, nome_archivio = _storico_del_modello(
+        nome, identita.get("brand", ""))
+
+    # IL NOME LO DECIDE L'ARCHIVIO, quando quel telefono ci sta già.
+    #
+    # Misurato interrogando il sito con le forme che una persona scrive
+    # davvero. Stesso telefono, stessa build, nomi diversi:
+    #
+    #     realme C63  → «realme C61»       RMX3939      → «C61»
+    #     Moto G14    → «Moto G14»         motorola g14 → «Motorola G14»
+    #     Pixel 9     → «Pixel 9»          pixel9       → «Google Pixel 9»
+    #
+    # Non è un dato sbagliato: è la grafia di chi ha risposto, e cambia
+    # con la strada che la domanda ha preso. Ma per chi guarda sono due
+    # risposte diverse alla stessa domanda, ed è esattamente ciò che
+    # rende un'applicazione poco credibile.
+    #
+    # L'archivio è utile per le forme che non hanno un codice. Quando il
+    # codice è noto, invece, il nome canonico del codice resta prioritario:
+    # una vecchia riga con l'alias C61 non può più rinominare RMX3939/C63.
+    if nome_archivio and not codice:
+        nome = _modello_con_marca(marca, nome_archivio, codice) or nome_archivio
+
+    # LA CORREZIONE A MANO VINCE SU TUTTO, ARCHIVIO COMPRESO.
+    #
+    # Nasce dal bug segnalato dall'utente: `RMX3933` ha più nomi
+    # commerciali veri («C61», «Note 60», «Note 60s», «NARZO N61» — la
+    # stessa piattaforma venduta con nomi diversi in mercati diversi, vedi
+    # il docstring di `_nomi_gemelli`), e `modelcodes.nome_canonico` ne
+    # sceglie uno solo, sempre allo stesso modo (il più corto): una scelta
+    # ARBITRARIA che non può sapere qual è il nome giusto per il telefono
+    # che chi cerca ha davvero in mano. Indovinare meglio non è possibile
+    # — sono tutti nomi reali, nessuno "più corretto" degli altri secondo
+    # il dataset — quindi la scelta si offre a chi il telefono ce l'ha, e
+    # si ricorda: stessa idea di `imeicheck.aggiungi_tac` (una correzione
+    # verificata da una persona vince su ogni fonte scaricata), applicata
+    # al nome invece che al modello di un TAC.
+    #
+    # SI CERCA IL CODICE CON `_codici_del_risultato`, non con `codice` da
+    # solo: chi ha corretto il nome può tornare a cercare con il NOME
+    # («Note 60»), non solo col codice («RMX3933») — e senza questo la
+    # correzione varrebbe solo per metà delle forme dello stesso telefono,
+    # esattamente l'incoerenza che questo intero fix esiste per chiudere.
+    codice_per_correzione = (codice or
+                              next(iter(_codici_del_risultato(query, nome)), ""))
+    nome_corretto = _correzione_salvata(codice, codice_per_correzione)
+    if nome_corretto:
+        nome = nome_corretto
+
+    # LA SCHEDA SI CALCOLA UNA VOLTA SOLA, PRIMA DEL NOME FINALE — perché
+    # può correggere il nome anche lei, non solo mostrarlo.
+    scheda = P.scheda_tecnica(nome, codice=codice or query,
+                              brand=identita.get("brand", ""))
+
+    # Per un codice esatto, la scheda curata/del catalogo è una fonte di
+    # identità più precisa del nome libero della fonte firmware. Questo
+    # chiude i casi di alias regionali: RMX3939 non può tornare C61 se la
+    # scheda per RMX3939 dichiara realme C63.
+    if codice and scheda.get("trovata") and scheda.get("titolo"):
+        # MA IL NOME CANONICO DEL CODICE VIENE PRIMA DELLA SCHEDA.
+        #
+        # La regola qui sopra nasce per non farsi rinominare dal nome
+        # libero di una fonte firmware, e resta giusta. Il catalogo delle
+        # specifiche pero' non e' un arbitro sui NOMI DI MERCATO: per
+        # `CPH2219` dichiara «Oppo F19», che e' la grafia indiana, mentre
+        # `nome_canonico` risponde «OPPO A74», quella europea.
+        #
+        # `nome_canonico` e' la funzione il cui unico mestiere e'
+        # rispondere «come si chiama QUESTO codice», con una scala
+        # deterministica e — soprattutto — con gli override scritti a
+        # mano in `data/nomi_modello.csv` in cima a tutto. Lasciarla
+        # scavalcare dalla scheda significava che quella tabella curata
+        # non aveva effetto sulla pagina, che e' l'unico posto dove
+        # serve.
+        #
+        # Il caso che aveva motivato la regola non cambia: per RMX3939 la
+        # scheda dice «realme C63» e `nome_canonico` pure, quindi qui non
+        # si sceglie nulla di diverso. Cambia solo dove i due DISCORDANO,
+        # ed e' esattamente il caso in cui serve un criterio.
+        #
+        # ...MA NON SOPRA UNA CORREZIONE SCRITTA A MANO. Questa
+        # assegnazione non guardava `nome_corretto` e lo cancellava: il
+        # tasto «Non è il nome giusto?» salvava, faceva pure il backup, e
+        # la pagina continuava a mostrare il nome di prima. È il modo
+        # peggiore di fallire — chi lo usa crede di aver sistemato il
+        # dato, e invece ha corretto il vuoto.
+        if not nome_corretto:
+            titolo = _nome_del_codice(codice) or scheda["titolo"]
+            nome = (_modello_con_marca(scheda.get("marca") or marca, titolo, codice)
+                    or titolo)
+
+    # QUANDO NON C'È UN FIRMWARE MA C'È UN TELEFONO VERO.
+    #
+    # Segnalato dall'utente cercando «m1910f4g» (Xiaomi Mi Note 10): nessuna
+    # fonte firmware conosceva quel codice, quindi `nome` restava la query
+    # grezza — ma `scheda_tecnica`, che prova il testo anche SENZA che
+    # abbia la forma di un codice riconosciuto, il telefono lo trovava lo
+    # stesso (foto, processore, tutto). Il risultato era una pagina con la
+    # scheda di un telefono vero sotto il titolo «Nessun firmware per
+    # «m1910f4g»» — nessun nome, solo il codice grezzo ripetuto, come se
+    # l'app non avesse capito niente pur avendo capito tutto.
+    #
+    # Qui si usa il titolo che la scheda ha già trovato, ma SOLO quando non
+    # c'è già un nome più autorevole (firmware, archivio o correzione a
+    # mano, tutti sopra) e la scheda ha davvero risolto qualcosa di diverso
+    # dalla query scritta — un titolo identico alla query non è una
+    # risoluzione, è un'eco.
+    if not nome_corretto and scheda["trovata"]:
+        titolo_scheda = (scheda["titolo"] or "").strip()
+        nome_tecnico = (nome or "").strip().upper() in {
+            (query or "").strip().upper(), (codice or "").strip().upper()
+        }
+        # La scheda curata ha già risolto il nome quando la fonte diretta
+        # restituisce soltanto il codice. In quel caso il suo titolo è più
+        # preciso, anche se la fonte conosce una versione Android.
+        if (titolo_scheda and titolo_scheda.lower() != query.strip().lower()
+                and (not versione_certa or nome_tecnico)):
+            # STESSA REGOLA DEL BLOCCO SOPRA, e va tenuta allineata: se il
+            # codice ha un nome canonico, quello viene prima del titolo
+            # della scheda. Questo ramo e' il ripiego per i codici che
+            # NESSUNA fonte firmware conosce (il caso «m1910f4g»), e li'
+            # il titolo della scheda resta l'unica risposta — ma quando il
+            # codice e' noto ai cataloghi, chi decide come si chiama e'
+            # `nome_canonico`, che tiene conto anche di
+            # `data/nomi_modello.csv`.
+            #
+            # Senza questa riga la correzione del blocco sopra non aveva
+            # effetto: `CPH2219` tornava «Oppo F19» qui, due assegnazioni
+            # piu' in basso.
+            titolo = _nome_del_codice(codice) or titolo_scheda
+            nome = _modello_con_marca(
+                scheda.get("marca") or marca, titolo, codice) or titolo
+            # Il nome è cambiato: il codice di correzione e un'eventuale
+            # correzione già salvata per QUEL nome vanno ricalcolati, stessa
+            # ragione del blocco sopra.
+            codice_per_correzione = (next(iter(_codici_del_risultato(query, nome)), "")
+                                     or codice_per_correzione)
+            # SI GUARDA PRIMA IL CODICE ESATTO, poi quello dedotto dal
+            # nome. Qui sopra il nome è appena cambiato, e da un nome si
+            # possono ricavare più codici: prendendone uno qualsiasi si
+            # finiva a cercare la correzione sotto un codice DIVERSO da
+            # quello scritto da chi l'ha salvata, e la correzione spariva
+            # senza dire niente. Cioè il tasto «Non è il nome giusto?»
+            # non faceva nulla, che è il modo peggiore di fallire: chi lo
+            # usa crede di aver sistemato il dato.
+            nome_corretto = _correzione_salvata(codice, codice_per_correzione)
+            if nome_corretto:
+                nome = nome_corretto
+
+    # Calcolati una volta sola: `opzioni_correzione` (vedi il suo
+    # docstring) parte dagli stessi «gemelli» mostrati sopra come fatto
+    # verificato, e può aggiungerne una forma sintetica in più — non il
+    # contrario, per non ricalcolare due volte gli stessi gemelli.
+    #
+    # Si calcolano anche senza `migliore`, quando c'è comunque un codice da
+    # correggere (il caso qui sopra): senza, chi cercava «m1910f4g» vedeva
+    # finalmente il nome giusto ma nessun modo di correggerlo se sbagliato.
+    ha_un_risultato = bool(identita) or bool(codice_per_correzione)
+    gemelli_veri = _nomi_gemelli(query, nome) if ha_un_risultato else []
+    opzioni_correzione = (_opzioni_correzione(nome, gemelli_veri, codice_per_correzione)
+                          if ha_un_risultato else [])
+    chiave_parco = chiave or extract.device_key(marca, nome)
+
+    return {
+        "query": query,
+        "trovato": bool(identita),
+        "nome": nome,
+        "codice": codice,
+        "codice_per_correzione": codice_per_correzione,
+        "corretto_a_mano": bool(nome_corretto),
+        "riga": " · ".join(pezzi),
+        "fonte": (versione_certa or identita).get("source_label", ""),
+        # La fonte non e' una decorazione: chi vuole controllare la build
+        # mostrata deve poterla aprire. Questo percorso e' deterministico
+        # e non dipende dalla quota di un servizio AI esterno.
+        "fonte_url": (versione_certa or identita).get("link", ""),
+        # Una versione di lancio/supporto è un dato Android utile, quindi
+        # non produce più una scheda apparentemente rotta. L'etichetta
+        # nella riga distingue esplicitamente quel caso da un OTA corrente.
+        "senza_firmware": bool(identita) and not bool(pezzi),
+        "tipo_versione": tipo_versione,
+        "firmware_confronto": {
+            "android": (versione_certa or {}).get("android_version") or "",
+            "build": (versione_certa or {}).get("build") or "",
+            "tipo": tipo_versione,
+        },
+        "scheda": scheda,
+        # 4G o 5G: due varianti dello stesso nome sono due telefoni da
+        # provare separatamente (vedi `P.rete_mobile`). Si calcola qui, sul
+        # nome DEFINITIVO, perché è il nome a portare il dato quando il
+        # produttore ha battezzato le due varianti — e si scrive anche
+        # dentro la scheda, così il riquadro in cima e la scheda tecnica
+        # non possono dire due cose diverse sullo stesso telefono.
+        "rete": _con_rete(scheda, nome),
+        "notizie": [P.riga_aggiornamento(n) for n in notizie[:6]],
+        "quante_notizie": len(notizie),
+        # IL «FORSE CERCAVI» ANCHE QUANDO LA RICERCA RIESCE.
+        #
+        # Stava solo nel ramo del fallimento, ed era il posto sbagliato.
+        # Le forme vicine servono di più proprio quando una risposta è
+        # arrivata ma non è quella giusta: chi scrive «galaxy s24» e
+        # voleva l'Ultra riceve una risposta corretta e inutile, e non
+        # ha nessun modo di accorgersi che l'Ultra è a un clic. Nel
+        # fallimento totale è un ripiego; qui è una correzione di rotta.
+        #
+        "forse": _forse_cercavi(query, nome, identita.get("brand", ""),
+                                bool(identita)),
+        # GEMELLI VERI, NON UN «FORSE». Vedi il docstring di `_nomi_gemelli`:
+        # stesso codice, più nomi commerciali reali. Si calcola solo se la
+        # ricerca ha prodotto un nome — senza, non c'è niente con cui
+        # confrontare i nomi risolti.
+        "gemelli": gemelli_veri,
+        "opzioni_correzione": opzioni_correzione,
+        "storico": storico,
+        "chiave": chiave,
+        "chiave_parco": chiave_parco,
+        "brand": marca,
+        "in_parco": bool(chiave_parco and chiave_parco in storage.watched_keys()),
+        "nota_fonte": risultato.get("structured_note"),
+        "errore": risultato.get("error"),
+    }
+
+
+# ======================================================================
+# Confronto fra due modelli
+# ======================================================================
+def _riga_confronto(etichetta: str, valore_a, valore_b) -> dict:
+    """Una riga della tabella di confronto: due valori e se differiscono.
+
+    IL CONFRONTO È TESTUALE, NON SEMANTICO — e lo dichiaro invece di
+    fingere altrimenti. "Unisoc Tiger T612" e "unisoc tiger t612" sono lo
+    stesso dato scritto diverso e qui NON verrebbero segnati come uguali
+    se non fosse per la normalizzazione sotto; "128GB" e "128 GB" restano
+    invece due stringhe diverse agli occhi di questo confronto, perché
+    provano a interpretare il TESTO delle fonti sarebbe un altro genere
+    di errore — quello per cui questo intero progetto esiste (vedi
+    `core/soc.py`, `core/modelcodes.py`): meglio una differenza segnalata
+    in più (falsa) che una vera taciuta perché "sembrava" la stessa cosa.
+    """
+    a = valore_a if valore_a not in (None, "") else "—"
+    b = valore_b if valore_b not in (None, "") else "—"
+    return {
+        "etichetta": etichetta,
+        "a": a,
+        "b": b,
+        "diversi": str(a).strip().lower() != str(b).strip().lower(),
+    }
+
+
+
+def _modello_da_imei(query: str) -> tuple[str, str]:
+    """`(testo_da_cercare, imei_riconosciuto)`.
+
+    Se la stringa e' un IMEI e il TAC lo identifica, torna il NOME del
+    modello: e' quello che le fonti conoscono, mentre quindici cifre non
+    compaiono in nessun catalogo ne' in nessun titolo di notizia.
+
+    Se l'IMEI non e' identificabile si restituisce il testo com'era: una
+    ricerca che non trova nulla dice comunque «non trovato» su quello che
+    hai scritto, che e' meglio di un errore.
+
+    Passa dallo STESSO `_esito_imei` della ricerca normale, non da una
+    seconda strada: e' la regola che questo file ripete ovunque, e nasce
+    dal bug «RMX3939 risponde con i dati di RMX3930», due funzioni che
+    facevano la stessa cosa in modo diverso.
+    """
+    testo = (query or "").strip()
+    if not testo or not imeicheck.is_imei_like(testo):
+        return testo, ""
+    esito = _esito_imei(testo)
+    return (esito.get("modello_cercato") or testo), testo
+
+
+def _confronta(query_a: str, query_b: str) -> dict:
+    """Due ricerche vere, messe fianco a fianco — non una terza ricerca.
+
+    PERCHÉ RIUSA `_esito_ricerca` INVECE DI SCRIVERNE UNA VERSIONE SUA.
+    Una funzione di confronto che rifà la ricerca a modo suo può
+    rispondere diversamente dalla ricerca singola sullo stesso identico
+    modello — ed è esattamente il tipo di doppio percorso che ha causato
+    il bug «RMX3939 risponde con i dati di RMX3930» (due funzioni diverse
+    che espandevano i nomi equivalenti, una corretta e una no: vedi
+    FONTI.md). Qui non esiste un secondo percorso: la stessa funzione,
+    la stessa cache, chiamata due volte.
+    """
+    query_a, query_b = (query_a or "").strip(), (query_b or "").strip()
+    # UN IMEI VA RIDOTTO AL MODELLO ANCHE QUI.
+    #
+    # Segnalato dall'utente: «quando cerco un dispositivo e poi faccio il
+    # confronto, la barra di ricerca del confronto non permette la
+    # ricerca tramite IMEI». Il riconoscimento viveva solo dentro la
+    # rotta della ricerca (`pagina_ricerca`), non dentro `_esito_ricerca`
+    # che il confronto condivide: quindici cifre arrivavano qui come un
+    # nome di modello, e si cercava un telefono chiamato
+    # «867051060315467».
+    #
+    # È anche il caso d'uso più naturale di questa pagina: due telefoni
+    # veri in mano, due IMEI da confrontare.
+    query_a, imei_a = _modello_da_imei(query_a)
+    query_b, imei_b = _modello_da_imei(query_b)
+    ra = _esito_ricerca(query_a) if query_a else None
+    rb = _esito_ricerca(query_b) if query_b else None
+
+    righe: list[dict] = []
+    stesso_modello = False
+    if ra and rb:
+        sa, sb = ra["scheda"], rb["scheda"]
+        righe = [
+            _riga_confronto("Versione", ra["riga"], rb["riga"]),
+            _riga_confronto("Fonte del firmware", ra["fonte"], rb["fonte"]),
+            _riga_confronto("Processore", sa.get("cpu"), sb.get("cpu")),
+            _riga_confronto("RAM", sa.get("ram"), sb.get("ram")),
+            _riga_confronto("Archiviazione", sa.get("storage"), sb.get("storage")),
+            _riga_confronto("Batteria", sa.get("batteria"), sb.get("batteria")),
+            _riga_confronto("Patch garantite fino a",
+                            sa.get("patch_fino_a"), sb.get("patch_fino_a")),
+        ]
+        # LE VOCI EXTRA (schermo, fotocamera...) NON SONO GARANTITE NELLO
+        # STESSO INSIEME per i due modelli — uno può avere una scheda
+        # completa e l'altro no. Si uniscono le etichette viste da
+        # entrambi, nell'ordine in cui `scheda_tecnica` le costruisce
+        # (fisso, vedi presenters.py), invece di presumere che le liste
+        # combacino posizione per posizione.
+        dizionario_a = dict(sa.get("voci") or [])
+        dizionario_b = dict(sb.get("voci") or [])
+        for etichetta in dict.fromkeys(list(dizionario_a) + list(dizionario_b)):
+            righe.append(_riga_confronto(
+                etichetta, dizionario_a.get(etichetta), dizionario_b.get(etichetta)))
+
+        # STESSO TELEFONO, NOMI DIVERSI — SI DICE, NON SI LASCIA INDOVINARE.
+        # `_esito_ricerca` fa già convergere le grafie diverse dello stesso
+        # modello allo stesso nome d'archivio (vedi `_cerca_davvero`): se
+        # dopo quella convergenza «C63» e «RMX3939» finiscono con lo
+        # stesso nome E lo stesso codice, non sono un confronto fra due
+        # telefoni ma lo stesso telefono chiesto due volte — il caso che
+        # ha reso concreto il bug di questa sessione, mostrato qui come
+        # informazione utile invece che come sorpresa silenziosa.
+        stesso_modello = bool(
+            ra.get("nome") and ra.get("nome") == rb.get("nome")
+            and (ra.get("codice") or "") == (rb.get("codice") or ""))
+
+    return {
+        "query_a": query_a,
+        "query_b": query_b,
+        "a": ra,
+        "b": rb,
+        "righe": righe,
+        "pronto": bool(ra and rb),
+        "stesso_modello": stesso_modello,
+        # Quale IMEI e' diventato quale modello: la casella mostra il nome
+        # risolto, e senza dirlo sembrerebbe che il testo scritto sia
+        # sparito da solo.
+        "imei_a": imei_a,
+        "imei_b": imei_b,
+    }
