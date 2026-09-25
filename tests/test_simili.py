@@ -107,6 +107,16 @@ class TestTrova(unittest.TestCase):
         self.assertNotIn("Samsung Galaxy A54", nomi, "il telefono stesso non è un simile")
         self.assertNotIn("Samsung Galaxy Tab S9 FE", nomi, "un tablet non è un telefono")
 
+    def test_il_telefono_cercato_non_e_simile_a_se_stesso(self):
+        """Da SM-A556B la ricerca mostra «Samsung Galaxy A55 5G», il
+        catalogo lo chiama «Samsung Galaxy A55»: stesso telefono, e in
+        produzione compariva in cima ai propri simili."""
+        candidati = _CANDIDATI + [_riga("Samsung Galaxy A55", "Exynos 1480 (4 nm)"),
+                                  _riga("Samsung Galaxy M56", "Exynos 1480 (4 nm)")]
+        esito = S.trova(nome="Samsung Galaxy A55 5G", chip="Samsung Exynos 1480 (S5E8845)",
+                        candidati=candidati, altri_nomi=("Samsung Galaxy A55",))
+        self.assertEqual([v["nome"] for v in esito["simili"]], ["Samsung Galaxy M56"])
+
     def test_oneplus_finisce_fra_le_altre_marche(self):
         esito = S.trova(nome="Oppo Reno8", chip="Mediatek Dimensity 1300",
                         candidati=_CANDIDATI)

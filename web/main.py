@@ -562,8 +562,15 @@ def _simili_di(request: Request, esito: dict, solo_stesso_software: bool) -> dic
     fw = esito.get("firmware_confronto") or {}
     if fw.get("tipo") == C.FW_CURRENT:
         android_archivio = _android_intero(fw.get("android"))
-    if android_archivio is None and chiave_rif in archivio:
-        android_archivio = _android_intero(archivio[chiave_rif].get("android_version"))
+    # La chiave del risultato nasce dal nome mostrato («Galaxy A55 5G»);
+    # l'archivio può conoscere lo stesso telefono col titolo della scheda
+    # («Galaxy A55»). Si provano entrambe, nell'ordine.
+    titolo_scheda = scheda.get("titolo") or ""
+    chiavi_rif = [c for c in (chiave_rif, extract.device_key(marca_gruppo, titolo_scheda)
+                              if titolo_scheda else "") if c]
+    for chiave in chiavi_rif:
+        if android_archivio is None and chiave in archivio:
+            android_archivio = _android_intero(archivio[chiave].get("android_version"))
     os_lancio = voci.get("Sistema di lancio")
 
     # IL PARCO SI MOSTRA SOLO A CHI PUÒ VEDERLO: è l'unica parte del sito
@@ -571,6 +578,7 @@ def _simili_di(request: Request, esito: dict, solo_stesso_software: bool) -> dic
     loggato = bool(auth_web.utente_da_richiesta(request))
     esito_simili = simili.trova(
         nome=nome, chip=scheda.get("cpu"), marca=marca_gruppo,
+        altri_nomi=(titolo_scheda,),
         android_archivio=android_archivio,
         android_lancio=simili.android_di_lancio(os_lancio),
         rilascio=scheda.get("rilascio"),

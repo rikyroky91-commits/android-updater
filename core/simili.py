@@ -214,7 +214,8 @@ def trova(*, nome: str, chip: str | None, marca: str = "",
           chiave_di=None,
           in_parco: set[str] | None = None,
           candidati: list[dict] | None = None,
-          massimo: int = 30) -> dict:
+          massimo: int = 30,
+          altri_nomi: tuple[str, ...] = ()) -> dict:
     """I telefoni simili a `nome`.
 
     `chip` è il testo del processore come la scheda lo mostra (anche con
@@ -249,12 +250,17 @@ def trova(*, nome: str, chip: str | None, marca: str = "",
     if marca_rif and marca_rif not in marche_coperte(candidati):
         esito["marca_non_coperta"] = True
 
-    nome_rif = (nome or "").strip().lower()
+    # LO STESSO TELEFONO NON È UN SIMILE. Il nome mostrato dalla ricerca
+    # («Samsung Galaxy A55 5G», da SM-A556B) e il titolo della scheda nel
+    # catalogo («Samsung Galaxy A55») sono due grafie dello stesso modello:
+    # confrontando solo il primo, il telefono cercato compariva in cima
+    # alla lista dei propri simili (visto in produzione il 25/09/2026).
+    stessi = {n.strip().lower() for n in (nome, *altri_nomi) if n and n.strip()}
     anno_rif = anno_di(rilascio)
     simili, altre = [], []
     for riga in candidati:
         nome_c = riga["nome"]
-        if nome_c.lower() == nome_rif or not e_telefono(nome_c):
+        if nome_c.lower() in stessi or not e_telefono(nome_c):
             continue
         chiavi_c = chiavi_chip(riga.get("chipset"))
         comuni = [c for c in chiavi_c if c in chiavi_rif]
