@@ -107,6 +107,31 @@ class TestTrova(unittest.TestCase):
         self.assertNotIn("Samsung Galaxy A54", nomi, "il telefono stesso non è un simile")
         self.assertNotIn("Samsung Galaxy Tab S9 FE", nomi, "un tablet non è un telefono")
 
+    def test_il_telefono_cercato_non_e_simile_a_se_stesso(self):
+        """Da SM-A556B la ricerca mostra «Samsung Galaxy A55 5G», il
+        catalogo lo chiama «Samsung Galaxy A55»: stesso telefono, e in
+        produzione compariva in cima ai propri simili."""
+        candidati = _CANDIDATI + [_riga("Samsung Galaxy A55", "Exynos 1480 (4 nm)"),
+                                  _riga("Samsung Galaxy M56", "Exynos 1480 (4 nm)")]
+        esito = S.trova(nome="Samsung Galaxy A55 5G", chip="Samsung Exynos 1480 (S5E8845)",
+                        candidati=candidati, altri_nomi=("Samsung Galaxy A55",))
+        self.assertEqual([v["nome"] for v in esito["simili"]], ["Samsung Galaxy M56"])
+
+    def test_il_suffisso_di_rete_del_nome_cercato_non_lo_rende_un_altro(self):
+        """Secondo correttivo, verificato in produzione: ricerca e scheda
+        dicevano entrambe «Galaxy A55 5G», il catalogo «Galaxy A55»."""
+        candidati = _CANDIDATI + [_riga("Samsung Galaxy A55", "Exynos 1480 (4 nm)"),
+                                  _riga("Samsung Galaxy M56", "Exynos 1480 (4 nm)")]
+        esito = S.trova(nome="Samsung Galaxy A55 5G", chip="Exynos 1480",
+                        candidati=candidati, altri_nomi=("Samsung Galaxy A55 5G",))
+        self.assertEqual([v["nome"] for v in esito["simili"]], ["Samsung Galaxy M56"])
+
+    def test_un_candidato_con_un_altro_suffisso_resta_diverso(self):
+        candidati = [_riga("Samsung Galaxy A07 4G", "Mediatek Helio G99")]
+        esito = S.trova(nome="Samsung Galaxy A07 5G", chip="Mediatek Helio G99",
+                        candidati=candidati)
+        self.assertEqual([v["nome"] for v in esito["simili"]], ["Samsung Galaxy A07 4G"])
+
     def test_oneplus_finisce_fra_le_altre_marche(self):
         esito = S.trova(nome="Oppo Reno8", chip="Mediatek Dimensity 1300",
                         candidati=_CANDIDATI)

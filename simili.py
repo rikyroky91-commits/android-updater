@@ -206,6 +206,29 @@ def marche_coperte(candidati: list[dict]) -> set[str]:
     return {marca_di(r["nome"]) for r in candidati}
 
 
+_RE_RETE_IN_CODA = re.compile(r"\s+(5G|4G|LTE)$", re.IGNORECASE)
+
+
+def forme_stesso_telefono(nome: str | None) -> set[str]:
+    """Il nome, e il nome senza «5G»/«4G» in coda, in minuscolo.
+
+    Da SM-A556B la ricerca e la scheda dicono «Samsung Galaxy A55 5G», il
+    catalogo «Samsung Galaxy A55»: lo stesso telefono, che in produzione
+    compariva ancora fra i propri simili (verificato il 25/09/2026 dopo il
+    primo correttivo, che confrontava solo i nomi interi). Si toglie il
+    suffisso solo dal nome di PARTENZA: un candidato «A55 4G» resta un
+    telefono diverso da un «A55 5G».
+    """
+    testo = (nome or "").strip()
+    if not testo:
+        return set()
+    forme = {testo.lower()}
+    senza = _RE_RETE_IN_CODA.sub("", testo).strip()
+    if senza:
+        forme.add(senza.lower())
+    return forme
+
+
 def trova(*, nome: str, chip: str | None, marca: str = "",
           android_archivio: int | None = None,
           android_lancio: int | None = None,
@@ -214,7 +237,8 @@ def trova(*, nome: str, chip: str | None, marca: str = "",
           chiave_di=None,
           in_parco: set[str] | None = None,
           candidati: list[dict] | None = None,
-          massimo: int = 30) -> dict:
+          massimo: int = 30,
+          altri_nomi: tuple[str, ...] = ()) -> dict:
     """I telefoni simili a `nome`.
 
     `chip` è il testo del processore come la scheda lo mostra (anche con
@@ -249,12 +273,17 @@ def trova(*, nome: str, chip: str | None, marca: str = "",
     if marca_rif and marca_rif not in marche_coperte(candidati):
         esito["marca_non_coperta"] = True
 
-    nome_rif = (nome or "").strip().lower()
+    # LO STESSO TELEFONO NON È UN SIMILE. Il nome mostrato dalla ricerca
+    # («Samsung Galaxy A55 5G», da SM-A556B) e il titolo della scheda nel
+    # catalogo («Samsung Galaxy A55») sono due grafie dello stesso modello:
+    # confrontando solo il primo, il telefono cercato compariva in cima
+    # alla lista dei propri simili (visto in produzione il 25/09/2026).
+    stessi = {forma for n in (nome, *altri_nomi) for forma in forme_stesso_telefono(n)}
     anno_rif = anno_di(rilascio)
     simili, altre = [], []
     for riga in candidati:
         nome_c = riga["nome"]
-        if nome_c.lower() == nome_rif or not e_telefono(nome_c):
+        if nome_c.lower() in stessi or not e_telefono(nome_c):
             continue
         chiavi_c = chiavi_chip(riga.get("chipset"))
         comuni = [c for c in chiavi_c if c in chiavi_rif]
