@@ -375,10 +375,17 @@ def memoria_dei_cataloghi() -> dict:
 #      ne ha bisogno, e vale la pena: un indice da rifare è un fastidio,
 #      un processo ucciso a metà ricerca è una pagina bianca.
 #
-# LA SOGLIA È 450 SU 512 E NON PIÙ ALTA di proposito. Il picco misurato è
-# 457, cioè il margine vero è già stato consumato una volta: intervenire a
-# 480 vorrebbe dire intervenire dopo.
-SOGLIA_ALLEGGERIMENTO_MB = 450.0
+# LA SOGLIA È 380 SU 512 (era 450 fino al 25/09/2026). Il picco misurato
+# a settembre era 457, cioè a 450 il margine vero era già stato consumato
+# una volta: intervenire lì voleva dire intervenire dopo. 380 è il valore
+# già scritto in `render.yaml` e nel passaggio di consegne OOM, ma il
+# Blueprint non aggiorna un servizio esistente: senza la variabile nel
+# pannello restava il 450 del codice (visto in `/health` il 25/09/2026).
+# Ora codice e Blueprint dicono la stessa cosa. Il costo di intervenire
+# presto è basso — `malloc_trim` e al più indici che si rifanno dal disco
+# — mentre il pavimento normale dopo la scansione isolata sta sui 130-210
+# MB: sotto i 380 non si interviene mai per niente.
+SOGLIA_ALLEGGERIMENTO_MB = 380.0
 #: Sotto questo intervallo non si riprova. `malloc_trim` non è gratis e la
 #: memoria non cambia in un secondo: senza questa pausa, una raffica di
 #: richieste sopra soglia pagherebbe il trim a ognuna.

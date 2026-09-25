@@ -1303,9 +1303,20 @@ class TestAlleggerimentoAutomatico(unittest.TestCase):
 
         self.addCleanup(rimetti)
 
-    def test_la_soglia_predefinita_e_450(self):
+    def test_la_soglia_predefinita_e_380(self):
+        """Uguale a `render.yaml`: il 25/09/2026 `/health` diceva 450
+        perché il pannello non aveva la variabile e valeva il codice."""
         os.environ.pop("MEMORIA_SOGLIA_MB", None)
-        self.assertEqual(self.util.soglia_alleggerimento_mb(), 450.0)
+        self.assertEqual(self.util.soglia_alleggerimento_mb(), 380.0)
+
+    def test_codice_e_blueprint_dicono_la_stessa_soglia(self):
+        percorso = os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), "render.yaml")
+        with open(percorso, encoding="utf-8") as f:
+            testo = f.read()
+        blocco = testo.split("key: MEMORIA_SOGLIA_MB", 1)[1]
+        valore = float(blocco.split('value: "', 1)[1].split('"', 1)[0])
+        self.assertEqual(valore, self.util.SOGLIA_ALLEGGERIMENTO_MB)
 
     def test_la_soglia_si_puo_cambiare_dall_ambiente(self):
         os.environ["MEMORIA_SOGLIA_MB"] = "300"
@@ -1315,7 +1326,7 @@ class TestAlleggerimentoAutomatico(unittest.TestCase):
         """Una variabile d'ambiente sbagliata non deve trasformarsi in
         «nessun limite»: sarebbe il guasto peggiore di tutti, silenzioso."""
         os.environ["MEMORIA_SOGLIA_MB"] = "quattrocento"
-        self.assertEqual(self.util.soglia_alleggerimento_mb(), 450.0)
+        self.assertEqual(self.util.soglia_alleggerimento_mb(), 380.0)
 
     def test_a_zero_si_spegne(self):
         os.environ["MEMORIA_SOGLIA_MB"] = "0"

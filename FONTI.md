@@ -1035,7 +1035,7 @@ ci stanno sessanta minuti di ricerche, e ogni ricerca e' una manciata di
 richieste HTTP con il loro transito.
 
 Ora il controllo si fa a ogni richiesta servita (`MEMORIA_SOGLIA_MB`,
-predefinito 450). Sotto soglia costa la lettura di `/proc/self/statm`.
+predefinito 380 dal 25/09/2026, prima 450). Sotto soglia costa la lettura di `/proc/self/statm`.
 Sopra soglia interviene in due tempi: prima `libera_memoria()`, che non
 perde niente; poi, solo se ancora sopra, butta gli indici RICOSTRUIBILI
 — indice TAC, schede di confronto, cache delle ricerche. Fuori da quella
