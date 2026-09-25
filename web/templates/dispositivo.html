@@ -24,6 +24,12 @@
       {{ "Togli dal parco di test" if device.in_parco else "Aggiungi al parco di test" }}
     </button>
   </form>
+  {% if scheda.cpu %}
+  <form method="get" action="/simili" class="azione-simili">
+    <input type="hidden" name="q" value="{{ device.modello }}">
+    <button type="submit" class="secondario">Trova un telefono con hardware simile</button>
+  </form>
+  {% endif %}
 </section>
 
 <h3 class="occhiello">Storico</h3>

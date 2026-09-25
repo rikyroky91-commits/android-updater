@@ -513,6 +513,84 @@ def pagina_confronto(request: Request, a: str = Query(default=""),
     ))
 
 
+@app.get("/simili", response_class=HTMLResponse)
+def pagina_simili(request: Request, q: str = Query(default=""),
+                  software: int = Query(default=0)):
+    """Telefoni con hardware simile: stessa marca, stesso processore.
+
+    Riusa `_esito_ricerca` come il confronto, e per la stessa ragione:
+    il telefono di partenza deve essere ESATTAMENTE quello che la ricerca
+    ha appena mostrato, non una seconda risoluzione del nome che potrebbe
+    finire su un altro modello. `senza_rete=True`: serve identità e
+    scheda, non il firmware — e se la ricerca completa è ancora nella
+    memoria corta, torna quella.
+    """
+    query, imei = _modello_da_imei((q or "").strip())
+    esito = _esito_ricerca(query, senza_rete=True) if query else None
+    simili_esito = _simili_di(request, esito, bool(software)) if esito else None
+    return _rendi(request, "simili.html", _contesto(
+        request, attiva="cerca", query=q, imei=imei, esito=esito,
+        simili=simili_esito, solo_software=bool(software),
+    ))
+
+
+def _android_intero(valore) -> int | None:
+    try:
+        return int(str(valore).strip().split(".")[0])
+    except (TypeError, ValueError):
+        return None
+
+
+def _simili_di(request: Request, esito: dict, solo_stesso_software: bool) -> dict:
+    """Prepara `core.simili.trova` a partire da un risultato di ricerca."""
+    from core import simili
+
+    scheda = esito.get("scheda") or {}
+    voci = dict(scheda.get("voci") or [])
+    nome = esito.get("nome") or scheda.get("titolo") or esito.get("query") or ""
+    marca_gruppo = esito.get("brand") or scheda.get("marca") or ""
+
+    archivio = {d["device_key"]: d for d in storage.get_devices()
+                if d.get("device_key")}
+    chiave_rif = esito.get("chiave") or esito.get("chiave_parco") or ""
+
+    # IL SOFTWARE DI PARTENZA, con la sua provenienza. Un Android appena
+    # verificato dalla ricerca completa vale più dell'archivio; l'Android
+    # di lancio si tiene a parte e si confronta solo con altri Android di
+    # lancio (vedi `core/simili.py`).
+    android_archivio = None
+    fw = esito.get("firmware_confronto") or {}
+    if fw.get("tipo") == C.FW_CURRENT:
+        android_archivio = _android_intero(fw.get("android"))
+    if android_archivio is None and chiave_rif in archivio:
+        android_archivio = _android_intero(archivio[chiave_rif].get("android_version"))
+    os_lancio = voci.get("Sistema di lancio")
+
+    # IL PARCO SI MOSTRA SOLO A CHI PUÒ VEDERLO: è l'unica parte del sito
+    # dietro login, e questa pagina no.
+    loggato = bool(auth_web.utente_da_richiesta(request))
+    esito_simili = simili.trova(
+        nome=nome, chip=scheda.get("cpu"), marca=marca_gruppo,
+        android_archivio=android_archivio,
+        android_lancio=simili.android_di_lancio(os_lancio),
+        rilascio=scheda.get("rilascio"),
+        archivio=archivio, chiave_di=extract.device_key,
+        in_parco=storage.watched_keys() if loggato else set(),
+    )
+    if solo_stesso_software:
+        esito_simili["simili"] = [v for v in esito_simili["simili"] if v["stesso_software"]]
+        esito_simili["altre_marche"] = [v for v in esito_simili["altre_marche"]
+                                        if v["stesso_software"]]
+    esito_simili.update({
+        "nome": nome,
+        "chip_mostrato": scheda.get("cpu"),
+        "android_archivio": android_archivio,
+        "os_lancio": os_lancio,
+        "loggato": loggato,
+    })
+    return esito_simili
+
+
 @app.get("/dispositivi", response_class=HTMLResponse)
 def pagina_dispositivi(request: Request,
                        filtro: str = Query(default=""),
@@ -1183,7 +1261,9 @@ def parco_aggiungi(request: Request, chiave: str = Form(...), brand: str = Form(
     # Il parametro viene dal nostro template, ma non deve mai diventare un
     # redirect verso un dominio esterno se qualcuno costruisce una POST a
     # mano. Accettiamo solo la ricerca locale con la query gia' compilata.
-    if ritorno.startswith("/?") and not ritorno.startswith("//"):
+    # Anche la pagina dei telefoni simili, che ha lo stesso tasto riga per
+    # riga: stessa regola, solo percorsi locali scritti da noi.
+    if (ritorno.startswith("/?") or ritorno.startswith("/simili?")) and not ritorno.startswith("//"):
         return RedirectResponse(f"{ritorno}&parco=1", status_code=303)
     return RedirectResponse(f"/dispositivo?k={quote(chiave)}", status_code=303)
 

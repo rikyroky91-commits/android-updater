@@ -364,6 +364,8 @@ a { color: inherit; }
 .proposta.attiva { border-color: var(--ink); font-weight: 700; }
 .azione-parco { margin-top: .9rem; }
 .azione-parco form { margin: 0; }
+.azione-simili { margin-top: .5rem; }
+.azione-simili button.secondario { border-radius: 7px; padding: .5rem .75rem; }
 
 /* La data e' un'azione frequente del parco: campo e salvataggio restano
    sulla stessa riga, gia' compilati con oggi, invece di aprire una pagina
@@ -1094,4 +1096,16 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .firmware-arrivato { animation: none; }
+}
+
+/* Telefoni con hardware simile: il filtro è una casella, non un campo di
+   ricerca — la regola generica `.confronto-form input` la allargava a
+   pillola e la staccava dalla sua etichetta. */
+.confronto-form .simili-filtro {
+  display: inline-flex; align-items: center; gap: .4rem;
+  font-size: .85rem; color: var(--neutral); white-space: nowrap;
+}
+.confronto-form .simili-filtro input {
+  flex: 0 0 auto; min-width: 0; width: auto; padding: 0; margin: 0;
+  border: 0; border-radius: 0; box-shadow: none;
 }

@@ -128,6 +128,18 @@
   </div>
   {% endif %}
 
+  {# ACCANTO AL PARCO, perché nasce dalla stessa domanda: «su quale
+     telefono lo provo?». Se questo modello non ce l'hai, un altro della
+     stessa marca con lo stesso chip è il sostituto più vicino. La ricerca
+     parte dalla STESSA domanda fatta qui (`domanda_originale`), come il
+     secondo tempo del firmware: vedi il commento più sopra. #}
+  {% if risultato.scheda.cpu %}
+  <form method="get" action="/simili" class="azione-simili">
+    <input type="hidden" name="q" value="{{ risultato.domanda_originale or risultato.query }}">
+    <button type="submit" class="secondario">Trova un telefono con hardware simile</button>
+  </form>
+  {% endif %}
+
   {# QUESTO CODICE HA PIÙ DI UN NOME COMMERCIALE VERO, NON UN «FORSE».
      `RMX3933` è insieme «C61», «Note 60», «Note 60s» e «NARZO N61»: la
      stessa piattaforma venduta con nomi diversi in mercati diversi. Il
