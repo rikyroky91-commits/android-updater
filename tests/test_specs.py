@@ -503,3 +503,55 @@ class TestMarcaChiestaColNomeCorto(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _scheda_nome(nome, chip="Chip X"):
+    return {"nome": nome, "marca": C.XIAOMI, "codici": [], "chipset": chip}
+
+
+class TestNomiCheSiSomigliano(unittest.TestCase):
+    """25/09/2026: «Xiaomi 15» rispondeva con la scheda del Redmi 15 4G, e
+    i Redmi Note della fonte Xiaomi («… 4G EEA») non trovavano la loro."""
+
+    CATALOGO = [
+        _scheda_nome("Xiaomi 15", "Qualcomm SM8750-AB Snapdragon 8 Elite (3 nm)"),
+        _scheda_nome("Xiaomi Redmi 15 4G", "Qualcomm Snapdragon 685"),
+        _scheda_nome("Xiaomi Redmi 15"),
+        _scheda_nome("Xiaomi Redmi Note 14 Pro 4G", "Mediatek Helio G100 Ultra"),
+        _scheda_nome("Xiaomi Redmi Note 14 Pro 5G"),
+        _scheda_nome("Xiaomi Redmi Note 14 Pro 5G (India)"),
+        _scheda_nome("vivo Z1"),
+        _scheda_nome("vivo iQOO Z1"),
+    ]
+
+    def setUp(self):
+        specs.carica_da(self.CATALOGO, "somiglianze")
+        self.addCleanup(specs.carica_da, SCHEDE, "fixture")
+
+    def _nome(self, testo):
+        scheda = specs.per_nome(testo)
+        return scheda.nome if scheda else None
+
+    def test_ogni_scheda_si_trova_col_proprio_nome(self):
+        for riga in self.CATALOGO:
+            with self.subTest(nome=riga["nome"]):
+                self.assertEqual(self._nome(riga["nome"]), riga["nome"])
+
+    def test_redmi_non_diventa_xiaomi(self):
+        self.assertEqual(self._nome("Xiaomi 15"), "Xiaomi 15")
+        self.assertEqual(self._nome("Redmi 15"), "Xiaomi Redmi 15")
+
+    def test_iqoo_non_diventa_vivo(self):
+        self.assertEqual(self._nome("iQOO Z1"), "vivo iQOO Z1")
+
+    def test_il_mercato_in_coda_non_fa_parte_del_nome(self):
+        self.assertEqual(self._nome("Redmi Note 14 Pro 4G EEA"), "Xiaomi Redmi Note 14 Pro 4G")
+        self.assertEqual(self._nome("Xiaomi 15 Global"), "Xiaomi 15")
+
+    def test_la_variante_indiana_del_catalogo_viene_prima(self):
+        self.assertEqual(self._nome("Redmi Note 14 Pro 5G India"),
+                         "Xiaomi Redmi Note 14 Pro 5G (India)")
+
+    def test_senza_rete_resta_ambiguo(self):
+        """Tolto il mercato, «Redmi Note 14 Pro» è ancora 4G o 5G: non si sceglie."""
+        self.assertIsNone(self._nome("Redmi Note 14 Pro EEA"))

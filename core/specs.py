@@ -502,6 +502,12 @@ def _forme_nome(nome: str) -> list[str]:
     return soc.varianti_nome(nome)
 
 
+def _forma_esatta(nome: str) -> str:
+    """Il nome così com'è, nella stessa normalizzazione di `varianti_nome`."""
+    from . import soc
+    return re.sub(r"\s+", " ", soc.normalizza_parentesi_numeriche(nome or "")).strip().upper()
+
+
 # Sotto questa lunghezza un nome non identifica un telefono: la forma
 # abbreviata di «OnePlus 2» è «2».
 _LUNGHEZZA_MINIMA = 3
@@ -524,12 +530,23 @@ def indicizza(schede: list[dict]) -> tuple[dict[str, dict], dict[str, dict]]:
     per_nome: dict[str, dict] = {}
     contese: set[str] = set()
 
+    # IL NOME ESATTO DI UNA SCHEDA NON SI CONTENDE CON UNA FORMA DERIVATA
+    # di un'altra. Prima «XIAOMI 15» (nome vero dello Xiaomi 15) e la
+    # forma abbreviata di «Xiaomi Redmi 15» si annullavano a vicenda, e lo
+    # Xiaomi 15 non si trovava più nemmeno scritto esattamente com'è.
+    esatti: set[str] = set()
+    for riga in schede:
+        esatto = _forma_esatta(riga["nome"])
+        if esatto and esatto not in per_nome:
+            per_nome[esatto] = riga
+            esatti.add(esatto)
+
     for riga in schede:
         for codice in riga.get("codici") or ():
             per_codice.setdefault(codice.upper(), riga)
 
         for forma in _forme_nome(riga["nome"]):
-            if len(forma) < _LUNGHEZZA_MINIMA or forma in contese:
+            if len(forma) < _LUNGHEZZA_MINIMA or forma in contese or forma in esatti:
                 continue
             precedente = per_nome.get(forma)
             if precedente is None:
@@ -713,15 +730,50 @@ def per_codice(codice: str) -> Scheda | None:
 _SUFFISSI_CONNETTIVITA = ("4G", "5G", "LTE", "5G UW")
 
 
+# IL MERCATO IN CODA AL NOME non fa parte del modello. Le fonti firmware
+# Xiaomi chiamano i telefoni «Redmi Note 14 Pro 4G EEA», «Xiaomi 14T Pro
+# Global»: il catalogo no. Visto in produzione il 25/09/2026 — la pagina
+# del Redmi Note 14 Pro 4G mostrava il firmware ma nessuna scheda, nessun
+# processore e nessuna foto, e lo stesso valeva per ogni Xiaomi arrivato
+# da quella fonte con il mercato in coda.
+_RE_MERCATO_IN_CODA = re.compile(
+    r"\s+\(?(EEA|Global|EU|Europe|India|IN|China|CN|TW|Taiwan|RU|Russia|ID|"
+    r"Indonesia|TR|Turkey|JP|Japan|LATAM|MX|KR)\)?$", re.IGNORECASE)
+_MERCATI_NEL_CATALOGO = {"india": "India", "in": "India", "china": "China",
+                         "cn": "China", "japan": "Japan", "jp": "Japan"}
+
+
 def per_nome(nome: str, marca: str | None = None) -> Scheda | None:
     testo = (nome or "").strip()
     if not testo:
         return None
+    trovata = _per_nome_esatto(testo, marca)
+    if trovata is not None:
+        return trovata
+    mercato = _RE_MERCATO_IN_CODA.search(testo)
+    if not mercato:
+        return None
+    base = testo[: mercato.start()].strip()
+    # Il catalogo tiene a parte alcune varianti di mercato con il nome
+    # tra parentesi («Redmi Note 14 Pro 5G (India)»): quella si prova per
+    # prima, perché può montare un chip diverso da quella globale.
+    nel_catalogo = _MERCATI_NEL_CATALOGO.get(mercato.group(1).lower())
+    if nel_catalogo:
+        trovata = _per_nome_esatto(f"{base} ({nel_catalogo})", marca)
+        if trovata is not None:
+            return trovata
+    return _per_nome_esatto(base, marca) if base else None
+
+
+def _per_nome_esatto(testo: str, marca: str | None = None) -> Scheda | None:
     curata = _curata_per_nome(testo)
     if curata and _marca_compatibile(curata, marca):
         return curata
     carica()
-    forme = _forme_nome(testo)
+    # LA FORMA ESATTA PER PRIMA: `varianti_nome` non ha un ordine, e una
+    # forma abbreviata poteva rispondere prima del nome scritto per intero.
+    esatta = _forma_esatta(testo)
+    forme = [esatta] + [f for f in _forme_nome(testo) if f != esatta]
     for forma in forme:
         riga = _per_nome.get(forma)
         if riga:

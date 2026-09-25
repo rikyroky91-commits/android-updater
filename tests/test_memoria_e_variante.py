@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 RADICE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-from core import imeicheck, modelcodes  # noqa: E402
+from core import imeicheck, modelcodes, storage  # noqa: E402
 from web import presenters as P  # noqa: E402
 
 
@@ -1715,6 +1715,9 @@ class TestUnAntibotNonEUnGuastoPasseggero(unittest.TestCase):
         os.environ["TAC_API_KEY"] = "una-chiave"
         os.environ["TAC_API_MAX_GIORNO"] = "0"
         os.environ["TAC_API_MAX_MESE"] = "0"
+        # La pausa lunga vive in archivio: ogni prova parte senza, e non
+        # ne lascia a chi viene dopo.
+        storage.set_meta(imeicheck._META_PAUSA_LUNGA, "{}")
         imeicheck.reset_cache()
 
         def rimetti():
@@ -1724,6 +1727,7 @@ class TestUnAntibotNonEUnGuastoPasseggero(unittest.TestCase):
                 else:
                     os.environ[k] = v
             imeicheck.requests = self._requests
+            storage.set_meta(imeicheck._META_PAUSA_LUNGA, "{}")
             imeicheck.reset_cache()
 
         self.addCleanup(rimetti)
@@ -1790,6 +1794,54 @@ class TestUnAntibotNonEUnGuastoPasseggero(unittest.TestCase):
         self._servizio(500, "Internal Server Error")
         imeicheck.cerca_tac_online_esito("35139740")
         self.assertIn("500", imeicheck.ultimo_esito_servizio()["dettaglio"])
+
+    def _conta_chiamate(self, stato, testo):
+        chiamate = []
+        self._servizio(stato, testo)
+        finto = imeicheck.requests
+        originale = finto.post
+
+        class Contatore:
+            def post(self_interno, *a, **k):
+                chiamate.append(1)
+                return originale(*a, **k)
+        imeicheck.requests = Contatore()
+        return chiamate
+
+    def test_un_antibot_mette_in_pausa_per_ore_anche_dopo_un_riavvio(self):
+        """25/09/2026: 26 chiamate su 100 bruciate contro l'antibot, perché
+        la pausa di cinque minuti viveva in memoria e Render addormenta il
+        processo. La pausa lunga sta in archivio e sopravvive."""
+        chiamate = self._conta_chiamate(503, self.PAGINA)
+        imeicheck.cerca_tac_online_esito("35139740")
+        self.assertEqual(len(chiamate), 1)
+        imeicheck._pausa_servizio = {}      # come dopo un riavvio
+        imeicheck.reset_cache()
+        self.assertEqual(imeicheck.cerca_tac_online_esito("35139741"),
+                         ("errore", None))
+        self.assertEqual(len(chiamate), 1, "nessuna nuova chiamata durante la pausa")
+        self.assertIn("pausa", imeicheck.pausa_lunga("HiCellTek") or "")
+        self.assertIn("pausa fino al", imeicheck.stato_servizio_esterno())
+
+    def test_una_chiave_nuova_toglie_la_pausa(self):
+        chiamate = self._conta_chiamate(503, self.PAGINA)
+        imeicheck.cerca_tac_online_esito("35139740")
+        os.environ["TAC_API_KEY"] = "chiave-diversa"
+        imeicheck._pausa_servizio = {}
+        imeicheck.cerca_tac_online_esito("35139741")
+        self.assertEqual(len(chiamate), 2)
+
+    def test_un_guasto_normale_non_mette_la_pausa_lunga(self):
+        self._servizio(500, "Internal Server Error")
+        imeicheck.cerca_tac_online_esito("35139740")
+        self.assertIsNone(imeicheck.pausa_lunga("HiCellTek"))
+
+    def test_la_pausa_si_puo_spegnere(self):
+        os.environ["TAC_API_PAUSA_ANTIBOT_ORE"] = "0"
+        self.addCleanup(os.environ.pop, "TAC_API_PAUSA_ANTIBOT_ORE", None)
+        self._servizio(503, self.PAGINA)
+        imeicheck.cerca_tac_online_esito("35139740")
+        self.assertIsNone(imeicheck.pausa_lunga("HiCellTek"))
 
 
 class TestITreSegnapostoDellIndirizzo(unittest.TestCase):

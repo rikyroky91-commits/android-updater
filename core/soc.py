@@ -326,7 +326,17 @@ def varianti_nome(nome: str) -> list[str]:
 
     # Senza la parola di gamma: «Galaxy S24 Ultra» → «S24 Ultra»
     senza_gamma = [p for p in parole if p not in _GAMME]
-    if senza_gamma and senza_gamma != parole:
+    # MA NON SE RESTA LA MARCA MADRE DI UN SOTTOMARCHIO. «Xiaomi Redmi 15
+    # 4G» senza «Redmi» diventa «Xiaomi 15 4G», che è il nome di un altro
+    # telefono (lo Xiaomi 15, un Snapdragon 8 Elite): la ricerca «Xiaomi
+    # 15» rispondeva con la scheda del Redmi 15 4G (visto il 25/09/2026).
+    # Redmi e POCO riusano i numeri della serie principale Xiaomi (e iQOO
+    # quelli di vivo: iQOO Z1 non è vivo Z1); Galaxy
+    # e Samsung no, quindi «Samsung S24» resta una forma valida.
+    tolte = {p for p in parole if p in _GAMME}
+    madre_rimasta = any(_MARCA_DI_GAMMA.get(g) in senza_gamma
+                        for g in tolte & _SOTTOMARCHI_CON_NUMERI_PROPRI)
+    if senza_gamma and senza_gamma != parole and not madre_rimasta:
         forme.add(" ".join(senza_gamma))
 
     # Senza la marca: «Samsung Galaxy A32» → «Galaxy A32»
@@ -340,12 +350,14 @@ def varianti_nome(nome: str) -> list[str]:
         for forma in list(forme):
             forme.add(f"{marca} {forma}")
             senza = [p for p in forma.split(" ") if p not in _GAMME]
-            if senza:
+            # Stessa regola di sopra: «Redmi 15» non diventa «Xiaomi 15».
+            if senza and parole[0] not in _SOTTOMARCHI_CON_NUMERI_PROPRI:
                 forme.add(f"{marca} {' '.join(senza)}")
 
     return [f for f in forme if f]
 
 
+_SOTTOMARCHI_CON_NUMERI_PROPRI = {"REDMI", "POCO", "IQOO"}
 _MARCA_DI_GAMMA = {"GALAXY": "SAMSUNG", "REDMI": "XIAOMI", "POCO": "XIAOMI",
                    "NARZO": "REALME", "MOTO": "MOTOROLA", "IQOO": "VIVO"}
 

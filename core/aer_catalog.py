@@ -140,6 +140,10 @@ def normalize(nome: str) -> str:
     spazi. «OPPO Find X9 Pro» e «oppo findx9pro» collassano sulla stessa
     chiave."""
     testo = _PARENTESI.sub(" ", str(nome or ""))
+    # IL «+» È PARTE DEL NOME. Toglierlo con il resto della punteggiatura
+    # rendeva «realme 14 Pro» e «realme 14 Pro+» la stessa chiave: la
+    # ricerca del 14 Pro rispondeva con il 14 Pro+ (visto il 25/09/2026).
+    testo = testo.replace("+", " plus ")
     return re.sub(r"[^a-z0-9]+", "", testo.lower())
 
 

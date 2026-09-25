@@ -47,12 +47,14 @@ from . import config as C
 MAI_TESTATO = "mai_testato"
 INVARIATO = "invariato"
 DA_RITESTARE = "da_ritestare"
+DA_VERIFICARE = "da_verificare"
 INCOERENTE = "incoerente"
 
 ETICHETTE = {
     MAI_TESTATO: "⚪ Mai testato",
     INVARIATO: "🟢 Invariato",
     DA_RITESTARE: "🔴 Da ritestare",
+    DA_VERIFICARE: "🟡 Da verificare",
     INCOERENTE: "🟠 Dato incoerente",
 }
 
@@ -149,6 +151,16 @@ AZIONI = {
 }
 
 
+# Quale colonna di `get_devices` dice il tipo di dato di ciascun campo.
+_TIPO_DEL_CAMPO = {"android_version": "android_kind", "os_version": "android_kind",
+                   "build": "build_kind", "patch_level": "build_kind"}
+
+
+def _riportato(device: dict, campo: str) -> bool:
+    """Il valore attuale viene da un rollout RIPORTATO, non verificato."""
+    return (device.get(_TIPO_DEL_CAMPO[campo]) or "") == C.FW_REPORTED
+
+
 def confronta(device: dict, baseline: dict | None) -> dict:
     """Confronta lo stato attuale di un dispositivo con l'ultima fotografia.
 
@@ -191,6 +203,11 @@ def confronta(device: dict, baseline: dict | None) -> dict:
             "prima": vecchio,
             "dopo": nuovo,
             "severita": _peso(campo, vecchio, nuovo),
+            # UN ROLLOUT RIPORTATO NON È UN AGGIORNAMENTO CERTO. Era il
+            # punto aperto della revisione di agosto: questi dati
+            # arrivavano al «da ritestare» indistinguibili da quelli
+            # verificati, e facevano rilanciare test per una notizia.
+            "riportato": _riportato(device, campo),
         }
         if _regressione(campo, vecchio, nuovo):
             voce["severita"] = None
@@ -232,12 +249,35 @@ def confronta(device: dict, baseline: dict | None) -> dict:
             "note": note,
         }
 
+    if all(v["riportato"] for v in cambiamenti):
+        riassunto = "; ".join(
+            f"{v['etichetta']} {v['prima']} → {v['dopo']} (riportato)" for v in cambiamenti)
+        severita = min(
+            (v["severita"] for v in cambiamenti),
+            key=lambda s: C.SEVERITY_RANK.get(s, len(C.SEVERITY_ORDER)),
+        )
+        return {
+            "stato": DA_VERIFICARE,
+            "etichetta": ETICHETTE[DA_VERIFICARE],
+            "severita": severita,
+            "azione": ("Aggiornamento riportato da una fonte, non ancora "
+                       "confermato: controlla la versione sul telefono prima "
+                       "di rilanciare i test"),
+            "cambiamenti": cambiamenti,
+            "incoerenze": [],
+            "mancanti": mancanti,
+            "riassunto": riassunto,
+            "tested_at": tested_at,
+            "note": note,
+        }
+
     severita = min(
         (v["severita"] for v in cambiamenti),
         key=lambda s: C.SEVERITY_RANK.get(s, len(C.SEVERITY_ORDER)),
     )
     riassunto = "; ".join(
-        f"{v['etichetta']} {v['prima']} → {v['dopo']}" for v in cambiamenti)
+        f"{v['etichetta']} {v['prima']} → {v['dopo']}"
+        + (" (riportato)" if v["riportato"] else "") for v in cambiamenti)
     return {
         "stato": DA_RITESTARE,
         "etichetta": ETICHETTE[DA_RITESTARE],
@@ -258,7 +298,8 @@ def riepilogo(devices: list[dict], baselines: dict[str, dict]) -> dict:
     Alimenta i contatori del parco di test: quanti device hanno una novità
     dall'ultima prova, quanti sono fermi, quanti non hanno mai una baseline.
     """
-    conteggio = {MAI_TESTATO: 0, INVARIATO: 0, DA_RITESTARE: 0, INCOERENTE: 0}
+    conteggio = {MAI_TESTATO: 0, INVARIATO: 0, DA_RITESTARE: 0,
+                 DA_VERIFICARE: 0, INCOERENTE: 0}
     for device in devices:
         esito = confronta(device, baselines.get(device.get("device_key")))
         conteggio[esito["stato"]] += 1

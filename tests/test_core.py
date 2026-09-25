@@ -1486,6 +1486,23 @@ class TestMotorolaLolinet(unittest.TestCase):
         self.assertEqual(items[0].model_code, "XT2409-1")
         self.assertEqual(items[0].android_version, 15)
 
+    def test_la_ricerca_per_nome_imposta_anche_il_codice_xt(self):
+        """Punto aperto della revisione di agosto: il ramo per nome non
+        impostava `model_code`, e i gemelli restavano sconosciuti."""
+        original = sources._lolinet_latest
+        sources._lolinet_latest = lambda *_args: (
+            "XT2409-1_VIENNA_RETEU_15_V2UIS35.43-12-4-1_subsidy-DEFAULT.zip",
+            "https://mirror.test/XT2409-1.zip", "2026-01-01 00:00",
+        )
+        try:
+            items = sources._lookup_motorola("Edge 50 Neo")
+        finally:
+            sources._lolinet_latest = original
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].model_code, "XT2409-1")
+        self.assertEqual(items[0].android_version, 15)
+        self.assertEqual(items[0].build, "V2UIS35.43-12-4-1")
+
     def test_mappa_codici_copre_un_campione_esteso_di_modelli(self):
         # Ogni voce deriva dal nome di un pacchetto, non da una somiglianza.
         self.assertGreaterEqual(len(sources.MOTOROLA_LOLINET_CODES), 25)

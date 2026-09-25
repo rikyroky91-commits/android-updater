@@ -153,6 +153,9 @@ _PARENTESI = re.compile(r"\([^)]*\)")
 def normalize(name: str) -> str:
     text = _PARENTESI.sub(" ", str(name or ""))
     text = re.sub(r"^\s*oppo\s+", " ", text, flags=re.IGNORECASE)
+    # Il «+» distingue due telefoni (Reno Pro e Reno Pro+): vedi la stessa
+    # regola in `aer_catalog.normalize`.
+    text = text.replace("+", " plus ")
     return re.sub(r"[^a-z0-9]+", "", text.lower())
 
 

@@ -4835,15 +4835,20 @@ def _lookup_motorola(model_name: str) -> list[RawItem]:
             found = None
         if found:
             filename, file_url, date_str = found
-            name_match = _LOLINET_NAME_RE.search(filename)
+            # STESSA LETTURA DEL RAMO PER CODICE: prima questo ramo leggeva
+            # solo i pacchetti OTA (niente fastboot) e non impostava mai il
+            # codice XT, quindi una ricerca per nome non riconosceva i
+            # «gemelli» che la stessa ricerca per codice trovava.
+            model_code, android_version, build = _lolinet_metadata(filename)
             return [RawItem(
-                title=f"Motorola {commercial} — build {name_match.group(3) if name_match else filename}",
+                title=f"Motorola {commercial} — build {build or filename}",
                 link=file_url,
                 published=iso(date_str.replace(" ", "T", 1)),
                 brand=C.VIVO,
                 device=f"Motorola {commercial}",
-                build=name_match.group(3) if name_match else None,
-                android_version=int(name_match.group(2)) if name_match else None,
+                model_code=model_code,
+                build=build,
+                android_version=android_version,
                 size_info="Firmware ufficiale (mirror lolinet.com)",
             )]
     return _lookup_motorola_archivio(model_name)

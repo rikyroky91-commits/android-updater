@@ -136,6 +136,37 @@ class TestDatiSospetti(unittest.TestCase):
         self.assertEqual(len(esito["mancanti"]), 4)
 
 
+class TestRolloutRiportato(unittest.TestCase):
+    """Punto aperto dalla revisione di agosto: un rollout solo RIPORTATO
+    arrivava al «da ritestare» indistinguibile da uno verificato."""
+
+    def test_solo_dati_riportati_chiedono_una_verifica_non_un_retest(self):
+        esito = retest.confronta(
+            device(android_version=16, android_kind=C.FW_REPORTED), baseline())
+        self.assertEqual(esito["stato"], retest.DA_VERIFICARE)
+        self.assertIn("(riportato)", esito["riassunto"])
+        self.assertIn("telefono", esito["azione"])
+
+    def test_un_dato_verificato_resta_un_retest(self):
+        esito = retest.confronta(
+            device(android_version=16, android_kind=C.FW_CURRENT), baseline())
+        self.assertEqual(esito["stato"], retest.DA_RITESTARE)
+
+    def test_misto_vince_il_dato_verificato(self):
+        esito = retest.confronta(
+            device(android_version=16, android_kind=C.FW_REPORTED,
+                   build="S928BXXU6DYB1", build_kind=C.FW_CURRENT), baseline())
+        self.assertEqual(esito["stato"], retest.DA_RITESTARE)
+        self.assertIn("Android 15 → 16 (riportato)", esito["riassunto"])
+
+    def test_il_riepilogo_li_conta_a_parte(self):
+        conteggio = retest.riepilogo(
+            [device(android_version=16, android_kind=C.FW_REPORTED)],
+            {"samsung|galaxy-s24-ultra": baseline()})
+        self.assertEqual(conteggio[retest.DA_VERIFICARE], 1)
+        self.assertEqual(conteggio[retest.DA_RITESTARE], 0)
+
+
 class TestPersistenza(unittest.TestCase):
     def setUp(self):
         self._db = tempfile.mktemp(suffix=".db")
@@ -204,3 +235,40 @@ class TestPersistenza(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class TestTipoDelDatoInArchivio(unittest.TestCase):
+    """`get_devices` dice da che tipo di riga vengono Android e build."""
+
+    def setUp(self):
+        self._db = tempfile.mktemp(suffix=".db")
+        C.DB_PATH = self._db
+        storage.reset_state()
+        storage.init_db()
+
+    def tearDown(self):
+        storage.reset_state()
+        if os.path.exists(self._db):
+            os.remove(self._db)
+
+    def _riga(self, ident, tipo, android, build):
+        storage.upsert_update({
+            "id": ident, "device_key": "samsung|s24ultra", "brand": "Samsung",
+            "device_model": "Galaxy S24 Ultra", "title": ident,
+            "android_version": android, "build": build, "firmware_kind": tipo,
+            "source_trust": "noisy", "is_relevant": 1,
+            "published": "2026-09-01", "first_seen": "2026-09-01",
+        })
+
+    def test_solo_riportato(self):
+        self._riga("r1", C.FW_REPORTED, 16, "S928BXXU6")
+        riga = storage.get_devices()[0]
+        self.assertEqual((riga["android_kind"], riga["build_kind"]),
+                         (C.FW_REPORTED, C.FW_REPORTED))
+
+    def test_il_verificato_vince(self):
+        self._riga("r1", C.FW_REPORTED, 16, "S928BXXU6")
+        self._riga("c1", C.FW_CURRENT, 15, "S928BXXU5")
+        riga = storage.get_devices()[0]
+        self.assertEqual((riga["android_version"], riga["android_kind"]),
+                         (15, C.FW_CURRENT))

@@ -1343,6 +1343,10 @@ def stato_servizio_esterno() -> str:
     riassunto = riassunto_servizio()
     if riassunto:
         pezzi.append(riassunto)
+    for fornitore in configurati:
+        motivo = pausa_lunga(fornitore["nome"])
+        if motivo:
+            pezzi.append(f"{fornitore['nome']} {motivo[:120]}")
     consumo = riassunto_consumo()
     if consumo:
         pezzi.append(consumo)
@@ -1489,8 +1493,102 @@ def _ricorda_esito_servizio(esito: str, dettaglio: str,
     import time as _time
     if esito == "errore":
         _pausa_servizio[fornitore] = (_time.monotonic(), dettaglio)
+        if _SEGNO_PAUSA_LUNGA in dettaglio:
+            _metti_pausa_lunga(fornitore, dettaglio)
     else:
         _pausa_servizio.pop(fornitore, None)
+        _togli_pausa_lunga(fornitore)
+
+
+# ======================================================================
+# UN ANTIBOT NON È UN GUASTO PASSEGGERO: PAUSA LUNGA E PERSISTENTE
+# ======================================================================
+# Visto in produzione il 25/09/2026: HiCellTek rispondeva con la pagina
+# «Security check» di o2switch dal 08/09. Con la pausa di cinque minuti,
+# e con Render che addormenta il processo dopo un quarto d'ora di quiete
+# (azzerando la pausa, che viveva solo in memoria), OGNI IMEI sconosciuto
+# rifaceva la chiamata: 26 delle 100 del mese bruciate, zero risposte, e
+# qualche secondo d'attesa in più per chi cercava. Un antibot con
+# JavaScript non se ne va da solo in cinque minuti: la pausa dura ore, si
+# scrive in archivio così sopravvive al riavvio, e decade da sola se si
+# cambia chiave o indirizzo (chi cambia configurazione vuole riprovare).
+_META_PAUSA_LUNGA = "imei_tac_pausa_antibot"
+PAUSA_ANTIBOT_ORE_PREDEFINITA = 24
+_SEGNO_PAUSA_LUNGA = "controllo antibot"
+_pausa_lunga: dict | None = None
+
+
+def _ore_pausa_antibot() -> float:
+    try:
+        return max(0.0, float(C.env("TAC_API_PAUSA_ANTIBOT_ORE",
+                                    str(PAUSA_ANTIBOT_ORE_PREDEFINITA)) or 0))
+    except ValueError:
+        return float(PAUSA_ANTIBOT_ORE_PREDEFINITA)
+
+
+def _impronta_fornitore(nome: str) -> str:
+    import hashlib
+    for fornitore in fornitori_tac():
+        if fornitore["nome"] == nome:
+            grezzo = f"{fornitore['url']}|{fornitore['chiave']}"
+            return hashlib.sha256(grezzo.encode()).hexdigest()[:16]
+    return ""
+
+
+def _pause_lunghe() -> dict:
+    global _pausa_lunga
+    if _pausa_lunga is None:
+        try:
+            letto = json.loads(storage.get_meta(_META_PAUSA_LUNGA) or "{}")
+        except Exception:
+            letto = {}
+        _pausa_lunga = letto if isinstance(letto, dict) else {}
+    return _pausa_lunga
+
+
+def _salva_pause_lunghe() -> None:
+    try:
+        storage.set_meta(_META_PAUSA_LUNGA, json.dumps(_pause_lunghe()))
+    except Exception:      # pragma: no cover - una diagnosi non rompe nulla
+        pass
+
+
+def _metti_pausa_lunga(fornitore: str, dettaglio: str) -> None:
+    ore = _ore_pausa_antibot()
+    if not fornitore or ore <= 0:
+        return
+    from datetime import timedelta
+    fino = datetime.now(timezone.utc) + timedelta(hours=ore)
+    _pause_lunghe()[fornitore] = {
+        "fino": fino.isoformat(timespec="seconds"),
+        "motivo": dettaglio[:300],
+        "impronta": _impronta_fornitore(fornitore),
+    }
+    _salva_pause_lunghe()
+
+
+def _togli_pausa_lunga(fornitore: str) -> None:
+    if fornitore and _pause_lunghe().pop(fornitore, None) is not None:
+        _salva_pause_lunghe()
+
+
+def pausa_lunga(fornitore: str) -> str | None:
+    """Il motivo della pausa lunga di questo fornitore, se è ancora valida."""
+    voce = _pause_lunghe().get(fornitore)
+    if not isinstance(voce, dict):
+        return None
+    try:
+        fino = datetime.fromisoformat(voce.get("fino") or "")
+    except ValueError:
+        fino = None
+    scaduta = fino is None or datetime.now(timezone.utc) >= fino
+    cambiato = (voce.get("impronta") or "") != _impronta_fornitore(fornitore)
+    if scaduta or cambiato:
+        _togli_pausa_lunga(fornitore)
+        return None
+    quando = (voce.get("fino") or "")[:16].replace("T", " ")
+    return (f"in pausa fino al {quando} UTC dopo un controllo antibot: "
+            f"{voce.get('motivo') or ''}").strip()
 
 
 def servizio_in_pausa(fornitore: str = "") -> str | None:
@@ -2021,7 +2119,7 @@ def cerca_tac_online_esito(tac: str) -> tuple[str, tuple[str, str] | None]:
         # OGNI STRADA DA QUI IN GIU' LASCIA DETTO COM'E' ANDATA. Prima
         # finivano tutte nello stesso `("errore", None)` muto: vedi il
         # commento in `stato_servizio_esterno`.
-        if servizio_in_pausa(fornitore["nome"]):
+        if servizio_in_pausa(fornitore["nome"]) or pausa_lunga(fornitore["nome"]):
             incompleto = True
             continue
         # IL TETTO SI GUARDA PRIMA DI USCIRE IN RETE, e la chiamata si
@@ -2791,8 +2889,11 @@ def libera_indice() -> bool:
 def reset_cache() -> None:
     with _LOCK_INDICE:
         global _memory_index, _status, _pausa_servizio, _ultimo_esito, _storico
-        global _consumo, _indice_da_ricostruire
+        global _consumo, _indice_da_ricostruire, _pausa_lunga
         _indice_da_ricostruire = True
+        # La pausa lunga NON si azzera qui (resta in archivio, vedi
+        # `_metti_pausa_lunga`): si rilegge soltanto.
+        _pausa_lunga = None
         _memory_index = None
         _status = "non ancora caricato"
         _ultimo_esito = None

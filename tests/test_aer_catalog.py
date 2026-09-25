@@ -320,3 +320,19 @@ class TestIntegrazioneNelleFonti(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestIlPiuFaParteDelNome(unittest.TestCase):
+    """25/09/2026: «realme 14 Pro» rispondeva con il 14 Pro+, perché il
+    «+» spariva con il resto della punteggiatura."""
+
+    def test_pro_e_pro_plus_sono_due_chiavi(self):
+        self.assertNotEqual(aer.normalize("realme 14 Pro 5G"),
+                            aer.normalize("realme 14 Pro+ 5G"))
+        self.assertEqual(aer.normalize("realme 14 Pro+ 5G"),
+                         aer.normalize("realme 14 Pro Plus 5G"))
+
+    def test_oppo_official_uguale(self):
+        from core import oppo_official
+        self.assertNotEqual(oppo_official.normalize("Reno13 Pro"),
+                            oppo_official.normalize("Reno13 Pro+"))

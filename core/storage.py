@@ -749,6 +749,20 @@ def get_devices(brands: list[str] | None = None, search: str | None = None) -> l
              WHERE u.device_key = r.device_key AND u.is_relevant = 1 AND u.firmware_kind IN ('current', 'reported') AND u.patch_level IS NOT NULL
              ORDER BY CASE u.firmware_kind WHEN 'current' THEN 0 ELSE 1 END ASC,
                                CASE u.source_trust WHEN 'structured' THEN 0 WHEN 'curated' THEN 1 WHEN 'noisy' THEN 2 ELSE 3 END ASC, COALESCE(u.published, u.first_seen) DESC LIMIT 1) AS patch_level,
+           -- DA DOVE VIENE la versione Android e la build scelte sopra:
+           -- 'current' (verificata) o 'reported' (rollout riportato, non
+           -- confermato). Stesso ordine delle due sottoquery che scelgono
+           -- il valore, così il tipo è quello della riga vincente. Serve al
+           -- parco: un aggiornamento solo riportato non è un «da ritestare»
+           -- certo (vedi `core/retest.py`).
+           (SELECT u.firmware_kind FROM updates u
+             WHERE u.device_key = r.device_key AND u.is_relevant = 1 AND u.firmware_kind IN ('current', 'reported') AND u.android_version IS NOT NULL
+             ORDER BY CASE u.firmware_kind WHEN 'current' THEN 0 ELSE 1 END ASC,
+                               CASE u.source_trust WHEN 'structured' THEN 0 WHEN 'curated' THEN 1 WHEN 'noisy' THEN 2 ELSE 3 END ASC, u.android_version DESC, COALESCE(u.published, u.first_seen) DESC LIMIT 1) AS android_kind,
+           (SELECT u.firmware_kind FROM updates u
+             WHERE u.device_key = r.device_key AND u.is_relevant = 1 AND u.firmware_kind IN ('current', 'reported') AND u.build IS NOT NULL
+             ORDER BY CASE u.firmware_kind WHEN 'current' THEN 0 ELSE 1 END ASC,
+                               CASE u.source_trust WHEN 'structured' THEN 0 WHEN 'curated' THEN 1 WHEN 'noisy' THEN 2 ELSE 3 END ASC, COALESCE(u.published, u.first_seen) DESC LIMIT 1) AS build_kind,
            -- Il codice della variante da cui viene il dato. Serve al chip:
            -- risolto per codice è esatto, risolto per nome può solo dire
            -- «Exynos oppure Snapdragon». `app.chip_di()` lo leggeva già,
