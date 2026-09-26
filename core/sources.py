@@ -3947,9 +3947,18 @@ def _lookup_nothing(model_name: str) -> list[RawItem]:
     if errore or not tutti:
         return []
     richiesto = (model_name or "").strip().upper()
-    per_codice = [i for i in tutti if i.model_code and i.model_code == richiesto]
+    # Il codice anche dentro una frase: «Nothing A069» (la forma dei
+    # database TAC) non trovava niente perché si confrontava la frase intera.
+    codici = set(re.findall(r"\bA\d{3}[A-Z]?\b", richiesto))
+    per_codice = [i for i in tutti if i.model_code and i.model_code in codici]
     if per_codice:
-        return per_codice[:1]
+        return [max(per_codice, key=lambda i: len(i.model_code))]
+    # «Nothing (3a)», «nothing 3a pro»: senza la parola «Phone» il nome non
+    # somigliava a nessuna voce, e il banco di prova del 26/09/2026 ha visto
+    # «Nothing (3A)» risolto in un altro telefono.
+    m = re.match(r"^\s*nothing\s+(?!phone\b)\(?\s*(\d[a-z]?)\s*\)?(.*)$", model_name or "", re.I)
+    if m:
+        model_name = f"Nothing Phone ({m.group(1).lower()}){m.group(2)}"
     bersaglio = modelcodes._normalize_name(model_name)
     if not bersaglio:
         return []

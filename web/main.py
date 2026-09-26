@@ -2024,7 +2024,7 @@ def _modello_con_marca(marca: str, modello: str, codice: str = "") -> str:
     marchi_nel_nome = ("samsung", "redmi", "xiaomi", "poco",
                        "realme", "oppo", "oneplus", "motorola", "moto",
                        "google", "honor", "huawei", "apple",
-                       "vivo", "iqoo", "nothing", "nokia", "sony")
+                       "vivo", "iqoo", "nothing", "cmf", "nokia", "sony")
     if basso.startswith(marchi_nel_nome):
         return modello
 
@@ -2046,10 +2046,18 @@ def _modello_con_marca(marca: str, modello: str, codice: str = "") -> str:
     elif "/" in marca:
         marca = ""
 
-    if not marca or marca.lower() in ("sconosciuto", "other", "altri brand"):
+    # «Altri brand (Nothing, Umidigi, Doogee…)» è l'etichetta del gruppo, non
+    # una marca: prima passava il controllo (che cercava solo «altri brand»
+    # esatto) e il nome diventava «Altri brand (…) CMF Phone 1».
+    if not marca or marca.lower().startswith(("sconosciuto", "other", "altri brand")):
         return modello
     if basso.startswith(marca.lower() + " "):
         return modello
+    # Il gruppo «Google Pixel» davanti a «Pixel 9» dava «Google Pixel Pixel
+    # 9»: se l'ultima parola della marca è la prima del modello, una basta.
+    ultima = marca.split()[-1].lower()
+    if len(marca.split()) > 1 and basso.split()[0] == ultima:
+        return f"{' '.join(marca.split()[:-1])} {modello}"
     return f"{marca} {modello}"
 
 

@@ -824,6 +824,17 @@ class TestRicerca(_Sito):
             "vivo V60",
         )
 
+    def test_etichetta_di_gruppo_e_marca_ripetuta(self):
+        """Dal banco di prova del 26/09/2026: «Altri brand (Nothing, …) CMF
+        Phone 1» e «Google Pixel Pixel 9 Pro»."""
+        from core import config as C
+        from web import main as M
+
+        self.assertEqual(M._modello_con_marca(C.OTHER, "CMF Phone 1"), "CMF Phone 1")
+        self.assertEqual(M._modello_con_marca(C.OTHER, "Phone (3a)"), "Phone (3a)")
+        self.assertEqual(M._modello_con_marca(C.PIXEL, "Pixel 9 Pro"), "Google Pixel 9 Pro")
+        self.assertEqual(M._modello_con_marca("Samsung", "Galaxy S24"), "Samsung Galaxy S24")
+
     def test_un_modello_trovato_mostra_la_scheda(self):
         type(self).RISPOSTA_RICERCA = staticmethod(lambda q: {"items": [{
             "source": "official_lookup", "source_label": "Endpoint FOTA ufficiale",

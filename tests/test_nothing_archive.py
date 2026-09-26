@@ -119,6 +119,14 @@ class TestFonte(unittest.TestCase):
         self.assertEqual(sources._lookup_nothing("Nothing Phone (3a) Pro")[0].device,
                          "Nothing Phone (3a) Pro")
 
+    def test_forme_senza_phone_e_codice_nella_frase(self):
+        """Dal banco di prova del 26/09/2026: «Nothing (3A)» finiva su un
+        altro telefono e «Nothing A069» non trovava niente."""
+        self.assertEqual(sources._lookup_nothing("Nothing (3A)")[0].device, "Nothing Phone (3a)")
+        self.assertEqual(sources._lookup_nothing("nothing 3a pro")[0].device,
+                         "Nothing Phone (3a) Pro")
+        self.assertEqual(sources._lookup_nothing("Nothing A024")[0].device, "Nothing Phone (3)")
+
     def test_guasto_non_in_cache(self):
         sources.http_get = lambda *a, **k: FintaRisposta(status=403)
         items, errore = sources.fetch_nothing_archive()
