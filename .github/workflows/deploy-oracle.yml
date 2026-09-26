@@ -1,0 +1,76 @@
+# Pubblica il sito sul VPS Oracle a ogni push su main.
+#
+# Il codice viaggia DA QUI al server (tar via SSH), non il contrario: il
+# repository è privato e così sul server non serve nessuna chiave per
+# leggerlo. Sul server si ricostruisce l'immagine e si riavvia; l'archivio
+# sta in un volume e non viene toccato.
+#
+# Segreti del repository necessari (Settings → Secrets → Actions):
+#   ORACLE_HOST     l'IP pubblico della VM
+#   ORACLE_USER     l'utente SSH (ubuntu, sulle immagini Ubuntu)
+#   ORACLE_SSH_KEY  la chiave PRIVATA scaricata alla creazione della VM
+name: deploy-oracle
+
+on:
+  push:
+    branches: [main]
+    # I commit orari della scansione cambiano solo tracker.db: ricostruire
+    # il sito ogni ora per quello non serve, sul server l'archivio vive da sé.
+    paths-ignore:
+      - "tracker.db"
+      - "**.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-oracle
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Chiave SSH
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$ORACLE_SSH_KEY" > ~/.ssh/id_oracle
+          chmod 600 ~/.ssh/id_oracle
+          ssh-keyscan -H "$ORACLE_HOST" >> ~/.ssh/known_hosts
+
+      - name: Copia il codice e riavvia
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
+        run: |
+          tar czf - --exclude=.git . \
+            | ssh -i ~/.ssh/id_oracle "$ORACLE_USER@$ORACLE_HOST" '
+                set -e
+                rm -rf ~/app.nuova && mkdir ~/app.nuova
+                tar xzf - -C ~/app.nuova
+                rm -rf ~/app && mv ~/app.nuova ~/app
+                cd ~/app
+                docker compose -f deploy/oracle/docker-compose.yml up -d --build --remove-orphans
+                docker image prune -f
+              '
+
+      - name: Controllo
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
+        run: |
+          ssh -i ~/.ssh/id_oracle "$ORACLE_USER@$ORACLE_HOST" '
+            cd ~/app
+            dc="docker compose -f deploy/oracle/docker-compose.yml"
+            for i in $(seq 1 30); do
+              $dc exec -T web curl -fsS http://127.0.0.1:8000/health && exit 0
+              sleep 3
+            done
+            $dc logs --tail 50 web; exit 1
+          '

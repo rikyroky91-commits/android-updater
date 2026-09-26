@@ -64,8 +64,16 @@ jobs:
         # un minuto: un timeout più corto farebbe fallire il lavoro
         # proprio nel caso in cui sta facendo il suo mestiere.
         # `-I` manda una HEAD, che è la richiesta più leggera possibile.
+        #
+        # L'indirizzo sta nella variabile di repository SITE_URL (Settings →
+        # Secrets and variables → Actions → Variables), così cambiare host
+        # non tocca più questo file. Dal 26/09/2026 il sito è su Koyeb:
+        # Render ha sospeso il servizio per i 5 GB di banda gratuita esauriti.
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
         run: |
+          test -n "$SITE_URL" || { echo "variabile SITE_URL non impostata"; exit 1; }
           curl -fsS -I --max-time 90 \
-            https://android-updater.onrender.com/health \
+            "${SITE_URL%/}/health" \
             && echo "sveglio" \
             || { echo "non ha risposto entro 90s"; exit 1; }

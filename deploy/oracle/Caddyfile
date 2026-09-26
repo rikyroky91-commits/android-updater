@@ -1,0 +1,7 @@
+# SITE_DOMAIN viene da ~/sito.env. Senza un dominio proprio va benissimo
+# quello gratuito di sslip.io costruito dall'IP pubblico, per esempio
+# 130-61-12-34.sslip.io: risolve da solo sull'IP e Let's Encrypt lo accetta.
+{$SITE_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:8000
+}

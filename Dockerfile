@@ -53,6 +53,13 @@ COPY --chown=app scripts/scrivi_versione.py ./scripts/scrivi_versione.py
 ARG RENDER_GIT_COMMIT
 RUN python scripts/scrivi_versione.py
 
+# Cartella per un archivio PERSISTENTE, dove l'host ne offre uno (il VPS
+# Oracle: vedi deploy/oracle/). Creata qui e di proprietà di `app` perché
+# un volume Docker nuovo eredita proprietario e permessi dalla cartella
+# dell'immagine: senza, nascerebbe di root e SQLite non potrebbe scriverci.
+# Su Render resta vuota e inutilizzata: lì DB_PATH punta a /tmp.
+RUN mkdir -p /home/app/archivio && chown app /home/app/archivio
+
 USER app
 ENV PYTHONUNBUFFERED=1 \
     PORT=8000 \

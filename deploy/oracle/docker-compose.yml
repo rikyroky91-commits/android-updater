@@ -1,0 +1,50 @@
+# Il sito sul VPS Oracle «Always Free».
+#
+# Due container: il sito (lo stesso Dockerfile di Render) e Caddy davanti,
+# che prende da solo il certificato HTTPS da Let's Encrypt e lo rinnova.
+#
+# Si avvia dalla radice del repository:
+#   docker compose -f deploy/oracle/docker-compose.yml up -d --build
+# ed è esattamente quello che fa il workflow `deploy-oracle.yml`.
+name: sito
+
+services:
+  web:
+    build:
+      context: ../..
+    restart: unless-stopped
+    # I segreti (GEMINI_API_KEY, TELEGRAM_*, BACKUP_*) e SITE_DOMAIN stanno
+    # in ~/sito.env sul server, FUORI dalla cartella del codice: il deploy
+    # la sovrascrive a ogni push, quel file no.
+    env_file: ${HOME}/sito.env
+    environment:
+      PORT: "8000"
+      # QUI IL DISCO È PERSISTENTE, a differenza di Render: l'archivio sta
+      # in un volume e sopravvive a riavvii e deploy. La copia nell'immagine
+      # serve solo al primissimo avvio (`_semina_archivio`).
+      DB_PATH: /home/app/archivio/tracker.db
+    volumes:
+      - archivio:/home/app/archivio
+    # Nessuna porta pubblicata: dall'esterno si passa solo da Caddy.
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - web
+    env_file: ${HOME}/sito.env
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  archivio:
+  caddy_data:
+  caddy_config:
