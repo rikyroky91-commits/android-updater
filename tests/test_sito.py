@@ -824,6 +824,30 @@ class TestRicerca(_Sito):
             "vivo V60",
         )
 
+    def test_marca_davanti_al_codice(self):
+        """Dal banco di prova del 26/09/2026: con la marca davanti un codice
+        esatto rispondeva «nessun firmware»."""
+        from web import main as M
+
+        self.assertEqual(M._codice_senza_marca("Samsung SM-S921B"), "SM-S921B")
+        self.assertEqual(M._codice_senza_marca("oppo cph2789"), "CPH2789")
+        self.assertEqual(M._codice_senza_marca("1+ CPH2707"), "CPH2707")
+        self.assertEqual(M._codice_senza_marca("Honor ABR-NX1"), "ABR-NX1")
+        # Un nome commerciale non si tocca.
+        self.assertEqual(M._codice_senza_marca("Samsung Galaxy S24"), "Samsung Galaxy S24")
+        self.assertEqual(M._codice_senza_marca("realme Note 50"), "realme Note 50")
+
+    def test_non_trovato_dura_di_piu(self):
+        from web.cache import CacheATempo
+
+        cache = CacheATempo(0.01)
+        cache.scrivi("breve", {"x": 1})
+        cache.scrivi("lunga", {"x": 2}, durata=60)
+        import time
+        time.sleep(0.05)
+        self.assertIsNone(cache.leggi("breve"))
+        self.assertEqual(cache.leggi("lunga"), {"x": 2})
+
     def test_etichetta_di_gruppo_e_marca_ripetuta(self):
         """Dal banco di prova del 26/09/2026: «Altri brand (Nothing, …) CMF
         Phone 1» e «Google Pixel Pixel 9 Pro»."""

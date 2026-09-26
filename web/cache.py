@@ -95,11 +95,15 @@ class CacheATempo:
             self.colpi += 1
             return valore
 
-    def scrivi(self, chiave: str, valore: Any) -> None:
+    def scrivi(self, chiave: str, valore: Any, durata: float | None = None) -> None:
+        """`durata` sostituisce quella della cache per questa sola voce:
+        serve alle risposte «non trovato», che non invecchiano come una
+        build (vedi `_esito_ricerca` in web/main.py)."""
         if not self.attiva or valore is None:
             return
         with self._lucchetto:
-            self._voci[chiave] = (time.monotonic() + self.durata, valore)
+            self._voci[chiave] = (time.monotonic() + (self.durata if durata is None else durata),
+                                  valore)
             self._voci.move_to_end(chiave)
             while len(self._voci) > self.capienza:
                 self._voci.popitem(last=False)

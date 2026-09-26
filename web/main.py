@@ -222,6 +222,29 @@ def avvio() -> None:
         _scalda_i_cataloghi()
 
 
+def _tieni_calde_le_fonti() -> None:
+    """Riscarica le fonti di ricerca man mano che scadono, per sempre.
+
+    Solo con `PRERISCALDA_CONTINUO` (acceso sul VPS Oracle, spento su
+    Render da 512 MB). Le cache delle fonti durano un'ora: senza questo,
+    la prima ricerca dopo ogni scadenza pagava di nuovo i download — il
+    banco di prova del 26/09/2026 ha misurato ricerche da 11 a 25 secondi
+    proprio a cache fredde. Ogni giro tocca solo le fonti scadute
+    (`sources._scalda_fonti` salta quelle fresche), quindi a regime non
+    scarica quasi niente.
+    """
+    if not C.env_bool("PRERISCALDA_CONTINUO", False):
+        return
+    import time
+    while True:
+        try:
+            sources._scalda_fonti(list(sources._STRUCTURED_LOOKUPS_LIST))
+            STATO_AVVIO["fonti tenute calde"] = f"ultimo giro {datetime.now():%H:%M}"
+        except Exception as errore:  # pragma: no cover - si riprova al giro dopo
+            STATO_AVVIO["fonti tenute calde"] = f"giro non riuscito: {errore}"
+        time.sleep(5 * 60)
+
+
 def _scalda_i_cataloghi() -> None:
     """Carica i cataloghi pesanti in sottofondo, prima che serva.
 
@@ -277,6 +300,7 @@ def _scalda_i_cataloghi() -> None:
             STATO_AVVIO["esito del servizio TAC"] = f"non letto: {errore}"
         STATO_AVVIO["memoria restituita dopo il preriscaldamento"] = (
             f"{libera_memoria()} MB")
+        _tieni_calde_le_fonti()
 
     # `daemon` perché non deve trattenere la chiusura del processo, e in
     # un thread perché l'avvio non deve aspettarlo: se la prima visita
@@ -2635,7 +2659,15 @@ def _esito_ricerca(query: str, senza_rete: bool = False) -> dict:
             if not identificato or modelcodes.stesso_telefono(
                     esito.get("nome") or query, migliore.get("nome") or ""):
                 esito = migliore
-    RICERCHE.scrivi(chiave, esito)
+    # LE RISPOSTE «NON TROVATO» DURANO DI PIÙ. Banco di prova del 26/09/2026:
+    # quasi ogni ricerca a vuoto consumava l'intero budget (~11 s) prima di
+    # dire di no, e ripeterla ricomprava gli stessi undici secondi. Un no
+    # non invecchia come una build: resta sei ore, e se ne va con tutto il
+    # resto quando la cache si svuota (correzione di un nome o di un TAC,
+    # fine scansione).
+    vuota = not esito.get("trovato") and not (esito.get("scheda") or {}).get("trovata")
+    RICERCHE.scrivi(chiave, esito,
+                    durata=C.SEARCH_CACHE_NEGATIVE_SECONDS if vuota else None)
     return esito
 
 
@@ -2968,6 +3000,35 @@ def _nome_del_codice(codice: str) -> str | None:
     return nome
 
 
+# Le marche che precedono un codice nelle ricerche e nei database TAC.
+_MARCA_DAVANTI = re.compile(
+    r"^\s*(?:samsung|galaxy|oppo|one\s*plus|1\+|xiaomi|redmi|poco|realme|honor|"
+    r"huawei|vivo|iqoo|motorola|moto|lenovo|google|pixel|nothing|cmf|apple|nokia|"
+    r"hmd|sony|zte|nubia|tcl|asus|tecno|infinix)\s+",
+    re.IGNORECASE)
+
+
+def _codice_senza_marca(query: str) -> str:
+    """«Samsung SM-S921B» → «SM-S921B», se quello che resta è un codice.
+
+    Trovato dal banco di prova del 26/09/2026: «SM-S921B», «CPH2789»,
+    «CPH2707», «ABR-NX1» da soli trovavano telefono e firmware; con la
+    marca davanti («Samsung SM-S921B», «Oppo CPH2789», «OnePlus CPH2707»,
+    «Honor ABR-NX1») rispondevano «nessun firmware». È il modo in cui
+    molti scrivono, ed è la forma dei database TAC. La marca non aggiunge
+    niente a un codice, che è già esatto: si toglie solo quando ciò che
+    resta È un codice, così un nome commerciale («Samsung Galaxy S24»)
+    non viene toccato.
+    """
+    m = _MARCA_DAVANTI.match(query or "")
+    if not m:
+        return query
+    resto = query[m.end():].strip()
+    if resto and " " not in resto and sources.looks_like_model_code(resto):
+        return resto.upper()
+    return query
+
+
 def _codice_con_gli_spazi(query: str) -> str:
     """«cph 2695» → «CPH2695», ma solo se quella forma risolve davvero.
 
@@ -3020,7 +3081,7 @@ def _correzione_salvata(*codici: str) -> str | None:
 
 
 def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
-    query = _codice_con_gli_spazi(query)
+    query = _codice_con_gli_spazi(_codice_senza_marca(query))
     risultato = scan.search_model(query, senza_rete=senza_rete)
     fonti_dirette = [i for i in risultato.get("items", [])
                      if i.get("source") in ("official_lookup", "curated_lookup")]

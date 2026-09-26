@@ -590,6 +590,8 @@ RICERCA_IN_DUE_TEMPI = env_bool("RICERCA_IN_DUE_TEMPI", True)
 # A zero la cache è spenta e il comportamento torna quello di prima.
 SEARCH_CACHE_SECONDS = env_int("SEARCH_CACHE_SECONDS", 900)
 SEARCH_CACHE_MAX = env_int("SEARCH_CACHE_MAX", 200)
+# Le ricerche senza risultato: vedi RICERCHE_VUOTE in web/main.py.
+SEARCH_CACHE_NEGATIVE_SECONDS = env_int("SEARCH_CACHE_NEGATIVE_SECONDS", 6 * 3600)
 
 
 # --- Persistenza del database fra i riavvii ------------------------------

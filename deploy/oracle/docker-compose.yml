@@ -25,6 +25,11 @@ services:
       DB_PATH: /home/app/archivio/tracker.db
       # 380 era tarato sui 512 MB di Render; qui la VM ne ha 12 GB.
       MEMORIA_SOGLIA_MB: "3000"
+      # Con 12 GB i cataloghi si caricano subito e le fonti restano calde:
+      # su Render (512 MB) restano spenti. Vedi web/main._tieni_calde_le_fonti.
+      PRERISCALDA_CATALOGHI: "true"
+      PRERISCALDA_FONTI_RICERCA: "true"
+      PRERISCALDA_CONTINUO: "true"
     volumes:
       - archivio:/home/app/archivio
     # Nessuna porta pubblicata: dall'esterno si passa solo da Caddy.
