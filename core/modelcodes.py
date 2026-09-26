@@ -420,6 +420,53 @@ def _varianti_senza_spazi(codice: str) -> list[str]:
     return [f"{marca}{numero}-{variante}", f"{marca}{numero}{variante}"]
 
 
+# ======================================================================
+# Nomi cinesi → forma internazionale, solo per la VISUALIZZAZIONE
+# ======================================================================
+# `nome_canonico` preferisce già l'alfabeto latino, ma per i codici venduti
+# solo in Cina il dataset conosce SOLO il nome cinese: «荣耀 X70i»,
+# «realme 真我 GT8 Pro». Il banco di prova del 26/09/2026 ne ha contati 29
+# su 442 ricerche, quasi tutti HONOR e realme. Le parole che ricorrono sono
+# poche — la marca, la gamma, qualche edizione — e hanno una forma
+# internazionale certa, che è quella che il produttore usa fuori dalla Cina.
+#
+# L'ordine conta: le forme lunghe prima delle corte, così «荣耀畅玩» diventa
+# «HONOR Play» e non «HONOR畅玩». Ciò che non è in tabella resta com'è:
+# meglio un nome in parte cinese che una traduzione inventata.
+_PAROLE_CINESI = (
+    ("荣耀畅玩", "HONOR Play "), ("华为畅享", "HUAWEI Enjoy "), ("华为麦芒", "HUAWEI Maimang "),
+    ("华为手环", "HUAWEI Band "), ("华为手表", "HUAWEI Watch "), ("荣耀手环", "HONOR Band "),
+    ("荣耀手表", "HONOR Watch "), ("小米手环", "Xiaomi Band "), ("保时捷设计", " Porsche Design"),
+    ("荣耀", "HONOR "), ("华为", "HUAWEI "), ("真我", "realme "), ("小米", "Xiaomi "),
+    ("红米", "Redmi "), ("一加", "OnePlus "), ("魅族", "Meizu "), ("努比亚", "nubia "),
+    ("中兴", "ZTE "), ("联想", "Lenovo "), ("摩托罗拉", "motorola "), ("三星", "Samsung "),
+    ("平板", "Pad "), ("至尊版", " Ultimate"), ("青春版", " Youth"), ("活力版", " Vitality"),
+    ("竞速版", " Racing"), ("探索版", " Explorer"), ("冠军版", " Champion"),
+    ("典藏版", " Collector"), ("标准版", ""), ("全网通", ""),
+)
+_CJK = re.compile(r"[一-鿿]")
+
+
+def latinizza(nome: str) -> str:
+    """«荣耀 X70i» → «HONOR X70i», «realme 真我 GT8 Pro» → «realme GT8 Pro».
+
+    Tocca solo i nomi che contengono caratteri cinesi; la marca ripetuta
+    dalla traduzione («Honor 荣耀X70» → «Honor HONOR X70») si toglie.
+    """
+    if not nome or not _CJK.search(nome):
+        return nome
+    testo = nome
+    for cinese, latino in _PAROLE_CINESI:
+        testo = testo.replace(cinese, latino)
+    parole = testo.split()
+    pulite: list[str] = []
+    for parola in parole:
+        if pulite and pulite[-1].lower() == parola.lower():
+            continue
+        pulite.append(parola)
+    return " ".join(pulite)
+
+
 def resolve(code: str) -> list[str]:
     """Nomi commerciali noti per un codice modello (es. 'RMX3939' →
     ['realme C61 Global', 'realme C63', 'realme C65s', 'realme NARZO N63']),

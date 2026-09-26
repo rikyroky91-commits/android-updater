@@ -863,6 +863,17 @@ class TestRicerca(_Sito):
         self.assertIsNone(cache.leggi("breve"))
         self.assertEqual(cache.leggi("lunga"), {"x": 2})
 
+    def test_nomi_cinesi_in_forma_internazionale(self):
+        """Dal banco di prova: «荣耀 X70i», «realme 真我 GT8 Pro»."""
+        from core import modelcodes
+        from web import main as M
+
+        self.assertEqual(modelcodes.latinizza("荣耀 X70i"), "HONOR X70i")
+        self.assertEqual(modelcodes.latinizza("realme 真我 GT8 Pro"), "realme GT8 Pro")
+        self.assertEqual(modelcodes.latinizza("荣耀畅玩 60m"), "HONOR Play 60m")
+        self.assertEqual(modelcodes.latinizza("Galaxy S24"), "Galaxy S24")
+        self.assertEqual(M._modello_con_marca("Huawei / Honor", "荣耀 Magic8"), "HONOR Magic8")
+
     def test_etichetta_di_gruppo_e_marca_ripetuta(self):
         """Dal banco di prova del 26/09/2026: «Altri brand (Nothing, …) CMF
         Phone 1» e «Google Pixel Pixel 9 Pro»."""

@@ -264,22 +264,37 @@ a { color: inherit; }
   margin: 0 0 .5rem; font-size: clamp(.95rem, 1.8vw, 1.1rem);
   color: var(--neutral); font-style: italic;
 }
-/* La faccina furba: un cenno di testa una volta, all'apertura della
-   pagina, e di nuovo passandoci sopra col mouse. */
+/* La faccina furba: annuisce piano, sempre, con una pausa fra un cenno e
+   l'altro. Passandoci sopra col mouse (o toccandola) diventa una risata
+   che saltella. Le due facce stanno una sopra l'altra: si scambia solo
+   quale si vede, così la riga non si sposta. */
 .furbetto {
-  display: inline-block; transform-origin: 50% 80%;
-  animation: cenno 1.4s ease-in-out .6s 1 both;
-  cursor: default;
+  display: inline-grid; cursor: default; vertical-align: baseline;
 }
-.furbetto:hover { animation: cenno 1s ease-in-out 1; }
+.faccia { grid-area: 1 / 1; display: inline-block; transform-origin: 50% 85%; }
+.faccia-furba { animation: cenno 3.2s ease-in-out infinite; }
+.faccia-ride { opacity: 0; transform: scale(.6); }
+.furbetto:hover .faccia-furba, .furbetto:active .faccia-furba {
+  opacity: 0; animation: none;
+}
+.furbetto:hover .faccia-ride, .furbetto:active .faccia-ride {
+  opacity: 1; animation: risata .5s ease-in-out infinite;
+}
 @keyframes cenno {
-  0%, 100% { transform: rotate(0) translateY(0); }
-  25%      { transform: rotate(-12deg) translateY(-2px); }
-  50%      { transform: rotate(8deg); }
-  75%      { transform: rotate(-4deg); }
+  0%, 55%, 100% { transform: rotate(0) translateY(0); }
+  65%           { transform: rotate(-12deg) translateY(-2px); }
+  75%           { transform: rotate(8deg); }
+  85%           { transform: rotate(-4deg); }
+}
+@keyframes risata {
+  0%, 100% { transform: scale(1.1) translateY(0) rotate(-6deg); }
+  50%      { transform: scale(1.2) translateY(-5px) rotate(6deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .furbetto, .furbetto:hover { animation: none; }
+  .faccia-furba, .furbetto:hover .faccia-ride, .furbetto:active .faccia-ride {
+    animation: none;
+  }
+  .furbetto:hover .faccia-ride { transform: scale(1.1); }
 }
 
 .ingresso-cifre {

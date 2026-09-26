@@ -2095,7 +2095,9 @@ def _modello_con_marca(marca: str, modello: str, codice: str = "") -> str:
     composizione del nome usata dal risultato, così una ricerca per IMEI e
     una per codice non possono più mostrare «A-16 4G» o «C63» nudi.
     """
-    modello = " ".join(str(modello or "").split())
+    # I codici venduti solo in Cina hanno nel dataset solo il nome cinese:
+    # si mostra la forma internazionale (vedi `modelcodes.latinizza`).
+    modello = modelcodes.latinizza(" ".join(str(modello or "").split()))
     marca = " ".join(str(marca or "").split())
     if not modello:
         return ""
