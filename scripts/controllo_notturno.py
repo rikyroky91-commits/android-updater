@@ -51,7 +51,9 @@ CASI: list[tuple[str, str, bool]] = [
     ("Nothing Phone (3)", "phone (3)", True),          # archivio Nothing
     ("A059P", "phone (3a) pro", True),
     ("HONOR 400 Lite", "400 lite", False),             # HONOR: supporto
-    ("moto g85", "g85", False),                        # Motorola
+    # g85 e S50 Neo condividono il codice XT2427-4: l'archivio Motorola
+    # lo chiama S50 Neo. Stesso hardware, si accettano entrambi.
+    ("moto g85", "g85|s50 neo", False),               # Motorola
     ("vivo X200", "x200", False),                      # vivo: fabbrica
     # --- nomi e codici ---
     ("Galaxy A07", "a07", True),
@@ -84,7 +86,8 @@ def main() -> int:
         secondi = time.monotonic() - inizio
         nome = esito.get("nome", "")
         problemi = []
-        if atteso.lower() not in nome.lower():
+        # «a|b»: va bene uno qualsiasi dei nomi (telefoni con più nomi veri).
+        if not any(forma in nome.lower() for forma in atteso.lower().split("|")):
             problemi.append(f"nome «{nome}», atteso che contenga «{atteso}»")
         if serve_firmware and not esito.get("firmware"):
             problemi.append("nessun firmware")
