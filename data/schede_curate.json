@@ -155,11 +155,19 @@
   {
     "nome": "HONOR Pad X9a",
     "marca": "Honor / Huawei",
-    "codici": ["ELN2-L29", "ELN2-L23", "ELN2-W29"],
+    "codici": [
+      "ELN2-L29",
+      "ELN2-L23",
+      "ELN2-W29"
+    ],
     "chipset": "Qualcomm Snapdragon 685 4G",
     "cpu": "Octa-core (4x Cortex-A73 2,8 GHz + 4x Cortex-A53 1,9 GHz)",
-    "ram_gb": [6],
-    "storage_gb": [128],
+    "ram_gb": [
+      6
+    ],
+    "storage_gb": [
+      128
+    ],
     "memoria": "6GB + 128GB",
     "display": "11,5 pollici, 2,5K",
     "display_tipo": "LCD, 120 Hz",
@@ -173,11 +181,18 @@
   {
     "nome": "HONOR Pad 10",
     "marca": "Honor / Huawei",
-    "codici": ["HEY3-N09", "HEY3-W00"],
+    "codici": [
+      "HEY3-N09",
+      "HEY3-W00"
+    ],
     "chipset": "Qualcomm Snapdragon 7 Gen 3",
     "cpu": "Octa-core (1x Cortex-A715 2,63 GHz + 3x Cortex-A715 2,4 GHz + 4x Cortex-A510 1,8 GHz)",
-    "ram_gb": [8],
-    "storage_gb": [256],
+    "ram_gb": [
+      8
+    ],
+    "storage_gb": [
+      256
+    ],
     "display": "12,1 pollici, 2560 x 1600 pixel",
     "display_tipo": "TFT LCD (IPS), 120 Hz",
     "batteria": "10100 mAh",
@@ -192,12 +207,20 @@
   {
     "nome": "HONOR X7d",
     "marca": "Honor / Huawei",
-    "codici": ["LGN-LX1", "LGN-LX2", "LGN-LX3"],
+    "codici": [
+      "LGN-LX1",
+      "LGN-LX2",
+      "LGN-LX3"
+    ],
     "chipset": "Qualcomm Snapdragon 685",
     "cpu": "Octa-core (4x Cortex-A73 2,8 GHz + 4x Cortex-A53 1,9 GHz)",
     "gpu": "Adreno 610",
-    "ram_gb": [8],
-    "storage_gb": [256],
+    "ram_gb": [
+      8
+    ],
+    "storage_gb": [
+      256
+    ],
     "memoria": "8GB + 256GB",
     "display": "6,77 pollici, 720 x 1610 pixel",
     "display_tipo": "TFT LCD",
@@ -213,12 +236,19 @@
   {
     "nome": "HONOR X6d 5G",
     "marca": "Honor / Huawei",
-    "codici": ["NLA-NX1", "NLA-NX3"],
+    "codici": [
+      "NLA-NX1",
+      "NLA-NX3"
+    ],
     "chipset": "MediaTek Dimensity 6300",
     "cpu": "Octa-core (2x Cortex-A76 2,4 GHz + 6x Cortex-A55 2,0 GHz)",
     "gpu": "ARM Mali-G57 MC2",
-    "ram_gb": [4],
-    "storage_gb": [128],
+    "ram_gb": [
+      4
+    ],
+    "storage_gb": [
+      128
+    ],
     "memoria": "4GB + 128GB",
     "batteria": "5260 mAh",
     "ricarica": "USB-C",
@@ -229,11 +259,19 @@
   {
     "nome": "HONOR MagicPad4",
     "marca": "Honor / Huawei",
-    "codici": ["YLE-W09"],
+    "codici": [
+      "YLE-W09"
+    ],
     "chipset": "Qualcomm Snapdragon 8 Gen 5",
     "cpu": "Octa-core, CPU Oryon di terza generazione fino a 3,8 GHz",
-    "ram_gb": [12, 16],
-    "storage_gb": [256, 512],
+    "ram_gb": [
+      12,
+      16
+    ],
+    "storage_gb": [
+      256,
+      512
+    ],
     "memoria": "12GB + 256GB, 16GB + 512GB",
     "display": "12,3 pollici, 3000 x 1920 pixel",
     "display_tipo": "OLED, fino a 165 Hz",
@@ -254,8 +292,14 @@
     "chipset": "Qualcomm Snapdragon 685 (6 nm)",
     "cpu": "Octa-core fino a 2,8 GHz",
     "gpu": "Adreno 610",
-    "ram_gb": [4, 6, 8],
-    "storage_gb": [128],
+    "ram_gb": [
+      4,
+      6,
+      8
+    ],
+    "storage_gb": [
+      128
+    ],
     "memoria": "4GB + 128GB, 6GB + 128GB, 8GB + 128GB (LPDDR4X, UFS 2.2)",
     "display": "6,67 pollici, 2400 x 1080 pixel",
     "display_tipo": "AMOLED, 120 Hz",
@@ -275,8 +319,14 @@
     "chipset": "MediaTek Dimensity 6300 (6 nm)",
     "cpu": "Octa-core (2x Cortex-A76 2,4 GHz + 6x Cortex-A55)",
     "gpu": "Mali-G57 MC2",
-    "ram_gb": [4, 6, 8],
-    "storage_gb": [128],
+    "ram_gb": [
+      4,
+      6,
+      8
+    ],
+    "storage_gb": [
+      128
+    ],
     "memoria": "4GB + 128GB, 6GB + 128GB, 8GB + 128GB (LPDDR4X, UFS 2.2)",
     "display": "6,9 pollici",
     "display_tipo": "LCD, AdaptiveSync fino a 120 Hz",
@@ -296,8 +346,14 @@
     "chipset": "MediaTek Dimensity 7400-Ultra (4 nm)",
     "cpu": "Octa-core fino a 2,6 GHz",
     "gpu": "Mali-G615",
-    "ram_gb": [8, 12],
-    "storage_gb": [256, 512],
+    "ram_gb": [
+      8,
+      12
+    ],
+    "storage_gb": [
+      256,
+      512
+    ],
     "memoria": "8GB + 256GB, 8GB + 512GB, 12GB + 256GB, 12GB + 512GB (LPDDR4X, UFS 2.2)",
     "display": "6,83 pollici, 2772 x 1280 pixel",
     "display_tipo": "AMOLED CrystalRes, 120 Hz",
@@ -317,8 +373,14 @@
     "chipset": "Qualcomm Snapdragon 6s Gen 3 (6 nm)",
     "cpu": "Octa-core fino a 2,3 GHz",
     "gpu": "Adreno",
-    "ram_gb": [4, 8],
-    "storage_gb": [128, 256],
+    "ram_gb": [
+      4,
+      8
+    ],
+    "storage_gb": [
+      128,
+      256
+    ],
     "memoria": "4GB + 128GB, 8GB + 256GB (LPDDR4X, UFS 2.2)",
     "display": "6,9 pollici, 2340 x 1080 pixel",
     "display_tipo": "LCD DotDisplay, fino a 144 Hz",
@@ -339,8 +401,14 @@
     "chipset": "MediaTek Dimensity 7200-Ultra (4 nm)",
     "cpu": "Octa-core fino a 2,8 GHz",
     "gpu": "Mali-G610",
-    "ram_gb": [8, 12],
-    "storage_gb": [256, 512],
+    "ram_gb": [
+      8,
+      12
+    ],
+    "storage_gb": [
+      256,
+      512
+    ],
     "memoria": "8GB + 256GB, 12GB + 512GB (LPDDR5, UFS 3.1)",
     "display": "6,67 pollici, 2712 x 1220 pixel",
     "display_tipo": "AMOLED CrystalRes, 120 Hz",
@@ -352,5 +420,362 @@
     "peso": "204,5 g",
     "dimensioni": "161,4 x 74,2 x 8,9 mm",
     "fonte": "specifiche ufficiali Xiaomi Redmi Note 13 Pro+ 5G"
+  },
+  {
+    "nome": "Nothing Phone (1)",
+    "marca": "Altri brand (Nothing, Umidigi, Doogee…)",
+    "codici": [
+      "A063"
+    ],
+    "rilascio": "Luglio 2022",
+    "chipset": "Qualcomm Snapdragon 778G+",
+    "gpu": "Adreno 642L",
+    "ram_gb": [
+      8,
+      12
+    ],
+    "storage_gb": [
+      128,
+      256
+    ],
+    "memoria": "128GB 8GB RAM, 256GB 8GB RAM, 256GB 12GB RAM",
+    "display": "6,55 pollici",
+    "display_tipo": "OLED, 1080 x 2400, 120 Hz",
+    "batteria": "4500 mAh",
+    "ricarica": "33W cablata, 15W wireless, 5W wireless inversa",
+    "camera_post": "50 MP (OIS) + 50 MP ultragrandangolo",
+    "camera_front": "16 MP",
+    "os_lancio": "Android 12, Nothing OS 1.0",
+    "fonte": "nothing.wiki (pagine hardware) e tabella modelli di nothing_archive, verificate il 26/09/2026",
+    "peso": "194 g"
+  },
+  {
+    "nome": "Nothing Phone (2)",
+    "marca": "Altri brand (Nothing, Umidigi, Doogee…)",
+    "codici": [
+      "A065"
+    ],
+    "rilascio": "Luglio 2023",
+    "chipset": "Qualcomm Snapdragon 8+ Gen 1",
+    "gpu": "Adreno 730",
+    "ram_gb": [
+      8,
+      12
+    ],
+    "storage_gb": [
+      128,
+      256,
+      512
+    ],
+    "memoria": "128GB 8GB RAM, 256GB 12GB RAM, 512GB 12GB RAM",
+    "display": "6,7 pollici",
+    "display_tipo": "LTPO AMOLED, 1080 x 2412, 120 Hz",
+    "batteria": "4700 mAh",
+    "ricarica": "45W cablata, 15W wireless, 5W wireless inversa",
+    "camera_post": "50 MP (OIS) + 50 MP ultragrandangolo",
+    "camera_front": "32 MP",
+    "os_lancio": "Android 13, Nothing OS 2.0",
+    "fonte": "nothing.wiki (pagine hardware) e tabella modelli di nothing_archive, verificate il 26/09/2026",
+    "peso": "201 g"
+  },
+  {
+    "nome": "Nothing Phone (2a)",
+    "marca": "Altri brand (Nothing, Umidigi, Doogee…)",
+    "codici": [
+      "A142"
+    ],
+    "rilascio": "Marzo 2024",
+    "chipset": "MediaTek Dimensity 7200 Pro",
+    "gpu": "Mali-G610 MC4",
+    "ram_gb": [
+      8,
+      12
+    ],
+    "storage_gb": [
+      128,
+      256
+    ],
+    "memoria": "128GB 8GB RAM, 256GB 8GB RAM, 256GB 12GB RAM",
+    "display": "6,7 pollici",
+    "display_tipo": "AMOLED, 1084 x 2412, 120 Hz",
+    "batteria": "5000 mAh",
+    "ricarica": "45W cablata",
+    "camera_post": "50 MP (OIS) + 50 MP ultragrandangolo",
+    "camera_front": "32 MP",
+    "os_lancio": "Android 14, Nothing OS 2.5",
+    "fonte": "nothing.wiki (pagine hardware) e tabella modelli di nothing_archive, verificate il 26/09/2026",
+    "peso": "190 g"
+  },
+  {
+    "nome": "Nothing Phone (2a) Plus",
+    "marca": "Altri brand (Nothing, Umidigi, Doogee…)",
+    "codici": [
+      "A142P"
+    ],
+    "rilascio": "Luglio 2024",
+    "chipset": "MediaTek Dimensity 7350 Pro",
+    "gpu": "Mali-G610 MC4",
+    "ram_gb": [
+      8,
+      12
+    ],
+    "storage_gb": [
+      256
+    ],
+    "memoria": "256GB 8GB RAM, 256GB 12GB RAM",
+    "display": "6,7 pollici",
+    "display_tipo": "AMOLED, 1084 x 2412, 120 Hz",
+    "batteria": "5000 mAh",
+    "ricarica": "50W cablata",
+    "camera_post": "50 MP (OIS) + 50 MP ultragrandangolo",
+    "camera_front": "50 MP",
+    "os_lancio": "Android 14, Nothing OS 2.6",
+    "fonte": "nothing.wiki (pagine hardware) e tabella modelli di nothing_archive, verificate il 26/09/2026"
+  },
+  {
+    "nome": "Nothing Phone (3a)",
+    "marca": "Altri brand (Nothing, Umidigi, Doogee…)",
+    "codici": [
+      "A059"
+    ],
+    "rilascio": "Marzo 2025",
+    "chipset": "Qualcomm Snapdragon 7s Gen 3",
+    "gpu": "Adreno 710",
+    "ram_gb": [
+      8,
+      12
+    ],
+    "storage_gb": [
+      128,
+      256
+    ],
+    "memoria": "128GB 8GB RAM, 256GB 12GB RAM",
+    "display": "6,77 pollici",
+    "display_tipo": "AMOLED flessibile, 1080 x 2392, 120 Hz",
+    "batteria": "5000 mAh",
+    "ricarica": "50W cablata",
+    "camera_post": "50 MP (OIS) + 50 MP tele 2x + 8 MP ultragrandangolo",
+    "camera_front": "32 MP",
+    "os_lancio": "Android 15, Nothing OS 3.0",
+    "fonte": "nothing.wiki (pagine hardware) e tabella modelli di nothing_archive, verificate il 26/09/2026",
+    "peso": "201 g"
+  },
+  {
+    "nome": "Nothing Phone (3a) Pro",
+    "marca": "Altri brand (Nothing, Umidigi, Doogee…)",
+    "codici": [
+      "A059P"
+    ],
+    "rilascio": "Marzo 2025",
+    "chipset": "Qualcomm Snapdragon 7s Gen 3",
+    "gpu": "Adreno 710",
+    "ram_gb": [
+      8,
+      12
+    ],
+    "storage_gb": [
+      128,
+      256
+    ],
+    "memoria": "128GB 8GB RAM, 256GB 12GB RAM",
+    "display": "6,77 pollici",
+    "display_tipo": "AMOLED flessibile, 1080 x 2392, 120 Hz",
+    "batteria": "5000 mAh",
+    "ricarica": "50W cablata",
+    "camera_post": "50 MP (OIS) + 50 MP periscopio 3x + 8 MP ultragrandangolo",
+    "camera_front": "50 MP",
+    "os_lancio": "Android 15, Nothing OS 3.0",
+    "fonte": "nothing.wiki (pagine hardware) e tabella modelli di nothing_archive, verificate il 26/09/2026"
+  },
+  {
+    "nome": "Nothing Phone (3)",
+    "marca": "Altri brand (Nothing, Umidigi, Doogee…)",
+    "codici": [
+      "A024"
+    ],
+    "rilascio": "Luglio 2025",
+    "chipset": "Qualcomm Snapdragon 8s Gen 4",
+    "gpu": "Adreno 825",
+    "ram_gb": [
+      12,
+      16
+    ],
+    "storage_gb": [
+      256,
+      512
+    ],
+    "memoria": "256GB 12GB RAM, 512GB 16GB RAM",
+    "display": "6,67 pollici",
+    "display_tipo": "AMOLED flessibile, 1260 x 2800, 120 Hz",
+    "batteria": "5150 mAh (India 5500 mAh)",
+    "ricarica": "65W cablata, 15W wireless",
+    "camera_post": "50 MP (OIS) + 50 MP ultragrandangolo + 50 MP periscopio 3x",
+    "camera_front": "50 MP",
+    "os_lancio": "Android 15, Nothing OS 3.5",
+    "fonte": "nothing.wiki (pagine hardware) e tabella modelli di nothing_archive, verificate il 26/09/2026",
+    "peso": "218 g"
+  },
+  {
+    "nome": "Nothing Phone (3a) Lite",
+    "marca": "Altri brand (Nothing, Umidigi, Doogee…)",
+    "codici": [
+      "A001T"
+    ],
+    "rilascio": "Ottobre 2025",
+    "chipset": "MediaTek Dimensity 7300 Pro",
+    "gpu": "Mali-G615 MC2",
+    "ram_gb": [
+      8
+    ],
+    "storage_gb": [
+      128,
+      256
+    ],
+    "memoria": "128GB 8GB RAM, 256GB 8GB RAM",
+    "display": "6,77 pollici",
+    "display_tipo": "AMOLED flessibile, 1080 x 2392, 120 Hz",
+    "batteria": "5000 mAh",
+    "ricarica": "33W cablata",
+    "camera_post": "50 MP (OIS) + 8 MP ultragrandangolo + 2 MP macro",
+    "camera_front": "16 MP",
+    "os_lancio": "Android 15, Nothing OS 3.5",
+    "fonte": "nothing.wiki (pagine hardware) e tabella modelli di nothing_archive, verificate il 26/09/2026",
+    "peso": "199 g"
+  },
+  {
+    "nome": "Nothing Phone (4a)",
+    "marca": "Altri brand (Nothing, Umidigi, Doogee…)",
+    "codici": [
+      "A069"
+    ],
+    "rilascio": "Marzo 2026",
+    "chipset": "Qualcomm Snapdragon 7s Gen 4",
+    "gpu": "Adreno 810",
+    "ram_gb": [
+      8,
+      12
+    ],
+    "storage_gb": [
+      128,
+      256
+    ],
+    "memoria": "128GB 8GB RAM, 256GB 8GB RAM, 256GB 12GB RAM",
+    "display": "6,78 pollici",
+    "display_tipo": "AMOLED, 120 Hz",
+    "batteria": "5080 mAh (India 5400 mAh)",
+    "ricarica": "50W cablata",
+    "camera_post": "50 MP (OIS) + 50 MP tele 3,5x + 8 MP ultragrandangolo",
+    "camera_front": "32 MP",
+    "os_lancio": "Android 16, Nothing OS 4.1",
+    "fonte": "nothing.wiki (pagine hardware) e tabella modelli di nothing_archive, verificate il 26/09/2026"
+  },
+  {
+    "nome": "Nothing Phone (4a) Pro",
+    "marca": "Altri brand (Nothing, Umidigi, Doogee…)",
+    "codici": [
+      "A069P"
+    ],
+    "rilascio": "Marzo 2026",
+    "chipset": "Qualcomm Snapdragon 7 Gen 4",
+    "gpu": "Adreno 722",
+    "ram_gb": [
+      8,
+      12
+    ],
+    "storage_gb": [
+      128,
+      256
+    ],
+    "memoria": "128GB 8GB RAM, 256GB 8GB RAM, 256GB 12GB RAM",
+    "display": "6,83 pollici",
+    "display_tipo": "AMOLED 1.5K, 144 Hz",
+    "batteria": "5080 mAh (India 5400 mAh)",
+    "ricarica": "50W cablata, 7,5W wireless inversa",
+    "camera_post": "50 MP (OIS) + 50 MP tele 3,5x + 8 MP ultragrandangolo",
+    "camera_front": "32 MP",
+    "os_lancio": "Android 16, Nothing OS 4.1",
+    "fonte": "nothing.wiki (pagine hardware) e tabella modelli di nothing_archive, verificate il 26/09/2026"
+  },
+  {
+    "nome": "Nothing Phone (4b)",
+    "marca": "Altri brand (Nothing, Umidigi, Doogee…)",
+    "codici": [
+      "A009P"
+    ],
+    "rilascio": "Luglio 2026",
+    "chipset": "Qualcomm Snapdragon 6 Gen 4",
+    "gpu": "Adreno 810",
+    "ram_gb": [
+      8
+    ],
+    "storage_gb": [
+      128,
+      256
+    ],
+    "memoria": "128GB 8GB RAM, 256GB 8GB RAM",
+    "display": "6,77 pollici",
+    "display_tipo": "Super AMOLED, 120 Hz",
+    "batteria": "5200 mAh (India 6000 mAh)",
+    "ricarica": "33W cablata",
+    "camera_post": "50 MP (OIS) + 8 MP ultragrandangolo",
+    "camera_front": "16 MP",
+    "os_lancio": "Android 16, Nothing OS 4.1",
+    "fonte": "nothing.wiki (pagine hardware) e tabella modelli di nothing_archive, verificate il 26/09/2026",
+    "peso": "210 g"
+  },
+  {
+    "nome": "CMF Phone 1",
+    "marca": "Altri brand (Nothing, Umidigi, Doogee…)",
+    "codici": [
+      "A015"
+    ],
+    "rilascio": "Luglio 2024",
+    "chipset": "MediaTek Dimensity 7300 (4 nm)",
+    "gpu": "Mali-G615 MC2",
+    "ram_gb": [
+      6,
+      8
+    ],
+    "storage_gb": [
+      128,
+      256
+    ],
+    "memoria": "128GB 6GB RAM, 128GB 8GB RAM, 256GB 8GB RAM",
+    "display": "6,67 pollici",
+    "display_tipo": "Super AMOLED, 1080 x 2400, 120 Hz",
+    "batteria": "5000 mAh",
+    "ricarica": "33W cablata",
+    "camera_post": "50 MP",
+    "camera_front": "16 MP",
+    "os_lancio": "Android 14, Nothing OS 2.6",
+    "fonte": "nothing.wiki (pagine hardware) e tabella modelli di nothing_archive, verificate il 26/09/2026",
+    "peso": "197-202 g"
+  },
+  {
+    "nome": "CMF Phone 2 Pro",
+    "marca": "Altri brand (Nothing, Umidigi, Doogee…)",
+    "codici": [
+      "A001"
+    ],
+    "rilascio": "Aprile 2025",
+    "chipset": "MediaTek Dimensity 7300 Pro (4 nm)",
+    "gpu": "Mali-G615 MC2",
+    "ram_gb": [
+      8
+    ],
+    "storage_gb": [
+      128,
+      256
+    ],
+    "memoria": "128GB 8GB RAM, 256GB 8GB RAM",
+    "display": "6,77 pollici",
+    "display_tipo": "AMOLED flessibile, 1080 x 2392, 120 Hz",
+    "batteria": "5000 mAh",
+    "ricarica": "33W cablata",
+    "camera_post": "50 MP + 50 MP tele 2x + 8 MP ultragrandangolo",
+    "camera_front": "16 MP",
+    "os_lancio": "Android 15, Nothing OS 3.2",
+    "fonte": "nothing.wiki (pagine hardware) e tabella modelli di nothing_archive, verificate il 26/09/2026",
+    "peso": "185 g"
   }
 ]

@@ -950,6 +950,155 @@ def _ripiego_honor_ufficiale(*indizi: str | None, marca: str | None = None) -> S
     return scheda
 
 
+# ======================================================================
+# realme: la pagina «specs» ufficiale, per un solo modello
+# ======================================================================
+# Aggiunta il 26/09/2026 dopo il banco di prova: schede realme al 12%. Il
+# mirror GSMArena non ha realme, versus ne copre pochi, e Wikidata —
+# misurato lo stesso giorno — ha 15 telefoni realme e nessuno col chip.
+# Le pagine ufficiali invece sono HTML statico con sezioni etichettate
+# («Processore», «RAM: … ROM: …», «Dimensioni: 6,77 pollici», «Batteria da
+# 6000 mAh»): si legge la versione italiana e, se manca, quella globale in
+# inglese. Stesse regole del ripiego HONOR: un modello alla volta, cache
+# piccola, il titolo della pagina deve nominare il telefono cercato, e un
+# campo che non si trova resta vuoto.
+FONTE_REALME_LABEL = "specifiche ufficiali realme"
+_REALME_SPECS_URLS = ("https://www.realme.com/it/{slug}/specs",
+                      "https://www.realme.com/global/{slug}/specs")
+_realme_specs_cache: dict[str, tuple[float, Scheda | None]] = {}
+_realme_specs_lock = threading.Lock()
+_RE_REALME_TITOLO = re.compile(r"<title>([^<]+)</title>", re.IGNORECASE)
+_RE_REALME_CHIP = re.compile(r"\| (?:Processore|Processor|Chipset) \| ([^|]{3,60}?) \|")
+_RE_REALME_RAM = re.compile(r"RAM:\s*([\d\s,/+GB]+?)\s*(?:ROM|$|\|)", re.IGNORECASE)
+_RE_REALME_ROM = re.compile(r"ROM:\s*([\d\s,/GBT]+?)\s*(?:RAM|$|\||\*)", re.IGNORECASE)
+_RE_REALME_POLLICI = re.compile(r"(?:Dimensioni|Size|Screen size)\s*:\s*([\d.,]+)\s*(?:pollici|inch|\")",
+                                re.IGNORECASE)
+_RE_REALME_HZ = re.compile(r"(?:aggiornamento|refresh rate)[^|]{0,30}?(\d{2,3})\s*Hz", re.IGNORECASE)
+_RE_REALME_BATTERIA = re.compile(r"(?:Batteria|Battery)[^|]{0,25}?(\d{4,5})\s*mAh", re.IGNORECASE)
+_RE_REALME_RICARICA = re.compile(r"(?:Ricarica|Charg\w*)[^|]{0,30}?(\d{2,3})\s*W\b", re.IGNORECASE)
+_RE_REALME_CAMERA = re.compile(r"\| (?:Fotocamera|Camera) \|[^|]*?(\d{2,3})\s*MP", re.IGNORECASE)
+_RE_REALME_SELFIE = re.compile(r"(?:selfie|anteriore|front)[^|]{0,30}?(\d{1,3})\s*MP", re.IGNORECASE)
+
+
+def _slug_realme(nome: str) -> list[str]:
+    """«realme 14 Pro 5G» → [«realme-14-pro-5g», «realme-14-pro»]."""
+    parole = re.findall(r"[a-z0-9+]+", (nome or "").lower().replace("+", " plus "))
+    if not parole or parole[0] != "realme" or len(parole) < 2:
+        return []
+    base = "-".join(parole)
+    varianti = [base]
+    if base.endswith("-5g"):
+        varianti.append(base[:-3])
+    else:
+        varianti.append(base + "-5g")
+    return varianti
+
+
+def _gb(testo: str) -> tuple[int, ...]:
+    valori = []
+    for numero, unita in re.findall(r"(\d+)\s*(GB|TB)", testo or "", re.IGNORECASE):
+        valore = int(numero) * (1024 if unita.upper() == "TB" else 1)
+        if valore not in valori:
+            valori.append(valore)
+    return tuple(sorted(valori))
+
+
+def _scheda_realme_da_html(nome: str, pagina: str, url: str) -> Scheda | None:
+    titolo = _RE_REALME_TITOLO.search(pagina or "")
+    chiave = _chiave_honor(nome)
+    if not titolo or not chiave or chiave not in _chiave_honor(html.unescape(titolo.group(1))):
+        return None
+    testo = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " | ", pagina)))
+    testo = re.sub(r"(?:\|\s*)+", "| ", testo)
+    chip = _RE_REALME_CHIP.search(testo)
+    ram = _RE_REALME_RAM.search(testo)
+    rom = _RE_REALME_ROM.search(testo)
+    pollici = _RE_REALME_POLLICI.search(testo)
+    hz = _RE_REALME_HZ.search(testo)
+    batteria = _RE_REALME_BATTERIA.search(testo)
+    ricarica = _RE_REALME_RICARICA.search(testo)
+    camera = _RE_REALME_CAMERA.search(testo)
+    selfie = _RE_REALME_SELFIE.search(testo)
+    # Alcune pagine non scrivono «RAM: … ROM: …» ma solo i tagli «8GB+256GB».
+    tagli = re.findall(r"(\d{1,2})\s*GB\s*\+\s*(\d{2,4})\s*(?:GB|TB)", testo)
+    ram_gb = _gb(ram.group(1)) if ram else tuple(sorted({int(r) for r, _ in tagli}))
+    rom_gb = _gb(rom.group(1)) if rom else tuple(sorted({int(m) for _, m in tagli}))
+    # «RAM dinamica 8GB+16GB» ha la stessa forma di un taglio: sotto i 32 GB
+    # non è archiviazione di un telefono attuale, è RAM virtuale.
+    rom_gb = tuple(g for g in rom_gb if g >= 32)
+    ram_gb = tuple(g for g in ram_gb if g <= 24)
+    # «Piattaforma mobile Snapdragon® 8 Elite Gen 5» → «Snapdragon 8 Elite Gen 5».
+    nome_chip = None
+    if chip:
+        nome_chip = re.sub(r"[®™]", "", chip.group(1))
+        nome_chip = re.sub(r"^(?:Piattaforma mobile|Processore|Chip|Chipset|Mobile platform)\s+", "",
+                           nome_chip.strip(), flags=re.IGNORECASE)
+        nome_chip = re.sub(r"\s+(?:MediaTek|5G)$", "", pulisci(nome_chip))
+    campi = {
+        "chipset": nome_chip,
+        "ram_gb": ram_gb,
+        "storage_gb": rom_gb,
+        "display": f"{pollici.group(1)} pollici" if pollici else None,
+        "display_tipo": f"{hz.group(1)} Hz" if hz else None,
+        "batteria": f"{batteria.group(1)} mAh" if batteria else None,
+        "ricarica": f"{ricarica.group(1)} W" if ricarica else None,
+        "camera_post": f"{camera.group(1)} MP" if camera else None,
+        "camera_front": f"{selfie.group(1)} MP" if selfie else None,
+    }
+    # Almeno due fra chip, batteria e display: meno di così non è una scheda.
+    if sum(1 for k in ("chipset", "batteria", "display") if campi[k]) < 2:
+        return None
+    sezioni = {"Specifiche ufficiali realme": {
+        etichetta: valore for etichetta, valore in (
+            ("Processore", campi["chipset"]),
+            ("RAM", " / ".join(f"{g} GB" for g in campi["ram_gb"]) or None),
+            ("Archiviazione", " / ".join(f"{g} GB" for g in campi["storage_gb"]) or None),
+            ("Display", " · ".join(x for x in (campi["display"], campi["display_tipo"]) if x) or None),
+            ("Batteria", campi["batteria"]), ("Ricarica", campi["ricarica"]),
+            ("Fotocamera principale", campi["camera_post"]),
+            ("Fotocamera anteriore", campi["camera_front"]),
+            ("Pagina prodotto", url),
+        ) if valore
+    }}
+    return Scheda(nome=nome, marca=C.OPPO, sezioni_json=_ripiega_sezioni(sezioni),
+                  fonte=FONTE_REALME_LABEL, **campi)
+
+
+def _ripiego_realme_ufficiale(*indizi: str | None) -> Scheda | None:
+    """Scheda dalla pagina «specs» ufficiale per un realme che manca altrove."""
+    nome = next((str(i).strip() for i in indizi
+                 if i and str(i).strip().lower().startswith("realme ")), None)
+    slugs = _slug_realme(nome or "")
+    if not slugs or requests is None:
+        return None
+    ora = time.monotonic()
+    with _realme_specs_lock:
+        cached = _realme_specs_cache.get(slugs[0])
+        if cached and ora - cached[0] < _HONOR_SPECS_TTL:
+            return cached[1]
+    scheda = None
+    for slug in slugs:
+        for modello in _REALME_SPECS_URLS:
+            url = modello.format(slug=slug)
+            try:
+                risposta = requests.get(url, headers={"User-Agent": C.USER_AGENT},
+                                        timeout=C.SEARCH_HTTP_TIMEOUT)
+            except Exception:
+                continue
+            if getattr(risposta, "status_code", 0) != 200:
+                continue
+            scheda = _scheda_realme_da_html(nome, getattr(risposta, "text", "") or "", url)
+            if scheda:
+                break
+        if scheda:
+            break
+    with _realme_specs_lock:
+        if len(_realme_specs_cache) >= _HONOR_SPECS_CACHE_LIMIT:
+            _realme_specs_cache.pop(next(iter(_realme_specs_cache)))
+        _realme_specs_cache[slugs[0]] = (ora, scheda)
+    return scheda
+
+
 def _ripiego_esterno(*indizi: str | None, marca: str | None = None) -> Scheda | None:
     """La scheda di un modello fuori dal mirror, da versus o HONOR ufficiale.
 
@@ -1041,7 +1190,8 @@ def _ripiego_esterno(*indizi: str | None, marca: str | None = None) -> Scheda | 
                 return _a_scheda(riga)
     except Exception:  # il ripiego non deve mai fermare una ricerca
         pass
-    return _ripiego_honor_ufficiale(*testi, marca=marca)
+    return (_ripiego_honor_ufficiale(*testi, marca=marca)
+            or _ripiego_realme_ufficiale(*testi))
 
 
 def cerca(*indizi: str | None, marca: str | None = None) -> Scheda | None:
