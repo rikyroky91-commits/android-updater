@@ -2692,6 +2692,9 @@ def _esito_ricerca(query: str, senza_rete: bool = False) -> dict:
     per il confronto fra due modelli, che condivide questa funzione, e
     non si crea la seconda strada che questo file evita ovunque.
     """
+    solo_marca = _esito_solo_marca(query)
+    if solo_marca is not None:
+        return solo_marca
     chiave = _chiave_ricerca(query)
     pronto = RICERCHE.leggi(chiave)
     if pronto is not None:
@@ -2725,6 +2728,57 @@ def _esito_ricerca(query: str, senza_rete: bool = False) -> dict:
     vuota = not esito.get("trovato") and not (esito.get("scheda") or {}).get("trovata")
     RICERCHE.scrivi(chiave, esito,
                     durata=C.SEARCH_CACHE_NEGATIVE_SECONDS if vuota else None)
+    return esito
+
+
+_SOLO_MARCHE = frozenset("""
+samsung galaxy apple iphone ipad google pixel xiaomi redmi poco oppo realme
+oneplus vivo iqoo motorola moto honor huawei nothing cmf sony nokia
+""".split())
+
+
+def _esito_solo_marca(query: str) -> dict | None:
+    """Una marca da sola: i suoi modelli in archivio, non un telefono a caso.
+
+    Dal banco di prova del 26/09/2026: cercare «realme» rispondeva «OPPO
+    A6s», «Samsung» un modello qualsiasi — la ricerca trattava la marca
+    come un nome da completare e sceglieva il primo candidato. Chi scrive
+    solo la marca non ha ancora scelto un telefono: gli si mostrano quelli
+    che l'archivio conosce, i più aggiornati di recente per primi.
+    """
+    parola = " ".join((query or "").lower().split())
+    if parola not in _SOLO_MARCHE:
+        return None
+    gruppo = (C.OTHER if parola in ("nothing", "cmf")
+              else extract.detect_brand(f"{parola} x1 2"))
+    # Nei gruppi che uniscono più marche («Oppo / Realme / OnePlus», «Altri
+    # brand») si tengono solo i nomi che portano la marca scritta.
+    filtra_per_nome = gruppo is None or "/" in gruppo or gruppo == C.OTHER
+    if parola in ("galaxy", "iphone", "ipad", "pixel", "moto"):
+        filtra_per_nome = False
+    try:
+        dispositivi = storage.get_devices(brands=[gruppo] if gruppo else None)
+    except Exception:  # pragma: no cover - l'archivio può non essere pronto
+        dispositivi = []
+    dispositivi.sort(key=lambda d: d.get("last_update_at") or "", reverse=True)
+    nomi: list[str] = []
+    for d in dispositivi:
+        nome = " ".join((d.get("model") or d.get("device_model") or "").split())
+        # Fuori i codici nudi («SM-X200») e la marca da sola: non sono
+        # nomi da proporre come «scegli un modello».
+        if (not nome or nome in nomi or nome.lower() == parola
+                or sources.looks_like_model_code(nome.split()[-1]) and len(nome.split()) <= 2):
+            continue
+        if filtra_per_nome and parola not in nome.lower():
+            continue
+        nomi.append(nome)
+        if len(nomi) >= 12:
+            break
+    esito = _esito_vuoto(query)
+    esito["scheda"] = P.scheda_tecnica("")
+    esito["forse"] = nomi
+    esito["nota_fonte"] = (f"«{query.strip()}» è una marca: scegli un modello"
+                           + (" fra quelli qui sotto." if nomi else "."))
     return esito
 
 

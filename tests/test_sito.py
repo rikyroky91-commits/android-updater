@@ -840,6 +840,16 @@ class TestRicerca(_Sito):
         self.assertEqual(M._codice_senza_marca("Samsung Galaxy S24"), "Samsung Galaxy S24")
         self.assertEqual(M._codice_senza_marca("realme Note 50"), "realme Note 50")
 
+    def test_solo_la_marca(self):
+        """«realme» da solo rispondeva «OPPO A6s» (banco di prova 26/09/2026)."""
+        from web import main as M
+
+        self.assertIsNone(M._esito_solo_marca("realme C63"))
+        esito = M._esito_solo_marca("realme")
+        self.assertFalse(esito["trovato"])
+        self.assertIn("è una marca", esito["nota_fonte"])
+        self.assertIsInstance(esito["forse"], list)
+
     def test_non_trovato_dura_di_piu(self):
         from web.cache import CacheATempo
 
