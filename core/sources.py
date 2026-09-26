@@ -39,6 +39,7 @@ from . import config as C
 from . import extract
 from . import modelcodes
 from . import motorola_catalog
+from . import nothing_archive
 from . import oplus_arb
 from . import oppo_official
 from . import storage
@@ -144,6 +145,7 @@ _FIRMWARE_KIND_BY_SOURCE = {
     "honor_aer": C.FW_FACTORY,
     "honor_security": C.FW_SUPPORT,
     "vivo_aer": C.FW_FACTORY,
+    "nothing_archive": C.FW_CURRENT,
 }
 
 
@@ -3836,6 +3838,129 @@ def fetch_minor_brands():
 
 
 # ======================================================================
+# Nothing / CMF — archivio community delle build (vedi core/nothing_archive)
+# ======================================================================
+# Un'ora, come le altre pagine: l'archivio si aggiorna al più qualche volta
+# al giorno, e l'albero del repository costa UNA chiamata all'API di GitHub
+# (60 all'ora senza token: con questa cache se ne usa una).
+_NOTHING_TTL_SECONDI = 60 * 60
+_nothing_cache = _CacheDiFonte(_NOTHING_TTL_SECONDI)
+# Quante build leggere al massimo per telefono cercando la prima stabile:
+# in testa possono esserci due o tre beta di fila.
+_NOTHING_MAX_LETTURE = 4
+_NOTHING_MAX_BYTE = 256 * 1024
+
+
+def reset_nothing_cache() -> None:
+    _nothing_cache.azzera()
+
+
+def fetch_nothing_archive(forza: bool = False) -> tuple[list[RawItem], str | None]:
+    return _nothing_cache.ottieni(_fetch_nothing_archive_scarica, forza)
+
+
+def _nothing_changelog(percorso: str) -> str | None:
+    try:
+        risposta = http_get(nothing_archive.RAW_URL + percorso, timeout=C.HTTP_TIMEOUT)
+    except Exception:
+        return None
+    if risposta.status_code != 200:
+        return None
+    return (risposta.text or "")[:_NOTHING_MAX_BYTE]
+
+
+def _nothing_item(build, testo: str, beta_piu_recente=None,
+                  cartella: str | None = None) -> RawItem:
+    nome, codice = nothing_archive.MODELLI[cartella or build.cartella]
+    patch = nothing_archive.patch_sicurezza(testo)
+    pezzi = []
+    if patch:
+        pezzi.append(f"Patch di sicurezza {patch}")
+    if beta_piu_recente is not None:
+        pezzi.append(f"Beta più recente: Nothing OS {beta_piu_recente.versione} "
+                     f"({beta_piu_recente.data}), esclusa perché non stabile")
+    corpo = nothing_archive.estratto(testo)
+    if corpo:
+        pezzi.append(corpo)
+    return RawItem(
+        title=f"{nome} — Nothing OS {build.versione} ({build.nome_build})",
+        link=nothing_archive.BLOB_URL + build.percorso,
+        published=build.data,
+        brand=C.OTHER,
+        device=nome,
+        model_code=codice,
+        version=f"Nothing OS {build.versione}",
+        build=build.nome_build,
+        android_version=build.android,
+        size_info="Stable OTA",
+        summary=" · ".join(pezzi),
+        trust=C.TRUST_CURATED,
+        firmware_kind=C.FW_CURRENT,
+    )
+
+
+def _fetch_nothing_archive_scarica() -> tuple[list[RawItem], str | None]:
+    try:
+        risposta = http_get(nothing_archive.TREE_URL, timeout=C.HTTP_TIMEOUT + 10,
+                            headers={"Accept": "application/vnd.github+json"})
+    except Exception as exc:
+        return [], f"connessione fallita: {exc}"
+    if risposta.status_code != 200:
+        return [], f"HTTP {risposta.status_code} dall'elenco dell'archivio"
+    try:
+        albero = risposta.json()
+    except ValueError:
+        return [], "l'elenco dell'archivio non è JSON"
+
+    per_dispositivo = nothing_archive.build_per_dispositivo(albero)
+    if not per_dispositivo:
+        return [], ("elenco raggiungibile ma nessun changelog riconosciuto: "
+                    "probabile cambio di struttura dell'archivio")
+
+    def ultima_stabile(build_list) -> list[RawItem]:
+        beta_vista = None
+        for build in build_list[:_NOTHING_MAX_LETTURE]:
+            testo = _nothing_changelog(build.percorso)
+            if testo is None:
+                return []      # senza il testo non si sa se è beta: meglio niente
+            if nothing_archive.e_beta(testo):
+                beta_vista = beta_vista or build
+                continue
+            return [_nothing_item(build, testo, beta_vista, cartella)
+                    for cartella in (build.cartella,
+                                     *nothing_archive.CONDIVISI.get(build.cartella, ()))]
+        return []
+
+    # Un telefono per thread: sono letture indipendenti di file piccoli, e
+    # in fila costavano 8 secondi a cache fredda (misurato il 26/09/2026).
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        items = [i for gruppo in pool.map(ultima_stabile, per_dispositivo.values())
+                 for i in gruppo]
+    if not items:
+        return [], "nessuna build stabile letta dai changelog"
+    items.sort(key=lambda i: i.published or "", reverse=True)
+    return items, None
+
+
+def _lookup_nothing(model_name: str) -> list[RawItem]:
+    tutti, errore = fetch_nothing_archive()
+    if errore or not tutti:
+        return []
+    richiesto = (model_name or "").strip().upper()
+    per_codice = [i for i in tutti if i.model_code and i.model_code == richiesto]
+    if per_codice:
+        return per_codice[:1]
+    bersaglio = modelcodes._normalize_name(model_name)
+    if not bersaglio:
+        return []
+    esatti = [i for i in tutti if modelcodes._normalize_name(i.device or "") == bersaglio]
+    if esatti:
+        return esatti[:1]
+    return _piu_vicini(
+        [(i, modelcodes._normalize_name(i.device or "")) for i in tutti], bersaglio)
+
+
+# ======================================================================
 # Registro delle fonti
 # ======================================================================
 SOURCES: list[Source] = [
@@ -3940,6 +4065,11 @@ SOURCES: list[Source] = [
            "dall'archivio tecnico per ogni codice XT del catalogo Motorola."),
     Source("news_motorola", "Motorola — ricerca news", C.TRUST_NOISY,
            fetch_motorola, C.VIVO, "https://news.google.com", is_web_search=True),
+    Source("nothing_archive", "Nothing/CMF — archivio build (nothing_archive)",
+           C.TRUST_CURATED, fetch_nothing_archive, C.OTHER, nothing_archive.HOMEPAGE,
+           "Archivio community con il changelog di ogni build Nothing/CMF: "
+           "ultima build stabile per telefono, Android dalla lettera della "
+           "build, patch di sicurezza quando dichiarata. Le beta sono escluse."),
     Source("news_minor", "Altri brand — ricerca news", C.TRUST_NOISY,
            fetch_minor_brands, C.OTHER, "https://news.google.com", is_web_search=True),
 ]
@@ -5003,6 +5133,8 @@ _STRUCTURED_LOOKUPS_LIST = [
                      fetch_realme_aer, firmware_kind=C.FW_FACTORY),
     StructuredLookup(C.OPPO, _lookup_oppo, "basso", "elenco ufficiale Oppo",
                      fetch_oppo_aer, firmware_kind=C.FW_SUPPORT),
+    StructuredLookup(C.OTHER, _lookup_nothing, "basso", "archivio build Nothing/CMF (non ufficiale)",
+                     fetch_nothing_archive, trust=C.TRUST_CURATED),
     # In fondo alle economiche, appena prima di GSMArena: le pagine
     # ufficiali di marca hanno la versione di fabbrica e vanno provate
     # prima. Questa risponde per QUALSIASI marca — comprese quelle senza
@@ -5777,6 +5909,7 @@ _CACHE_PER_FETCH = {
     id(fetch_oppo_aer): _oppo_aer_cache,
     id(fetch_pixel_ota): _pixel_ota_cache,
     id(fetch_realme_aer): _realme_pagina_cache,
+    id(fetch_nothing_archive): _nothing_cache,
 }
 
 # Quante fonti si scaldano insieme. Sono download indipendenti su host
