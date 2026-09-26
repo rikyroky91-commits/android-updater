@@ -1676,6 +1676,35 @@ def api_suggerimenti(q: str = Query(default="")):
     return JSONResponse({"voci": suggest.suggest(q, limit=8)})
 
 
+@app.get("/api/cerca")
+def api_cerca(q: str = Query(default="", max_length=80)):
+    """L'esito di una ricerca in forma compatta, per il controllo notturno.
+
+    Nasce il 26/09/2026 dal banco di prova: tre regressioni trovate in un
+    pomeriggio («Apple iPhone 16», «Samsung SM-S921B», il nome «Altri
+    brand (…) CMF Phone 1») sarebbero state viste il giorno stesso da un
+    controllo che ripete ogni notte una trentina di ricerche note — vedi
+    `scripts/controllo_notturno.py`. Passa dalla stessa cache delle
+    pagine: non costa più di una visita normale. Chiusa ai crawler da
+    robots.txt, come le ricerche.
+    """
+    q = " ".join((q or "").split())
+    if not q:
+        return JSONResponse({"errore": "manca q"}, status_code=400)
+    esito = _esito_ricerca(q)
+    return JSONResponse({
+        "query": q,
+        "trovato": bool(esito.get("trovato")),
+        "nome": esito.get("nome") or "",
+        "codice": esito.get("codice") or "",
+        "firmware": bool(esito.get("trovato")) and not esito.get("senza_firmware"),
+        "tipo_versione": esito.get("tipo_versione") or "",
+        "riga": esito.get("riga") or "",
+        "fonte": esito.get("fonte") or "",
+        "scheda": bool((esito.get("scheda") or {}).get("trovata")),
+    })
+
+
 # CHI HA CONSUMATO LA BANDA. Il 26/09/2026 i log di Caddy su Oracle hanno
 # mostrato GPTBot (il crawler di OpenAI) che seguiva i link «Forse
 # cercavi» e lanciava ricerche a raffica: «X-View Q11», «Gini N6»,

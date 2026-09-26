@@ -1,0 +1,28 @@
+# Ogni notte una trentina di ricerche note contro il sito vero.
+#
+# Se una ricerca che funzionava smette di funzionare, il lavoro fallisce e
+# GitHub manda un'email a chi ha il repository: è l'avviso. Vedi
+# scripts/controllo_notturno.py per l'elenco e il perché di ogni ricerca.
+#
+# L'indirizzo è la variabile di repository SITE_URL, la stessa di sveglia.yml.
+name: controllo-notturno
+
+on:
+  schedule:
+    - cron: "40 3 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  controllo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Ricerche note
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: python scripts/controllo_notturno.py "${SITE_URL:-https://mobileupdatetracker.duckdns.org}"
