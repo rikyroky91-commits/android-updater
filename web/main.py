@@ -50,8 +50,8 @@ from fastapi.staticfiles import StaticFiles
 
 from core import aer_catalog, aiquery, allegati, appledevices, cifratura, config as C
 from core import extract, imeicheck, mail, modelcodes, retest, scan, soc, sources, specs
-from core import storage, suggest, versus
-from core.util import (alleggerisci_se_serve, fmt_date, fmt_relative, libera_memoria,
+from core import storage, suggest, traduzioni, versus
+from core.util import (alleggerisci_se_serve, fmt_date, fmt_relative, libera_memoria, truncate,
                        memoria_dei_cataloghi, memoria_contenitore_mb, memoria_mb, memoria_picco_mb,
                        registra_da_svuotare, stato_alleggerimento)
 
@@ -151,6 +151,13 @@ async def guarda_la_memoria(request: Request, call_next):
 STATO_AVVIO: dict = {}
 
 
+def _dopo_la_scansione() -> None:
+    """A fine scansione: le risposte ricordate descrivono l'archivio di
+    prima, e le voci nuove vanno tradotte in italiano."""
+    RICERCHE.svuota()
+    traduzioni.traduci_in_sottofondo()
+
+
 def avvio() -> None:
     """L'ORDINE QUI DENTRO NON È INDIFFERENTE.
 
@@ -214,7 +221,11 @@ def avvio() -> None:
     if C.env_bool("AVVIA_WORKER", True):
         # La scansione oraria gira in un processo a sé (`core/scan_isolata.py`):
         # a fine giro le risposte ricordate descrivono l'archivio di prima.
-        scan.start_background_worker(dopo_scansione=lambda: RICERCHE.svuota())
+        scan.start_background_worker(dopo_scansione=_dopo_la_scansione)
+        # Le novità già in archivio si traducono subito, in sottofondo, con
+        # più lotti del giro normale: la pagina deve essere in italiano
+        # senza aspettare tre scansioni (vedi core/traduzioni.py).
+        traduzioni.traduci_in_sottofondo(max_lotti=60)
     # Il preriscaldamento tiene insieme in RAM cataloghi enormi mentre la
     # scansione può caricarne altri: sul piano Render da 512 MB è un picco
     # evitabile. È opt-in per chi dispone di memoria sufficiente.
@@ -750,8 +761,9 @@ def pagina_novita(request: Request, giorni: int = Query(default=30),
     scelte = {"tutto": tutte, "firmware": firmware, "notizie": notizie}[tipo]
 
     gruppi: list[dict] = []
+    tradotte = traduzioni.mappa([v.get("id") for v in scelte[:mostra]])
     for grezza in scelte[:mostra]:
-        voce = P.voce_feed(grezza)
+        voce = P.con_traduzione(P.voce_feed(grezza), tradotte.get(grezza.get("id")))
         voce["verificato"] = grezza.get("firmware_kind") == C.FW_CURRENT
         voce["nel_parco"] = bool(seguiti and grezza.get("device_key") in seguiti)
         etichetta, lettera = _MARCHE_CORTE.get(grezza.get("brand"), ("", "•"))
@@ -2835,6 +2847,20 @@ oneplus vivo iqoo motorola moto honor huawei nothing cmf sony nokia
 """.split())
 
 
+def _notizie_in_italiano(notizie: list[dict]) -> list[dict]:
+    """Le notizie sotto una ricerca, col titolo tradotto dove c'è."""
+    tradotte = traduzioni.mappa([n.get("id") for n in notizie])
+    righe = []
+    for n in notizie:
+        riga = P.riga_aggiornamento(n)
+        t = tradotte.get(n.get("id"))
+        if t and t.get("titolo"):
+            riga["titolo_originale"] = n.get("title", "")
+            riga["titolo"] = truncate(t["titolo"], 130)
+        righe.append(riga)
+    return righe
+
+
 def _esito_solo_marca(query: str) -> dict | None:
     """Una marca da sola: i suoi modelli in archivio, non un telefono a caso.
 
@@ -3680,7 +3706,7 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
         # dentro la scheda, così il riquadro in cima e la scheda tecnica
         # non possono dire due cose diverse sullo stesso telefono.
         "rete": _con_rete(scheda, nome),
-        "notizie": [P.riga_aggiornamento(n) for n in notizie[:6]],
+        "notizie": _notizie_in_italiano(notizie[:6]),
         "quante_notizie": len(notizie),
         # IL «FORSE CERCAVI» ANCHE QUANDO LA RICERCA RIESCE.
         #

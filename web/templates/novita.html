@@ -87,6 +87,13 @@
             <span class="tenue">{{ v.fonte }}</span>
             {% if v.link %}<a class="feed-fonte" href="{{ v.link }}" target="_blank" rel="noopener noreferrer">Leggi →</a>{% endif %}
           </p>
+          {% if v.titolo_originale or v.riassunto_originale %}
+          <details class="originale">
+            <summary>Tradotto in italiano · originale</summary>
+            {% if v.titolo_originale %}<p class="originale-titolo">{{ v.titolo_originale }}</p>{% endif %}
+            {% if v.riassunto_originale %}<p>{{ v.riassunto_originale }}</p>{% endif %}
+          </details>
+          {% endif %}
         </div>
       </li>
       {% endfor %}

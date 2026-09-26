@@ -609,6 +609,25 @@ def _riassunto_pulito(testo: str) -> str:
     return " ".join(testo.split())
 
 
+def con_traduzione(voce: dict, traduzione: dict | None) -> dict:
+    """Titolo e riassunto in italiano, con l'originale a portata di clic.
+
+    Vedi `core/traduzioni.py`. Se la traduzione coincide con l'originale
+    (la fonte era già italiana) non si propone un «originale» identico.
+    """
+    if not traduzione:
+        return voce
+    titolo = traduzione.get("titolo") or ""
+    riassunto = traduzione.get("riassunto") or ""
+    if titolo and titolo.strip().lower() != (voce.get("titolo") or "").strip().lower():
+        voce["titolo_originale"] = voce.get("titolo", "")
+        voce["titolo"] = titolo
+    if riassunto and not voce.get("riassunto_di_servizio") and             riassunto.strip().lower() != (voce.get("riassunto") or "").strip().lower():
+        voce["riassunto_originale"] = voce.get("riassunto", "")
+        voce["riassunto"] = truncate(riassunto, 320)
+    return voce
+
+
 def voce_feed(item: dict) -> dict:
     """Una notizia di aggiornamento come la si legge in un lettore RSS.
 

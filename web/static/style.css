@@ -1231,6 +1231,13 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
   background: var(--superficie); color: var(--ink);
 }
 .novita-altre { text-align: center; margin: 1.6rem 0 .4rem; }
+/* L'originale della notizia tradotta: chiuso, piccolo, per chi vuole
+   controllare la traduzione o citare il testo della fonte. */
+.originale { margin-top: .35rem; font-size: .78rem; color: var(--neutral); }
+.originale > summary { cursor: pointer; width: fit-content; }
+.originale > summary:hover { color: var(--verde); }
+.originale p { margin: .3rem 0 0; line-height: 1.45; }
+.originale-titolo { font-weight: 600; }
 
 @media (max-width: 640px) {
   .novita-titolo { font-size: 1.4rem; }
