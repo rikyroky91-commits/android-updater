@@ -2015,6 +2015,16 @@ class TestSupportoApple(unittest.TestCase):
         self.assertEqual(item["os_version"], "iOS 16.7.10")
         self.assertNotIn("26", item["os_version"])
 
+    def test_marca_davanti_al_nome(self):
+        """«Apple iPhone 15 Pro» è la forma dei database TAC e di molte
+        ricerche: fino al 26/09/2026 rispondeva «nessuna fonte lo conosce»."""
+        self.assertEqual(appledevices.identifiers_for("Apple iPhone 15 Pro"), ["iPhone16,1"])
+        self.assertEqual(appledevices.identifiers_for("apple iphone 15 pro"), ["iPhone16,1"])
+        res = scan.search_model("Apple Iphone 15 Pro")
+        self.assertEqual(res["items"][0]["os_version"], "iOS 26.2")
+        # Non si tocca «Apple Watch»: non è un iPhone/iPad e resta com'è.
+        self.assertEqual(appledevices.normalize_name("Apple Watch Series 6"), "apple watch series 6")
+
     def test_iphone_x_non_puo_avere_una_versione_moderna(self):
         res = scan.search_model("iPhone X")
         self.assertEqual(res["structured_count"], 1)

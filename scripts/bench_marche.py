@@ -51,6 +51,18 @@ MARCHE = {
     "NOTHING": ("nothing", "cmf", "altri brand"),
 }
 
+# La prima parola del nome, come la scriverebbe chi cerca. Le righe del
+# catalogo con davanti l'operatore («At&T Galaxy Note», «2Degrees Galaxy
+# J2») sono nomi che nessuno digita: misurarle abbassava i numeri per un
+# motivo che con la ricerca vera non c'entra.
+PRIME_PAROLE = {
+    "SAMSUNG": {"samsung", "galaxy"}, "APPLE": {"apple", "iphone"},
+    "GOOGLE": {"google", "pixel"}, "XIAOMI": {"xiaomi", "redmi", "poco"},
+    "MOTOROLA": {"motorola", "moto"}, "OPPO": {"oppo"}, "REALME": {"realme"},
+    "ONEPLUS": {"oneplus", "1+"}, "VIVO": {"vivo", "iqoo"},
+    "HONOR": {"honor"}, "HUAWEI": {"huawei"}, "NOTHING": {"nothing", "cmf"},
+}
+
 _ANNO_RE = re.compile(r"\b(20[12]\d)\b")
 _NON_TELEFONI = re.compile(r"\b(watch|band|buds|tab|pad|tv|router|laptop|book|glass|ring)\b", re.I)
 
@@ -90,6 +102,8 @@ def modelli_per_marca(per_marca: int, anno_minimo: int) -> dict[str, list[dict]]
         # anche il modo in cui una persona lo cercherebbe.
         if not nome or len(nome) < 5 or _NON_TELEFONI.search(nome):
             continue
+        if nome.split()[0].lower() not in PRIME_PAROLE[marca]:
+            continue
         chiave = nome.upper()
         if chiave not in scelti[marca]:
             scelti[marca][chiave] = {"marca": marca, "nome": nome.title(),
@@ -121,7 +135,9 @@ def prova(modello: dict) -> dict:
         esito["ricerca_tipo"] = r.get("tipo_versione") or ""
         esito["ricerca_riga"] = (r.get("riga") or "")[:120]
         esito["ricerca_fonte"] = r.get("fonte") or ""
-        esito["scheda"] = bool(r.get("scheda"))
+        # `scheda` è SEMPRE un dizionario, anche quando non è stata trovata:
+        # contarlo come vero dava il 100% ovunque nella prima prova.
+        esito["scheda"] = bool((r.get("scheda") or {}).get("trovata"))
         esito["ricerca_errore"] = r.get("errore") or ""
     except Exception as errore:  # pragma: no cover - si registra, non si ferma
         esito.update(ricerca_trovato=False, ricerca_firmware=False, scheda=False,
@@ -174,7 +190,7 @@ def main_cli() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--per-marca", type=int, default=40)
     p.add_argument("--anno-minimo", type=int, default=2021)
-    p.add_argument("--thread", type=int, default=4)
+    p.add_argument("--thread", type=int, default=1)
     p.add_argument("--uscita", default="bench.json")
     p.add_argument("--marche", default="", help="es. SAMSUNG,NOTHING")
     a = p.parse_args()

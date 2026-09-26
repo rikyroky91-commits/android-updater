@@ -103,7 +103,13 @@ def normalize_name(name: str) -> str:
     ('iPad Air (WiFi)' e 'iPad Air (Cellular)' collassano su 'ipad air')."""
     text = re.sub(r"\([^)]*\)", " ", name or "")
     text = re.sub(r"[^a-z0-9+]+", " ", text.lower())
-    return re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\s+", " ", text).strip()
+    # LA MARCA DAVANTI NON FA PARTE DEL NOME. Il catalogo dice «iPhone 16»,
+    # chi cerca scrive spesso «Apple iPhone 16» — ed è anche la forma dei
+    # database TAC. Senza toglierla la ricerca rispondeva «nessuna fonte
+    # conosce il modello» dopo 13 secondi (banco di prova del 26/09/2026:
+    # 0 iPhone su 30 trovati scritti così).
+    return re.sub(r"^apple\s+(?=(?:iphone|ipad|ipod)\b)", "", text)
 
 
 def _build() -> None:
