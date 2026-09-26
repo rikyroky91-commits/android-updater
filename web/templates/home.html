@@ -16,10 +16,14 @@
 #}
 {% block ricerca %}
 <section class="ingresso">
-  {# UN TITOLO SOLO. Dal 26/09/2026 è la frase scelta dall'utente, con i
-     punti in verde come le iniziali di M.U.T nella testata. #}
+  {# UNA BATTUTA, NON UNO SLOGAN (26/09/2026, su richiesta). La domanda
+     piccola in grigio è la preparazione, il titolo grande è la risposta
+     secca, e la faccina furba chiude — con un cenno una volta sola
+     all'apertura, fermo per chi ha chiesto meno movimento. I punti sono
+     verdi come le iniziali di M.U.T nella testata. #}
+  <p class="ingresso-domanda">Quale aggiornamento è arrivato, su quale modello, quando?</p>
   <h1 class="ingresso-titolo"><span class="punti">...</span>il mio sito lo fa<span
-      class="punti">.</span></h1>
+      class="punti">.</span> <span class="furbetto" role="img" aria-label="sorriso furbo">😏</span></h1>
   {% with grande = true %}{% include "_ricerca.html" %}{% endwith %}
   <p class="ingresso-nota">
     Scrivi un nome («Galaxy S24»), un codice modello («SM-S921B») o un
