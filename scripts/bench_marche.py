@@ -179,6 +179,14 @@ def main_cli() -> None:
     p.add_argument("--marche", default="", help="es. SAMSUNG,NOTHING")
     a = p.parse_args()
 
+    # Niente scansione in sottofondo: nello stesso processo si contende
+    # database e cataloghi con le ricerche, e la prima prova del 26/09/2026
+    # si è fermata a 20 modelli su 442 con la CPU a zero.
+    os.environ["AVVIA_WORKER"] = "false"
+    # Se si blocca di nuovo, ogni 5 minuti lo stato di tutti i thread
+    # finisce nel log invece di un silenzio indistinguibile dal lavoro.
+    import faulthandler
+    faulthandler.dump_traceback_later(300, repeat=True)
     from web import main
     main.avvio()
 
@@ -198,8 +206,11 @@ def main_cli() -> None:
             esiti.append(f.result())
             if i % 20 == 0:
                 print(f"  {i}/{len(tutti)} in {time.monotonic() - inizio:.0f}s", flush=True)
-                with open(a.uscita, "w", encoding="utf-8") as out:
-                    json.dump(esiti, out, ensure_ascii=False, indent=1)
+                try:
+                    with open(a.uscita, "w", encoding="utf-8") as out:
+                        json.dump(esiti, out, ensure_ascii=False, indent=1)
+                except OSError as errore:
+                    print(f"  salvataggio parziale non riuscito: {errore}", flush=True)
     with open(a.uscita, "w", encoding="utf-8") as out:
         json.dump(esiti, out, ensure_ascii=False, indent=1)
     print(riepilogo(esiti))
