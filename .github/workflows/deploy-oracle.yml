@@ -56,7 +56,15 @@ jobs:
                 tar xzf - -C ~/app.nuova
                 rm -rf ~/app && mv ~/app.nuova ~/app
                 cd ~/app
-                docker compose -f deploy/oracle/docker-compose.yml up -d --build --remove-orphans
+                dc="docker compose -f deploy/oracle/docker-compose.yml"
+                # Il 26/09/2026 un «Conflict. The container name /sito-web-1 is
+                # already in use» ha lasciato il sito spento: Docker aveva
+                # creato il nuovo container senza riuscire a togliere il vecchio.
+                # Al primo errore si tolgono i container del sito e si riprova.
+                if ! $dc up -d --build --remove-orphans; then
+                  docker ps -a --format "{{.Names}}" | grep -E "sito-web-1$" | xargs -r docker rm -f
+                  $dc up -d --remove-orphans
+                fi
                 docker image prune -f
               '
 

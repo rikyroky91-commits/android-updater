@@ -37,7 +37,8 @@ sudo netfilter-persistent save
 if [ ! -f "$HOME/sito.env" ]; then
   ip=$(curl -fsS https://ifconfig.me || echo "IP-PUBBLICO")
   cat > "$HOME/sito.env" <<EOF
-# Dominio del sito. Senza un dominio proprio: l'IP con i trattini + .sslip.io
+# Dominio del sito: l'IP con i trattini + .sslip.io, oppure un nome DuckDNS.
+# Più nomi insieme, separati da virgola: «nome.duckdns.org, 1-2-3-4.sslip.io».
 SITE_DOMAIN=${ip//./-}.sslip.io
 
 GEMINI_API_KEY=

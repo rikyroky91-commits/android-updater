@@ -1676,6 +1676,34 @@ def api_suggerimenti(q: str = Query(default="")):
     return JSONResponse({"voci": suggest.suggest(q, limit=8)})
 
 
+# CHI HA CONSUMATO LA BANDA. Il 26/09/2026 i log di Caddy su Oracle hanno
+# mostrato GPTBot (il crawler di OpenAI) che seguiva i link «Forse
+# cercavi» e lanciava ricerche a raffica: «X-View Q11», «Gini N6»,
+# «LG-K220»... Ognuna costa secondi di rete verso decine di fonti. È con
+# ogni probabilità il motivo per cui Render ha sospeso il piano gratuito
+# per i 5 GB esauriti. Un robots.txt non c'era.
+#
+# Le ricerche e le API sono chiuse a tutti i crawler: non c'è niente da
+# indicizzare in una pagina che dipende da cosa si è digitato. I crawler
+# che raccolgono dati per addestrare modelli restano fuori del tutto.
+_CRAWLER_AI = ("GPTBot", "ChatGPT-User", "OAI-SearchBot", "ClaudeBot", "Claude-Web",
+               "anthropic-ai", "CCBot", "Google-Extended", "PerplexityBot",
+               "Bytespider", "Amazonbot", "Applebot-Extended", "meta-externalagent",
+               "Diffbot", "ImagesiftBot", "Omgilibot", "cohere-ai")
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+def robots():
+    chiusi = ("/*?q=", "/*?*q=", "/api/", "/confronto", "/dispositivo", "/imei",
+              "/login", "/registrati", "/admin", "/parco")
+    a_capo = chr(10)
+    blocchi = [f"User-agent: {nome}{a_capo}Disallow: /" for nome in _CRAWLER_AI]
+    blocchi.append(f"User-agent: *{a_capo}"
+                   + "".join(f"Disallow: {p}{a_capo}" for p in chiusi)
+                   + "Allow: /")
+    return PlainTextResponse((a_capo * 2).join(blocchi) + a_capo)
+
+
 @app.get("/health")
 @app.head("/health")
 def health(dettaglio: str = Query(default="")):
