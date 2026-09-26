@@ -36,6 +36,12 @@
      rosso qui significa «🔴 MAJOR, retest completo», e un pulsante che
      usa lo stesso colore di un allarme indebolisce l'allarme. */
   --cerca:        #1f7a5a;
+  /* IL VERDE DEL MARCHIO (M.U.T, 26/09/2026): lo stesso del tasto Cerca,
+     così il sito ha un solo verde. Lo si usa per le iniziali, i punti
+     della frase in home, la navigazione attiva e i piccoli richiami.
+     Il rosso resta riservato alle severità MAJOR. */
+  --verde:        var(--cerca);
+  --verde-tenue:  rgba(31, 122, 90, .14);
   --cerca-scuro:  #176046;
   --ai:           #3f3d9e;
   --ai-scuro:     #302e7d;
@@ -52,6 +58,9 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
+
+::selection { background: var(--verde-tenue); }
+:focus-visible { outline: 2px solid var(--verde); outline-offset: 2px; }
 
 html { -webkit-text-size-adjust: 100%; }
 
@@ -107,20 +116,31 @@ a { color: inherit; }
   font-size: 1.1rem; font-weight: 700; letter-spacing: -.01em;
   text-decoration: none; white-space: nowrap;
 }
+.iniziale, .punti { color: var(--verde); }
+.marchio .iniziale { font-weight: 800; }
+.sigla { font-weight: 700; letter-spacing: .04em; color: var(--ink); }
 .nav { display: flex; gap: 1.5rem; flex: 1; flex-wrap: wrap; }
 .nav a {
   text-decoration: none; color: var(--neutral); font-size: .92rem;
   padding: .2rem 0; border-bottom: 3px solid transparent;
 }
-.nav a:hover { color: var(--accent); }
+.nav a:hover { color: var(--verde); }
 .nav a.attiva {
-  color: var(--ink); font-weight: 700; border-bottom-color: var(--accent);
+  color: var(--ink); font-weight: 700; border-bottom-color: var(--verde);
 }
 .stato-fonti {
   font-size: .78rem; color: var(--neutral); text-decoration: none;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.stato-fonti:hover { color: var(--accent); }
+/* La spia accanto al conteggio delle fonti: verde se rispondono tutte,
+   ambra se qualcuna manca. Il rosso resta alle severità. */
+.spia {
+  display: inline-block; width: .5rem; height: .5rem; border-radius: 50%;
+  margin-right: .4rem; vertical-align: .05rem;
+}
+.spia-ok { background: var(--verde); box-shadow: 0 0 0 3px var(--verde-tenue); }
+.spia-parziale { background: var(--differenza); }
+.stato-fonti:hover { color: var(--verde); }
 
 /* Login/logout in testata: chi è dentro vede il proprio nome, chi non lo
    è vede un solo link «Accedi» — niente occupa spazio per due stati alla
@@ -130,14 +150,14 @@ a { color: inherit; }
   white-space: nowrap; display: flex; align-items: center; gap: .5rem;
 }
 .conto a { color: var(--neutral); text-decoration: none; }
-.conto a:hover { color: var(--accent); }
+.conto a:hover { color: var(--verde); }
 .logout-form { margin: 0; display: inline; }
 .link-bottone {
   font: inherit; font-size: .8rem; color: var(--neutral);
   background: none; border: none; padding: 0; cursor: pointer;
   text-decoration: underline; text-underline-offset: 2px;
 }
-.link-bottone:hover { color: var(--accent); }
+.link-bottone:hover { color: var(--verde); }
 
 /* --- Impaginato -------------------------------------------------------
    `width: 100%` NON È RIDONDANTE, ed è la stessa trappola del tasto
@@ -245,7 +265,7 @@ a { color: inherit; }
   font-size: .84rem; color: var(--neutral);
 }
 .ingresso-cifre strong {
-  color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--verde); font-weight: 700; font-variant-numeric: tabular-nums;
 }
 
 /* La barra ingrandita. Stessa forma, taglia maggiore: è lo stesso
@@ -299,6 +319,13 @@ a { color: inherit; }
 .firmware-risultato, .firmware-in-arrivo {
   background: #f3f7f5; border: 1px solid #d7e3dd; border-radius: 12px;
   padding: 1rem 1.2rem; margin-bottom: 1rem;
+}
+/* Un firmware VERIFICATO (build corrente da una fonte strutturata) ha il
+   filo verde del marchio: è il dato per cui si apre il sito. Le versioni
+   solo riportate o di lancio restano col bordo neutro. */
+.firmware-verificato { border-left: 4px solid var(--verde); }
+.firmware-verificato .firmware-versione::before {
+  content: "✓"; color: var(--verde); font-weight: 700; margin-right: .45rem;
 }
 .firmware-risultato .firmware-versione { font-size: clamp(1.1rem, 2vw, 1.4rem); font-weight: 600; line-height: 1.4; }
 .firmware-dettagli { margin: .6rem 0; line-height: 1.6; overflow-wrap: anywhere; }
@@ -360,7 +387,7 @@ a { color: inherit; }
   border: 1px solid var(--filo); padding: .25rem .7rem;
   font-size: .85rem; background: var(--paper);
 }
-.proposta:hover { border-color: var(--accent); color: var(--accent); }
+.proposta:hover { border-color: var(--verde); color: var(--verde); }
 .proposta.attiva { border-color: var(--ink); font-weight: 700; }
 .azione-parco { margin-top: .9rem; }
 .azione-parco form { margin: 0; }
@@ -485,7 +512,7 @@ a { color: inherit; }
   background: none; border: none; text-decoration: underline;
   cursor: pointer; padding: 0;
 }
-.link-discreto:hover { color: var(--accent); }
+.link-discreto:hover { color: var(--verde); }
 
 .ai { margin-top: 1rem; }
 .ai button, button.secondario {
@@ -620,7 +647,7 @@ code {
 }
 .tabella tbody tr:hover { background: var(--superficie); }
 .tabella a { text-decoration: none; font-weight: 600; }
-.tabella a:hover { color: var(--accent); }
+.tabella a:hover { color: var(--verde); }
 .tabella.minuta th { text-transform: none; letter-spacing: 0; width: 190px; }
 
 /* --- Notizie ----------------------------------------------------------- */
@@ -630,7 +657,7 @@ code {
   padding: .8rem 0; border-bottom: 1px solid var(--filo);
 }
 .notizie a { text-decoration: none; font-weight: 600; }
-.notizie a:hover { color: var(--accent); }
+.notizie a:hover { color: var(--verde); }
 .notizia-coda { text-align: right; white-space: nowrap; }
 
 /* --- Piede ------------------------------------------------------------- */
@@ -842,7 +869,7 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
   text-transform: none; letter-spacing: 0; color: var(--ink);
 }
 .nome-modello a { color: inherit; text-decoration: none; }
-.nome-modello a:hover { color: var(--accent); }
+.nome-modello a:hover { color: var(--verde); }
 .tabella-confronto .cella-nome .sottotitolo {
   display: block; margin-top: .2rem; font-size: .74rem; font-weight: 500;
   color: var(--neutral);

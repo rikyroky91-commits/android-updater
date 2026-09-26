@@ -1,5 +1,5 @@
 {% if not senza_nome %}{% include "_nome_risultato.html" %}{% endif %}
-<div class="firmware-risultato">
+<div class="firmware-risultato{{ " firmware-verificato" if risultato.tipo_versione == "current" }}">
 {% if risultato.tipo_versione in ['factory', 'support'] %}
 <p class="nota"><strong>Dato di lancio o supporto.</strong> Non conferma l'ultimo aggiornamento disponibile per questo telefono.</p>
 {% elif risultato.tipo_versione == 'reported' %}

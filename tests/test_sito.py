@@ -182,8 +182,10 @@ class TestLePagineSiDisegnano(_SitoConLogin):
         una testata alta zero, col solo filo nero e senza il nome."""
         for percorso in ("/", "/novita", "/catalogo"):
             with self.subTest(percorso=percorso):
-                self.assertIn("Mobile Update Tracker",
-                              self.client.get(percorso).text)
+                pagina = self.client.get(percorso).text
+                self.assertIn("Mobile Update Tracker", pagina)
+                # La sigla M.U.T (26/09/2026): nel titolo della scheda.
+                self.assertIn("M.U.T", pagina)
 
     def test_la_navigazione_marca_la_pagina_corrente(self):
         pagina = self.client.get("/aggiornamenti").text

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titolo %}{{ titolo_sito }}{% endblock %}
+{% block titolo %}{{ titolo_sito }} · {{ nome_esteso }}{% endblock %}
 
 {#
   LA HOME È LA SOLA BARRA DI RICERCA.
@@ -16,11 +16,10 @@
 #}
 {% block ricerca %}
 <section class="ingresso">
-  {# UN TITOLO SOLO. Erano due frasi che dicevano la stessa cosa in due
-     modi, e la seconda era anche scritta male — «Che telefono è, e a che
-     versione sta»: dopo la virgola quella congiunzione non ci va. Resta
-     quella giusta, che è anche quella che descrive il sito. #}
-  <h1 class="ingresso-titolo">{{ sottotitolo }}</h1>
+  {# UN TITOLO SOLO. Dal 26/09/2026 è la frase scelta dall'utente, con i
+     punti in verde come le iniziali di M.U.T nella testata. #}
+  <h1 class="ingresso-titolo"><span class="punti">...</span>il mio sito lo fa<span
+      class="punti">.</span></h1>
   {% with grande = true %}{% include "_ricerca.html" %}{% endwith %}
   <p class="ingresso-nota">
     Scrivi un nome («Galaxy S24»), un codice modello («SM-S921B») o un

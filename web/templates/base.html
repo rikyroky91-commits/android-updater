@@ -30,7 +30,11 @@
       {# Il marchio riporta alla home, che è la pagina della sola
          ricerca: è il gesto che si fa per ricominciare da capo, e deve
          riportare al punto di partenza, non all'elenco. #}
-      <a class="marchio" href="/">{{ titolo_sito }}</a>
+      {# Le tre iniziali in verde compongono la sigla M.U.T, che è il nome
+         breve del sito (titoli delle schede, piede). #}
+      <a class="marchio" href="/" aria-label="{{ titolo_sito }} — {{ nome_esteso }}"><span
+         class="iniziale">M</span>obile <span class="iniziale">U</span>pdate <span
+         class="iniziale">T</span>racker</a>
       <nav class="nav">
         <a href="/" class="{{ 'attiva' if attiva == 'cerca' }}">Cerca</a>
         <a href="/novita" class="{{ 'attiva' if attiva == 'novita' }}">Novità</a>
@@ -45,7 +49,8 @@
          questo ne cambia la natura: non decora la testata, è la prima
          riga di diagnostica, leggibile da qualunque pagina. #}
       <a class="stato-fonti" href="{{ '/catalogo' if utente else '/novita' }}">
-        {% if fonti_totali %}{{ fonti_ok }}/{{ fonti_totali }} fonti attive
+        {% if fonti_totali %}<span class="spia {{ 'spia-ok' if fonti_ok == fonti_totali else 'spia-parziale' }}"
+          aria-hidden="true"></span>{{ fonti_ok }}/{{ fonti_totali }} fonti attive
         {% else %}nessuna scansione ancora{% endif %}
       </a>
       {# Il parco di test è l'unica pagina dietro login (vedi web/account.py):
@@ -71,7 +76,8 @@
   </main>
 
   <footer class="pieduccio">
-    <span>{{ titolo_sito }}</span>
+    <span class="sigla" title="{{ nome_esteso }}"><span class="iniziale">M</span>.<span
+          class="iniziale">U</span>.<span class="iniziale">T</span></span>
     <span>I dati vengono dalle fonti dei produttori. Le lacune sono dichiarate, non riempite.</span>
   </footer>
 

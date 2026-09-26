@@ -37,8 +37,12 @@ def contesto(request: Request, **extra) -> dict:
     è collegato adesso (per la voce Accedi/Esci della navigazione)."""
     stati = storage.get_source_status()
     base = {
-        "titolo_sito": "Mobile Update Tracker",
-        "sottotitolo": "Quale aggiornamento è arrivato, su quale modello, quando.",
+        # M.U.T dal 26/09/2026, su richiesta: la sigla va nei titoli delle
+        # schede e nel piede, il nome esteso (con le iniziali in verde)
+        # nella testata. La frase della home sta in home.html perché ha
+        # dei pezzi colorati, e un testo con markup non si passa da qui.
+        "titolo_sito": "M.U.T",
+        "nome_esteso": "Mobile Update Tracker",
         "fonti_ok": sum(1 for s in stati if s.get("ok")),
         "fonti_totali": len(stati),
         "ai_attiva": aiquery.disponibile(),
