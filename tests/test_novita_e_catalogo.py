@@ -146,23 +146,24 @@ class TestLetturaSuSchermoStretto(_SitoNuovo):
     """Rifiniture nate guardando la pagina su un telefono, non sul
     portatile: «sembra tutto confuso», 17/08/2026."""
 
-    def test_i_filtri_di_marca_stanno_chiusi(self):
-        """Sette voci lunghe («Oppo / Realme / OnePlus») occupavano mezza
-        schermata PRIMA della prima notizia. Chi apre questa pagina vuole
-        leggere le novita', non scegliere un filtro."""
+    def test_i_filtri_di_marca_sono_pillole_corte(self):
+        """Dal 26/09/2026 le marche sono pulsanti sempre visibili con
+        etichette corte («Samsung», non il gruppo lungo del tracker); su
+        un telefono stanno su UNA riga che scorre di lato (vedi il CSS di
+        `.pillole`), quindi non occupano mezza schermata prima della prima
+        notizia — il difetto che il vecchio menu chiuso risolveva."""
         self.client.cookies.clear()
         pagina = self.client.get("/novita?giorni=90").text
-        self.assertIn("<details", pagina)
-        self.assertIn("filtro-marca", pagina)
-        # Chiuso non deve nascondere QUALE filtro e' attivo.
-        self.assertIn("Marca:", pagina)
+        self.assertIn('class="pillola attiva">Tutte le marche', pagina)
+        self.assertIn(">Samsung</a>", pagina)
 
-    def test_il_filtro_attivo_apre_il_pannello(self):
-        """Se un filtro c'e', chiuderlo lo renderebbe invisibile: si
-        vedrebbe un elenco corto senza capire perche'."""
+    def test_il_filtro_attivo_si_vede(self):
+        """Un filtro attivo deve vedersi: pillola evidenziata e conteggi
+        delle schede calcolati sul filtro."""
         self.client.cookies.clear()
         pagina = self.client.get("/novita?giorni=90&marca=Samsung").text
-        self.assertIn("<details class=\"filtro-marca\" open>", pagina)
+        self.assertIn('class="pillola attiva">Samsung</a>', pagina)
+        self.assertIn('class="attiva">Tutto <span>', pagina)
 
     def test_la_fonte_non_compare_due_volte(self):
         """Visto sullo screenshot: «GSMArena · patch di sicurezza» sopra e

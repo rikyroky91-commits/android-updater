@@ -51,7 +51,7 @@ from fastapi.staticfiles import StaticFiles
 from core import aer_catalog, aiquery, allegati, appledevices, cifratura, config as C
 from core import extract, imeicheck, mail, modelcodes, retest, scan, soc, sources, specs
 from core import storage, suggest, versus
-from core.util import (alleggerisci_se_serve, fmt_date, libera_memoria,
+from core.util import (alleggerisci_se_serve, fmt_date, fmt_relative, libera_memoria,
                        memoria_dei_cataloghi, memoria_contenitore_mb, memoria_mb, memoria_picco_mb,
                        registra_da_svuotare, stato_alleggerimento)
 
@@ -669,31 +669,127 @@ def pagina_dispositivi(request: Request,
     ))
 
 
+# Le marche come si leggono su un pulsante: il gruppo del tracker
+# («Oppo / Realme / OnePlus») resta il valore del filtro, questa è solo
+# l'etichetta corta. La lettera colora il distintivo della scheda.
+_MARCHE_CORTE = {
+    C.SAMSUNG: ("Samsung", "S"), C.XIAOMI: ("Xiaomi", "X"), C.APPLE: ("Apple", "A"),
+    C.PIXEL: ("Pixel", "G"), C.OPPO: ("Oppo · realme · OnePlus", "O"),
+    C.VIVO: ("vivo · Motorola", "V"), C.HUAWEI: ("Huawei · Honor", "H"),
+    C.OTHER: ("Altri", "•"),
+}
+_NOVITA_PER_PAGINA = 40
+
+
+def _giorno_di(voce: dict) -> str:
+    """«Oggi», «Ieri», il giorno della settimana, poi la data."""
+    grezzo = (voce.get("published") or voce.get("first_seen") or "")[:10]
+    try:
+        giorno = date.fromisoformat(grezzo)
+    except ValueError:
+        return "Senza data"
+    oggi = datetime.now(timezone.utc).date()
+    distanza = (oggi - giorno).days
+    if distanza <= 0:
+        return "Oggi"
+    if distanza == 1:
+        return "Ieri"
+    if distanza < 7:
+        return ("Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì",
+                "Sabato", "Domenica")[giorno.weekday()]
+    mesi = ("gennaio febbraio marzo aprile maggio giugno luglio agosto settembre "
+            "ottobre novembre dicembre").split()
+    return f"{giorno.day} {mesi[giorno.month - 1]}"
+
+
 @app.get("/novita", response_class=HTMLResponse)
 def pagina_novita(request: Request, giorni: int = Query(default=30),
-                  marca: str = Query(default="")):
-    """Le ultime notizie sugli aggiornamenti, in forma di feed.
+                  marca: str = Query(default=""), tipo: str = Query(default="tutto"),
+                  q: str = Query(default="", max_length=60),
+                  generiche: int = Query(default=0), parco: int = Query(default=0),
+                  mostra: int = Query(default=_NOVITA_PER_PAGINA)):
+    """Le novità, fatte per essere trovate e lette (rifatta il 26/09/2026).
 
-    SOSTITUISCE «Dispositivi» E «Aggiornamenti». Erano due tabelle: una
-    elencava 1500 telefoni, l'altra 300 righe su sette colonne. Nessuna
-    delle due rispondeva alla domanda con cui si apre questa pagina —
-    «cosa è successo, e mi riguarda?» — perché per rispondere serve il
-    TESTO della notizia, e in una griglia non ci stava.
+    PRIMA: 300 voci in un blocco solo, firmware e articoli mescolati, i
+    filtri di marca chiusi in un menu, e dentro anche notizie che non
+    parlano di telefoni (il changelog di Vivaldi, di Firefox) finite fra
+    «Altri brand» perché la fonte multi-marca non sa distinguerle.
 
-    L'elenco completo dei dispositivi non è sparito: è finito in
-    «Catalogo», che è il posto dove si va quando si vuole guardare
-    l'archivio invece delle novità.
+    ORA, per chi apre la pagina con la domanda «cosa è uscito, e mi
+    riguarda?»:
+      * tre schede con il conteggio — Tutto, Firmware verificati (build
+        da fonti strutturate), Notizie (articoli);
+      * le marche come pulsanti sempre visibili, e una ricerca interna;
+      * le voci raggruppate per giorno, 40 alla volta con «Mostra altre»;
+      * gli articoli che non nominano nessun telefono nascosti, con un
+        collegamento per vederli: sono rumore per chi cerca un modello.
     """
-    voci = storage.get_updates(only_relevant=True, since_days=giorni, limit=300)
-    # Le marche si ricavano da ciò che c'è DAVVERO in questo intervallo,
-    # non da un elenco fisso: un filtro che porta a zero risultati è
-    # peggio di un filtro assente.
-    marche = sorted({v.get("brand") for v in voci if v.get("brand")})
+    giorni = giorni if giorni in (7, 30, 90) else 30
+    tipo = tipo if tipo in ("tutto", "firmware", "notizie") else "tutto"
+    mostra = max(_NOVITA_PER_PAGINA, min(int(mostra or 0), 600))
+    utente = auth_web.utente_da_richiesta(request)
+    seguiti = storage.watched_keys() if utente else set()
+
+    tutte = storage.get_updates(only_relevant=True, since_days=giorni,
+                                search=q or None, limit=1500)
+    marche_presenti = {v.get("brand") for v in tutte if v.get("brand")}
     if marca:
-        voci = [v for v in voci if v.get("brand") == marca]
+        tutte = [v for v in tutte if v.get("brand") == marca]
+    if parco and seguiti:
+        tutte = [v for v in tutte if v.get("device_key") in seguiti]
+
+    # Un articolo senza un telefono riconosciuto non è una novità su un
+    # telefono. Con una ricerca in corso si tiene: chi cerca una parola
+    # vuole anche quelli.
+    senza_modello = [v for v in tutte if not (v.get("device_model") or "").strip()]
+    if not generiche and not q:
+        tutte = [v for v in tutte if (v.get("device_model") or "").strip()]
+
+    firmware = [v for v in tutte if v.get("firmware_kind") == C.FW_CURRENT]
+    notizie = [v for v in tutte if v.get("firmware_kind") != C.FW_CURRENT]
+    scelte = {"tutto": tutte, "firmware": firmware, "notizie": notizie}[tipo]
+
+    gruppi: list[dict] = []
+    for grezza in scelte[:mostra]:
+        voce = P.voce_feed(grezza)
+        voce["verificato"] = grezza.get("firmware_kind") == C.FW_CURRENT
+        voce["nel_parco"] = bool(seguiti and grezza.get("device_key") in seguiti)
+        etichetta, lettera = _MARCHE_CORTE.get(grezza.get("brand"), ("", "•"))
+        voce["lettera"] = lettera
+        voce["marca_corta"] = etichetta
+        voce["relativo"] = fmt_relative(grezza.get("published") or grezza.get("first_seen"))
+        giorno = _giorno_di(grezza)
+        if not gruppi or gruppi[-1]["giorno"] != giorno:
+            gruppi.append({"giorno": giorno, "voci": []})
+        gruppi[-1]["voci"].append(voce)
+
+    filtri = {"giorni": giorni, "marca": marca, "tipo": tipo, "q": q,
+              "generiche": generiche, "parco": parco}
+
+    def link(**cambia) -> str:
+        valori = {**filtri, **cambia}
+        pezzi = [(k, v) for k, v in valori.items()
+                 if v not in ("", 0, None) and not (k == "tipo" and v == "tutto")
+                 and not (k == "giorni" and v == 30)]
+        return "/novita" + ("?" + "&".join(f"{k}={quote(str(v))}" for k, v in pezzi)
+                            if pezzi else "")
+
+    marche = [{"valore": m, "etichetta": _MARCHE_CORTE.get(m, (m, ""))[0],
+               "link": link(marca=m), "attiva": m == marca}
+              for m in C.BRANDS if m in marche_presenti]
     return _rendi(request, "novita.html", _contesto(
-        request, attiva="novita", giorni=giorni, marca=marca, marche=marche,
-        voci=[P.voce_feed(v) for v in voci],
+        request, attiva="novita", filtri=filtri, gruppi=gruppi, marche=marche,
+        conteggi={"tutto": len(tutte), "firmware": len(firmware), "notizie": len(notizie)},
+        link_tipo={t: link(tipo=t) for t in ("tutto", "firmware", "notizie")},
+        link_giorni={g: link(giorni=g) for g in (7, 30, 90)},
+        link_tutte_marche=link(marca=""),
+        link_senza_ricerca=link(q=""),
+        link_generiche=link(generiche=0 if generiche else 1),
+        link_parco=link(parco=0 if parco else 1) if seguiti else "",
+        link_altre=link(mostra=mostra + _NOVITA_PER_PAGINA) if len(scelte) > mostra else "",
+        restanti=max(0, len(scelte) - mostra),
+        generiche_nascoste=0 if (generiche or q) else len(senza_modello),
+        totale_scelte=len(scelte),
     ))
 
 

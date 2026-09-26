@@ -1138,6 +1138,108 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
   .feed-fonte { margin-left: 0; }
 }
 
+/* --- Novità, versione del 26/09/2026 -------------------------------------
+   Barra con titolo e ricerca, schede con conteggio, marche e periodo come
+   pillole sempre visibili, voci raggruppate per giorno con un distintivo
+   di marca a sinistra. Vedi `pagina_novita` in web/main.py. */
+.novita { max-width: 860px; margin: 0 auto; }
+.novita-testa {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap; margin: 1.2rem 0 .8rem;
+}
+.novita-titolo { margin: 0; font-size: 1.7rem; letter-spacing: -.02em; }
+.novita-cerca { flex: 1 1 260px; max-width: 360px; }
+.novita-cerca input {
+  width: 100%; font: inherit; font-size: .9rem; padding: .55rem .9rem;
+  border: 1px solid var(--filo); border-radius: 999px; background: var(--carta);
+}
+.novita-cerca input:focus { border-color: var(--verde); outline: none;
+  box-shadow: 0 0 0 3px var(--verde-tenue); }
+
+.novita-schede {
+  display: flex; gap: 1.4rem; border-bottom: 1px solid var(--filo);
+  margin-bottom: .9rem; overflow-x: auto;
+}
+.novita-schede a {
+  text-decoration: none; color: var(--neutral); font-size: .95rem;
+  padding: .55rem 0; border-bottom: 3px solid transparent; white-space: nowrap;
+}
+.novita-schede a span {
+  font-size: .75rem; font-variant-numeric: tabular-nums; margin-left: .2rem;
+  padding: .05rem .4rem; border-radius: 999px; background: var(--superficie);
+}
+.novita-schede a .spunta { background: none; padding: 0; margin: 0; color: var(--verde); font-weight: 700; }
+.novita-schede a:hover { color: var(--ink); }
+.novita-schede a.attiva { color: var(--ink); font-weight: 700; border-bottom-color: var(--verde); }
+.novita-schede a.attiva span:not(.spunta) { background: var(--verde-tenue); color: var(--verde); }
+
+.novita-filtri { display: grid; gap: .5rem; margin-bottom: .6rem; }
+.pillole { display: flex; gap: .4rem; flex-wrap: wrap; }
+.pillola {
+  font-size: .8rem; text-decoration: none; white-space: nowrap;
+  padding: .3rem .75rem; border-radius: 999px;
+  border: 1px solid var(--filo); background: var(--carta); color: var(--ink);
+  transition: border-color .15s, background .15s;
+}
+.pillola:hover { border-color: var(--verde); color: var(--verde); }
+.pillola.attiva { background: var(--verde); border-color: var(--verde); color: #fff; }
+.pillola.grande { font-size: .9rem; padding: .55rem 1.2rem; }
+.pillole.periodo .pillola { font-size: .75rem; padding: .22rem .65rem; }
+
+.novita-riepilogo, .novita-nota { font-size: .85rem; color: var(--neutral); margin: .4rem 0; }
+.novita-nota { margin-top: 1.5rem; text-align: center; }
+
+/* Il giorno resta in vista mentre si scorre il suo gruppo. */
+.novita-data {
+  position: sticky; top: 0; z-index: 2;
+  margin: 1.4rem 0 0; padding: .45rem 0;
+  font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--neutral); background: var(--paper); border-bottom: 1px solid var(--filo);
+}
+.novita .feed { margin: 0; }
+.novita .feed-voce {
+  display: grid; grid-template-columns: 2.2rem 1fr; gap: .9rem;
+  padding: 1rem .2rem; transition: background .15s;
+}
+.novita .feed-voce:hover { background: var(--superficie); }
+.novita .feed-voce.verificata { box-shadow: inset 3px 0 0 var(--verde); }
+.feed-corpo { min-width: 0; }
+
+.distintivo {
+  width: 2.2rem; height: 2.2rem; border-radius: 50%;
+  display: grid; place-items: center;
+  font-weight: 700; font-size: .95rem; color: #fff; background: var(--neutral);
+}
+.distintivo[data-lettera="S"] { background: #1f4fa3; }
+.distintivo[data-lettera="X"] { background: #e8641b; }
+.distintivo[data-lettera="A"] { background: #3a3a3c; }
+.distintivo[data-lettera="G"] { background: #3a7be0; }
+.distintivo[data-lettera="O"] { background: #1c8a57; }
+.distintivo[data-lettera="V"] { background: #4b4bb8; }
+.distintivo[data-lettera="H"] { background: #c0392b; }
+
+.feed-tag.verificato { --tinta: var(--verde); }
+.feed-tag.parco { --tinta: var(--ai); }
+
+/* Il riassunto si ferma a tre righe: la notizia completa è a un clic. */
+.novita .feed-riassunto {
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.novita .feed-versione {
+  display: inline-block; padding: .15rem .5rem; border-radius: 5px;
+  background: var(--superficie); color: var(--ink);
+}
+.novita-altre { text-align: center; margin: 1.6rem 0 .4rem; }
+
+@media (max-width: 640px) {
+  .novita-titolo { font-size: 1.4rem; }
+  .novita-cerca { max-width: none; }
+  .novita .feed-voce { grid-template-columns: 1.8rem 1fr; gap: .7rem; }
+  .distintivo { width: 1.8rem; height: 1.8rem; font-size: .8rem; }
+  .pillole { flex-wrap: nowrap; overflow-x: auto; padding-bottom: .2rem; }
+}
+
 /* --- Il firmware che sta arrivando ------------------------------------- */
 /* LA ROTELLINA STA DOVE ANDRANNO I DATI. Messa in cima alla pagina
    direbbe «il sito sta pensando»; messa qui dice «manca questo, e sta

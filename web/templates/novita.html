@@ -2,83 +2,112 @@
 {% block titolo %}Novità · {{ titolo_sito }}{% endblock %}
 {% block corpo %}
 {#
-  UN FEED, NON UNA TABELLA.
+  LE NOVITÀ, FATTE PER ESSERE TROVATE E LETTE (26/09/2026).
 
-  «Aggiornamenti» era una griglia di sette colonne. Una tabella risponde
-  bene a «confronta queste righe fra loro», che non è la domanda di chi
-  apre questa pagina — la sua è «cosa è successo, e mi riguarda?». Per
-  rispondere serve il testo della notizia, e in una griglia non ci stava.
+  In alto tutto quello che serve per restringere — schede, marche,
+  periodo, ricerca — sempre visibile e in un colpo d'occhio; sotto le
+  voci raggruppate per giorno, come in un lettore di notizie. Il perché
+  di ogni scelta è nel docstring di `pagina_novita` in web/main.py.
 
   Niente immagini di copertina, di proposito: le fonti RSS le
   pubblicano di rado e le altre foto che abbiamo sono del TELEFONO, non
-  dell'articolo.
+  dell'articolo. Al loro posto il distintivo di marca.
 #}
-<div class="feed-barra">
-  <h3 class="occhiello">Novità · ultimi {{ giorni }} giorni</h3>
+<section class="novita">
+  <header class="novita-testa">
+    <h1 class="novita-titolo">Novità</h1>
+    <form class="novita-cerca" method="get" action="/novita" role="search">
+      {% for k, v in filtri.items() if k not in ('q',) and v not in ('', 0) %}
+      <input type="hidden" name="{{ k }}" value="{{ v }}">
+      {% endfor %}
+      <input type="search" name="q" value="{{ filtri.q }}" placeholder="Cerca fra le novità: modello, build…"
+             aria-label="Cerca fra le novità">
+    </form>
+  </header>
 
-  <p class="proposte periodi">
-    {% for g in [7, 30, 90] %}
-    <a class="proposta {{ 'attiva' if g == giorni }}" href="/novita?giorni={{ g }}{% if marca %}&marca={{ marca | urlencode }}{% endif %}">{{ g }}g</a>
-    {% endfor %}
-  </p>
-</div>
+  <nav class="novita-schede" aria-label="Tipo di novità">
+    <a href="{{ link_tipo.tutto }}" class="{{ 'attiva' if filtri.tipo == 'tutto' }}">Tutto <span>{{ conteggi.tutto }}</span></a>
+    <a href="{{ link_tipo.firmware }}" class="{{ 'attiva' if filtri.tipo == 'firmware' }}"><span class="spunta">✓</span> Firmware verificati <span>{{ conteggi.firmware }}</span></a>
+    <a href="{{ link_tipo.notizie }}" class="{{ 'attiva' if filtri.tipo == 'notizie' }}">Notizie <span>{{ conteggi.notizie }}</span></a>
+  </nav>
 
-{% if marche %}
-{# I FILTRI DI MARCA STANNO CHIUSI. Sono sette voci lunghe («Oppo /
-   Realme / OnePlus», «Xiaomi / Redmi / POCO») e su un telefono
-   occupavano mezza schermata PRIMA della prima notizia: chi apre questa
-   pagina vuole leggere le novità, non scegliere un filtro. Il riassunto
-   nel `summary` dice quale filtro è attivo, così chiuso non nasconde
-   un'informazione. #}
-<details class="filtro-marca"{% if marca %} open{% endif %}>
-  <summary>
-    Marca: <strong>{{ marca if marca else "tutte" }}</strong>
-  </summary>
-  <p class="proposte">
-    <a class="proposta {{ 'attiva' if not marca }}" href="/novita?giorni={{ giorni }}">Tutte</a>
-    {% for m in marche %}
-    <a class="proposta {{ 'attiva' if m == marca }}" href="/novita?giorni={{ giorni }}&marca={{ m | urlencode }}">{{ m }}</a>
-    {% endfor %}
-  </p>
-</details>
-{% endif %}
+  <div class="novita-filtri">
+    <div class="pillole" role="group" aria-label="Marca">
+      <a href="{{ link_tutte_marche }}" class="pillola {{ 'attiva' if not filtri.marca }}">Tutte le marche</a>
+      {% for m in marche %}
+      <a href="{{ m.link }}" class="pillola {{ 'attiva' if m.attiva }}">{{ m.etichetta }}</a>
+      {% endfor %}
+    </div>
+    <div class="pillole periodo" role="group" aria-label="Periodo">
+      {% for g in [7, 30, 90] %}
+      <a href="{{ link_giorni[g] }}" class="pillola {{ 'attiva' if g == filtri.giorni }}">{{ g }} giorni</a>
+      {% endfor %}
+      {% if link_parco %}
+      <a href="{{ link_parco }}" class="pillola {{ 'attiva' if filtri.parco }}">Solo il mio parco</a>
+      {% endif %}
+    </div>
+  </div>
 
-{% if voci %}
-<ol class="feed">
-  {% for v in voci %}
-  <li class="feed-voce">
-    {# IL TITOLO PER PRIMO, e più grande di tutto il resto: è quello che
-       si legge scorrendo. Modello e severità sono etichette piccole
-       sopra, non due blocchi che competono con lui. #}
-    <p class="feed-testa">
-      {% if v.modello %}<a class="feed-modello" href="/?q={{ v.modello | urlencode }}">{{ v.modello }}</a>
-      {% elif v.brand %}<span class="feed-modello tenue">{{ v.brand }}</span>{% endif %}
-      {% if v.severita %}<span class="feed-tag" style="--tinta: {{ v.colore }}">{{ v.severita }}</span>{% endif %}
-    </p>
+  {% if filtri.q %}
+  <p class="novita-riepilogo">{{ totale_scelte }} risultati per «{{ filtri.q }}» ·
+    <a href="{{ link_senza_ricerca }}">togli la ricerca</a></p>
+  {% endif %}
 
-    <h2 class="feed-titolo">
-      {% if v.link %}<a href="{{ v.link }}" target="_blank" rel="noopener noreferrer">{{ v.titolo }}</a>
-      {% else %}{{ v.titolo }}{% endif %}
-    </h2>
+  {% if gruppi %}
+  {% for gruppo in gruppi %}
+  <section class="novita-giorno">
+    <h2 class="novita-data">{{ gruppo.giorno }}</h2>
+    <ol class="feed">
+      {% for v in gruppo.voci %}
+      <li class="feed-voce {{ 'verificata' if v.verificato }}">
+        <span class="distintivo" data-lettera="{{ v.lettera }}" aria-hidden="true">{{ v.lettera }}</span>
+        <div class="feed-corpo">
+          <p class="feed-testa">
+            {% if v.modello %}<a class="feed-modello" href="/?q={{ v.modello | urlencode }}">{{ v.modello }}</a>
+            {% elif v.marca_corta %}<span class="feed-modello tenue">{{ v.marca_corta }}</span>{% endif %}
+            {% if v.verificato %}<span class="feed-tag verificato">✓ firmware verificato</span>
+            {% elif v.severita %}<span class="feed-tag" style="--tinta: {{ v.colore }}">{{ v.severita }}</span>{% endif %}
+            {% if v.nel_parco %}<span class="feed-tag parco">nel tuo parco</span>{% endif %}
+          </p>
 
-    {% if v.riassunto %}
-    <p class="feed-riassunto {{ 'di-servizio' if v.riassunto_di_servizio }}">{{ v.riassunto }}</p>
-    {% endif %}
+          <h3 class="feed-titolo">
+            {% if v.link %}<a href="{{ v.link }}" target="_blank" rel="noopener noreferrer">{{ v.titolo }}</a>
+            {% else %}{{ v.titolo }}{% endif %}
+          </h3>
 
-    {% if v.versione %}<p class="feed-versione">{{ v.versione }}</p>{% endif %}
+          {% if v.riassunto %}
+          <p class="feed-riassunto {{ 'di-servizio' if v.riassunto_di_servizio }}">{{ v.riassunto }}</p>
+          {% endif %}
 
-    <p class="feed-piede">
-      <span class="tenue">{{ v.fonte }}</span>
-      <span class="tenue">·</span>
-      <span class="tenue">{{ v.quando }}</span>
-      {% if v.link %}<a class="feed-fonte" href="{{ v.link }}" target="_blank" rel="noopener noreferrer">Apri →</a>{% endif %}
-    </p>
-  </li>
+          {% if v.versione %}<p class="feed-versione">{{ v.versione }}</p>{% endif %}
+
+          <p class="feed-piede">
+            <span title="{{ v.quando }}">{{ v.relativo }}</span>
+            <span class="tenue">·</span>
+            <span class="tenue">{{ v.fonte }}</span>
+            {% if v.link %}<a class="feed-fonte" href="{{ v.link }}" target="_blank" rel="noopener noreferrer">Leggi →</a>{% endif %}
+          </p>
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
   {% endfor %}
-</ol>
-{% else %}
-<p class="vuoto">Nessuna novità in questo intervallo.
-  {% if marca %}<a href="/novita?giorni={{ giorni }}">Prova senza filtro di marca</a>.{% endif %}
-</p>
-{% endif %}
+
+  {% if link_altre %}
+  <p class="novita-altre"><a class="pillola grande" href="{{ link_altre }}">Mostra altre {{ [restanti, 40] | min }} <span class="tenue">(ne restano {{ restanti }})</span></a></p>
+  {% endif %}
+  {% else %}
+  <p class="vuoto">Nessuna novità con questi filtri.
+    {% if filtri.marca or filtri.q or filtri.parco %}<a href="/novita?giorni={{ filtri.giorni }}">Togli i filtri</a>.{% endif %}
+  </p>
+  {% endif %}
+
+  {% if generiche_nascoste %}
+  <p class="novita-nota">{{ generiche_nascoste }} articoli che non nominano nessun telefono sono nascosti.
+    <a href="{{ link_generiche }}">Mostrali</a></p>
+  {% elif filtri.generiche %}
+  <p class="novita-nota"><a href="{{ link_generiche }}">Nascondi gli articoli che non nominano nessun telefono</a></p>
+  {% endif %}
+</section>
 {% endblock %}
