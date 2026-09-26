@@ -76,6 +76,20 @@ def configurato() -> bool:
     )
 
 
+def sola_lettura() -> bool:
+    """True se questa istanza legge l'archivio ma non lo scrive mai.
+
+    NASCE DAL 26/09/2026, quando il sito ha cominciato a girare su due
+    host insieme (Oracle e Render) con lo STESSO Gist. Due istanze che
+    salvano sullo stesso archivio si sovrascrivono a vicenda: vince
+    l'ultima che scrive, e le modifiche dell'altra — un account approvato,
+    un test segnato — spariscono senza errori. Una sola deve scrivere; le
+    altre si impostano con `BACKUP_SOLO_LETTURA=true` e ripristinano
+    all'avvio come sempre.
+    """
+    return C.env("BACKUP_SOLO_LETTURA").strip().lower() in ("1", "true", "si", "sì", "yes")
+
+
 def _headers_github() -> dict:
     return {
         "Authorization": f"Bearer {C.env('BACKUP_GITHUB_TOKEN')}",
@@ -291,6 +305,10 @@ def salva(forza: bool = False) -> tuple[bool, str]:
     if not configurato():
         messaggio = "nessun archivio configurato"
         _esito("salvataggio", False, messaggio)
+        return False, messaggio
+    if sola_lettura():
+        messaggio = "sola lettura (BACKUP_SOLO_LETTURA): questa istanza non scrive l'archivio"
+        _esito("salvataggio", None, messaggio)
         return False, messaggio
     if requests is None:  # pragma: no cover
         messaggio = "libreria 'requests' non disponibile"
@@ -801,6 +819,8 @@ def avvia_salvataggio_continuo() -> str:
     global _thread_salvataggio
     if not configurato():
         return "non attivo: nessun archivio configurato"
+    if sola_lettura():
+        return "non attivo: istanza in sola lettura (BACKUP_SOLO_LETTURA)"
     if _thread_salvataggio and _thread_salvataggio.is_alive():
         return "già attivo"
     _fermare.clear()

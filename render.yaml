@@ -76,6 +76,12 @@ services:
         sync: false
       - key: BACKUP_GITHUB_TOKEN
         sync: false
+      # Dal 26/09/2026 il sito principale è su Oracle (deploy/oracle/) e
+      # Render gira in parallelo con lo STESSO Gist: deve solo leggerlo.
+      # Due istanze che scrivono lo stesso archivio si cancellano a
+      # vicenda le modifiche (vedi core/backup.sola_lettura).
+      - key: BACKUP_SOLO_LETTURA
+        value: "true"
       # --- Accesso al parco di test (vedi core/auth.py, web/account.py) ---
       # Le prime tre creano l'unico account amministratore al primo avvio
       # (non lo ricreano né lo aggiornano più dopo — cambia la password

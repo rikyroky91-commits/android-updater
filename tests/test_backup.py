@@ -109,6 +109,36 @@ class BaseBackup(unittest.TestCase):
             return f.read()
 
 
+class TestSolaLettura(BaseBackup):
+    """Due istanze sullo stesso Gist: quella in sola lettura non scrive."""
+
+    def tearDown(self):
+        os.environ.pop("BACKUP_SOLO_LETTURA", None)
+        super().tearDown()
+
+    def test_non_carica_niente(self):
+        os.environ["BACKUP_GIST_ID"] = "abc123"
+        os.environ["BACKUP_GITHUB_TOKEN"] = "token"
+        os.environ["BACKUP_SOLO_LETTURA"] = "true"
+        self._scrivi_db()
+
+        class FinteRichieste:
+            @staticmethod
+            def patch(*a, **k):
+                raise AssertionError("un'istanza in sola lettura ha scritto l'archivio")
+
+            get = patch
+
+        backup.requests = FinteRichieste
+        ok, messaggio = backup.salva(forza=True)
+        self.assertFalse(ok)
+        self.assertIn("sola lettura", messaggio)
+        self.assertIn("sola lettura", backup.avvia_salvataggio_continuo())
+
+    def test_spenta_per_default(self):
+        self.assertFalse(backup.sola_lettura())
+
+
 class TestConfigurazione(BaseBackup):
     def test_inerte_senza_configurazione(self):
         """Senza archivio configurato il modulo non deve fare nulla: chi non
