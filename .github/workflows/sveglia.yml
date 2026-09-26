@@ -67,7 +67,7 @@ jobs:
         #
         # L'indirizzo sta nella variabile di repository SITE_URL (Settings →
         # Secrets and variables → Actions → Variables), così cambiare host
-        # non tocca più questo file. Dal 26/09/2026 il sito è su Koyeb:
+        # non tocca più questo file. Dal 26/09/2026 il sito è su Oracle Cloud:
         # Render ha sospeso il servizio per i 5 GB di banda gratuita esauriti.
         env:
           SITE_URL: ${{ vars.SITE_URL }}
