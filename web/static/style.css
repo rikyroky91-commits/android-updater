@@ -110,7 +110,7 @@ a { color: inherit; }
 .testata-interno {
   max-width: var(--colonna); margin: 0 auto;
   padding: .9rem 1.5rem;
-  display: flex; align-items: center; gap: 2rem;
+  display: flex; align-items: center; gap: .8rem 2rem; flex-wrap: wrap;
 }
 .marchio {
   font-size: 1.1rem; font-weight: 700; letter-spacing: -.01em;
@@ -120,9 +120,13 @@ a { color: inherit; }
 .marchio .iniziale { font-weight: 800; }
 .sigla { font-weight: 700; letter-spacing: .04em; color: var(--ink); }
 .nav { display: flex; gap: 1.5rem; flex: 1; flex-wrap: wrap; }
+/* LE VOCI NON SI SPEZZANO. Fra 860 e ~1000 px il menu non stava accanto
+   al marchio e le voci si impilavano in colonna («Parco di / test»,
+   26/09/2026): ora nessuna voce va a capo a metà, e la testata va a capo
+   intera quando serve (vedi `.testata-interno`). */
 .nav a {
   text-decoration: none; color: var(--neutral); font-size: .92rem;
-  padding: .2rem 0; border-bottom: 3px solid transparent;
+  padding: .2rem 0; border-bottom: 3px solid transparent; white-space: nowrap;
 }
 .nav a:hover { color: var(--verde); }
 .nav a.attiva {
@@ -717,7 +721,7 @@ code {
    build spezzata su due righe non è più una sigla che si copia. */
 @media (max-width: 860px) {
   .testata-interno { flex-wrap: wrap; gap: .8rem 1.2rem; }
-  .nav { order: 3; width: 100%; gap: 1.1rem; }
+  .nav { order: 3; width: 100%; gap: 1.1rem; flex: 1 1 100%; }
   .scheda { grid-template-columns: 1fr; }
   .scheda-foto { max-width: 200px; }
   .tabella { display: block; overflow-x: auto; white-space: nowrap; }
@@ -1158,8 +1162,9 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
 
 .novita-schede {
   display: flex; gap: 1.4rem; border-bottom: 1px solid var(--filo);
-  margin-bottom: .9rem; overflow-x: auto;
+  margin-bottom: .9rem; overflow-x: auto; scrollbar-width: none;
 }
+.novita-schede::-webkit-scrollbar { display: none; }
 .novita-schede a {
   text-decoration: none; color: var(--neutral); font-size: .95rem;
   padding: .55rem 0; border-bottom: 3px solid transparent; white-space: nowrap;
@@ -1244,7 +1249,9 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
   .novita-cerca { max-width: none; }
   .novita .feed-voce { grid-template-columns: 1.8rem 1fr; gap: .7rem; }
   .distintivo { width: 1.8rem; height: 1.8rem; font-size: .8rem; }
-  .pillole { flex-wrap: nowrap; overflow-x: auto; padding-bottom: .2rem; }
+  .pillole { flex-wrap: nowrap; overflow-x: auto; padding-bottom: .2rem;
+             scrollbar-width: none; }
+  .pillole::-webkit-scrollbar { display: none; }
 }
 
 /* --- Il firmware che sta arrivando ------------------------------------- */
