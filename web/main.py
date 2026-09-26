@@ -3081,7 +3081,16 @@ def _codice_senza_marca(query: str) -> str:
     if not m:
         return query
     resto = query[m.end():].strip()
-    if resto and " " not in resto and sources.looks_like_model_code(resto):
+    if not resto or " " in resto or not sources.looks_like_model_code(resto):
+        return query
+    # ...E SOLO SE IL CODICE È DI QUELLA MARCA. Il controllo notturno del
+    # 26/09/2026 ha visto «vivo X200» diventare «Samsung Galaxy Tab A8»:
+    # «X200» ha la forma di un codice, ed è quello di un tablet Samsung
+    # (SM-X200). La marca digitata allora non è un di più, è ciò che dice
+    # di quale telefono si parla.
+    digitata = extract.detect_brand(m.group(0).replace("1+", "oneplus") + " x1 2")
+    del_codice = sources.brand_from_code(resto)
+    if digitata and del_codice == digitata:
         return resto.upper()
     return query
 
@@ -3371,8 +3380,13 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
 
     # LA SCHEDA SI CALCOLA UNA VOLTA SOLA, PRIMA DEL NOME FINALE — perché
     # può correggere il nome anche lei, non solo mostrarlo.
+    # Senza identità la marca si prende da ciò che è stato digitato: con
+    # «vivo X200» nessuna fonte firmware rispondeva, la scheda si cercava
+    # senza filtro e il codice «X200» dava il tablet Samsung SM-X200 —
+    # nome compreso (controllo notturno del 26/09/2026).
     scheda = P.scheda_tecnica(nome, codice=codice or query,
-                              brand=identita.get("brand", ""))
+                              brand=identita.get("brand", "")
+                              or extract.detect_brand(query) or "")
 
     # Per un codice esatto, la scheda curata/del catalogo è una fonte di
     # identità più precisa del nome libero della fonte firmware. Questo

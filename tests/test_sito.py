@@ -833,6 +833,9 @@ class TestRicerca(_Sito):
         self.assertEqual(M._codice_senza_marca("oppo cph2789"), "CPH2789")
         self.assertEqual(M._codice_senza_marca("1+ CPH2707"), "CPH2707")
         self.assertEqual(M._codice_senza_marca("Honor ABR-NX1"), "ABR-NX1")
+        # Un codice di un'altra marca non la sostituisce: «X200» è un
+        # tablet Samsung, «vivo X200» è un telefono vivo.
+        self.assertEqual(M._codice_senza_marca("vivo X200"), "vivo X200")
         # Un nome commerciale non si tocca.
         self.assertEqual(M._codice_senza_marca("Samsung Galaxy S24"), "Samsung Galaxy S24")
         self.assertEqual(M._codice_senza_marca("realme Note 50"), "realme Note 50")
