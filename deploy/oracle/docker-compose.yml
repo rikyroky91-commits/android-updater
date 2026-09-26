@@ -23,6 +23,8 @@ services:
       # in un volume e sopravvive a riavvii e deploy. La copia nell'immagine
       # serve solo al primissimo avvio (`_semina_archivio`).
       DB_PATH: /home/app/archivio/tracker.db
+      # 380 era tarato sui 512 MB di Render; qui la VM ne ha 12 GB.
+      MEMORIA_SOGLIA_MB: "3000"
     volumes:
       - archivio:/home/app/archivio
     # Nessuna porta pubblicata: dall'esterno si passa solo da Caddy.

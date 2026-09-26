@@ -48,6 +48,10 @@ BACKUP_GITHUB_TOKEN=
 EOF
   chmod 600 "$HOME/sito.env"
 fi
+# SESSION_SECRET firma i cookie: senza, ogni riavvio disconnette tutti.
+# Generata qui, sul server, e mai mostrata.
+grep -q '^SESSION_SECRET=.' "$HOME/sito.env" \
+  || echo "SESSION_SECRET=$(openssl rand -hex 32)" >> "$HOME/sito.env"
 
 mkdir -p "$HOME/app"
 echo
