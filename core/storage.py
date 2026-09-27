@@ -1637,7 +1637,8 @@ _CHIAVI_KEY = "schema_chiavi_dispositivo"
 # 1 → chiave = marca | nome ripulito dai separatori
 # 2 → le parole di marca che non distinguono nulla escono dalla chiave,
 #     così «Galaxy S24 Ultra» e «Samsung S24 Ultra» sono un telefono solo
-_CHIAVI_VERSIONE = 2
+# 3 → il «+» diventa «plus»: «Galaxy S21+» non è più il Galaxy S21
+_CHIAVI_VERSIONE = 3
 
 
 def migra_chiavi_dispositivo() -> dict:

@@ -361,7 +361,11 @@ def radice_modello(brand: str, model: str) -> str:
     """La parte del nome che identifica davvero il modello, in minuscolo e
     senza separatori. «Galaxy S24 Ultra», «Samsung S24 Ultra» e «S24 Ultra»
     danno tutte e tre `s24ultra`."""
-    testo = str(model or "").lower()
+    # IL «+» È UN MODELLO DIVERSO, non un separatore. Toglierlo insieme alla
+    # punteggiatura dava a «Galaxy S21+» la stessa chiave del Galaxy S21: in
+    # archivio i due telefoni erano uno solo, con la storia mescolata
+    # (trovato il 26/09/2026). «S21+» e «S21 Plus» restano invece uguali.
+    testo = str(model or "").lower().replace("+", " plus ")
     # LA STESSA PAROLA DUE VOLTE DI FILA NON DISTINGUE NIENTE.
     # «POCO POCO M4 Pro», «Nokia Nokia C32», «Honor HONOR Magic6»: nomi
     # nati dall'unione di due colonne dove la marca compariva già. La

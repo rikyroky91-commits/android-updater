@@ -3255,6 +3255,12 @@ def _storico_del_modello(nome: str, brand: str) -> tuple[list[dict], str, str]:
     # della stessa domanda non danno due nomi diversi.
     chiavi: list[str] = []
     nomi: dict[str, str] = {}
+    # SENZA MARCA SI DEDUCE DAL NOME. Con la ricerca «senza rete» (pagina
+    # dei simili, confronto) la marca arrivava vuota, e allora qualunque
+    # telefono che la ricerca tollerante dell'archivio riportava veniva
+    # accettato: per «Samsung Galaxy S21» vinceva il Galaxy S21 FE, e la
+    # pagina dei simili dava all'S21 l'Android 16 dell'FE (26/09/2026).
+    brand = brand or extract.detect_brand(nome) or ""
     if brand:
         chiave = extract.device_key(brand, nome)
         if chiave:
@@ -3275,9 +3281,13 @@ def _storico_del_modello(nome: str, brand: str) -> tuple[list[dict], str, str]:
             # coerenti. Il confronto è sulla chiave di dispositivo, cioè
             # la stessa regola con cui l'archivio decide che due nomi
             # sono un telefono solo.
+            stesso_nome = (_nome_per_confronto(device.get("model") or "")
+                           == _nome_per_confronto(nome))
             if not atteso or chiave == atteso:
                 nomi.setdefault(chiave, device.get("model") or "")
-            if chiave not in chiavi:
+            # Un'altra chiave vale solo per lo STESSO nome scritto in un altro
+            # modo (marca salvata diversamente), mai per un telefono vicino.
+            if chiave not in chiavi and (not atteso or chiave == atteso or stesso_nome):
                 chiavi.append(chiave)
     except Exception:  # pragma: no cover - l'archivio non deve fermare la ricerca
         pass
