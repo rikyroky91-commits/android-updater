@@ -767,7 +767,11 @@ def search_model(model_query: str, senza_rete: bool = False) -> dict:
     #    e' gia' disponibile.
     structured_has_firmware = any(_ha_firmware(item) for item in structured_items)
     raw_items, error = ([], None)
-    if not structured_has_firmware and not senza_rete:
+    # `RICERCA_SENZA_NOTIZIE` serve solo al banco di prova: centinaia di
+    # ricerche di fila su Google News fanno bloccare l'indirizzo del server
+    # (503 dal 26/09/2026), e il banco misura firmware, nomi e schede.
+    if (not structured_has_firmware and not senza_rete
+            and not C.env_bool("RICERCA_SENZA_NOTIZIE", False)):
         raw_items, error = sources.search_model_live(model_query)
         if not (error and not raw_items):
             news_items = [normalize(raw, _LIVE_SOURCE) for raw in raw_items]
