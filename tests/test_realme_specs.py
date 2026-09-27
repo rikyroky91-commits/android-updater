@@ -36,11 +36,29 @@ class TestPaginaRealme(unittest.TestCase):
         altro modello solo perché l'indirizzo ha risposto."""
         self.assertIsNone(specs._scheda_realme_da_html("realme C75", PAGINA, URL))
 
+    def test_json_ld_e_alimentatori(self):
+        """Il JSON-LD delle pagine recenti si legge; i watt degli
+        alimentatori in vendita nel menu non sono la ricarica del telefono."""
+        pagina = ('<title>realme P4 Full Specifications</title>'
+                  '<nav>realme SUPERVOOC 80W Power Adapter</nav>'
+                  '<script type="application/ld+json">{"additionalProperty":['
+                  '{"@type":"PropertyValue","name":"Chipset","value":"Qualcomm Snapdragon 685, 8-core CPU"},'
+                  '{"@type":"PropertyValue","name":"Display","value":"6.8 inches, 120Hz AMOLED"},'
+                  '{"@type":"PropertyValue","name":"Battery and Charging","value":"7000mAh (Typical), 45W SUPERVOOC"}'
+                  ']}</script>')
+        s = specs._scheda_realme_da_html("realme P4", pagina, URL)
+        self.assertEqual(s.chipset, "Qualcomm Snapdragon 685")
+        self.assertEqual(s.batteria, "7000 mAh")
+        self.assertEqual(s.ricarica, "45 W")
+        self.assertEqual(s.display, "6.8 pollici")
+
     def test_slug(self):
         self.assertEqual(specs._slug_realme("realme 14 Pro 5G"),
                          ["realme-14-pro-5g", "realme-14-pro"])
         self.assertEqual(specs._slug_realme("realme 13 Pro+"),
                          ["realme-13-pro-plus", "realme-13-pro-plus-5g"])
+        # «GT8» sul sito ufficiale è «gt-8».
+        self.assertIn("realme-gt-8-pro", specs._slug_realme("realme GT8 Pro"))
         self.assertEqual(specs._slug_realme("Galaxy S24"), [])
 
 

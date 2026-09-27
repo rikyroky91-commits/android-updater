@@ -863,6 +863,12 @@ def _scheda_honor_da_html(nome: str, pagina: str, url: str) -> Scheda | None:
     slug = _slug_honor(nome)
     marker = f"/products/smartphone/{slug}/" if slug else ""
     start = pagina.lower().find(marker.lower()) if marker else -1
+    # DAL 2026 LE IMMAGINI NON STANNO PIÙ IN QUELLA CARTELLA, e senza
+    # ancoraggio il ripiego non restituiva niente (HONOR 400 Lite, verificato
+    # il 27/09/2026). Il contenuto del modello comincia comunque al tag
+    # <main>, dopo il menu con gli altri prodotti: è il confine nuovo.
+    if start < 0:
+        start = pagina.lower().find("<main")
     if start < 0:
         return None
     pagina_prodotto = pagina[start:]
@@ -964,7 +970,14 @@ def _ripiego_honor_ufficiale(*indizi: str | None, marca: str | None = None) -> S
 # campo che non si trova resta vuoto.
 FONTE_REALME_LABEL = "specifiche ufficiali realme"
 _REALME_SPECS_URLS = ("https://www.realme.com/it/{slug}/specs",
-                      "https://www.realme.com/global/{slug}/specs")
+                      "https://www.realme.com/global/{slug}/specs",
+                      # Diversi modelli (15x, 10 Pro 5G, P4 5G) hanno la
+                      # pagina solo nella versione indiana.
+                      "https://www.realme.com/in/{slug}/specs")
+# Le pagine più recenti hanno la scheda anche in JSON-LD, coppie
+# «name»/«value» («Chipset», «Display», «Battery and Charging»…): è il dato
+# più pulito della pagina e si legge per primo.
+_RE_REALME_LD = re.compile(r'"name"\s*:\s*"([^"]{2,40})"\s*,\s*"value"\s*:\s*"([^"]{1,300})"')
 _realme_specs_cache: dict[str, tuple[float, Scheda | None]] = {}
 _realme_specs_lock = threading.Lock()
 _RE_REALME_TITOLO = re.compile(r"<title>([^<]+)</title>", re.IGNORECASE)
@@ -986,12 +999,14 @@ def _slug_realme(nome: str) -> list[str]:
     if not parole or parole[0] != "realme" or len(parole) < 2:
         return []
     base = "-".join(parole)
-    varianti = [base]
-    if base.endswith("-5g"):
-        varianti.append(base[:-3])
-    else:
-        varianti.append(base + "-5g")
-    return varianti
+    # «GT8» sul sito ufficiale è «gt-8»: si prova anche con le lettere
+    # staccate dalle cifre.
+    staccato = re.sub(r"(?<=[a-z])(?=\d)|(?<=\d)(?=[a-z]{2})", "-", base)
+    varianti: list[str] = []
+    for forma in dict.fromkeys((base, staccato)):
+        varianti.append(forma)
+        varianti.append(forma[:-3] if forma.endswith("-5g") else forma + "-5g")
+    return list(dict.fromkeys(varianti))
 
 
 def _gb(testo: str) -> tuple[int, ...]:
@@ -1010,13 +1025,49 @@ def _scheda_realme_da_html(nome: str, pagina: str, url: str) -> Scheda | None:
         return None
     testo = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " | ", pagina)))
     testo = re.sub(r"(?:\|\s*)+", "| ", testo)
+    # Il JSON-LD, se c'è, si mette in testa al testo con le etichette che i
+    # modelli qui sotto riconoscono già.
+    ld = {n.strip().lower(): html.unescape(v) for n, v in _RE_REALME_LD.findall(pagina or "")}
+    if ld:
+        pezzi = []
+        if ld.get("chipset"):
+            pezzi.append(f"| Chipset | {ld['chipset'].split(',')[0]} |")
+        if ld.get("memory and storage"):
+            pezzi.append(f"| {ld['memory and storage'].replace('RAM', 'GB RAM')} |")
+        if ld.get("display"):
+            pezzi.append(f"| Size: {ld['display'].split(',')[0]} refresh rate {ld['display']} |")
+        if ld.get("battery and charging"):
+            pezzi.append(f"| Battery {ld['battery and charging']} charging {ld['battery and charging']} |")
+        testo = " ".join(pezzi) + " " + testo
     chip = _RE_REALME_CHIP.search(testo)
     ram = _RE_REALME_RAM.search(testo)
     rom = _RE_REALME_ROM.search(testo)
-    pollici = _RE_REALME_POLLICI.search(testo)
+    # Solo misure da telefono: un «2.0"» altrove nella pagina (un sensore,
+    # un'icona) diventava lo schermo del NARZO 70x.
+    pollici = next((m for m in [_RE_REALME_POLLICI.search(testo)] + list(
+        re.finditer(r"(\d[.,]\d{1,2})\s*(?:pollici|inch(?:es)?)", testo))
+        if m and 5.5 <= float(m.group(1).replace(",", ".")) <= 8.5), None)
     hz = _RE_REALME_HZ.search(testo)
-    batteria = _RE_REALME_BATTERIA.search(testo)
-    ricarica = _RE_REALME_RICARICA.search(testo)
+    # «5000mAh Massive Battery»: il numero prima della parola.
+    batteria = _RE_REALME_BATTERIA.search(testo) or re.search(r"(\d{4,5})\s*mAh", testo)
+    # La potenza di ricarica: quella accanto al nome della tecnologia, la più
+    # alta; sotto i 15 W è quasi sempre un altro numero (ricarica inversa,
+    # un accessorio), non la ricarica del telefono.
+    # Il PRIMO valore nell'ordine della pagina, non il massimo: più sotto la
+    # pagina elenca anche altri modelli (il 10 Pro 5G prendeva gli 80 W di
+    # un fratello maggiore).
+    watt = [(m.start(), int(m.group(1))) for m in re.finditer(
+        r"(\d{2,3})\s*W\b[^|]{0,12}?(?:SUPER\s*VOOC|VOOC|Dart|ricarica|charg)", testo, re.IGNORECASE)]
+    watt += [(m.start(), int(m.group(1))) for m in re.finditer(
+        r"(?:SUPER\s*VOOC|ricarica|charg\w*)[^|]{0,20}?(\d{2,3})\s*W\b", testo, re.IGNORECASE)]
+    # Il menu del sito elenca gli ALIMENTATORI in vendita («realme SUPERVOOC
+    # 80W Power Adapter», «Power Charger 10W»): quei numeri non sono del
+    # telefono e vengono prima di lui nella pagina.
+    def e_accessorio(inizio: int) -> bool:
+        return bool(re.search(r"adapter|power charger|alimentatore",
+                              testo[max(0, inizio - 40):inizio + 45], re.IGNORECASE))
+    watt = sorted(w for w in watt if 15 <= w[1] <= 300 and not e_accessorio(w[0]))
+    ricarica = re.match(r"(\d+)", str(watt[0][1])) if watt else None
     camera = _RE_REALME_CAMERA.search(testo)
     selfie = _RE_REALME_SELFIE.search(testo)
     # Alcune pagine non scrivono «RAM: … ROM: …» ma solo i tagli «8GB+256GB».
@@ -1033,7 +1084,8 @@ def _scheda_realme_da_html(nome: str, pagina: str, url: str) -> Scheda | None:
         nome_chip = re.sub(r"[®™]", "", chip.group(1))
         nome_chip = re.sub(r"^(?:Piattaforma mobile|Processore|Chip|Chipset|Mobile platform)\s+", "",
                            nome_chip.strip(), flags=re.IGNORECASE)
-        nome_chip = re.sub(r"\s+(?:MediaTek|5G)$", "", pulisci(nome_chip))
+        nome_chip = re.sub(r"(?:\s+(?:MediaTek|5G|Chipset|processor|processore))+$", "",
+                           pulisci(nome_chip), flags=re.IGNORECASE)
     campi = {
         "chipset": nome_chip,
         "ram_gb": ram_gb,
@@ -1160,9 +1212,14 @@ def _ripiego_esterno(*indizi: str | None, marca: str | None = None) -> Scheda | 
         if riga:
             return _a_scheda(riga)
 
-    if not marca_nota:
-        return None
-    for testo in testi:
+    # SENZA MARCA NOTA A VERSUS SI PASSA OLTRE, NON SI ESCE. Prima qui c'era
+    # `return None`: quando versus non riconosceva il gruppo di marca
+    # («Oppo / Realme / OnePlus», «Huawei / Honor») la funzione finiva prima
+    # di arrivare alle pagine ufficiali HONOR e realme in fondo, e quei
+    # ripieghi non partivano quasi mai (banco di prova del 27/09/2026:
+    # «realme 12 Pro 5G» riconosciuto, scheda assente, pagina ufficiale
+    # disponibile).
+    for testo in testi if marca_nota else ():
         completo = versus.con_marca(testo, marca_nota)
         riga = versus.scheda_grezza(completo, _MARCHE.get(marca_nota.lower(), C.OTHER))
         if riga:
@@ -1175,6 +1232,8 @@ def _ripiego_esterno(*indizi: str | None, marca: str | None = None) -> Scheda | 
     # preserva la precedenza del nome scelto dalla fonte chiamante quando
     # questo è già risolvibile.
     try:
+        if not marca_nota:
+            raise LookupError("nessuna marca nota a versus")
         from . import modelcodes
         alias_completi = []
         for codice in testi:
