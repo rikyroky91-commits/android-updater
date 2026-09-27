@@ -1151,6 +1151,107 @@ def _ripiego_realme_ufficiale(*indizi: str | None) -> Scheda | None:
     return scheda
 
 
+# ======================================================================
+# HUAWEI: la pagina «specs» ufficiale italiana, per un solo modello
+# ======================================================================
+# Aggiunta il 27/09/2026: schede Huawei al 7% nel banco di prova. HUAWEI
+# pubblica una scheda con etichette chiare («Batteria», «Ricarica»,
+# «Fotocamera frontale»…) solo per i modelli venduti in Europa (Pura 80
+# Pro, Mate X6): i nova recenti e i modelli solo cinesi non ce l'hanno, e
+# lì il buco resta. Il processore NON si legge: nella pagina c'è anche il
+# menu con testi promozionali su altri chip («Kirin 990…»), e un chip
+# sbagliato è peggio di nessuno.
+FONTE_HUAWEI_LABEL = "specifiche ufficiali HUAWEI Italia"
+_HUAWEI_SPECS_URL = "https://consumer.huawei.com/it/phones/{slug}/specs/"
+_huawei_specs_cache: dict[str, tuple[float, Scheda | None]] = {}
+_huawei_specs_lock = threading.Lock()
+
+
+def _slug_huawei(nome: str) -> list[str]:
+    """«HUAWEI Pura 80 Pro» → [«pura80-pro», «pura-80-pro»]."""
+    parole = re.findall(r"[a-z0-9]+", (nome or "").lower())
+    if parole and parole[0] == "huawei":
+        parole = parole[1:]
+    if len(parole) < 2 and not (parole and re.search(r"\d", parole[0])):
+        return []
+    staccato = "-".join(parole)
+    unito = list(parole)
+    if len(unito) >= 2 and unito[1].isdigit():
+        unito[0:2] = [unito[0] + unito[1]]
+    return list(dict.fromkeys(["-".join(unito), staccato]))
+
+
+def _scheda_huawei_da_html(nome: str, pagina: str, url: str) -> Scheda | None:
+    titolo = re.search(r"<title>([^<]+)</title>", pagina or "", re.IGNORECASE)
+    chiave = _chiave_honor(re.sub(r"(?i)^huawei\s+", "", nome or ""))
+    if (not titolo or not chiave or "specifiche" not in titolo.group(1).lower()
+            or chiave not in _chiave_honor(html.unescape(titolo.group(1)))):
+        return None
+    testo = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " | ", pagina)))
+    testo = re.sub(r"(?:\|\s*)+", "| ", testo)
+
+    def campo(modello: str) -> re.Match | None:
+        return re.search(modello, testo, re.IGNORECASE)
+
+    batteria = campo(r"\| Batteria \| (\d{4,5})\s*mAh")
+    ricarica = campo(r"\| Ricarica \| [^|]*?max\s*(\d{2,3})\s*W")
+    front = campo(r"\| Fotocamera frontale \| [^|]*?(\d{1,3})\s*MP")
+    post = campo(r"\| Fotocamera posteriore \| [^|]*?(\d{2,3})\s*MP")
+    pollici = next((m for m in re.finditer(r"(\d[.,]\d{1,2})\s*pollici", testo)
+                    if 5.5 <= float(m.group(1).replace(",", ".")) <= 8.5), None)
+    peso = campo(r"\| Peso \| [^|]*?(\d{3}(?:[.,]\d)?)\s*g\b")
+    campi = {
+        "batteria": f"{batteria.group(1)} mAh" if batteria else None,
+        "ricarica": f"{ricarica.group(1)} W" if ricarica else None,
+        "camera_front": f"{front.group(1)} MP" if front else None,
+        "camera_post": f"{post.group(1)} MP" if post else None,
+        "display": f"{pollici.group(1)} pollici" if pollici else None,
+        "peso": f"{peso.group(1)} g" if peso else None,
+    }
+    if sum(1 for v in campi.values() if v) < 2:
+        return None
+    sezioni = {"Specifiche ufficiali HUAWEI": {
+        etichetta: valore for etichetta, valore in (
+            ("Display", campi["display"]), ("Batteria", campi["batteria"]),
+            ("Ricarica", campi["ricarica"]), ("Fotocamera principale", campi["camera_post"]),
+            ("Fotocamera anteriore", campi["camera_front"]), ("Peso", campi["peso"]),
+            ("Pagina prodotto", url),
+        ) if valore
+    }}
+    return Scheda(nome=nome, marca=C.HUAWEI, sezioni_json=_ripiega_sezioni(sezioni),
+                  fonte=FONTE_HUAWEI_LABEL, **campi)
+
+
+def _ripiego_huawei_ufficiale(*indizi: str | None) -> Scheda | None:
+    nome = next((str(i).strip() for i in indizi
+                 if i and str(i).strip().lower().startswith("huawei ")), None)
+    slugs = _slug_huawei(nome or "")
+    if not slugs or requests is None:
+        return None
+    ora = time.monotonic()
+    with _huawei_specs_lock:
+        cached = _huawei_specs_cache.get(slugs[0])
+        if cached and ora - cached[0] < _HONOR_SPECS_TTL:
+            return cached[1]
+    scheda = None
+    for slug in slugs:
+        url = _HUAWEI_SPECS_URL.format(slug=slug)
+        try:
+            risposta = requests.get(url, headers={"User-Agent": C.USER_AGENT},
+                                    timeout=C.SEARCH_HTTP_TIMEOUT)
+        except Exception:
+            continue
+        if getattr(risposta, "status_code", 0) == 200:
+            scheda = _scheda_huawei_da_html(nome, getattr(risposta, "text", "") or "", url)
+            if scheda:
+                break
+    with _huawei_specs_lock:
+        if len(_huawei_specs_cache) >= _HONOR_SPECS_CACHE_LIMIT:
+            _huawei_specs_cache.pop(next(iter(_huawei_specs_cache)))
+        _huawei_specs_cache[slugs[0]] = (ora, scheda)
+    return scheda
+
+
 def _ripiego_esterno(*indizi: str | None, marca: str | None = None) -> Scheda | None:
     """La scheda di un modello fuori dal mirror, da versus o HONOR ufficiale.
 
@@ -1250,7 +1351,8 @@ def _ripiego_esterno(*indizi: str | None, marca: str | None = None) -> Scheda | 
     except Exception:  # il ripiego non deve mai fermare una ricerca
         pass
     return (_ripiego_honor_ufficiale(*testi, marca=marca)
-            or _ripiego_realme_ufficiale(*testi))
+            or _ripiego_realme_ufficiale(*testi)
+            or _ripiego_huawei_ufficiale(*testi))
 
 
 def cerca(*indizi: str | None, marca: str | None = None) -> Scheda | None:

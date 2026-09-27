@@ -64,3 +64,28 @@ class TestPaginaRealme(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPaginaHuawei(unittest.TestCase):
+    """Etichette come sulla pagina vera del Pura 80 Pro (27/09/2026)."""
+
+    PAGINA = ('<title>HUAWEI Pura 80 Pro Specifiche tecniche - HUAWEI Italia</title>'
+              '<nav>Kirin 990, aprendo la nuova era del 5G</nav>'
+              '<div>Dimensioni: 6,8 pollici</div><div>Peso</div><div>Circa 219 g (compresa la batteria)</div>'
+              '<div>Fotocamera frontale</div><div>Fotocamera selfie da 13 MP (grandangolo, F2.4)</div>'
+              '<div>Batteria</div><div>5170 mAh (valore nominale)</div>'
+              '<div>Ricarica</div><div>HUAWEI SuperCharge (max 100 W)</div>')
+
+    def test_campi(self):
+        s = specs._scheda_huawei_da_html("HUAWEI Pura 80 Pro", self.PAGINA, "u")
+        self.assertEqual((s.display, s.batteria, s.ricarica, s.camera_front, s.peso),
+                         ("6,8 pollici", "5170 mAh", "100 W", "13 MP", "219 g"))
+        # Il chip del menu promozionale non entra mai.
+        self.assertIsNone(s.chipset)
+
+    def test_titolo_di_un_altro_modello(self):
+        self.assertIsNone(specs._scheda_huawei_da_html("HUAWEI Mate X6", self.PAGINA, "u"))
+
+    def test_slug(self):
+        self.assertEqual(specs._slug_huawei("HUAWEI Pura 80 Pro"), ["pura80-pro", "pura-80-pro"])
+        self.assertEqual(specs._slug_huawei("HUAWEI Mate X6"), ["mate-x6"])
