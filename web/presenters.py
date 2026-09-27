@@ -475,7 +475,8 @@ def scheda_tecnica(nome: str, codice: str = "", brand: str = "",
         "marca": marca,
         "codice": codice,
         "foto": foto,
-        "rilascio": scheda.rilascio if scheda else None,
+        "rilascio": rilascio_in_italiano(scheda.rilascio) if scheda else None,
+        "mai_in_vendita": bool(scheda and _MAI_IN_VENDITA.search(scheda.rilascio or "")),
         "cpu": chip.etichetta if chip else None,
         "cpu_nota": chip.nota if chip else None,
         "cpu_fonte": chip.fonte if chip else None,
@@ -607,6 +608,38 @@ def _riassunto_pulito(testo: str) -> str:
     testo = _CODA_RSS.sub("", str(testo or ""))
     testo = _TRONCAMENTO_FONTE.sub("", testo)
     return " ".join(testo.split())
+
+
+# GSMArena scrive in inglese lo stato dei modelli mai arrivati nei negozi.
+# Il caso reale (26/09/2026): SM-G990F, un Galaxy S21 4G che Samsung ha
+# cancellato nel 2021 — la pagina diceva «Uscito Not announced yet» e
+# «nessuna fonte firmware conosce il codice», che fa pensare a un buco del
+# sito invece che a un telefono mai esistito in vendita.
+_MAI_IN_VENDITA = re.compile(r"not announced|cancel+ed|rumou?red", re.IGNORECASE)
+
+
+def rilascio_in_italiano(testo: str | None) -> str | None:
+    if not testo:
+        return testo
+    basso = testo.lower()
+    if "cancel" in basso:
+        return "mai uscito: modello cancellato"
+    if "not announced" in basso or "rumor" in basso or "rumour" in basso:
+        return "mai uscito: mai annunciato ufficialmente"
+    testo = re.sub(r"^Released\s+", "", testo, flags=re.IGNORECASE)
+    testo = re.sub(r"^Exp\. release\s+", "previsto ", testo, flags=re.IGNORECASE)
+    # «2021, January 29» → «29 gennaio 2021»; «2024, March» → «marzo 2024».
+    def data(m: re.Match) -> str:
+        mese = _MESI_EN.get(m.group(2).lower())
+        if not mese:
+            return m.group(0)
+        return f"{m.group(3) + ' ' if m.group(3) else ''}{mese} {m.group(1)}"
+    return re.sub(r"(\d{4}),\s*([A-Za-z]+)(?:\s+(\d{1,2}))?", data, testo)
+
+
+_MESI_EN = dict(zip(
+    "january february march april may june july august september october november december".split(),
+    "gennaio febbraio marzo aprile maggio giugno luglio agosto settembre ottobre novembre dicembre".split()))
 
 
 def con_traduzione(voce: dict, traduzione: dict | None) -> dict:

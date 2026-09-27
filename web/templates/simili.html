@@ -22,7 +22,7 @@
     {% if v.solo_una_variante %}<br><span class="nota">Solo alcune varianti: {{ v.chip | replace("\n", " · ") }}. Controlla il codice del telefono.</span>{% endif %}
   </td>
   <td>
-    {% if v.android_archivio %}Android {{ v.android_archivio }} <span class="nota">archivio</span><br>{% endif %}
+    {% if v.android_archivio %}<strong>Android {{ v.android_archivio }}</strong> <span class="nota">attuale</span><br>{% endif %}
     {% if v.android_lancio %}<span class="tenue">Android {{ v.android_lancio }} al lancio</span>{% elif not v.android_archivio %}—{% endif %}
   </td>
   <td>

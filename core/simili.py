@@ -215,7 +215,8 @@ def trova(*, nome: str, chip: str | None, marca: str = "",
           in_parco: set[str] | None = None,
           candidati: list[dict] | None = None,
           massimo: int = 30,
-          altri_nomi: tuple[str, ...] = ()) -> dict:
+          altri_nomi: tuple[str, ...] = (),
+          riga_archivio=None) -> dict:
     """I telefoni simili a `nome`.
 
     `chip` è il testo del processore come la scheda lo mostra (anche con
@@ -268,6 +269,15 @@ def trova(*, nome: str, chip: str | None, marca: str = "",
             continue
         chiave = chiave_di(riga.get("marca", ""), nome_c) if chiave_di else ""
         in_archivio = archivio.get(chiave) if chiave else None
+        # PER CODICE, PRIMA CHE PER NOME. Il catalogo scrive «Samsung Galaxy
+        # Z Flip3 5G», l'archivio conosce «Galaxy Z Flip3» dalla fonte
+        # ufficiale: con la sola chiave del nome quasi nessun simile
+        # trovava il suo firmware in archivio, e la tabella ripiegava su
+        # «Android 11 al lancio» per tutti (segnalato il 26/09/2026).
+        if in_archivio is None and riga_archivio is not None:
+            in_archivio = riga_archivio(riga)
+            if in_archivio:
+                chiave = in_archivio.get("device_key") or chiave
         lancio_c = android_di_lancio(riga.get("os_lancio"))
         archivio_c = (in_archivio or {}).get("android_version")
         # STESSO SOFTWARE, confrontando dati dello stesso tipo e solo
@@ -295,6 +305,7 @@ def trova(*, nome: str, chip: str | None, marca: str = "",
             "rilascio": riga.get("rilascio") or "",
             "anno": anno_c,
             "os_lancio": riga.get("os_lancio") or "",
+            "codici": list(riga.get("codici") or ()),
             "chiave": chiave,
             "in_archivio": bool(in_archivio),
             "in_parco": bool(chiave and chiave in in_parco),

@@ -25,7 +25,7 @@
     {% elif scheda.rilascio %}
     {# L'UNICA COSA NUOVA di questa riga quando il nome non si ripete:
        la data di uscita, che il riquadro sopra non dice. #}
-    <p class="sottotitolo">Uscito {{ scheda.rilascio }}</p>
+    <p class="sottotitolo">{% if scheda.mai_in_vendita %}<strong>{{ scheda.rilascio | capitalize }}</strong>{% else %}Uscito {{ scheda.rilascio }}{% endif %}</p>
     {% endif %}
 
     {# IL PROCESSORE PER PRIMO, E NON SOLO NELL'ORDINE DELL'HTML. Nella

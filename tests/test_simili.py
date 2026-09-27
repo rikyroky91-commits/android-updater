@@ -242,3 +242,53 @@ class TestPaginaSimiliConLogin(_ConCandidati, _SitoConLogin):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSimiliTrovanoIlFirmwareInArchivio(unittest.TestCase):
+    """Segnalato il 26/09/2026: per il Galaxy S21 i simili mostravano solo
+    «Android 11 al lancio», perché il catalogo scrive «Samsung Galaxy S21
+    Ultra 5G» e l'archivio «Galaxy S21 Ultra»."""
+
+    def test_per_codice_e_per_nome(self):
+        from core import simili
+        from web.main import _nome_per_confronto
+
+        candidati = [
+            {"nome": "Samsung Galaxy S21 Ultra 5G", "marca": "Samsung", "chipset": "Exynos 2100 (5 nm)",
+             "codici": ["SM-G998B"], "os_lancio": "Android 11", "rilascio": "2021, January"},
+            {"nome": "Samsung Galaxy Z Flip3 5G", "marca": "Samsung", "chipset": "Snapdragon 888 (5 nm)",
+             "codici": [], "os_lancio": "Android 11", "rilascio": "2021, August"},
+        ]
+        archivio = {"k-ultra": {"device_key": "k-ultra", "android_version": 15},
+                    "k-flip": {"device_key": "k-flip", "android_version": 15}}
+
+        def riga_archivio(riga):
+            if "SM-G998B" in riga.get("codici", []):
+                return archivio["k-ultra"]
+            if _nome_per_confronto(riga["nome"]) == _nome_per_confronto("Galaxy Z Flip3"):
+                return archivio["k-flip"]
+            return None
+
+        esito = simili.trova(nome="Samsung Galaxy S21", chip="Exynos 2100 oppure Snapdragon 888",
+                             marca="Samsung", android_archivio=15, candidati=candidati,
+                             archivio={}, chiave_di=lambda m, n: "", riga_archivio=riga_archivio)
+        per_nome = {v["nome"]: v for v in esito["simili"]}
+        self.assertEqual(per_nome["Samsung Galaxy S21 Ultra 5G"]["android_archivio"], 15)
+        self.assertEqual(per_nome["Samsung Galaxy S21 Ultra 5G"]["stesso_software"], "archivio")
+        self.assertEqual(per_nome["Samsung Galaxy Z Flip3 5G"]["android_archivio"], 15)
+
+    def test_nome_per_confronto(self):
+        from web.main import _nome_per_confronto
+
+        self.assertEqual(_nome_per_confronto("Samsung Galaxy Z Flip3 5G"),
+                         _nome_per_confronto("Galaxy Z Flip3"))
+        self.assertEqual(_nome_per_confronto("Redmi Pads"), "redmi pads")
+
+
+class TestModelloMaiInVendita(unittest.TestCase):
+    def test_rilascio_in_italiano(self):
+        from web import presenters as P
+
+        self.assertEqual(P.rilascio_in_italiano("Cancelled"), "mai uscito: modello cancellato")
+        self.assertEqual(P.rilascio_in_italiano("Released 2021, January 29"), "29 gennaio 2021")
+        self.assertEqual(P.rilascio_in_italiano("Exp. release 2026, October"), "previsto ottobre 2026")

@@ -576,6 +576,105 @@ def _android_intero(valore) -> int | None:
         return None
 
 
+def _nome_per_confronto(nome: str) -> str:
+    """«Samsung Galaxy Z Flip3 5G» e «Galaxy Z Flip3» → la stessa chiave."""
+    chiave = modelcodes._normalize_name(nome or "")
+    chiave = re.sub(r"\b(?:samsung|google|apple|xiaomi|motorola|oneplus)\b", " ", chiave)
+    chiave = re.sub(r"\b(?:5g|4g|lte|dual sim|ds)\b", " ", chiave)
+    return " ".join(chiave.split())
+
+
+def _trova_in_archivio(archivio: dict[str, dict]):
+    """Una funzione riga-del-catalogo → riga dell'archivio, per codice e poi
+    per nome normalizzato. Vedi `core/simili.trova` per il perché."""
+    per_codice: dict[str, str] = {}
+    try:
+        conn = storage.connect()
+        for r in conn.execute("SELECT DISTINCT model_code, device_key FROM updates"
+                              " WHERE model_code IS NOT NULL AND model_code <> ''"
+                              " AND firmware_kind = 'current'"):
+            per_codice.setdefault(r["model_code"].upper(), r["device_key"])
+    except Exception:  # pragma: no cover - senza archivio si confronta per nome
+        pass
+    per_nome: dict[str, str] = {}
+    for chiave, riga in archivio.items():
+        nomi = [riga.get("model") or ""] + (riga.get("nomi_noti") or "").split(",")
+        for nome in nomi:
+            forma = _nome_per_confronto(nome)
+            if forma:
+                per_nome.setdefault(forma, chiave)
+
+    def trova(riga: dict) -> dict | None:
+        for codice in riga.get("codici") or ():
+            chiave = per_codice.get(str(codice).upper().split("/")[0].strip())
+            if chiave and chiave in archivio:
+                return archivio[chiave]
+        chiave = per_nome.get(_nome_per_confronto(riga.get("nome") or ""))
+        return archivio.get(chiave) if chiave else None
+
+    return trova
+
+
+_SIMILI_DA_CERCARE = 12
+_SIMILI_BUDGET_SECONDI = 9.0
+
+
+def _firmware_dei_simili(esito_simili: dict, android_rif: int | None) -> None:
+    """Il firmware attuale dei simili che l'archivio non conosce ancora.
+
+    Segnalato il 26/09/2026 con due screenshot: per il Galaxy S21 i simili
+    (S21 Ultra, S21+, S21 FE) mostravano solo «Android 11 al lancio»,
+    mentre le fonti ufficiali li danno su Android 15 e 16. L'abbinamento
+    per codice con l'archivio (`_trova_in_archivio`) ne recupera molti;
+    per quelli che restano si interrogano le fonti firmware come fa una
+    ricerca normale — in parallelo, al più dodici, dentro un tetto di
+    tempo — e si tiene solo una build CORRENTE, mai una versione di lancio
+    o riportata da una notizia.
+    """
+    from concurrent.futures import ThreadPoolExecutor, wait
+
+    voci = [v for v in esito_simili.get("simili", []) + esito_simili.get("altre_marche", [])
+            if not v.get("android_archivio")][:_SIMILI_DA_CERCARE]
+    if not voci:
+        return
+
+    def cerca(voce: dict) -> int | None:
+        tracce = [c for c in voce.get("codici") or [] if sources.looks_like_model_code(c)][:1]
+        tracce.append(voce["nome"])
+        for traccia in tracce:
+            try:
+                items, _nota = sources.lookup_model_structured(traccia)
+            except Exception:
+                continue
+            for item in items:
+                if (getattr(item, "firmware_kind", None) == C.FW_CURRENT
+                        and getattr(item, "android_version", None)):
+                    return int(item.android_version)
+        return None
+
+    pool = ThreadPoolExecutor(max_workers=6)
+    futuri = {pool.submit(cerca, v): v for v in voci}
+    fatti, _ = wait(futuri, timeout=_SIMILI_BUDGET_SECONDI)
+    pool.shutdown(wait=False, cancel_futures=True)
+    for futuro in fatti:
+        voce = futuri[futuro]
+        try:
+            android = futuro.result()
+        except Exception:
+            continue
+        if android:
+            voce["android_archivio"] = android
+            voce["android_da_fonte"] = True
+            if android_rif:
+                voce["stesso_software"] = "archivio" if android == android_rif else None
+    # Chi ora risulta con lo stesso Android attuale sale in cima, come
+    # farebbe se l'archivio lo avesse già conosciuto.
+    for chiave in ("simili", "altre_marche"):
+        esito_simili[chiave] = sorted(
+            esito_simili.get(chiave, []),
+            key=lambda v: (v.get("stesso_software") != "archivio", v.get("stesso_software") is None))
+
+
 def _simili_di(request: Request, esito: dict, solo_stesso_software: bool) -> dict:
     """Prepara `core.simili.trova` a partire da un risultato di ricerca."""
     from core import simili
@@ -587,6 +686,7 @@ def _simili_di(request: Request, esito: dict, solo_stesso_software: bool) -> dic
 
     archivio = {d["device_key"]: d for d in storage.get_devices()
                 if d.get("device_key")}
+    riga_archivio = _trova_in_archivio(archivio)
     chiave_rif = esito.get("chiave") or esito.get("chiave_parco") or ""
 
     # IL SOFTWARE DI PARTENZA, con la sua provenienza. Un Android appena
@@ -617,9 +717,10 @@ def _simili_di(request: Request, esito: dict, solo_stesso_software: bool) -> dic
         android_archivio=android_archivio,
         android_lancio=simili.android_di_lancio(os_lancio),
         rilascio=scheda.get("rilascio"),
-        archivio=archivio, chiave_di=extract.device_key,
+        archivio=archivio, chiave_di=extract.device_key, riga_archivio=riga_archivio,
         in_parco=storage.watched_keys() if loggato else set(),
     )
+    _firmware_dei_simili(esito_simili, android_archivio)
     if solo_stesso_software:
         esito_simili["simili"] = [v for v in esito_simili["simili"] if v["stesso_software"]]
         esito_simili["altre_marche"] = [v for v in esito_simili["altre_marche"]

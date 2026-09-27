@@ -18,6 +18,13 @@
   <p>Il modello è riconosciuto, ma nessuna fonte ne pubblica la versione
      firmware attuale.</p>
   <p class="nota">{{ risultato.fonte }}</p>
+{% elif risultato.scheda and risultato.scheda.mai_in_vendita %}
+  {# UN TELEFONO MAI ARRIVATO NEI NEGOZI non ha firmware da cercare: dirlo
+     è la risposta, non un buco delle fonti (SM-G990F, 26/09/2026). #}
+  <p><strong>Questo modello non è mai stato messo in vendita</strong>
+     ({{ risultato.scheda.rilascio }}): non esiste un firmware da cercare.
+     Controlla il codice sull'etichetta del telefono: probabilmente è una
+     variante vicina.</p>
 {% elif risultato.nome and risultato.nome != risultato.query %}
   {# STESSA ONESTÀ, UN GRADINO PIÙ INDIETRO. Qui non è nemmeno una
      fonte firmware a riconoscere il modello: è la scheda tecnica (foto,
