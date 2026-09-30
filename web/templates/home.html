@@ -53,4 +53,47 @@
 </section>
 {% endblock %}
 
+{% block classe_body %}con-ultimora{% endblock %}
+
 {% block corpo %}{% endblock %}
+
+{% block fuori %}
+{# L'ULTIM'ORA, COME IN UN TELEGIORNALE ALL-NEWS (30/09/2026, su richiesta).
+   Le stesse novità della pagina Novità, in una striscia che scorre di
+   lato in fondo alla home; il filo rosso sopra è il ring dei due
+   lottatori disegnati da `static/ring.js`. Le voci sono scritte due
+   volte di fila perché lo scorrimento torni al punto di partenza senza
+   uno stacco: la seconda copia è nascosta ai lettori di schermo e fuori
+   dal giro del tasto Tab, così non si legge tutto due volte. #}
+<div class="ultimora" data-ultimora>
+  <canvas class="ultimora-ring" data-ring aria-hidden="true"></canvas>
+  <div class="ultimora-barra">
+    <span class="ultimora-ora" data-orologio aria-hidden="true">--:--</span>
+    <a class="ultimora-etichetta" href="/novita" title="Tutte le novità">Ultim'ora</a>
+    <div class="ultimora-nastro" role="region" aria-label="Ultime notizie di aggiornamento">
+      {% if ticker %}
+      <ul class="ultimora-scorre" data-scorre style="--durata: {{ [ticker | length * 7, 40] | max }}s">
+        {% for copia in [false, true] %}
+        {% for n in ticker %}
+        <li class="ultimora-voce"{% if copia %} aria-hidden="true"{% endif %}>
+          <span class="distintivo" data-lettera="{{ n.lettera }}" aria-hidden="true">{{ n.lettera }}</span>
+          <a class="ultimora-modello" href="{{ n.cerca }}"{% if copia %} tabindex="-1"{% endif %}>{{ n.modello }}</a>
+          {% if n.codice %}<code>{{ n.codice }}</code>{% endif %}
+          {% if n.verificato %}<span class="ultimora-verificato" title="Firmware verificato">✓</span>{% endif %}
+          {% if n.link %}<a class="ultimora-titolo" href="{{ n.link }}" target="_blank" rel="noopener noreferrer"{% if copia %} tabindex="-1"{% endif %}>{{ n.titolo }}</a>
+          {% else %}<span class="ultimora-titolo">{{ n.titolo }}</span>{% endif %}
+          {% if n.versione %}<span class="ultimora-quando">{{ n.versione }}</span>{% endif %}
+          {% if n.relativo %}<span class="ultimora-quando">· {{ n.relativo }}</span>{% endif %}
+        </li>
+        {% endfor %}
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="ultimora-vuota">Nessuna novità in archivio per ora: la prossima scansione riempie questa striscia.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}<script src="/static/ring.js" defer></script>{% endblock %}

@@ -1,22 +1,18 @@
-{# Il confronto fra i database TAC, e la correzione manuale: dettagli di
-   una ricerca per IMEI, non l'identità del telefono. Prima stavano in un
-   riquadro proprio, in cima alla pagina, ripetendo nome e codice che il
-   risultato appena sotto diceva già — qui restano disponibili ma non
-   competono più con la risposta per l'attenzione di chi guarda. #}
-<details class="completa">
-  <summary>Confronto fra le fonti IMEI{% if imei.voci %} ({{ imei.voci | length }}){% endif %}</summary>
+{# IL CONFRONTO FRA LE FONTI IMEI, SEMPRE APERTO (30/09/2026, su richiesta).
 
-  {% if not imei.riconosciuto %}
-  {# NON È UN GUASTO, È UN BUCO DI COPERTURA. Sono due cose che si vivono
-     allo stesso modo ma si risolvono in modi opposti, e dirlo evita di
-     cercare un difetto che non c'è. #}
-  <p>Il TAC <code>{{ imei.tac }}</code> non è in nessuno dei database
-     consultati ({{ imei.stato_database }}).</p>
-  <p class="nota">I database gratuiti hanno buchi diversi fra loro e
-    nessuno è completo — misurato: aggiungerne un terzo ha portato lo 0,3%
-    di codici in più. Controlla su uno dei siti qui sotto, poi cerca
-    direttamente il nome del modello.</p>
-  {% endif %}
+   Prima stava in fondo alla pagina, dentro un `<details>` chiuso: chi
+   aveva appena cercato un IMEI vedeva i link ai siti esterni e doveva
+   scendere di tre riquadri e aprirne uno per sapere cosa dicevano i
+   NOSTRI database. Ora sta subito sotto quei link, aperto: sono le due
+   metà della stessa verifica («cosa dicono gli altri» e «cosa diciamo
+   noi»), e vanno lette una accanto all'altra.
+
+   Resta chiusa solo la correzione manuale su un TAC già riconosciuto:
+   è un'azione rara e non deve competere col risultato. Per un TAC
+   sconosciuto il modulo sta in chiaro, subito dopo (vedi
+   `_imei_identita.html`). #}
+<section class="imei-confronto" aria-labelledby="imei-confronto-titolo">
+  <h4 id="imei-confronto-titolo" class="imei-confronto-titolo">Confronto fra le fonti IMEI{% if imei.voci %} <span class="tenue">({{ imei.voci | length }})</span>{% endif %}</h4>
 
   {% if imei.discordi %}
   <p class="avviso">Le fonti <strong>non concordano</strong> su questo TAC. Non è
@@ -25,36 +21,37 @@
   {% endif %}
 
   {% if imei.voci %}
+  <div class="tabella-scorre">
   <table class="tabella minuta">
-    <thead><tr><th>Fonte</th><th>Marca</th><th>Modello</th><th>Codice</th><th>Anno</th></tr></thead>
+    <thead><tr><th>Fonte</th><th>Marca</th><th>Modello</th><th>Codice modello</th><th>Anno</th></tr></thead>
     <tbody>
       {% for v in imei.voci %}
       <tr>
         <td class="tenue">{{ v.fonte }}</td>
         <td>{{ v.marca }}</td>
         <td>{{ v.modello }}</td>
-        <td>{% if v.codice %}<code>{{ v.codice }}</code>{% else %}—{% endif %}</td>
+        <td>{% if v.codice %}<code>{{ v.codice }}</code>{% else %}<span class="tenue" title="Questa fonte non riporta il codice modello">non dichiarato</span>{% endif %}</td>
         <td class="tenue">{{ v.anno or "—" }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
   <p class="nota">La prima riga è la risposta che l'app usa: l'ordine è la
     precedenza, non la fortuna.</p>
   {% else %}
+  {# NON È UN GUASTO, È UN BUCO DI COPERTURA. #}
   <p class="vuoto">Nessuna delle basi dati locali conosce il TAC
-    <code>{{ imei.tac or "—" }}</code>.</p>
+    <code>{{ imei.tac or "—" }}</code>{% if imei.stato_database %} ({{ imei.stato_database }}){% endif %}.
+    I database gratuiti hanno buchi diversi fra loro e nessuno è completo.</p>
   {% endif %}
 
-  {# I 4 link ai siti di verifica non stanno più qui: sono sempre visibili
-     in `_imei_identita.html`, subito sotto il riquadro del risultato — non
-     dentro questo `<details>` che si apre solo a bisogno. #}
-  {# LA COPIA IN CHIARO STA SOTTO IL RISULTATO, non qui, quando il TAC è
-     sconosciuto: vedi `_imei_salva_modello.html`. Qui resta il caso in
-     cui una risposta c'è già e va corretta. #}
   {% if imei.riconosciuto %}
-  {% with introduzione = "Correggi tu il modello per questo TAC." %}
-  {% include "_imei_salva_modello.html" %}
-  {% endwith %}
+  <details class="completa imei-correggi">
+    <summary>Il modello è sbagliato? Correggilo</summary>
+    {% with introduzione = "Correggi tu il modello per questo TAC." %}
+    {% include "_imei_salva_modello.html" %}
+    {% endwith %}
+  </details>
   {% endif %}
-</details>
+</section>

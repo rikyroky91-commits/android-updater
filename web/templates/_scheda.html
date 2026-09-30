@@ -19,7 +19,7 @@
     {% if not senza_intestazione %}
     <h2>{{ scheda.titolo }}</h2>
     <p class="sottotitolo">
-      {{ scheda.marca }}{% if scheda.codice %} · <code>{{ scheda.codice }}</code>{% endif %}
+      {{ scheda.marca }}{% if scheda.codice %} · codice modello <code>{{ scheda.codice }}</code>{% else %} · <span class="tenue">codice modello non dichiarato</span>{% endif %}
       {%- if scheda.rilascio %} · uscito {{ scheda.rilascio }}{% endif %}
     </p>
     {% elif scheda.rilascio %}

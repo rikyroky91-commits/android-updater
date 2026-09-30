@@ -294,7 +294,8 @@
 {% with scheda = risultato.scheda %}{% include "_scheda_completa.html" %}{% endwith %}
 {% endif %}
 
-{% if imei %}{% include "_imei_confronto.html" %}{% endif %}
+{# Il confronto fra le fonti IMEI sta in cima, sotto i link ai siti di
+   verifica: vedi `_imei_identita.html` (30/09/2026). #}
 
 {# GLI AGGIORNAMENTI DI QUESTO MODELLO, se il telefono è già in archivio.
    È la seconda metà della domanda: «che telefono è» la risponde la

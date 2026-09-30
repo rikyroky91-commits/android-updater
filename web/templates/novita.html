@@ -63,7 +63,7 @@
         <span class="distintivo" data-lettera="{{ v.lettera }}" aria-hidden="true">{{ v.lettera }}</span>
         <div class="feed-corpo">
           <p class="feed-testa">
-            {% if v.modello %}<a class="feed-modello" href="/?q={{ v.modello | urlencode }}">{{ v.modello }}</a>
+            {% if v.modello %}<a class="feed-modello" href="/?q={{ v.modello | urlencode }}">{{ v.modello }}</a>{% if v.codice %} <code class="codice-mini">{{ v.codice }}</code>{% endif %}
             {% elif v.marca_corta %}<span class="feed-modello tenue">{{ v.marca_corta }}</span>{% endif %}
             {% if v.verificato %}<span class="feed-tag verificato">✓ firmware verificato</span>
             {% elif v.severita %}<span class="feed-tag" style="--tinta: {{ v.colore }}">{{ v.severita }}</span>{% endif %}

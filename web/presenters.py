@@ -97,6 +97,7 @@ def riga_dispositivo(device: dict, in_parco: bool = False) -> dict:
         "chiave": device.get("device_key", ""),
         "brand": device.get("brand", ""),
         "modello": device.get("model", ""),
+        "codice": device.get("model_code") or "",
         "cpu": chip.etichetta if chip else None,
         "cpu_nota": chip.nota if chip else None,
         "sistema": (f"Android {device['android_version']}"
@@ -720,6 +721,7 @@ def voce_feed(item: dict) -> dict:
         # rendeva la pagina difficile da leggere.
         "riassunto_di_servizio": ripiego,
         "modello": item.get("device_model") or "",
+        "codice": item.get("model_code") or "",
         "brand": item.get("brand", ""),
         "versione": versione,
         "quando": data_voce(item),

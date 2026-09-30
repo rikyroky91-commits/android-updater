@@ -43,7 +43,8 @@
     {% for r in righe %}
     <tr>
       <td class="tenue">{{ r.brand }}</td>
-      <td><a href="/dispositivo?k={{ r.chiave | urlencode }}">{{ r.modello }}</a></td>
+      <td><a href="/dispositivo?k={{ r.chiave | urlencode }}">{{ r.modello }}</a>
+        <span class="codice-mini">{% if r.codice %}<code>{{ r.codice }}</code>{% else %}<span class="tenue">codice n.d.</span>{% endif %}</span></td>
       <td>
         {% if r.puo_segnare_test %}
         <form method="post" action="/parco/segna-test" class="data-test-form">

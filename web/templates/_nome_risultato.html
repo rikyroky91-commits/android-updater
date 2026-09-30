@@ -1,3 +1,22 @@
 <header data-nome-risultato>
   <h2>{{ risultato.nome or risultato.query }}{% if risultato.rete and not risultato.rete.nel_nome %} <span class="pastiglia-rete">{{ risultato.rete.sigla }}</span>{% endif %}</h2>
+  {# IL CODICE MODELLO SOTTO IL NOME, SEMPRE (30/09/2026): vedi
+     `_codici_da_mostrare` in web/main.py. Quando nessuna fonte ne dichiara
+     uno lo si dice, invece di lasciare il nome commerciale da solo. #}
+  {% if risultato.mostra_codice %}
+  <p class="codice-modello" data-codice-modello>
+    <span class="etichetta">Codice modello</span>
+    {% if risultato.codici_modello %}
+    <code class="codice-principale">{{ risultato.codici_modello[0] }}</code>
+    {%- if risultato.codice_dal_nome %} <span class="tenue">dal catalogo per questo nome</span>{% endif %}
+    {% if risultato.altri_codici %}
+    <span class="altri-codici"><span class="tenue">· altre varianti:</span>
+      {% for c in risultato.altri_codici %}<a href="/?q={{ c | urlencode }}"><code>{{ c }}</code></a>{% endfor %}
+      {%- if risultato.altri_codici_in_piu %} <span class="tenue">e altre {{ risultato.altri_codici_in_piu }}</span>{% endif %}</span>
+    {% endif %}
+    {% else %}
+    <span class="tenue">non dichiarato dalle fonti consultate — leggilo in Impostazioni › Info sul telefono</span>
+    {% endif %}
+  </p>
+  {% endif %}
 </header>

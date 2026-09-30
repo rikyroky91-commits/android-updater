@@ -55,6 +55,17 @@
   --superficie: rgba(32, 30, 29, 0.045);
   --ombra:    0 2px 12px rgba(32, 30, 29, .10);
   --colonna:  1180px;
+  /* Testo sopra un fondo colorato (i tasti verdi e indaco): bianco in
+     tutti e due i temi. Prima era `var(--carta)`, che col tema scuro
+     diventava scuro su scuro. */
+  --su-tinta:  #ffffff;
+  --su-verde:  #ffffff;
+  --fondo-firmware: #f3f7f5;
+  --bordo-firmware: #d7e3dd;
+  --testo-nota:     #514f4e;
+  --fondo-avviso:   #fff8e9;
+  --anello:   rgba(32, 30, 29, .12);
+  color-scheme: light;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -197,7 +208,7 @@ a { color: inherit; }
   transition: box-shadow .18s ease;
 }
 .ricerca input:focus {
-  outline: none; box-shadow: 0 0 0 4px rgba(32, 30, 29, .12);
+  outline: none; box-shadow: 0 0 0 4px var(--anello);
 }
 /* I DUE TASTI, PIÙ PICCOLI E DISTINGUIBILI A COLPO D'OCCHIO.
    Erano due pastiglie grosse quasi uguali, una piena e una vuota, che
@@ -213,7 +224,7 @@ a { color: inherit; }
    colori diversi. Si vede solo guardando la pagina. */
 .ricerca button[type="submit"] {
   font: inherit; font-weight: 600; font-size: .9rem;
-  color: var(--carta); letter-spacing: .01em;
+  color: var(--su-tinta); letter-spacing: .01em;
   padding: .5rem 1.15rem; line-height: 1.35;
   background: var(--cerca); border: 1px solid var(--cerca);
   border-radius: 8px; cursor: pointer; white-space: nowrap;
@@ -359,7 +370,7 @@ a { color: inherit; }
 .esito.trovato { border-left-color: var(--filo); }
 .esito { border-left-color: var(--filo); }
 .firmware-risultato, .firmware-in-arrivo {
-  background: #f3f7f5; border: 1px solid #d7e3dd; border-radius: 12px;
+  background: var(--fondo-firmware); border: 1px solid var(--bordo-firmware); border-radius: 12px;
   padding: 1rem 1.2rem; margin-bottom: 1rem;
 }
 /* Un firmware VERIFICATO (build corrente da una fonte strutturata) ha il
@@ -372,8 +383,8 @@ a { color: inherit; }
 .firmware-risultato .firmware-versione { font-size: clamp(1.1rem, 2vw, 1.4rem); font-weight: 600; line-height: 1.4; }
 .firmware-dettagli { margin: .6rem 0; line-height: 1.6; overflow-wrap: anywhere; }
 .esito .nota { font-size: .9rem; line-height: 1.55; }
-.esito .scheda .nota, .esito .sottotitolo, .firmware-risultato .nota { font-size: .95rem; color: #514f4e; line-height: 1.6; }
-.imei-avviso { background: #fff8e9; border-left: 3px solid #a66b10; padding: .7rem 1rem; margin: 1rem 0; border-radius: 6px; }
+.esito .scheda .nota, .esito .sottotitolo, .firmware-risultato .nota { font-size: .95rem; color: var(--testo-nota); line-height: 1.6; }
+.imei-avviso { background: var(--fondo-avviso); border-left: 3px solid #a66b10; padding: .7rem 1rem; margin: 1rem 0; border-radius: 6px; }
 .imei-avviso > p { margin: 0 0 .5rem; }
 .imei-avviso summary { cursor: pointer; font-size: .9rem; }
 .esito .proposta, .esito button.secondario { border-radius: 7px; padding: .5rem .75rem; }
@@ -496,7 +507,7 @@ a { color: inherit; }
 .correzione-form input[type="text"] { flex: 1 1 220px; min-width: 160px; }
 .correzione-form button[type="submit"] {
   font: inherit; font-weight: 600; font-size: .85rem;
-  color: var(--carta); padding: .4rem .9rem;
+  color: var(--su-tinta); padding: .4rem .9rem;
   background: var(--ai); border: 1px solid var(--ai);
   border-radius: 6px; cursor: pointer;
 }
@@ -516,7 +527,7 @@ a { color: inherit; }
 }
 .modulo-account button[type="submit"] {
   font: inherit; font-weight: 600; font-size: .88rem;
-  color: var(--carta); padding: .55rem 1rem;
+  color: var(--su-tinta); padding: .55rem 1rem;
   background: var(--ai); border: 1px solid var(--ai);
   border-radius: 6px; cursor: pointer; margin-top: .2rem;
 }
@@ -762,7 +773,7 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
   font: inherit; font-weight: 700; font-size: .9rem;
   letter-spacing: .04em; line-height: 1.35;
   padding: .5rem .9rem; cursor: pointer; white-space: nowrap;
-  background: var(--ai); color: var(--carta);
+  background: var(--ai); color: var(--su-tinta);
   border: 1px solid var(--ai); border-radius: 8px;
   transition: background .15s ease, border-color .15s ease;
 }
@@ -844,7 +855,7 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
   transition: box-shadow .18s ease;
 }
 .confronto-form input:focus {
-  outline: none; box-shadow: 0 0 0 4px rgba(32, 30, 29, .12);
+  outline: none; box-shadow: 0 0 0 4px var(--anello);
 }
 .confronto-contro {
   font-size: .74rem; font-weight: 700; text-transform: uppercase;
@@ -852,7 +863,7 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
 }
 .confronto-form button[type="submit"] {
   font: inherit; font-weight: 600; font-size: .9rem;
-  color: var(--carta); letter-spacing: .01em;
+  color: var(--su-tinta); letter-spacing: .01em;
   padding: .55rem 1.2rem;
   background: var(--cerca); border: 1px solid var(--cerca);
   border-radius: 8px; cursor: pointer; white-space: nowrap;
@@ -1187,7 +1198,7 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
   transition: border-color .15s, background .15s;
 }
 .pillola:hover { border-color: var(--verde); color: var(--verde); }
-.pillola.attiva { background: var(--verde); border-color: var(--verde); color: #fff; }
+.pillola.attiva { background: var(--verde); border-color: var(--verde); color: var(--su-verde); }
 .pillola.grande { font-size: .9rem; padding: .55rem 1.2rem; }
 .pillole.periodo .pillola { font-size: .75rem; padding: .22rem .65rem; }
 
@@ -1290,3 +1301,185 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
   flex: 0 0 auto; min-width: 0; width: auto; padding: 0; margin: 0;
   border: 0; border-radius: 0; box-shadow: none;
 }
+
+/* ======================================================================
+   TEMA SCURO (30/09/2026, su richiesta)
+   ======================================================================
+   Si cambia dal tasto sole/luna nella testata, in qualunque momento; la
+   scelta resta per le visite successive (vedi `static/tema.js`). Senza
+   una scelta salvata vale quella del sistema operativo.
+
+   Solo i gettoni cambiano: tutto il foglio legge colori da variabili, e
+   i pochi valori scritti a mano sono diventati gettoni anche loro (vedi
+   `--fondo-firmware`, `--su-tinta`). Le severità tengono la loro tinta:
+   è il segnale che si legge per primo, e non deve cambiare col tema. */
+:root[data-tema="scuro"] {
+  --ink:      #ebe9e6;
+  --paper:    #121211;
+  --carta:    #1c1b1a;
+  --accent:   #ff5a3c;
+  --accent-scuro: #ff7d63;
+  --neutral:  #a6a29e;
+  --verde:        #46c291;
+  --verde-tenue:  rgba(70, 194, 145, .16);
+  --su-verde:     #0d1f17;
+  --ai:           #6e6be0;
+  --ai-scuro:     #8986ee;
+  --differenza:       #e2a83f;
+  --differenza-tenue: rgba(226, 168, 63, .13);
+  --filo:     rgba(235, 233, 230, .14);
+  --regola:   rgba(235, 233, 230, .72);
+  --superficie: rgba(235, 233, 230, .06);
+  --ombra:    0 2px 14px rgba(0, 0, 0, .45);
+  --fondo-firmware: #17231e;
+  --bordo-firmware: #2a3d34;
+  --testo-nota:     #b9b5b0;
+  --fondo-avviso:   #2a2213;
+  --anello:   rgba(235, 233, 230, .16);
+  color-scheme: dark;
+}
+:root[data-tema="scuro"] #rete { opacity: .38; }
+:root[data-tema="scuro"] img { filter: brightness(.94); }
+/* I tasti indaco sul fondo scuro: stessa tinta un gradino più profonda,
+   perché il bianco sopra resti leggibile. */
+:root[data-tema="scuro"] .tasto-ai,
+:root[data-tema="scuro"] .correzione-form button[type="submit"],
+:root[data-tema="scuro"] .modulo-account button[type="submit"] { background: #4f4cc2; border-color: #4f4cc2; }
+:root[data-tema="scuro"] .tag-accent { background: rgba(255, 90, 60, .16); }
+:root[data-tema="scuro"] .interpretato { background: rgba(110, 107, 224, .12); }
+
+/* Il passaggio fra i due temi è una dissolvenza breve, non uno scatto —
+   ma solo DOPO il primo disegno (la classe la mette `tema.js`), sennò
+   ogni pagina si aprirebbe con una dissolvenza dal bianco. */
+:root.tema-in-transizione body,
+:root.tema-in-transizione .testata,
+:root.tema-in-transizione .esito,
+:root.tema-in-transizione .scheda { transition: background-color .25s ease, color .25s ease; }
+
+.tema-tasto {
+  display: inline-grid; place-items: center;
+  width: 34px; height: 34px; padding: 0; flex: none;
+  border: 1px solid var(--filo); border-radius: 999px;
+  background: var(--carta); color: var(--ink); cursor: pointer;
+  transition: border-color .15s ease, color .15s ease;
+}
+.tema-tasto:hover { border-color: var(--verde); color: var(--verde); }
+.tema-tasto svg { width: 17px; height: 17px; }
+.tema-tasto .icona-luna { display: none; }
+:root[data-tema="scuro"] .tema-tasto .icona-sole { display: none; }
+:root[data-tema="scuro"] .tema-tasto .icona-luna { display: block; }
+
+/* ======================================================================
+   CODICE MODELLO ACCANTO AL NOME (30/09/2026)
+   ====================================================================== */
+.codice-modello {
+  margin: .1rem 0 .4rem; font-size: .9rem;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .5rem;
+}
+.codice-modello .etichetta {
+  font-size: .68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--neutral);
+}
+.codice-modello .codice-principale {
+  font-size: 1rem; font-weight: 700; padding: .12rem .45rem;
+  border: 1.5px solid var(--regola); background: var(--carta);
+}
+.altri-codici { display: inline-flex; flex-wrap: wrap; gap: .25rem; align-items: baseline; }
+.altri-codici a { text-decoration: none; }
+.altri-codici a:hover code { border-color: var(--verde); color: var(--verde); }
+.codice-mini { display: block; font-size: .76rem; margin-top: .1rem; }
+code.codice-mini { display: inline; }
+
+/* ======================================================================
+   CONFRONTO FRA LE FONTI IMEI, APERTO (30/09/2026)
+   ====================================================================== */
+.imei-confronto {
+  margin: .9rem 0 1rem; padding: .8rem 1rem;
+  border: 1px solid var(--filo); border-radius: 10px; background: var(--superficie);
+}
+.imei-confronto-titolo { margin: 0 0 .5rem; font-size: .95rem; }
+.imei-confronto .tabella { margin: 0; background: transparent; }
+.tabella-scorre { overflow-x: auto; }
+.imei-correggi { margin-top: .6rem; }
+
+/* ======================================================================
+   L'ULTIM'ORA IN FONDO ALLA HOME, CON IL RING (30/09/2026, su richiesta)
+   ======================================================================
+   Come la striscia di un telegiornale all-news: un'etichetta rossa ferma,
+   l'orologio, e le notizie che scorrono di lato. Il filo rosso sopra la
+   striscia fa da pavimento al ring dove i due lottatori (vedi
+   `static/ring.js`) si picchiano senza sosta. Il canvas non intercetta
+   i clic: si può sempre cliccare quello che c'è sotto. */
+body.con-ultimora { padding-bottom: 10.5rem; }
+.ultimora {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  pointer-events: none;
+}
+.ultimora-ring {
+  display: block; width: 100%; height: 118px; pointer-events: none;
+}
+.ultimora-barra {
+  pointer-events: auto;
+  display: flex; align-items: stretch; height: 44px;
+  border-top: 3px solid var(--accent);
+  background: #ffffff; color: #141414;
+  box-shadow: 0 -2px 14px rgba(0, 0, 0, .12);
+  font-family: "Archivo", sans-serif;
+}
+:root[data-tema="scuro"] .ultimora-barra { background: #1b1a19; color: #f1efec; }
+.ultimora-ora {
+  flex: none; display: grid; place-items: center; padding: 0 .8rem;
+  background: #141414; color: #fff; font-weight: 700; font-size: .95rem;
+  font-variant-numeric: tabular-nums; letter-spacing: .02em;
+}
+.ultimora-etichetta {
+  flex: none; display: grid; place-items: center; padding: 0 1rem;
+  background: var(--accent); color: #fff; text-decoration: none;
+  font-weight: 800; font-size: .92rem; letter-spacing: .03em; text-transform: uppercase;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  padding-right: 1.4rem;
+}
+.ultimora-etichetta:hover { background: #c9240b; }
+.ultimora-nastro {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; position: relative;
+  mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+}
+.ultimora-scorre {
+  display: flex; width: max-content; height: 100%; margin: 0; padding: 0;
+  list-style: none; align-items: center;
+  animation: ultimora-scorri var(--durata, 90s) linear infinite;
+}
+.ultimora-nastro:hover .ultimora-scorre,
+.ultimora-nastro:focus-within .ultimora-scorre { animation-play-state: paused; }
+@keyframes ultimora-scorri { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.ultimora-voce {
+  display: inline-flex; align-items: center; gap: .5rem;
+  white-space: nowrap; padding: 0 1.1rem 0 0; font-size: .95rem;
+}
+.ultimora-voce::after {
+  content: ""; width: 7px; height: 7px; background: var(--accent);
+  margin-left: 1.1rem; flex: none;
+}
+.ultimora-voce a { color: inherit; text-decoration: none; }
+.ultimora-voce a:hover { text-decoration: underline; }
+.ultimora-modello { font-weight: 800; text-transform: uppercase; letter-spacing: .01em; }
+.ultimora-voce code { font-size: .78rem; padding: .02rem .3rem; }
+.ultimora-titolo { font-weight: 600; text-transform: uppercase; }
+.ultimora-quando { font-size: .8rem; opacity: .65; }
+.ultimora-verificato { color: var(--verde); font-weight: 800; }
+.ultimora-voce .distintivo { width: 22px; height: 22px; font-size: .72rem; border-radius: 4px; }
+.ultimora-vuota { padding: 0 1rem; align-self: center; font-weight: 600; }
+
+@media (max-width: 640px) {
+  body.con-ultimora { padding-bottom: 8rem; }
+  .ultimora-ring { height: 92px; }
+  .ultimora-barra { height: 40px; }
+  .ultimora-ora { display: none; }
+  .ultimora-etichetta { padding: 0 1rem 0 .7rem; font-size: .8rem; }
+  .ultimora-voce { font-size: .86rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ultimora-scorre { animation: none; }
+  .ultimora-nastro { overflow-x: auto; mask-image: none; }
+}
+@media print { .ultimora { display: none; } }

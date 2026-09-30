@@ -381,6 +381,49 @@ def radice_head():
     return Response(status_code=200)
 
 
+_TICKER_VOCI = 24
+
+
+def _notizie_ticker() -> list[dict]:
+    """Le novità che scorrono in fondo alla home, come l'«ultim'ora» di un
+    telegiornale (30/09/2026, su richiesta).
+
+    STESSE REGOLE DELLA PAGINA NOVITÀ, IN PICCOLO: solo voci rilevanti che
+    nominano un telefono (un articolo sul changelog di un browser non è
+    una novità su un modello), titolo tradotto dove c'è, e il firmware
+    verificato distinto dall'articolo. Prima gli ultimi 14 giorni; se
+    l'archivio è fermo da più tempo si prendono comunque le ultime voci,
+    perché una striscia vuota sembra un guasto, non una settimana calma.
+
+    Il codice modello viaggia con il nome anche qui: è quello che dice
+    QUALE variante ha ricevuto l'aggiornamento.
+    """
+    try:
+        grezze = storage.get_updates(only_relevant=True, since_days=14, limit=80)
+        if len(grezze) < 6:
+            grezze = storage.get_updates(only_relevant=True, limit=80)
+    except Exception:  # la home non deve cadere per una striscia decorativa
+        return []
+    grezze = [v for v in grezze if (v.get("device_model") or "").strip()][:_TICKER_VOCI]
+    tradotte = traduzioni.mappa([v.get("id") for v in grezze])
+    voci = []
+    for grezza in grezze:
+        voce = P.con_traduzione(P.voce_feed(grezza), tradotte.get(grezza.get("id")))
+        etichetta, lettera = _MARCHE_CORTE.get(grezza.get("brand"), ("", "•"))
+        voci.append({
+            "modello": voce["modello"],
+            "codice": voce.get("codice") or "",
+            "titolo": truncate(voce.get("titolo") or "", 140),
+            "versione": voce.get("versione") or "",
+            "link": voce.get("link") or "",
+            "cerca": "/?q=" + quote(voce.get("codice") or voce["modello"]),
+            "lettera": lettera,
+            "verificato": grezza.get("firmware_kind") == C.FW_CURRENT,
+            "relativo": fmt_relative(grezza.get("published") or grezza.get("first_seen")),
+        })
+    return voci
+
+
 @app.get("/", response_class=HTMLResponse)
 def pagina_ricerca(request: Request, q: str = Query(default=""),
                     ai: str = Query(default=""),
@@ -408,6 +451,7 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
         return _rendi(request, "home.html", _contesto(
             request, attiva="cerca", query="", stats=stats,
             archivio_vuoto=not stats.get("devices"),
+            ticker=_notizie_ticker(),
         ))
 
     # L'IMEI PRIMA DI TUTTO. Un numero di quattordici, quindici o sedici
@@ -464,6 +508,7 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
         ) if x)
         verifica = aiquery.verifica(risultato.get("nome") or domanda, contesto)
 
+    risultato = _codici_da_mostrare(risultato, imei)
     return _rendi(request, "ricerca.html", _contesto(
         request, attiva="cerca", query=q, stats=stats,
         risultato=risultato, imei=imei, verifica_ai=verifica,
@@ -482,6 +527,112 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
         interpretato_perche=perche.strip() or risultato.get("ai_perche", ""),
         alternative=[a for a in alt if a and a != q][:3],
     ))
+
+
+_RE_CIFRA = re.compile(r"\d")
+_RE_MERCATO_IN_CODA = re.compile(
+    r"(?:\s+\(?(?:EEA|EU|Global|India|China|CN|Indonesia|Russia|RU|Turkey|TR|Taiwan|TW|"
+    r"Japan|JP|LATAM|NFC)\)?)+\s*$", re.I)
+# 4G e 5G NON sono mercati: «Redmi Note 13 5G» e «Redmi Note 13» sono due
+# telefoni con codici diversi, e toglierli darebbe il codice dell'altro.
+
+
+def _codici_da_mostrare(risultato: dict, imei: dict | None = None) -> dict:
+    """IL CODICE MODELLO ACCANTO AL NOME, SEMPRE (30/09/2026, su richiesta).
+
+    Il titolo del risultato diceva solo il nome commerciale: cercando
+    «Galaxy S24» o un IMEI la pagina rispondeva «Samsung Galaxy S24» e
+    il codice — l'unica cosa che distingue SM-S921B da SM-S921U, cioè due
+    firmware diversi da provare — non compariva da nessuna parte, perché
+    la scheda tecnica sotto lo nasconde apposta per non ripetere il nome.
+
+    Si prende, in ordine di certezza, il primo che c'è:
+      1. il codice della risposta (fonte firmware o codice digitato);
+      2. quello della scheda tecnica;
+      3. quello del TAC, per una ricerca da IMEI;
+      4. i codici che il catalogo associa al nome trovato.
+    Nessuno è dedotto: sono tutti già scritti altrove nella stessa
+    ricerca. Se nessuna fonte ne ha uno, la pagina lo DICE («codice non
+    dichiarato») invece di lasciare un buco muto o inventarne uno.
+
+    I nomi in codice interni (SAPPHIRE, bronco…) non sono codici modello:
+    un codice vero ha almeno una cifra. Restituisce una copia, così il
+    dizionario in cache non cambia sotto i piedi di chi lo condivide.
+    """
+    if not risultato:
+        return risultato
+    trovati: list[str] = []
+    nome = risultato.get("nome") or ""
+
+    def valido(codice) -> str:
+        # Un codice modello è una parola sola con almeno una cifra: «Galaxy
+        # S24» (il titolo della scheda, quando la scheda non ha un codice)
+        # ha una cifra ma è un nome, e SAPPHIRE è un nome in codice interno.
+        codice = str(codice or "").strip()
+        if (not codice or any(c.isspace() for c in codice) or not _RE_CIFRA.search(codice)
+                or len(codice) > 24 or codice.lower() == nome.lower()):
+            return ""
+        return codice
+
+    def aggiungi(codice) -> None:
+        codice = valido(codice)
+        if codice and codice.upper() not in (c.upper() for c in trovati):
+            trovati.append(codice)
+
+    # Il «riconoscimento del codice modello» dà il PRIMO codice che il
+    # catalogo associa al nome, cioè spesso una variante cinese (SM-S9210
+    # per «Galaxy S24»): non è la risposta di una fonte firmware, quindi va
+    # in fila con gli altri codici del nome e si ordina con loro.
+    da_catalogo = "riconoscimento del codice" in (risultato.get("fonte") or "").lower()
+    digitato = sources.looks_like_model_code(risultato.get("query") or "")
+    riserva: list[str] = []
+    for codice in (risultato.get("codice"), (risultato.get("scheda") or {}).get("codice")):
+        if da_catalogo and not digitato:
+            riserva.append(codice)
+        else:
+            aggiungi(codice)
+    if imei:
+        aggiungi(imei.get("codice"))
+        for voce in imei.get("voci") or []:
+            if trovati:
+                break
+            aggiungi(voce.get("codice"))
+    principale_certo = bool(trovati)
+    ha_identita = bool(risultato.get("trovato") or (risultato.get("scheda") or {}).get("trovata")
+                       or (imei and imei.get("riconosciuto")))
+    # Anche senza un'identità confermata: nel primo tempo della ricerca
+    # (prima che arrivi il firmware) il catalogo sa già quali codici porta
+    # quel nome, e sono la risposta più utile da dare subito.
+    try:
+        dal_nome = _codici_del_risultato(risultato.get("query") or "", nome)
+        # Il nome di una ROM porta spesso il mercato in coda («Redmi Note
+        # 13 NFC EEA»), che il catalogo dei codici non conosce: si riprova
+        # senza, e poi con quello che è stato scritto nella ricerca.
+        if not dal_nome and nome:
+            dal_nome = modelcodes.codes_for_name(_RE_MERCATO_IN_CODA.sub("", nome).strip())
+        if not dal_nome and not digitato and risultato.get("query"):
+            dal_nome = modelcodes.codes_for_name(risultato["query"])
+    except Exception:  # un catalogo non caricato non deve rompere la pagina
+        dal_nome = []
+    # Prima le forme che hanno davvero l'aspetto di un codice modello, poi
+    # le varianti europee Samsung («…B»): e' il firmware che si prova da
+    # questa parte del mondo.
+    candidati = [c for c in list(dal_nome) + riserva if valido(c)]
+    candidati = sorted(candidati, key=lambda c: (
+        not sources.looks_like_model_code(c),
+        not (c.upper().startswith("SM-") and c.upper().split("/")[0].endswith("B"))))
+    for codice in candidati:
+        aggiungi(codice)
+
+    copia = dict(risultato)
+    copia["codici_modello"] = trovati[:1]
+    copia["altri_codici"] = trovati[1:9]
+    copia["altri_codici_in_piu"] = max(0, len(trovati) - 9)
+    # Dedotti dal nome, non dalla risposta: si dice, perché un nome
+    # commerciale copre spesso più varianti con firmware diversi.
+    copia["codice_dal_nome"] = bool(trovati) and not principale_certo
+    copia["mostra_codice"] = ha_identita or bool(trovati)
+    return copia
 
 
 @app.get("/ricerca/firmware", response_class=HTMLResponse)
@@ -520,7 +671,9 @@ def frammento_firmware(request: Request, q: str = Query(default="")):
         imei = _identita_da_mostrare(imei, risultato.get("nome") or "")
         imei_status.annota(imei, conteggia=False)
     else:
+        imei = None
         risultato = _esito_ricerca(domanda)
+    risultato = _codici_da_mostrare(risultato, imei)
     return _rendi(request, "_esito_firmware.html", {"risultato": risultato})
 
 
@@ -992,6 +1145,9 @@ def pagina_parco(request: Request, test_salvato: int = Query(default=0),
             "chiave": chiave,
             "modello": voce.get("model") or device.get("model", ""),
             "brand": voce.get("brand") or device.get("brand", ""),
+            # Il codice accanto al nome anche nel parco (30/09/2026): due
+            # varianti dello stesso nome sono due telefoni da provare.
+            "codice": device.get("model_code") or voce.get("model_code") or "",
             "provato_il": fmt_date(tested_at_iso) if tested_at_iso else None,
             "installato": (riferimento or {}) if manuale_test else {},
             "esito_test": metadati_test.get("esito", "") if manuale_test else "",

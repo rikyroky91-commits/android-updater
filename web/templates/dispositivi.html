@@ -36,7 +36,8 @@
     {% for r in righe %}
     <tr>
       <td class="tenue">{{ r.brand }}</td>
-      <td><a href="/dispositivo?k={{ r.chiave | urlencode }}">{{ r.modello }}</a></td>
+      <td><a href="/dispositivo?k={{ r.chiave | urlencode }}">{{ r.modello }}</a>
+        <span class="codice-mini">{% if r.codice %}<code>{{ r.codice }}</code>{% else %}<span class="tenue">codice n.d.</span>{% endif %}</span></td>
       <td class="tenue">{{ r.cpu or "—" }}</td>
       <td>{{ r.sistema or "—" }}</td>
       <td>{% if r.build %}<code>{{ r.build }}</code>{% else %}—{% endif %}</td>
