@@ -178,6 +178,18 @@
   // gli occhi, dove una mela ha il «petto», non all'altezza della testa.
   const SPALLA_MELA = ["gomitoA", "manoA", "gomitoD", "manoD"];
   const ABBASSA_MELA = 12;
+  // A riposo le mani della mela stanno ai FIANCHI del frutto, una davanti e
+  // una dietro, non sulla faccia.
+  const LATI_MELA = { gomitoA: 14, manoA: 18, gomitoD: -13, manoD: -17 };
+  function scheletro(tipo) {
+    if (tipo !== "mela") return SCHELETRO;
+    const q = {};
+    for (const nome in SCHELETRO) {
+      q[nome] = SCHELETRO[nome].slice();
+      if (nome in LATI_MELA) { q[nome][1] = LATI_MELA[nome]; }
+    }
+    return q;
+  }
 
   function crea(tipo, x, dir) {
     const f = {
@@ -186,8 +198,9 @@
       azione: null, t: 0, durata: 0, colpito: false, pensa: caso(20, 60), meta: x,
       passo: 0, dolore: 0, preso: null, scalata: null, inVolo: false, botta: 0, fantasma: false,
     };
-    for (const nome in SCHELETRO) {
-      let [h, dx, r] = SCHELETRO[nome];
+    const sch = scheletro(tipo);
+    for (const nome in sch) {
+      let [h, dx, r] = sch[nome];
       if (tipo === "mela" && SPALLA_MELA.indexOf(nome) >= 0) h -= ABBASSA_MELA;
       const px = x + dx * dir * S, py = pavimento - h * S - 2 * S;
       f.p[nome] = { x: px, y: py, ox: px, oy: py, r: r * S };
@@ -232,8 +245,8 @@
 
   // --- Le pose ---------------------------------------------------------
   function posa(f) {
-    const q = {};
-    for (const nome in SCHELETRO) q[nome] = [SCHELETRO[nome][0], SCHELETRO[nome][1]];
+    const q = {}, sch = scheletro(f.tipo);
+    for (const nome in sch) q[nome] = [sch[nome][0], sch[nome][1]];
     const e = f.durata ? Math.sin(Math.PI * Math.min(1, f.t / f.durata)) : 0;
     const respiro = Math.sin(f.passo * 0.5 + (f.tipo === "mela" ? 1.7 : 0)) * 0.8;
     q.bacino[0] += respiro; q.collo[0] += respiro; q.testa[0] += respiro;
@@ -808,15 +821,69 @@
 
   // LA MELA: polpa bianca dentro, contorni neri, occhi neri
   // (01/10/2026, su richiesta). Un frutto intero col picciolo e la foglia.
+  // La bocca della mela cambia con quello che succede: serena a riposo,
+  // aperta quando colpisce, storta quando prende un colpo, lingua fuori da K.O.
+  function bocca(f, R) {
+    const x = f.dir * 0.1 * R, y = 0.4 * R, w = 0.3 * R;
+    ctx.strokeStyle = "#111"; ctx.fillStyle = "#111"; ctx.lineWidth = 1.5 * S; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath();
+    if (f.ko || f.rialzo > 30) {
+      ctx.moveTo(x - w * 0.8, y); ctx.lineTo(x + w * 0.8, y); ctx.stroke();
+      ctx.fillStyle = "#ff7a8a"; ctx.beginPath();
+      ctx.ellipse(x + f.dir * w * 0.3, y + 0.14 * R, 0.12 * R, 0.16 * R, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = 1 * S; ctx.stroke();
+    } else if (f.dolore || f.stordito) {
+      const n = 6;
+      for (let i = 0; i <= n; i++) {
+        const px = x - w + (2 * w * i) / n, py = y + (i % 2 ? -0.06 : 0.06) * R;
+        if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+      }
+      ctx.stroke();
+    } else if (f.azione === "pugno" || f.azione === "diretto" || f.azione === "montante" || f.azione === "calcio") {
+      ctx.ellipse(x, y + 0.04 * R, 0.2 * R, 0.17 * R, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#ff7a8a"; ctx.beginPath();
+      ctx.ellipse(x, y + 0.1 * R, 0.12 * R, 0.07 * R, 0, 0, Math.PI * 2); ctx.fill();
+    } else if (f.azione === "esulta") {
+      ctx.moveTo(x - w, y - 0.04 * R); ctx.quadraticCurveTo(x, y + 0.5 * R, x + w, y - 0.04 * R); ctx.closePath();
+      ctx.fillStyle = "#111"; ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.fillRect(x - w * 0.6, y - 0.03 * R, w * 1.2, 0.07 * R);
+    } else if (f.azione === "provoca") {
+      ctx.moveTo(x - w, y); ctx.quadraticCurveTo(x, y + 0.14 * R, x + w, y - 0.1 * R); ctx.stroke();
+      ctx.fillStyle = "#ff7a8a"; ctx.beginPath();
+      ctx.ellipse(x + f.dir * w * 0.5, y + 0.12 * R, 0.1 * R, 0.14 * R, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = 1 * S; ctx.stroke();
+    } else if (f.azione === "salto" || f.azione === "indietro") {
+      ctx.ellipse(x, y + 0.03 * R, 0.1 * R, 0.1 * R, 0, 0, Math.PI * 2); ctx.stroke();
+    } else {
+      const sorriso = 0.12 + 0.04 * Math.sin(f.passo * 0.2);
+      ctx.moveTo(x - w * 0.8, y); ctx.quadraticCurveTo(x, y + sorriso * R * 2, x + w * 0.8, y); ctx.stroke();
+    }
+  }
+
   function disegnaMela(f) {
     const p = f.p, nero = "#111";
-    arto(p.bacino, p.ginocchioD, p.piedeD, 3.2 * S, nero);
-    arto(p.bacino, p.ginocchioA, p.piedeA, 3.2 * S, nero);
+    // Gambe senza incroci: il ginocchio si piega sempre verso la faccia,
+    // qualunque cosa faccia la fisica (prima le gambe si intrecciavano).
     for (const piede of [p.piedeD, p.piedeA]) {
+      const dx = piede.x - p.bacino.x, dy = piede.y - p.bacino.y, lun = Math.hypot(dx, dy) || 1;
+      let nx = -dy / lun, ny = dx / lun;
+      if (nx * f.dir < 0) { nx = -nx; ny = -ny; }
+      const ginocchio = { x: p.bacino.x + dx / 2 + nx * 0.14 * lun, y: p.bacino.y + dy / 2 + ny * 0.14 * lun };
+      arto(p.bacino, ginocchio, piede, 3.2 * S, nero);
       ctx.fillStyle = "#f7f7f7"; ctx.beginPath();
       ctx.ellipse(piede.x + f.dir * 1.5 * S, piede.y - 0.5 * S, 4.2 * S, 2.6 * S, 0, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = nero; ctx.lineWidth = 1.2 * S; ctx.stroke();
     }
+    const spalla = { x: p.collo.x * 0.4 + p.bacino.x * 0.6, y: p.collo.y * 0.4 + p.bacino.y * 0.6 };
+    // Le braccia partono dai FIANCHI del frutto, non dal centro: così non
+    // attraversano la faccia.
+    const tx = p.bacino.x - p.collo.x, ty = p.bacino.y - p.collo.y, tl = Math.hypot(tx, ty) || 1;
+    let qx = -ty / tl, qy = tx / tl;
+    if (qx * f.dir < 0) { qx = -qx; qy = -qy; }
+    const lato = 12 * S;
+    const spallaA = { x: spalla.x + qx * lato, y: spalla.y + qy * lato };
+    const spallaD = { x: spalla.x - qx * lato, y: spalla.y - qy * lato };
+    arto(spallaD, p.gomitoD, p.manoD, 3 * S, nero);
     const ang = Math.atan2(p.bacino.y - p.collo.y, p.bacino.x - p.collo.x) - Math.PI / 2;
     const cx = p.collo.x * 0.55 + p.bacino.x * 0.45, cy = p.collo.y * 0.55 + p.bacino.y * 0.45;
     const R = 14 * S;
@@ -857,12 +924,12 @@
       }
       ctx.stroke();
     }
+    bocca(f, R);
     ctx.restore();
     // Tutt'e due le braccia stanno DAVANTI al corpo: prima quella lontana
     // finiva dietro la polpa e la mela sembrava avere una mano sola.
-    const spalla = { x: p.collo.x * 0.4 + p.bacino.x * 0.6, y: p.collo.y * 0.4 + p.bacino.y * 0.6 };
     for (const [gomito, mano, r] of [[p.gomitoD, p.manoD, 3.4], [p.gomitoA, p.manoA, 3.6]]) {
-      arto(spalla, gomito, mano, 3 * S, nero);
+      if (mano !== p.manoD) arto(spallaA, gomito, mano, 3 * S, nero);
       tondo(mano.x, mano.y, r * S, "#f7f7f7");
       ctx.strokeStyle = nero; ctx.lineWidth = 1.3 * S;
       ctx.beginPath(); ctx.arc(mano.x, mano.y, r * S, 0, Math.PI * 2); ctx.stroke();

@@ -27,7 +27,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="{{ statico('style.css') }}">
 </head>
 <body class="{% block classe_body %}{% endblock %}">
   {# La trama vive in un canvas dietro tutto. Qui si può davvero, perché
@@ -106,13 +106,13 @@
      lascerebbe il piè di pagina disegnato SOPRA la striscia. #}
   {% block fuori %}{% endblock %}
 
-  <script src="/static/tema.js" defer></script>
-  <script src="/static/rete.js" defer></script>
-  <script src="/static/ricerca.js" defer></script>
-  <script src="/static/ricerche-recenti.js" defer></script>
-  <script src="/static/imei-links.js" defer></script>
-  <script src="/static/firmware-in-arrivo.js" defer></script>
-  <script src="/static/confronto-installato.js" defer></script>
+  <script src="{{ statico('tema.js') }}" defer></script>
+  <script src="{{ statico('rete.js') }}" defer></script>
+  <script src="{{ statico('ricerca.js') }}" defer></script>
+  <script src="{{ statico('ricerche-recenti.js') }}" defer></script>
+  <script src="{{ statico('imei-links.js') }}" defer></script>
+  <script src="{{ statico('firmware-in-arrivo.js') }}" defer></script>
+  <script src="{{ statico('confronto-installato.js') }}" defer></script>
   {# ai.js pilotava il tasto «✦ AI», che non esiste piu': l'AI ora e'
      dentro la ricerca e parte dal server quando serve (vedi
      `_soccorso_ai` in web/main.py). Il file resta nel repository,

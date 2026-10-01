@@ -65,7 +65,7 @@ class TestUltimoraInHome(_Sito):
     def test_il_ring_e_lo_script_ci_sono(self):
         pagina = self.client.get("/").text
         self.assertIn("data-ring", pagina)
-        self.assertIn('/static/ring.js', pagina)
+        self.assertIn('/static/ring.js?v=', pagina)
         self.assertIn('class="con-ultimora"', pagina)
         self.assertEqual(self.client.get("/static/ring.js").status_code, 200)
 
@@ -148,7 +148,7 @@ class TestTemaScuro(_SitoConLogin):
                 pagina = self.client.get(percorso).text
                 self.assertIn("data-tema-tasto", pagina)
                 self.assertIn('aria-pressed="false"', pagina)
-                self.assertIn("/static/tema.js", pagina)
+                self.assertIn("/static/tema.js?v=", pagina)
 
     def test_il_tema_si_decide_prima_del_primo_disegno(self):
         """Se lo decidesse `tema.js` (defer) chi usa il tema scuro vedrebbe
@@ -402,3 +402,21 @@ class TestCodiceNellApiENelControlloNotturno(_Sito):
         un codice sparito, è un campo che non c'è ancora."""
         codice, _ = self._controllo({"nome": "Samsung Galaxy A07", "firmware": True})
         self.assertEqual(codice, 0)
+
+
+class TestFileStaticiFirmati(unittest.TestCase):
+    """Dopo un deploy il browser non deve riusare il vecchio style.css."""
+
+    def test_gli_stili_e_gli_script_hanno_la_firma(self):
+        import re
+        from fastapi.testclient import TestClient
+        from web.main import app
+        pagina = TestClient(app).get("/").text
+        for nome in ("style.css", "tema.js", "ring.js"):
+            self.assertRegex(pagina, r'/static/%s\?v=[0-9a-f]{10}' % re.escape(nome))
+
+    def test_la_firma_cambia_col_contenuto(self):
+        from web import contesto
+        a = contesto.statico("style.css")
+        self.assertRegex(a, r"^/static/style\.css\?v=[0-9a-f]{10}$")
+        self.assertEqual(contesto.statico("non-esiste.css"), "/static/non-esiste.css")

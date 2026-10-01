@@ -26,6 +26,26 @@ templates.env.globals["truncate"] = truncate
 templates.env.globals["fmt_date"] = fmt_date
 
 
+def statico(nome: str) -> str:
+    """URL di un file statico con la «firma» del suo contenuto.
+
+    Senza, il browser tiene in cache il vecchio `style.css` dopo un deploy e
+    mostra l'HTML nuovo con gli stili vecchi: pagina rotta finché non si
+    svuota la cache (successo il 01/10/2026 con la striscia dell'ultim'ora).
+    Con `?v=` il nome cambia a ogni modifica del file, quindi la cache non
+    può servire una versione vecchia."""
+    import hashlib
+    percorso = RADICE / "static" / nome
+    try:
+        firma = hashlib.md5(percorso.read_bytes()).hexdigest()[:10]
+    except OSError:
+        return f"/static/{nome}"
+    return f"/static/{nome}?v={firma}"
+
+
+templates.env.globals["statico"] = statico
+
+
 def rendi(request: Request, pagina: str, contesto: dict):
     """UNA SOLA FIRMA PER TUTTE LE PAGINE — vedi la nota originale in
     main.py sul perché FastAPI vuole `(request, pagina, contesto)`."""
