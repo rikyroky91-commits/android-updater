@@ -68,6 +68,73 @@
    dal giro del tasto Tab, così non si legge tutto due volte. #}
 <div class="ultimora" data-ultimora>
   <canvas class="ultimora-ring" data-ring aria-hidden="true"></canvas>
+  {# LA TENDINA DEL RING (01/10/2026, su richiesta): si apre dal tasto col
+     guantone. Scommesse con gettoni finti (restano nel browser), armi e
+     oggetti da mettere in campo a mano, imprevisti da accendere e spegnere.
+     Senza JavaScript resta nascosta. #}
+  <div class="ring-pannello" id="ring-pannello" data-pannello hidden role="region" aria-label="Opzioni del combattimento">
+    <div class="ring-pannello-testa">
+      <strong>Il ring</strong>
+      <button type="button" class="ring-chiudi" data-chiudi aria-label="Chiudi le opzioni">&#10005;</button>
+    </div>
+    <section class="ring-sezione">
+      <h3>Scommetti</h3>
+      <p class="ring-gettoni">Gettoni: <b data-gettoni>100</b>
+        <button type="button" class="ring-tasto ring-piccolo" data-ricarica hidden>Ricarica 100</button></p>
+      <div class="ring-riga">
+        <label class="ring-etichetta">Puntata
+          <select data-importo>
+            <option value="10">10</option><option value="25" selected>25</option>
+            <option value="50">50</option><option value="tutto">Tutto</option>
+          </select>
+        </label>
+      </div>
+      <div class="ring-riga">
+        <button type="button" class="ring-tasto ring-scelta" data-punta="robot">&#129302; Robot <span data-quota="robot">×2</span></button>
+        <button type="button" class="ring-tasto ring-scelta" data-punta="mela">&#127822; Mela <span data-quota="mela">×2</span></button>
+      </div>
+      <p class="ring-esito" data-esito aria-live="polite">Punta su chi vince il prossimo K.O.</p>
+    </section>
+    <section class="ring-sezione">
+      <h3>Metti in campo</h3>
+      <div class="ring-griglia">
+        <button type="button" class="ring-tasto" data-metti="classico">&#128241; Telefono</button>
+        <button type="button" class="ring-tasto" data-metti="orologio">&#8986; Smartwatch</button>
+        <button type="button" class="ring-tasto" data-metti="tablet">&#128203; Tablet</button>
+        <button type="button" class="ring-tasto" data-metti="pc">&#128187; Portatile</button>
+        <button type="button" class="ring-tasto" data-metti="pistola">&#128299; Pistola</button>
+        <button type="button" class="ring-tasto" data-metti="spada">&#128481; Spada</button>
+        <button type="button" class="ring-tasto" data-metti="bomba">&#128163; Bomba</button>
+        <button type="button" class="ring-tasto" data-metti="duo">&#10024; Pieghevole</button>
+      </div>
+    </section>
+    <section class="ring-sezione">
+      <h3>Imprevisti</h3>
+      <div class="ring-riga">
+        <label class="ring-etichetta">Gravità
+          <select data-gravita>
+            <option value="1" selected>Terra</option><option value="0.45">Luna</option>
+            <option value="0.12">Spazio</option><option value="1.7">Giove</option>
+          </select>
+        </label>
+      </div>
+      <div class="ring-griglia">
+        <button type="button" class="ring-tasto" data-imprevisto="acquazzone" aria-pressed="false">&#127783; Pioggia</button>
+        <button type="button" class="ring-tasto" data-imprevisto="natale" aria-pressed="false">&#127876; Natale</button>
+        <button type="button" class="ring-tasto" data-imprevisto="uragano" aria-pressed="false">&#127786; Uragano</button>
+        <button type="button" class="ring-tasto" data-imprevisto="rallenta" aria-pressed="false">&#128034; Al rallentatore</button>
+        <button type="button" class="ring-tasto" data-colpo="terremoto">&#127755; Terremoto</button>
+        <button type="button" class="ring-tasto" data-colpo="jet">&#128640; Jetpack a tutti</button>
+        <button type="button" class="ring-tasto" data-colpo="telefoni">&#128242; Pioggia di telefoni</button>
+        <button type="button" class="ring-tasto" data-colpo="furia">&#128293; Furia</button>
+      </div>
+      <div class="ring-griglia">
+        <button type="button" class="ring-tasto" data-sorprese aria-pressed="true">Imprevisti a sorpresa</button>
+        <button type="button" class="ring-tasto" data-cruento aria-pressed="true">Schizzi e arti staccati</button>
+      </div>
+      <button type="button" class="ring-tasto ring-largo" data-ricomincia>&#8635; Ricomincia il round</button>
+    </section>
+  </div>
   <div class="ultimora-barra">
     <span class="ultimora-ora" data-orologio aria-hidden="true">--:--</span>
     <a class="ultimora-etichetta" href="/novita" title="Tutte le novità">Ultim'ora</a>
@@ -93,16 +160,26 @@
       <p class="ultimora-vuota">Nessuna novità in archivio per ora: la prossima scansione riempie questa striscia.</p>
       {% endif %}
     </div>
-    {# DUE TASTI A DESTRA. «Pausa» ferma lo scorrimento delle notizie (chi
-       legge non deve inseguirle). «Lotte» spegne tutto il livello dei due
+    {# TRE TASTI A DESTRA. «Pausa» ferma lo scorrimento delle notizie (chi
+       legge non deve inseguirle). Il guantone apre la tendina con le opzioni
+       del combattimento. L'omino barrato spegne tutto il livello dei due
        lottatori e lascia la pagina con le sole notizie; la scelta resta nel
        browser, e chi ha ridotto i movimenti nel telefono lo trova spento.
        Senza JavaScript restano nascosti. #}
     <button type="button" class="ultimora-tasto ultimora-pausa" data-pausa hidden
             aria-pressed="false" title="Ferma o riprendi lo scorrimento">&#10074;&#10074;</button>
+    <button type="button" class="ultimora-tasto ultimora-opzioni" data-opzioni hidden
+            aria-expanded="false" aria-controls="ring-pannello"
+            title="Opzioni del combattimento: scommesse, armi, imprevisti">&#129354;</button>
     <button type="button" class="ultimora-tasto ultimora-gioca" data-gioca hidden
             aria-pressed="true" aria-label="Lotte accese o spente"
-            title="Spegni le lotte e lascia solo le notizie">&#129354;</button>
+            title="Spegni le lotte e lascia solo le notizie">
+      <svg class="omino" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        <circle cx="12" cy="5" r="2.6" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M12 8v7M7 11h10M12 15l-4 6M12 15l4 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path class="omino-taglio" d="M4 20L20 4" stroke="#d8343f" stroke-width="2.6" stroke-linecap="round"/>
+      </svg>
+    </button>
   </div>
 </div>
 {% endblock %}

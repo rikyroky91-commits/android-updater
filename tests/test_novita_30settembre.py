@@ -542,3 +542,41 @@ class TestRicercheRecentiDiTutti(unittest.TestCase):
         with mock.patch.object(main, "_esito_ricerca", return_value=non_trovato):
             self.client.get("/", params={"q": "xyz"}, headers={"user-agent": "Mozilla/5.0"})
         self.assertEqual(self.storage.ricerche_recenti(), [])
+
+
+class TestTendinaDelRing(unittest.TestCase):
+    """01/10/2026: l'omino barrato spegne tutto, il guantone apre la tendina
+    con scommesse, armi da mettere in campo e imprevisti."""
+
+    @classmethod
+    def setUpClass(cls):
+        from fastapi.testclient import TestClient
+        from web.main import app
+        cls.client = TestClient(app)
+        cls.home = cls.client.get("/").text
+        cls.css = cls.client.get("/static/style.css").text
+
+    def test_il_guantone_apre_la_tendina_e_l_omino_barrato_spegne(self):
+        i = self.home.index("data-opzioni")
+        self.assertIn("hidden", self.home[i:i + 40])
+        self.assertIn('aria-controls="ring-pannello"', self.home[i:i + 120])
+        j = self.home.index("data-gioca")
+        blocco = self.home[j:self.home.index("</button>", j)]
+        self.assertIn("omino-taglio", blocco)
+        self.assertNotIn("&#129354;", blocco)
+
+    def test_la_tendina_nasce_nascosta_e_ha_tutte_le_sezioni(self):
+        i = self.home.index("data-pannello")
+        self.assertIn("hidden", self.home[i:i + 30])
+        for marca in ('data-punta="robot"', 'data-punta="mela"', "data-gettoni", "data-esito",
+                      'data-metti="pistola"', 'data-metti="spada"', 'data-metti="bomba"', 'data-metti="tablet"',
+                      'data-metti="pc"', 'data-metti="orologio"', 'data-metti="duo"', "data-gravita",
+                      'data-imprevisto="acquazzone"', 'data-imprevisto="natale"', 'data-imprevisto="uragano"',
+                      "data-sorprese", "data-cruento", "data-ricomincia"):
+            self.assertIn(marca, self.home)
+
+    def test_la_tendina_riceve_i_clic_e_sale_dalla_striscia(self):
+        blocco = self.css[self.css.index(".ring-pannello {"):self.css.index(".ring-pannello.aperto")]
+        self.assertIn("pointer-events: auto", blocco)
+        self.assertIn("bottom: calc(100% + 8px)", blocco)
+        self.assertIn(".ultimora-gioca[aria-pressed=\"false\"] .omino-taglio { display: none; }", self.css)

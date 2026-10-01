@@ -1513,6 +1513,55 @@ html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-sel
 .ultimora-tasto[hidden] { display: none; }
 .ultimora-tasto:hover { background: var(--verde-tenue); }
 .ultimora-tasto[aria-pressed="true"] { background: var(--verde); color: var(--su-tinta, #fff); }
+/* L'omino barrato: barrato quando le lotte sono accese (il tasto le spegne),
+   senza barra e sbiadito quando sono spente (il tasto le riaccende). */
+.ultimora-gioca[aria-pressed="true"] { background: inherit; color: inherit; }
+.ultimora-gioca[aria-pressed="false"] { color: color-mix(in srgb, var(--ink, #141414) 55%, transparent); }
+.ultimora-gioca[aria-pressed="false"] .omino-taglio { display: none; }
+.ultimora-gioca .omino { display: block; margin: auto; }
+.ultimora-opzioni[aria-expanded="true"] { background: var(--verde-tenue); }
+
+/* --- La tendina del ring (01/10/2026) ------------------------------------
+   Sale dalla striscia, a destra, sopra il tasto col guantone. È l'unico
+   pezzo della striscia che riceve i clic (il resto del contenitore li lascia
+   passare alla pagina). */
+.ring-pannello {
+  position: absolute; right: 8px; bottom: calc(100% + 8px);
+  width: min(360px, calc(100vw - 16px)); max-height: min(70vh, 620px); overflow: auto;
+  pointer-events: auto; z-index: 3;
+  background: var(--carta, #fff); color: var(--ink, #141414);
+  border: 1px solid var(--bordo, #d4d0c8); border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.18);
+  padding: .75rem .9rem .9rem;
+  transform: translateY(24px); opacity: 0; visibility: hidden;
+  transition: transform .22s ease, opacity .18s ease, visibility 0s linear .22s;
+}
+.ring-pannello.aperto { transform: none; opacity: 1; visibility: visible; transition: transform .22s ease, opacity .18s ease; }
+.ring-pannello[hidden] { display: none; }
+.ring-pannello-testa { display: flex; align-items: center; justify-content: space-between; margin-bottom: .35rem; }
+.ring-chiudi { border: 0; background: none; color: inherit; font-size: 1rem; cursor: pointer; padding: .2rem .4rem; border-radius: 6px; }
+.ring-chiudi:hover { background: var(--verde-tenue); }
+.ring-sezione { border-top: 1px solid var(--bordo, #e3e0d9); padding-top: .55rem; margin-top: .55rem; }
+.ring-sezione h3 { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 .45rem; opacity: .7; }
+.ring-gettoni { margin: 0 0 .45rem; display: flex; align-items: center; gap: .5rem; }
+.ring-riga { display: flex; gap: .45rem; margin-bottom: .45rem; flex-wrap: wrap; }
+.ring-griglia { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; margin-bottom: .45rem; }
+.ring-etichetta { display: flex; align-items: center; gap: .45rem; font-size: .88rem; }
+.ring-etichetta select { font: inherit; padding: .25rem .4rem; border-radius: 6px; border: 1px solid var(--bordo, #c9c5bd); background: var(--carta, #fff); color: inherit; }
+.ring-tasto {
+  font: inherit; font-size: .85rem; line-height: 1.2; text-align: left; cursor: pointer;
+  padding: .45rem .55rem; border-radius: 8px; color: inherit;
+  background: var(--fondo-firmware, rgba(0,0,0,.03)); border: 1px solid var(--bordo, #d4d0c8);
+}
+.ring-tasto:hover { border-color: var(--verde); }
+.ring-tasto[aria-pressed="true"] { background: var(--verde); border-color: var(--verde); color: var(--su-tinta, #fff); }
+.ring-tasto:disabled { opacity: .45; cursor: not-allowed; }
+.ring-scelta { flex: 1; font-weight: 600; display: flex; justify-content: space-between; }
+.ring-scelta span { font-weight: 400; opacity: .75; }
+.ring-piccolo { padding: .2rem .5rem; font-size: .78rem; }
+.ring-largo { width: 100%; text-align: center; }
+.ring-esito { margin: .1rem 0 0; font-size: .82rem; min-height: 2.4em; opacity: .85; }
+@media (prefers-reduced-motion: reduce) { .ring-pannello, .ring-pannello.aperto { transition: none; } }
 @media print { .ultimora { display: none; } }
 
 /* --- Il tasto «Recenti» e il suo pannello (01/10/2026) -------------------

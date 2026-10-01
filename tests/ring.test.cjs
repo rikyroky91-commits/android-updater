@@ -447,10 +447,11 @@ test("lottando prima o poi qualcuno si alza in volo da solo", () => {
   let volato = false;
   for (let prova = 0; prova < 6 && !volato; prova++) {
     const amb = ambiente();
-    amb.avanza(60 * 60, (s) => { if (s.lottatori.some((f) => f.vola)) { volato = true; return false; } });
+    // Il primo minuto è calmo: il jetpack si accende solo dopo.
+    amb.avanza(60 * 120, (s) => { if (s.lottatori.some((f) => f.vola)) { volato = true; return false; } });
     dentro(amb);
   }
-  assert.ok(volato, "in sei minuti nessuno ha mai acceso il jetpack");
+  assert.ok(volato, "in dodici minuti nessuno ha mai acceso il jetpack");
 });
 
 test("imparano: i colpi a segno alzano il peso della mossa e l'esperienza, e si ricorda", () => {
@@ -504,4 +505,254 @@ test("lottando davvero l'esperienza cresce e viene salvata", () => {
   assert.ok(memoria["mut-ring-cervello"], "niente salvato");
   const pesi = Object.values(c.robot.pesi).concat(Object.values(c.mela.pesi));
   assert.ok(pesi.every((w) => w >= 0.4 && w <= 2.6));
+});
+
+test("il primo minuto è tranquillo: niente jetpack, niente eventi, al massimo due oggetti, nessuna arma", () => {
+  for (let prova = 0; prova < 3; prova++) {
+    const amb = ambiente();
+    amb.avanza(60 * 58, (s) => {
+      assert.ok(!s.lottatori.some((f) => f.vola), "jetpack acceso nel primo minuto");
+      assert.strictEqual(s.evento, null, "evento nel primo minuto");
+      assert.ok(s.telefoni.length <= 2, "troppi oggetti nel primo minuto: " + s.telefoni.length);
+      for (const t of s.telefoni) assert.ok(["classico", "grande", "pieghevole", "orologio"].includes(t.tipo), "oggetto grosso nel primo minuto: " + t.tipo);
+    });
+    dentro(amb);
+  }
+});
+
+test("dopo 70 secondi arrivano le armi; si impugnano, si usano e restano dentro la finestra", () => {
+  const amb = ambiente();
+  amb.avanza(10);
+  amb.finestra.__ring.tempo(70);
+  let viste = false, impugnata = false, sparato = false;
+  for (let blocco = 0; blocco < 120 && !(impugnata && sparato); blocco++) {
+    amb.avanza(60, (s) => {
+      if (s.telefoni.some((t) => t.tipo === "pistola" || t.tipo === "spada")) viste = true;
+      if (s.lottatori.some((f) => f.arma)) impugnata = true;
+      if (s.proiettili > 0) sparato = true;
+    });
+    dentro(amb);
+    if (blocco === 20 && !impugnata) amb.finestra.__ring.dai("robot", "pistola");
+  }
+  assert.ok(viste, "in due minuti dopo i 70 secondi non è caduta nessuna arma");
+  assert.ok(impugnata, "nessuno ha mai impugnato un'arma");
+  assert.ok(sparato, "con la pistola in mano non si è mai sparato");
+});
+
+test("la spada colpisce da più lontano di un pugno", () => {
+  let colpito = false;
+  for (let prova = 0; prova < 5 && !colpito; prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    amb.finestra.__ring.dai("robot", "spada");
+    amb.avanza(60 * 20, (s) => { if (s.lottatori.find((f) => f.tipo === "mela").danni > 0 || s.punteggio.robot > 0) { colpito = true; return false; } });
+    dentro(amb);
+  }
+  assert.ok(colpito, "con la spada il robot non ha mai colpito la mela");
+});
+
+test("si lanciano anche tablet, portatili e smartwatch, e fanno male", () => {
+  for (const forma of ["tablet", "pc", "orologio"]) {
+    const amb = ambiente();
+    amb.avanza(30);
+    const m = amb.lottatore("mela");
+    const i = amb.finestra.__ring.lanciaTelefono(m.testa.x - 60, m.testa.y - 2, 8, 0, forma);
+    assert.strictEqual(amb.stato().telefoni[i].tipo, forma);
+    let colpito = false;
+    amb.avanza(30, (s) => { if (s.lottatori.find((f) => f.tipo === "mela").danni > 0 || s.punteggio.robot + s.punteggio.mela > 0) { colpito = true; return false; } });
+    assert.ok(colpito, forma + " è passato attraverso la mela");
+    amb.avanza(120); dentro(amb);
+  }
+});
+
+test("chi manda K.O. l'altro fa un balletto", () => {
+  let ballato = false;
+  for (let prova = 0; prova < 4 && !ballato; prova++) {
+    const amb = ambiente();
+    for (let blocco = 0; blocco < 240 && !ballato; blocco++) {
+      amb.avanza(60, (s) => { if (s.lottatori.some((f) => f.ballo)) { ballato = true; return false; } });
+    }
+    dentro(amb);
+  }
+  assert.ok(ballato, "nessun balletto dopo un K.O.");
+});
+
+test("si afferra l'avversario, lo si tiene e lo si scaglia via", () => {
+  for (const mossa of ["sopra", "rotea", "suplex"]) {
+    const amb = ambiente();
+    amb.avanza(30);
+    assert.ok(amb.finestra.__ring.afferra("robot", mossa));
+    assert.ok(amb.lottatore("mela").tenuto, "la mela non risulta presa");
+    amb.avanza(10);
+    assert.ok(amb.lottatore("robot").tiene, "il robot ha mollato subito");
+    let lanciata = false;
+    amb.avanza(80, (s) => { if (!s.lottatori.find((f) => f.tipo === "mela").tenuto) { lanciata = true; return false; } });
+    assert.ok(lanciata, "con la mossa " + mossa + " la mela non viene mai lasciata");
+    assert.ok(!amb.lottatore("robot").tiene);
+    amb.avanza(240); dentro(amb);
+  }
+});
+
+test("lottando, prima o poi uno afferra l'altro da solo", () => {
+  let preso = false;
+  for (let prova = 0; prova < 4 && !preso; prova++) {
+    const amb = ambiente();
+    amb.finestra.__ring.tempo(60);
+    amb.avanza(60 * 120, (s) => { if (s.lottatori.some((f) => f.tenuto)) { preso = true; return false; } });
+    dentro(amb);
+  }
+  assert.ok(preso, "nessuna presa in otto minuti di lotta");
+});
+
+test("chi scende apposta da una piattaforma alta apre il paracadute; chi viene lanciato no", () => {
+  const amb = ambiente({ solidi: [[400, 300, 800, 330]], campo: [400, 300, 800, 330] });
+  amb.avanza(30);
+  let aperto = false;
+  // il robot cammina giù dal bordo per andare dalla mela, messa in basso
+  amb.porta("mela", 1000, amb.pavimento - 60, 10); amb.rilascia(1000, amb.pavimento - 60);
+  amb.avanza(60 * 30, (s) => { if (s.lottatori.some((f) => f.paracadute)) { aperto = true; return false; } });
+  assert.ok(aperto, "scendendo dalla piattaforma nessuno ha aperto il paracadute");
+  amb.avanza(60 * 6); dentro(amb);
+  // lanciato dal puntatore: niente paracadute
+  const lanciato = ambiente();
+  lanciato.avanza(30);
+  lanciato.porta("robot", 600, 100, 10); lanciato.rilascia(600, 100);
+  lanciato.avanza(200, (s) => { assert.ok(!s.lottatori.find((f) => f.tipo === "robot").paracadute, "paracadute aperto da lanciato"); });
+});
+
+test("il pieghevole della mela fa esplodere il robot, che si rimonta pezzo per pezzo", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  amb.finestra.__ring.esplodi();
+  let s = amb.stato();
+  assert.ok(s.lottatori.find((f) => f.tipo === "robot").esploso, "il robot non risulta esploso");
+  assert.ok(s.pezzi >= 15, "troppi pochi pezzi: " + s.pezzi);
+  assert.strictEqual(s.punteggio.mela, 1, "l'esplosione non conta come K.O.");
+  let rimontato = false;
+  amb.avanza(60 * 12, (st) => {
+    for (const f of st.lottatori) assert.ok(Number.isFinite(f.testa.x) && Number.isFinite(f.bacino.y));
+    if (!st.lottatori.find((f) => f.tipo === "robot").esploso) { rimontato = true; return false; }
+  });
+  assert.ok(rimontato, "il robot non si è mai rimontato");
+  assert.strictEqual(amb.stato().pezzi, 0);
+  amb.avanza(300); dentro(amb);
+});
+
+test("la mela tira fuori il pieghevole dal jetpack e lo lancia", () => {
+  let esploso = false;
+  for (let prova = 0; prova < 6 && !esploso; prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    amb.finestra.__ring.tempo(61);
+    amb.finestra.__ring.duo();
+    amb.avanza(60 * 4, (s) => { if (s.lottatori.find((f) => f.tipo === "robot").esploso) { esploso = true; return false; } });
+    dentro(amb);
+  }
+  assert.ok(esploso, "il pieghevole non ha mai fatto esplodere il robot");
+});
+
+test("scommesse: si punta, si vince al K.O. giusto, si perde a quello sbagliato, e i gettoni restano", () => {
+  const memoria = {};
+  const amb = ambiente({ memoria });
+  amb.avanza(30);
+  const r = amb.finestra.__ring;
+  assert.strictEqual(amb.stato().gettoni, 100);
+  assert.ok(r.comandi.scommetti("robot", 25));
+  assert.ok(!r.comandi.scommetti("mela", 10), "si può puntare due volte insieme");
+  assert.strictEqual(amb.stato().gettoni, 75);
+  const quota = amb.stato().scommessa.quota;
+  r.ko("mela");                               // vince il robot
+  assert.strictEqual(amb.stato().gettoni, 75 + Math.round(25 * quota));
+  assert.strictEqual(amb.stato().scommessa, null);
+  const dopo = amb.stato().gettoni;
+  assert.ok(r.comandi.scommetti("robot", 10));
+  r.ko("robot");                              // vince la mela
+  assert.strictEqual(amb.stato().gettoni, dopo - 10);
+  assert.ok(!r.comandi.scommetti("mela", 1e6), "si può puntare più di quel che si ha");
+  assert.strictEqual(memoria["mut-ring-gettoni"], String(dopo - 10));
+  assert.strictEqual(ambiente({ memoria }).stato().gettoni, dopo - 10, "i gettoni non restano nel browser");
+});
+
+test("un'esplosione vera: fuoco, fumo, detriti e braci, e chi è vicino viene sbalzato", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  const m = amb.lottatore("mela");
+  amb.finestra.__ring.scoppia(m.bacino.x - 30, m.bacino.y);
+  amb.avanza(2);
+  const tipi = amb.stato().particelleTipi;
+  for (const t of ["fuoco", "fumo", "detrito", "brace"]) assert.ok(tipi[t] > 0, "manca " + t);
+  amb.avanza(10);
+  assert.ok(Math.abs(amb.lottatore("mela").bacino.x - m.bacino.x) > 15, "la mela non è stata sbalzata");
+  amb.avanza(60 * 4); dentro(amb);
+});
+
+test("una bomba messa in campo prima o poi scoppia", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  amb.finestra.__ring.comandi.metti("bomba");
+  assert.ok(amb.stato().telefoni.some((t) => t.tipo === "bomba"));
+  let scoppiata = false;
+  amb.avanza(60 * 12, (s) => { if ((s.particelleTipi.fuoco || 0) > 0) { scoppiata = true; return false; } });
+  assert.ok(scoppiata, "la bomba non è mai scoppiata");
+  amb.avanza(60 * 3); dentro(amb);
+});
+
+test("un arto staccato vola via e poi torna al suo posto; con gli effetti spenti non si stacca niente", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  amb.finestra.__ring.smembra("robot");
+  assert.strictEqual(amb.lottatore("robot").staccati.length, 1);
+  assert.strictEqual(amb.stato().arti, 1);
+  let tornato = false;
+  amb.avanza(60 * 10, (s) => { if (s.arti === 0 && s.lottatori.find((f) => f.tipo === "robot").staccati.length === 0) { tornato = true; return false; } });
+  assert.ok(tornato, "l'arto non è mai tornato");
+  amb.finestra.__ring.comandi.cruento(false);
+  amb.finestra.__ring.smembra("mela");
+  assert.strictEqual(amb.lottatore("mela").staccati.length, 0);
+  assert.strictEqual(amb.memoria["mut-ring-cruento"], "off");
+  dentro(amb);
+});
+
+test("i colpi lasciano segni sul corpo", () => {
+  let segnato = false;
+  for (let prova = 0; prova < 3 && !segnato; prova++) {
+    const amb = ambiente();
+    amb.avanza(60 * 60, (s) => { if (s.lottatori.some((f) => f.segni > 0)) { segnato = true; return false; } });
+  }
+  assert.ok(segnato, "in un minuto di lotta nessun segno");
+});
+
+test("imprevisti a mano: pioggia, Natale con le palle di neve, uragano, gravità; tutto resta stabile", () => {
+  const amb = ambiente({ solidi: [[300, 600, 700, 630]] });
+  amb.avanza(30);
+  const c = amb.finestra.__ring.comandi;
+  c.gravita(0.12); assert.strictEqual(amb.stato().moltG, 0.12);
+  c.gravita(1);
+  c.imprevisto("acquazzone", true);
+  amb.avanza(60 * 20); dentro(amb);
+  assert.ok(amb.stato().particelleTipi.pioggia > 0, "non piove");
+  c.imprevisto("acquazzone", false);
+  c.imprevisto("natale", true);
+  let palla = false;
+  amb.avanza(60 * 60, (s) => { if (s.lottatori.some((f) => f.azione === "palla")) palla = true; });
+  dentro(amb);
+  assert.ok(amb.stato().particelleTipi.fiocco > 0, "non nevica");
+  assert.ok(palla, "a Natale nessuno ha tirato palle di neve");
+  c.imprevisto("natale", false);
+  c.imprevisto("uragano", true);
+  let alzato = false;
+  amb.avanza(60 * 40, (s) => { if (s.lottatori.some((f) => f.bacino.y < s.pavimento - 120)) alzato = true; dentro(amb); });
+  assert.ok(alzato, "l'uragano non ha sollevato nessuno");
+  c.imprevisto("uragano", false);
+  assert.strictEqual(amb.stato().uragano, false);
+  c.imprevisto("rallenta", true); assert.strictEqual(amb.stato().ritmo, 0.45);
+  c.imprevisto("rallenta", false); assert.strictEqual(amb.stato().ritmo, 1);
+});
+
+test("i comandi della tendina riaccendono le lotte se erano spente", () => {
+  const amb = ambiente({ memoria: { "mut-ring": "off" } });
+  assert.strictEqual(amb.stato().lottatori.length, 0);
+  amb.finestra.__ring.comandi.metti("spada");
+  assert.strictEqual(amb.stato().lottatori.length, 2);
+  assert.ok(amb.stato().telefoni.some((t) => t.tipo === "spada"));
 });
