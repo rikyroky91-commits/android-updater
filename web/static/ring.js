@@ -985,7 +985,7 @@
     const [w, h] = TIPI_TEL[tipo];
     telefoni.push({ x, y, ox: x - vx, oy: y - vy, a: caso(0, 6.28), va: caso(-0.15, 0.15), tipo,
                     w: w * S, h: h * S, r: 6.5 * S, stato: "libero", da: null, protetto: 0, cool: 0,
-                    ultimo: null, crepe: 0, colore: COLORI_TEL[Math.floor(Math.random() * COLORI_TEL.length)] });
+                    ultimo: null, crepe: 0, rotture: [], colore: COLORI_TEL[Math.floor(Math.random() * COLORI_TEL.length)] });
     if (telefoni.length > 6) {
       const vecchio = telefoni.findIndex((t) => t.stato === "libero");
       if (vecchio >= 0) telefoni.splice(vecchio, 1);
@@ -1078,7 +1078,7 @@
       if (urto > 13.5 * S && t.y > pavimento - t.r - 1) danneggiaStriscia(t.x, Math.min(1, urto / (VELOCITA_MAX * S)));
       if (urto > 4 * S) {
         polvere(t.x, t.y + t.r, 2);
-        if (urto > 8 * S && t.crepe < 4) { t.crepe++; schegge(t.x, t.y, 4, "#cfe9ff"); scrivi(Math.random() < 0.5 ? "CRACK!" : "CLONK!", t.x, t.y - 14 * S, false); }
+        if (urto > 8 * S && t.crepe < 4) { t.crepe++; rompiSchermo(t); schegge(t.x, t.y, 4, "#cfe9ff"); scrivi(Math.random() < 0.5 ? "CRACK!" : "CLONK!", t.x, t.y - 14 * S, false); }
       }
       if (t.stato === "volo" && velocitaTel(t) < 1.2 * S && t.y > pavimento - t.r - 2) { t.stato = "libero"; t.da = null; }
       // Un telefono veloce che tocca un lottatore gli fa male.
@@ -1094,7 +1094,7 @@
               colpisci(att, f, forza, t.x, t.y, SUONI_TEL[Math.floor(Math.random() * SUONI_TEL.length)]);
               schegge(t.x, t.y, 6, t.colore);
               t.ox = t.x + (t.x - t.ox) * 0.3; t.oy = t.y - 2 * S; t.va = caso(-0.4, 0.4);
-              t.cool = 20; t.ultimo = f; t.crepe = Math.min(5, t.crepe + 1);
+              t.cool = 20; t.ultimo = f; t.crepe = Math.min(5, t.crepe + 1); rompiSchermo(t);
               break;
             }
           }
@@ -1811,6 +1811,30 @@
     }
   }
 
+  // Una rottura dello schermo: una ragnatela che parte dal punto d'urto, con
+  // raggi spezzati e qualche anello. Tutto in coordinate locali del telefono
+  // e, al disegno, ritagliato dentro lo schermo: non esce mai dal telefono.
+  function rompiSchermo(t) {
+    const w = t.w - 2.2 * S, h = t.h - 3 * S;
+    const cx = caso(-0.3, 0.3) * w, cy = caso(-0.3, 0.3) * h;
+    const raggi = [], n = 4 + Math.floor(Math.random() * 2);
+    const base = caso(0, Math.PI * 2);
+    for (let i = 0; i < n; i++) {
+      const a = base + (i / n) * Math.PI * 2 + caso(-0.25, 0.25);
+      const lung = caso(0.35, 0.8) * Math.max(w, h);
+      const pts = [[cx, cy]];
+      let x = cx, y = cy, aa = a;
+      for (let k = 1; k <= 3; k++) {
+        aa += caso(-0.3, 0.3);
+        x += Math.cos(aa) * lung / 3; y += Math.sin(aa) * lung / 3;
+        pts.push([x, y]);
+      }
+      raggi.push(pts);
+    }
+    t.rotture.push({ cx, cy, raggi, anelli: [caso(0.07, 0.12) * w, caso(0.17, 0.25) * w] });
+    if (t.rotture.length > 2) t.rotture.shift();
+  }
+
   function disegnaTelefono(t) {
     ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(t.a);
     const w = t.w, h = t.h;
@@ -1823,13 +1847,24 @@
     ctx.lineTo(-w / 2 + 1.1 * S, h * 0.1); ctx.closePath(); ctx.fill();
     if (t.tipo === "pieghevole") { ctx.strokeStyle = "#111"; ctx.lineWidth = 1 * S; ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.lineTo(w / 2, 0); ctx.stroke(); }
     tondo(0, -h / 2 + 0.8 * S, 0.5 * S, "#000");
-    if (t.crepe) {
-      ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 0.7 * S; ctx.beginPath();
-      for (let i = 0; i < t.crepe; i++) {
-        const sx = (-0.3 + 0.2 * i) * w, sy = (-0.35 + 0.18 * i) * h;
-        ctx.moveTo(sx, sy); ctx.lineTo(sx + 0.3 * w, sy + 0.25 * h); ctx.lineTo(sx + 0.15 * w, sy + 0.45 * h);
+    if (t.rotture && t.rotture.length) {
+      // Ritaglio: le crepe vivono solo dentro lo schermo.
+      ctx.save();
+      rettangoloTondo(-w / 2 + 1.1 * S, -h / 2 + 1.5 * S, w - 2.2 * S, h - 3 * S, 1.2 * S); ctx.clip();
+      for (const r of t.rotture) {
+        // Macchia scura dove il vetro ha ceduto.
+        ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.beginPath(); ctx.arc(r.cx, r.cy, r.anelli[0] * 0.9, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "rgba(235,246,255,.9)"; ctx.lineWidth = 0.55 * S; ctx.lineJoin = "round"; ctx.beginPath();
+        for (const pts of r.raggi) {
+          ctx.moveTo(pts[0][0], pts[0][1]);
+          for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+        }
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(235,246,255,.5)"; ctx.lineWidth = 0.4 * S; ctx.beginPath();
+        for (const rr of r.anelli) { ctx.moveTo(r.cx + rr, r.cy); ctx.arc(r.cx, r.cy, rr, 0, Math.PI * 2); }
+        ctx.stroke();
       }
-      ctx.stroke();
+      ctx.restore();
     }
     ctx.restore();
   }
@@ -1950,6 +1985,7 @@
     // Solo per i test: un telefono lanciato a mano.
     lanciaTelefono: (x, y, vx, vy) => { const t = nuovoTelefono(x, y, vx, vy); t.stato = "volo"; t.cool = 0; return telefoni.indexOf(t); },
     danneggiaStriscia: (x, forza) => danneggiaStriscia(x, forza),
+    rompiTelefono: (i, n) => { const t = telefoni[i]; if (!t) return null; for (let k = 0; k < n; k++) { t.crepe = Math.min(5, t.crepe + 1); rompiSchermo(t); } t.va = 0; t.a = 0; t.stato = "libero"; return { x: t.x, y: t.y, w: t.w, h: t.h }; },
     cervello: () => JSON.parse(JSON.stringify(cervello)),
     livello: (tipo) => livelloDi(tipo),
     impara: (tipo, mossa, esito, esp) => { const f = lottatori.find((l) => l.tipo === tipo); if (f) impara(f, mossa, esito, esp); },
