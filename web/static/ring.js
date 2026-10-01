@@ -136,7 +136,7 @@
   // controlli — campi, tasti, immagini — e la testata intera. Tutto in
   // coordinate della finestra, come il canvas.
   const SOLIDI = "input, button, select, textarea, img";
-  const RIGA_MIN = 24;
+  const RIGA_MIN = 32;
   const FUORI = ".ultimora, script, style, canvas, noscript, datalist, [hidden], .sr-only";
 
   function riquadroUtile(r) {
@@ -246,7 +246,7 @@
       azione: null, t: 0, durata: 0, colpito: false, pensa: caso(20, 60), meta: x,
       passo: 0, dolore: 0, preso: null, scalata: null, inVolo: false, botta: 0, fantasma: false,
       aggr: caso(0.75, 1.3), furbo: caso(0.6, 1.4), furia: 0, tel: null, prendiTel: null, polv: 0,
-      jet: 0, volaY: 0, caos: 0, ix: 0, iy: 0, fiamma: 0,
+      jet: 0, volaY: 0, caos: 0, giro: 0, rot: 0, ix: 0, iy: 0, fiamma: 0,
     };
     const sch = scheletro(tipo);
     for (const nome in sch) {
@@ -442,6 +442,7 @@
     f.jet = Math.round(caso(260, 560)); f.azione = null; f.scalata = null; f.pensa = 6;
     f.volaY = Math.max(110, Math.min(pavimento - 90 * S, b.y - caso(70, 170) * S));
     f.caos = impazzito ? Math.round(caso(200, 340)) : 0;
+    f.giro = (Math.random() < 0.5 ? -1 : 1) * caso(0.09, 0.16); f.rot = 0;
     for (const n in f.p) f.p[n].oy = f.p[n].y + 3.5 * S;
     scintille(b.x, b.y + 22 * S, 8, "#ffb62e");
   }
@@ -474,16 +475,25 @@
     const g = GRAVITA * S * moltG, b = f.p.bacino;
     let spinta;
     if (f.caos > 0) {
+      // Giri impazziti: il getto gira in tondo (cerchi e otto, a volte al
+      // contrario), poi a secco di colpo e giù a schiantarsi.
       f.caos--;
-      if (f.caos % 12 === 0) {
-        const a = caso(0, Math.PI * 2), m = caso(1.8, 3.6) * S;
-        f.ix = Math.cos(a) * m; f.iy = Math.sin(a) * m - 1.2 * S;
-      }
+      f.rot = (f.rot || caso(0, 6.28)) + f.giro;
+      let m = (2.2 + 1.2 * Math.sin(f.caos * 0.05)) * S;
+      f.ix = Math.cos(f.rot) * m; f.iy = Math.sin(f.rot) * m;
+      // Mai contro il soffitto: in alto il giro si sposta in basso.
+      if (b.y < 150) f.iy = Math.abs(f.iy);
       spinta = g * 0.92;
       for (const n in f.p) { f.p[n].x += f.ix * 0.28; f.p[n].y += f.iy * 0.28; }
       f.p.testa.x += f.ix * 0.12; f.p.testa.y += f.iy * 0.12;
-      if (f.caos === 0) f.volaY = Math.max(110, Math.min(pavimento - 90 * S, b.y));
       if (passi % 3 === 0) fiammata(f, -f.iy, -f.ix);
+      if (f.caos === 0) {
+        // Schianto: il getto si spegne e si piomba a terra.
+        f.jet = 0; f.fiamma = 0; f.stordito = 70; f.forza = 0.2;
+        for (const n in f.p) f.p[n].oy = f.p[n].y - 9 * S;
+        scintille(b.x, b.y, 10, "#ffb62e");
+        return;
+      }
     } else {
       const err = b.y - f.volaY, vy = b.y - b.oy;
       spinta = Math.max(0, Math.min(2.2 * g, g + 0.004 * err + 0.14 * vy));
@@ -541,7 +551,7 @@
       }
     }
     // Ogni tanto si accende il jetpack e si va a lottare in aria.
-    if (!f.tel && Math.random() < 0.07 * f.furbo) { decolla(f, Math.random() < 0.22); return; }
+    if (!f.tel && Math.random() < 0.045 * f.furbo) { decolla(f, Math.random() < 0.3); return; }
     // L'avversario sta per colpire: ci si para o si schiva.
     if (altro.azione && COLPI[altro.azione] && Math.abs(altro.cx - f.cx) < 34 * S &&
         Math.abs(altro.base - f.base) <= 18 * S && Math.random() < 0.3 * f.furbo) {
