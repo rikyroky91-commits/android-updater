@@ -452,3 +452,56 @@ test("lottando prima o poi qualcuno si alza in volo da solo", () => {
   }
   assert.ok(volato, "in sei minuti nessuno ha mai acceso il jetpack");
 });
+
+test("imparano: i colpi a segno alzano il peso della mossa e l'esperienza, e si ricorda", () => {
+  const memoria = {};
+  const amb = ambiente({ memoria });
+  const r = amb.finestra.__ring;
+  assert.strictEqual(r.livello("robot"), 0);
+  for (let i = 0; i < 40; i++) r.impara("robot", "montante", 1, 1);
+  const c = r.cervello();
+  assert.ok(c.robot.pesi.montante > 1.5, "il montante non è diventato la mossa preferita");
+  assert.ok(c.robot.pesi.montante <= 2.6, "il peso non ha un tetto");
+  assert.ok(c.robot.pesi.pugno < 1.01 && c.robot.pesi.pugno > 0.9, "le altre mosse devono restare vicine a 1");
+  assert.ok(r.livello("robot") >= 2, "l'esperienza non alza il livello");
+  assert.ok(JSON.parse(memoria["mut-ring-cervello"]).robot.exp >= 30, "il cervello non viene salvato");
+  // alla visita dopo si riparte da quello che hanno imparato
+  const dopo = ambiente({ memoria });
+  assert.strictEqual(dopo.finestra.__ring.livello("robot"), r.livello("robot"));
+  assert.ok(dopo.finestra.__ring.cervello().robot.pesi.montante > 1.5);
+  // la mela non ne sa niente: ognuno impara per conto suo
+  assert.strictEqual(dopo.finestra.__ring.livello("mela"), 0);
+});
+
+test("chi sbaglia mossa la usa meno, ma mai fino a zero", () => {
+  const amb = ambiente();
+  const r = amb.finestra.__ring;
+  for (let i = 0; i < 200; i++) r.impara("mela", "calcio", -1, 0);
+  const w = r.cervello().mela.pesi.calcio;
+  assert.ok(w < 0.6 && w >= 0.4, "peso fuori dai limiti: " + w);
+});
+
+test("un cervello salvato male (dati sporchi) non rompe niente", () => {
+  const sporco = JSON.stringify({ robot: { exp: "boh", pesi: { pugno: 1e9, calcio: "x", para: -4 } }, mela: 7 });
+  const amb = ambiente({ memoria: { "mut-ring-cervello": sporco } });
+  const c = amb.finestra.__ring.cervello();
+  assert.strictEqual(c.robot.exp, 0);
+  assert.strictEqual(c.robot.pesi.pugno, 2.6);
+  assert.strictEqual(c.robot.pesi.calcio, 1);
+  assert.strictEqual(c.robot.pesi.para, 0.4);
+  const rotto = ambiente({ memoria: { "mut-ring-cervello": "{non json" } });
+  assert.strictEqual(rotto.finestra.__ring.livello("robot"), 0);
+  dentro(rotto);
+});
+
+test("lottando davvero l'esperienza cresce e viene salvata", () => {
+  const memoria = {};
+  const amb = ambiente({ memoria });
+  amb.avanza(60 * 90);
+  dentro(amb);
+  const c = amb.finestra.__ring.cervello();
+  assert.ok(c.robot.exp + c.mela.exp > 0, "in un minuto e mezzo nessun colpo ha insegnato nulla");
+  assert.ok(memoria["mut-ring-cervello"], "niente salvato");
+  const pesi = Object.values(c.robot.pesi).concat(Object.values(c.mela.pesi));
+  assert.ok(pesi.every((w) => w >= 0.4 && w <= 2.6));
+});

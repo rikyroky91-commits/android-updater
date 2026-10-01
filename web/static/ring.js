@@ -120,6 +120,65 @@
     return voci[voci.length - 1][1];
   };
 
+  // --- Il cervello: ogni lottatore impara dai colpi ----------------------
+  // Ogni mossa ha un peso che sale quando va a segno (o quando para) e scende
+  // quando si prende un colpo mentre la si fa o quando viene parata. Chi viene
+  // colpito impara a pararsi e a schivare di più. I pesi rientrano piano verso
+  // 1, così la varietà non si perde. L'esperienza dà il livello, e ogni livello
+  // sblocca qualcosa: 2 serie di colpi, 3 contrattacco dopo una parata, 4
+  // sfida chi vola, 5 più telefoni. Resta nel browser (nessun dato al server).
+  const CHIAVE_CERVELLO = "mut-ring-cervello";
+  const MOSSE = ["pugno", "diretto", "montante", "calcio", "para", "schiva", "salto", "provoca", "indietro"];
+  const LIVELLO_MAX = 8;
+  let cervello = {};
+  function pulisciCervello(grezzo) {
+    const puliti = {};
+    for (const tipo of ["robot", "mela"]) {
+      const c = grezzo && typeof grezzo === "object" ? grezzo[tipo] : null;
+      const pesi = {};
+      for (const m of MOSSE) {
+        const v = c && c.pesi ? Number(c.pesi[m]) : 1;
+        pesi[m] = Number.isFinite(v) ? Math.max(0.4, Math.min(2.6, v)) : 1;
+      }
+      const exp = c ? Number(c.exp) : 0;
+      puliti[tipo] = { exp: Number.isFinite(exp) ? Math.max(0, Math.min(5000, Math.floor(exp))) : 0, pesi };
+    }
+    return puliti;
+  }
+  try { cervello = pulisciCervello(JSON.parse(window.localStorage.getItem(CHIAVE_CERVELLO) || "null")); }
+  catch (errore) { cervello = pulisciCervello(null); }
+  let daSalvare = 0;
+  function salvaCervello(subito) {
+    if (!subito && ++daSalvare < 10) return;
+    daSalvare = 0;
+    try { window.localStorage.setItem(CHIAVE_CERVELLO, JSON.stringify(cervello)); } catch (errore) { /* pazienza */ }
+  }
+  const livelloDi = (tipo) => (cervello[tipo] ? Math.min(LIVELLO_MAX, Math.floor(Math.sqrt(cervello[tipo].exp / 3))) : 0);
+  const pesoMossa = (f, mossa) => (cervello[f.tipo] && cervello[f.tipo].pesi[mossa]) || 1;
+  function impara(f, mossa, esito, esperienza) {
+    const c = f && cervello[f.tipo];
+    if (!c || MOSSE.indexOf(mossa) < 0) return;
+    const prima = livelloDi(f.tipo);
+    for (const m of MOSSE) c.pesi[m] = 1 + (c.pesi[m] - 1) * 0.994;
+    c.pesi[mossa] = Math.max(0.4, Math.min(2.6, c.pesi[mossa] * (esito > 0 ? 1.08 : 0.94)));
+    if ((mossa === "para" || mossa === "schiva") && c.pesi[mossa] > 1.8) c.pesi[mossa] = 1.8;
+    c.exp = Math.min(5000, c.exp + (esperienza || 0));
+    const dopo = livelloDi(f.tipo);
+    if (dopo > prima) {
+      // Livello nuovo: scintille verdi e un po' più di fiuto.
+      f.furbo = Math.min(2, f.furbo + 0.08);
+      const b = f.p && f.p.testa;
+      if (b) scintille(b.x, b.y - 10 * S, 14, "#5fe08a");
+      salvaCervello(true);
+    } else salvaCervello(false);
+  }
+  // Il carattere di ogni round: casuale, ma chi ha esperienza è più furbo.
+  function nuovoCarattere(f) {
+    const l = livelloDi(f.tipo);
+    f.aggr = caso(0.75, 1.3) + 0.02 * l;
+    f.furbo = Math.min(2, caso(0.6, 1.4) + 0.07 * l);
+  }
+
   function leggiColori() {
     const stile = getComputedStyle(document.documentElement);
     inchiostro = (stile.getPropertyValue("--ink") || "").trim() || "#201e1d";
@@ -246,8 +305,9 @@
       azione: null, t: 0, durata: 0, colpito: false, pensa: caso(20, 60), meta: x,
       passo: 0, dolore: 0, preso: null, scalata: null, inVolo: false, botta: 0, fantasma: false,
       aggr: caso(0.75, 1.3), furbo: caso(0.6, 1.4), furia: 0, tel: null, prendiTel: null, polv: 0,
-      jet: 0, volaY: 0, caos: 0, giro: 0, rot: 0, ix: 0, iy: 0, fiamma: 0,
+      combo: 0, jet: 0, volaY: 0, caos: 0, giro: 0, rot: 0, ix: 0, iy: 0, fiamma: 0,
     };
+    f.furbo = Math.min(2, f.furbo + 0.07 * livelloDi(tipo));
     const sch = scheletro(tipo);
     for (const nome in sch) {
       let [h, dx, r] = sch[nome];
@@ -465,8 +525,9 @@
     const dx = Math.abs(ob.x - mio.x) / S;
     if (dx > 34) { f.meta = ob.x - f.dir * 27 * S; f.pensa = Math.round(caso(5, 16)); return; }
     f.meta = f.cx;
-    inizia(f, scegli([[30 * f.aggr, "pugno"], [22 * f.aggr, "diretto"], [16, "montante"],
-                      [16 * f.aggr, "calcio"], [8 * f.furbo, "para"], [8 * f.furbo, "schiva"]]));
+    inizia(f, scegli([[30 * f.aggr * pesoMossa(f, "pugno"), "pugno"], [22 * f.aggr * pesoMossa(f, "diretto"), "diretto"],
+                      [16 * pesoMossa(f, "montante"), "montante"], [16 * f.aggr * pesoMossa(f, "calcio"), "calcio"],
+                      [8 * f.furbo * pesoMossa(f, "para"), "para"], [8 * f.furbo * pesoMossa(f, "schiva"), "schiva"]]));
   }
 
   // La spinta del jetpack: tiene il corpo alla quota voluta (o lo sbatte
@@ -536,7 +597,7 @@
           const piano = f.dopo; f.dopo = null; f.azione = null;
           if (raggiungibile(f, piano.o)) { iniziaScalata(f, piano.o, piano.lato); return; }
         }
-        f.azione = null; f.pensa = caso(3, 22);
+        f.azione = null; f.pensa = f.combo ? 1 : caso(3, 22);
       }
       return;
     }
@@ -546,17 +607,22 @@
     // Un telefono per terra a portata di mano? Si raccoglie e si lancia.
     if (!f.tel && Math.abs(altro.base - f.base) <= 18 * S) {
       const t = telefonoVicino(f);
-      if (t && Math.random() < 0.5 * f.furbo) {
+      if (t && Math.random() < 0.5 * f.furbo * (1 + 0.08 * livelloDi(f.tipo))) {
         f.dir = t.x >= f.cx ? 1 : -1; f.prendiTel = t; inizia(f, "avanza", t.x); return;
       }
     }
     // Ogni tanto si accende il jetpack e si va a lottare in aria.
-    if (!f.tel && Math.random() < 0.045 * f.furbo) { decolla(f, Math.random() < 0.3); return; }
+    const lv = livelloDi(f.tipo);
+    // Chi ha imparato (livello 4) si alza in volo di proposito per inseguire
+    // un avversario che sta volando.
+    if (!f.tel && Math.random() < 0.045 * f.furbo * (lv >= 4 && altro.jet > 0 ? 5 : 1)) { decolla(f, altro.jet > 0 ? false : Math.random() < 0.3); return; }
     // L'avversario sta per colpire: ci si para o si schiva.
     if (altro.azione && COLPI[altro.azione] && Math.abs(altro.cx - f.cx) < 34 * S &&
-        Math.abs(altro.base - f.base) <= 18 * S && Math.random() < 0.3 * f.furbo) {
+        Math.abs(altro.base - f.base) <= 18 * S &&
+        Math.random() < 0.3 * f.furbo * (pesoMossa(f, "para") + pesoMossa(f, "schiva")) / 2) {
       f.dir = altro.p.bacino.x >= f.p.bacino.x ? 1 : -1;
-      inizia(f, Math.random() < 0.55 ? "para" : "schiva"); return;
+      const wp = pesoMossa(f, "para"), ws = pesoMossa(f, "schiva");
+      inizia(f, Math.random() < wp / (wp + ws) ? "para" : "schiva"); return;
     }
 
     const dy = altro.base - f.base;
@@ -564,13 +630,22 @@
       f.dir = altro.p.bacino.x >= f.p.bacino.x ? 1 : -1;
       const distanza = Math.abs(altro.cx - f.cx) / S;
       if (distanza > 34) {
-        const azione = scegli([[74 * f.aggr, "avanza"], [14, "provoca"], [12, "salto"]]);
+        const azione = scegli([[74 * f.aggr, "avanza"], [14 * pesoMossa(f, "provoca"), "provoca"], [12 * pesoMossa(f, "salto"), "salto"]]);
         inizia(f, azione, altro.cx);
       } else if (distanza < 22) {
-        inizia(f, scegli([[45, "indietro"], [25, "montante"], [30, "pugno"]]));
+        inizia(f, scegli([[45 * pesoMossa(f, "indietro"), "indietro"], [25 * pesoMossa(f, "montante"), "montante"],
+                          [30 * pesoMossa(f, "pugno"), "pugno"]]));
       } else {
-        inizia(f, scegli([[28 * f.aggr, "pugno"], [20 * f.aggr, "diretto"], [14, "montante"],
-                          [22 * f.aggr, "calcio"], [8 / f.aggr, "indietro"], [8, "salto"]]));
+        // Dopo un colpo a segno o una parata si va in serie: solo attacchi,
+        // scelti ancora più in base a quel che ha funzionato.
+        const serie = f.combo; f.combo = 0;
+        const pa = serie ? 2 : 1;
+        inizia(f, scegli([[28 * f.aggr * Math.pow(pesoMossa(f, "pugno"), pa), "pugno"],
+                          [20 * f.aggr * Math.pow(pesoMossa(f, "diretto"), pa), "diretto"],
+                          [14 * Math.pow(pesoMossa(f, "montante"), pa), "montante"],
+                          [22 * f.aggr * Math.pow(pesoMossa(f, "calcio"), pa), "calcio"],
+                          [serie ? 0 : 8 / f.aggr * pesoMossa(f, "indietro"), "indietro"],
+                          [serie ? 0 : 8 * pesoMossa(f, "salto"), "salto"]]));
       }
     } else if (dy > 0) {
       // L'avversario è più in basso: si va verso di lui, e se sta sotto
@@ -641,6 +716,8 @@
   function colpisci(f, altro, forza, x, y, suono) {
     // Una parata di fronte ferma quasi tutto, ma il colpo si sente.
     if (altro.azione === "para" && altro.dir === -f.dir) {
+      impara(altro, "para", 1, 1); impara(f, f.azione, -1, 0);
+      if (livelloDi(altro.tipo) >= 3 && Math.random() < 0.5) altro.combo = 1;
       scrivi("PARATO!", x, y - 6 * S, false);
       scintille(x, y, 5, "#bfe9ff");
       for (const n in altro.p) altro.p[n].ox -= f.dir * forza * 0.12 * S;
@@ -652,6 +729,15 @@
     if (altro.jet > 0 && Math.random() < 0.6) { altro.jet = 0; altro.caos = 0; }
     altro.danni++;
     const ko = altro.danni >= altro.soglia;
+    // Ha imparato qualcosa: chi ha colpito rifà volentieri quella mossa, chi
+    // era a metà di un'altra azione la rimpiange, chi l'ha presa si copre di più.
+    impara(f, f.azione, 1, ko ? 3 : 1);
+    if (COLPI[altro.azione]) impara(altro, altro.azione, -1, 0);
+    if (cervello[altro.tipo]) {
+      const pe = cervello[altro.tipo].pesi;
+      pe.para = Math.min(1.8, pe.para * 1.015); pe.schiva = Math.min(1.8, pe.schiva * 1.015);
+    }
+    if (livelloDi(f.tipo) >= 2 && !ko && Math.random() < 0.14 * livelloDi(f.tipo)) f.combo = 1;
     scintille(x, y, ko ? 16 : 9, f.furia > 0 ? "#ff6a3a" : "#ffe27a");
     fermoColpo = ko ? 9 : 3;
     if (ko) scossa = 12;
@@ -669,7 +755,8 @@
       altro.ko = Math.round(caso(110, 170)); altro.danni = 0; altro.soglia = Math.round(caso(3, 6));
       if (f.tipo) punteggio[f.tipo]++;
       // Ogni round un carattere nuovo: più aggressivo o più cauto.
-      for (const l of lottatori) { l.aggr = caso(0.75, 1.3); l.furbo = caso(0.6, 1.4); }
+      for (const l of lottatori) nuovoCarattere(l);
+      salvaCervello(true);
       scrivi("K.O.!  " + punteggio.robot + "–" + punteggio.mela, altro.p.bacino.x, altro.base - 72 * S, true);
     } else {
       altro.stordito = 12;
@@ -1863,6 +1950,9 @@
     // Solo per i test: un telefono lanciato a mano.
     lanciaTelefono: (x, y, vx, vy) => { const t = nuovoTelefono(x, y, vx, vy); t.stato = "volo"; t.cool = 0; return telefoni.indexOf(t); },
     danneggiaStriscia: (x, forza) => danneggiaStriscia(x, forza),
+    cervello: () => JSON.parse(JSON.stringify(cervello)),
+    livello: (tipo) => livelloDi(tipo),
+    impara: (tipo, mossa, esito, esp) => { const f = lottatori.find((l) => l.tipo === tipo); if (f) impara(f, mossa, esito, esp); },
     decolla: (tipo, impazzito) => { const f = lottatori.find((l) => l.tipo === tipo); if (f) decolla(f, !!impazzito); },
     avviaEvento: (nome) => { prossimoEvento = 1e9; if (nome === "luna") { moltG = 0.45; evento = { nome, durata: 620 }; } },
     stato: () => ({ telefoni: telefoni.map((t) => ({ x: t.x, y: t.y, stato: t.stato, tipo: t.tipo })),
