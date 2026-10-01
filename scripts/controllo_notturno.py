@@ -91,8 +91,14 @@ def main() -> int:
             problemi.append(f"nome «{nome}», atteso che contenga «{atteso}»")
         if serve_firmware and not esito.get("firmware"):
             problemi.append("nessun firmware")
+        # IL CODICE MODELLO ACCANTO AL NOME (richiesta del 30/09/2026): un
+        # risultato col solo nome commerciale non dice quale variante è.
+        if "codici_modello" in esito and not esito.get("codici_modello"):
+            problemi.append("nessun codice modello")
         stato = "OK    " if not problemi else "GUASTO"
-        print(f"{stato}  {query:22} {secondi:5.1f}s  {nome[:34]:34}  {esito.get('riga', '')[:60]}",
+        codice = (esito.get("codici_modello") or [""])[0]
+        print(f"{stato}  {query:22} {secondi:5.1f}s  {nome[:34]:34}  {codice[:14]:14}  "
+              f"{esito.get('riga', '')[:60]}",
               flush=True)
         if problemi:
             guasti.append(f"{query}: " + "; ".join(problemi))

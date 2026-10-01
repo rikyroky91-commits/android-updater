@@ -347,3 +347,58 @@ class TestSceltaDelCodice(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ======================================================================
+# Il codice modello anche fuori dalla pagina: API e controllo notturno
+# ======================================================================
+class TestCodiceNellApiENelControlloNotturno(_Sito):
+    def test_l_api_restituisce_i_codici(self):
+        dati = self.client.get("/api/cerca", params={"q": "SM-A075F"}).json()
+        self.assertIn("codici_modello", dati)
+        self.assertEqual(dati["codici_modello"][0], "SM-A075F")
+
+    def test_apple_usa_l_identificativo(self):
+        from core import appledevices
+        from web import main
+
+        vera_id, vera_cat = appledevices.identifiers_for, main._codici_del_risultato
+        appledevices.identifiers_for = lambda nome: ["iPhone17,1"] if nome == "iPhone 16 Pro" else []
+        main._codici_del_risultato = lambda q, n: []
+        self.addCleanup(setattr, appledevices, "identifiers_for", vera_id)
+        self.addCleanup(setattr, main, "_codici_del_risultato", vera_cat)
+        esito = main._codici_da_mostrare({"query": "iPhone 16 Pro", "nome": "Apple iPhone 16 Pro",
+                                          "trovato": True, "codice": "", "scheda": {}})
+        self.assertEqual(esito["codici_modello"], ["iPhone17,1"])
+
+    def _controllo(self, risposte):
+        import importlib.util
+
+        percorso = os.path.join(_RADICE, "scripts", "controllo_notturno.py")
+        spec = importlib.util.spec_from_file_location("controllo_notturno_prova", percorso)
+        modulo = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(modulo)
+        modulo.CASI = [("Galaxy A07", "a07", True)]
+        modulo.cerca = lambda base, q: risposte
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()) as uscita:
+            codice = modulo.main()
+        return codice, uscita.getvalue()
+
+    def test_il_controllo_notturno_segnala_un_codice_sparito(self):
+        codice, testo = self._controllo({"nome": "Samsung Galaxy A07", "firmware": True,
+                                         "codici_modello": []})
+        self.assertEqual(codice, 1)
+        self.assertIn("nessun codice modello", testo)
+
+    def test_il_controllo_notturno_passa_col_codice(self):
+        codice, _ = self._controllo({"nome": "Samsung Galaxy A07", "firmware": True,
+                                     "codici_modello": ["SM-A075F"]})
+        self.assertEqual(codice, 0)
+
+    def test_un_sito_non_ancora_aggiornato_non_fa_scattare_l_allarme(self):
+        """Fra il merge e il deploy il sito risponde senza il campo: non è
+        un codice sparito, è un campo che non c'è ancora."""
+        codice, _ = self._controllo({"nome": "Samsung Galaxy A07", "firmware": True})
+        self.assertEqual(codice, 0)

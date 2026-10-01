@@ -612,6 +612,11 @@ def _codici_da_mostrare(risultato: dict, imei: dict | None = None) -> dict:
             dal_nome = modelcodes.codes_for_name(_RE_MERCATO_IN_CODA.sub("", nome).strip())
         if not dal_nome and not digitato and risultato.get("query"):
             dal_nome = modelcodes.codes_for_name(risultato["query"])
+        # APPLE NON HA CODICI NEL CATALOGO ANDROID: il suo «codice modello»
+        # è l'identificativo (iPhone17,1), che l'elenco Apple già conosce.
+        if not dal_nome and nome:
+            senza_marca = re.sub(r"^\s*apple\s+", "", nome, flags=re.I)
+            dal_nome = appledevices.identifiers_for(senza_marca)
     except Exception:  # un catalogo non caricato non deve rompere la pagina
         dal_nome = []
     # Prima le forme che hanno davvero l'aspetto di un codice modello, poi
@@ -2056,12 +2061,15 @@ def api_cerca(q: str = Query(default="", max_length=80)):
     q = " ".join((q or "").split())
     if not q:
         return JSONResponse({"errore": "manca q"}, status_code=400)
-    esito = _esito_ricerca(q)
+    esito = _codici_da_mostrare(_esito_ricerca(q))
     return JSONResponse({
         "query": q,
         "trovato": bool(esito.get("trovato")),
         "nome": esito.get("nome") or "",
         "codice": esito.get("codice") or "",
+        # Il codice che la pagina mostra sotto il nome (vedi
+        # `_codici_da_mostrare`): il controllo notturno verifica che ci sia.
+        "codici_modello": (esito.get("codici_modello") or []) + (esito.get("altri_codici") or []),
         "firmware": bool(esito.get("trovato")) and not esito.get("senza_firmware"),
         "tipo_versione": esito.get("tipo_versione") or "",
         "riga": esito.get("riga") or "",
