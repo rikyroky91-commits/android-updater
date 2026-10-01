@@ -12,6 +12,13 @@ services:
   web:
     build:
       context: ../..
+      # IL COMMIT DENTRO L'IMMAGINE (01/10/2026). Il codice arriva qui via
+      # tar, senza `.git`: senza questo argomento /health diceva
+      # «commit: null» e non c'era modo di sapere quale versione girava.
+      # Lo passa `deploy-oracle.yml`; il nome è quello che il Dockerfile
+      # già leggeva su Render.
+      args:
+        RENDER_GIT_COMMIT: ${GIT_COMMIT:-}
     restart: unless-stopped
     # I segreti (GEMINI_API_KEY, TELEGRAM_*, BACKUP_*) e SITE_DOMAIN stanno
     # in ~/sito.env sul server, FUORI dalla cartella del codice: il deploy

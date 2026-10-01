@@ -1410,16 +1410,23 @@ code.codice-mini { display: inline; }
    striscia fa da pavimento al ring dove i due lottatori (vedi
    `static/ring.js`) si picchiano senza sosta. Il canvas non intercetta
    i clic: si può sempre cliccare quello che c'è sotto. */
-body.con-ultimora { padding-bottom: 10.5rem; }
+body.con-ultimora { padding-bottom: 4.5rem; }
 .ultimora {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
   pointer-events: none;
 }
 .ultimora-ring {
-  display: block; width: 100%; height: 118px; pointer-events: none;
+  /* DALL'01/10/2026 IL RING È TUTTA LA FINESTRA: i lottatori si lanciano
+     dovunque e usano gli elementi della pagina come appoggi (vedi
+     `static/ring.js`). Il canvas resta trasparente ai clic. */
+  position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2;
+  display: block; pointer-events: none;
 }
+/* La manina sopra un lottatore, e il pugno chiuso mentre lo si tiene. */
+html.ring-presa, html.ring-presa * { cursor: grab !important; }
+html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-select: none !important; }
 .ultimora-barra {
-  pointer-events: auto;
+  pointer-events: auto; position: relative; z-index: 1;
   display: flex; align-items: stretch; height: 44px;
   border-top: 3px solid var(--accent);
   background: #ffffff; color: #141414;
@@ -1471,8 +1478,7 @@ body.con-ultimora { padding-bottom: 10.5rem; }
 .ultimora-vuota { padding: 0 1rem; align-self: center; font-weight: 600; }
 
 @media (max-width: 640px) {
-  body.con-ultimora { padding-bottom: 8rem; }
-  .ultimora-ring { height: 92px; }
+  body.con-ultimora { padding-bottom: 4rem; }
   .ultimora-barra { height: 40px; }
   .ultimora-ora { display: none; }
   .ultimora-etichetta { padding: 0 1rem 0 .7rem; font-size: .8rem; }

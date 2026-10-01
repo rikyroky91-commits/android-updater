@@ -50,7 +50,7 @@ jobs:
           ORACLE_USER: ${{ secrets.ORACLE_USER }}
         run: |
           tar czf - --exclude=.git . \
-            | ssh -i ~/.ssh/id_oracle "$ORACLE_USER@$ORACLE_HOST" '
+            | ssh -i ~/.ssh/id_oracle "$ORACLE_USER@$ORACLE_HOST" "export GIT_COMMIT=$GITHUB_SHA;"'
                 set -e
                 rm -rf ~/app.nuova && mkdir ~/app.nuova
                 tar xzf - -C ~/app.nuova
@@ -73,12 +73,17 @@ jobs:
           ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
           ORACLE_USER: ${{ secrets.ORACLE_USER }}
         run: |
-          ssh -i ~/.ssh/id_oracle "$ORACLE_USER@$ORACLE_HOST" '
+          # Non basta che risponda: deve rispondere IL COMMIT APPENA
+          # PUBBLICATO. Un container vecchio rimasto su (il «Conflict» del
+          # 26/09) risponderebbe benissimo con la versione di prima.
+          ssh -i ~/.ssh/id_oracle "$ORACLE_USER@$ORACLE_HOST" "export GIT_COMMIT=$GITHUB_SHA;"'
             cd ~/app
             dc="docker compose -f deploy/oracle/docker-compose.yml"
             for i in $(seq 1 30); do
-              $dc exec -T web curl -fsS http://127.0.0.1:8000/health && exit 0
+              salute=$($dc exec -T web curl -fsS http://127.0.0.1:8000/health || true)
+              if echo "$salute" | grep -q "$GIT_COMMIT"; then echo "$salute"; exit 0; fi
               sleep 3
             done
+            echo "Il sito non risponde col commit $GIT_COMMIT:"; echo "$salute"
             $dc logs --tail 50 web; exit 1
           '
