@@ -1574,3 +1574,4 @@ html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-sel
 @media (prefers-reduced-motion: reduce) {
   .ultimora-barra.ultimora-colpita, .ultimora-barra.ultimora-guasta .ultimora-nastro { animation: none; }
 }
+.pannello-recenti-titolo { margin: .3rem 0 .2rem; font-size: .8rem; font-weight: 600; text-align: left; opacity: .7; letter-spacing: .02em; text-transform: uppercase; }

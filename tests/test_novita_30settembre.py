@@ -440,10 +440,11 @@ class TestRecentiFaccinaStriscia(unittest.TestCase):
         self.assertIn("hidden", self.home[i:i + 120])
         self.assertIn('aria-controls="pannello-recenti"', self.home)
 
-    def test_lo_script_costruisce_il_pannello_e_salva_anche_dai_link(self):
-        for pezzo in ("costruisciPannello", "pannello-recenti", "Cancella tutte", "Escape"):
+    def test_lo_script_costruisce_il_pannello_globale(self):
+        for pezzo in ("costruisciPannello", "pannello-recenti", "/api/ricerche-recenti", "Escape"):
             self.assertIn(pezzo, self.js)
-        self.assertIn("aggiungi(campo.value)", self.js)
+        # Le recenti sono di TUTTI e le tiene il server: niente localStorage.
+        self.assertNotIn("localStorage", self.js)
 
     def test_la_faccina_ha_la_versione_stordita(self):
         self.assertIn("faccia-stordita", self.home)
@@ -486,5 +487,58 @@ class TestStrisciaSempreInMovimento(unittest.TestCase):
 
     def test_il_ring_si_accende_con_un_tasto_e_si_ricorda(self):
         js = self.client.get("/static/ring.js").text
-        self.assertIn("mut-ring-gioca", js)
+        self.assertIn('"mut-ring"', js)
         self.assertIn("preferisceFermo", js)
+        self.assertIn("function spegni", js)
+
+
+class TestRicercheRecentiDiTutti(unittest.TestCase):
+    """Le ricerche recenti le tiene il server e le vedono tutti (01/10/2026)."""
+
+    def setUp(self):
+        from fastapi.testclient import TestClient
+        from core import storage
+        from web.main import app
+        self.storage = storage
+        self.client = TestClient(app)
+        with storage.transaction() as conn:
+            conn.execute("DELETE FROM ricerche_recenti")
+
+    def test_si_registra_un_nome_e_lo_vede_un_altro_visitatore(self):
+        self.assertTrue(self.storage.registra_ricerca_recente("Samsung Galaxy S24"))
+        # Un «altro» visitatore: client nuovo, nessun cookie condiviso.
+        from fastapi.testclient import TestClient
+        from web.main import app
+        altro = TestClient(app)
+        voci = altro.get("/api/ricerche-recenti").json()["voci"]
+        self.assertEqual(voci, ["Samsung Galaxy S24"])
+
+    def test_gli_imei_e_i_numeri_lunghi_non_si_registrano(self):
+        for testo in ("867051060315467", "IMEI 86705106", "x" * 70, ""):
+            self.assertFalse(self.storage.registra_ricerca_recente(testo), testo)
+        self.assertEqual(self.storage.ricerche_recenti(), [])
+
+    def test_ordine_dal_piu_recente_e_senza_doppioni(self):
+        for nome in ("Pixel 9", "Galaxy S24", "pixel 9"):
+            self.storage.registra_ricerca_recente(nome)
+        self.assertEqual(self.storage.ricerche_recenti(), ["pixel 9", "Galaxy S24"])
+
+    def test_una_ricerca_riuscita_finisce_nell_elenco_di_tutti(self):
+        from unittest import mock
+        from web import main
+        esito = dict(main._esito_vuoto("galaxy s24"), trovato=True, nome="Samsung Galaxy S24")
+        with mock.patch.object(main, "_esito_ricerca", return_value=esito):
+            self.client.get("/", params={"q": "galaxy s24"}, headers={"user-agent": "Mozilla/5.0 (iPhone)"})
+        self.assertIn("Samsung Galaxy S24", self.storage.ricerche_recenti())
+
+    def test_crawler_e_ricerche_non_riuscite_non_contano(self):
+        from unittest import mock
+        from web import main
+        esito = dict(main._esito_vuoto("galaxy s24"), trovato=True, nome="Samsung Galaxy S24")
+        with mock.patch.object(main, "_esito_ricerca", return_value=esito):
+            self.client.get("/", params={"q": "galaxy s24"}, headers={"user-agent": "GPTBot/1.0"})
+        self.assertEqual(self.storage.ricerche_recenti(), [])
+        non_trovato = dict(main._esito_vuoto("xyz"), trovato=False, nome="xyz")
+        with mock.patch.object(main, "_esito_ricerca", return_value=non_trovato):
+            self.client.get("/", params={"q": "xyz"}, headers={"user-agent": "Mozilla/5.0"})
+        self.assertEqual(self.storage.ricerche_recenti(), [])

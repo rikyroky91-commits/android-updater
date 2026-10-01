@@ -61,13 +61,14 @@
   const ctx = tela.getContext("2d");
   const preferisceFermo = !!(window.matchMedia &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  // Chi ha ridotto i movimenti trova il ring spento, ma può accenderlo col
-  // tasto «Gioca»: la scelta resta nel browser.
-  let giocaComunque = false;
-  try { giocaComunque = window.localStorage.getItem("mut-ring-gioca") === "1"; } catch (errore) { /* niente memoria */ }
-  const fermo = preferisceFermo && !giocaComunque;
+  // IL TASTO CHE SPEGNE TUTTO IL LIVELLO DELLE LOTTE (01/10/2026, su
+  // richiesta): lascia la pagina pulita, con le sole notizie. La scelta resta
+  // nel browser. Chi ha ridotto i movimenti nel telefono lo trova spento.
+  let scelta = null;
+  try { scelta = window.localStorage.getItem("mut-ring"); } catch (errore) { /* niente memoria */ }
+  let fermo = scelta === "off" || (scelta !== "on" && preferisceFermo);
 
-  // --- I tasti della striscia: pausa delle notizie e (se serve) «Gioca» ---
+  // --- I tasti della striscia: pausa delle notizie e lotte accese/spente ---
   const tastoPausa = document.querySelector("[data-pausa]");
   if (tastoPausa && barra) {
     tastoPausa.hidden = false;
@@ -77,15 +78,19 @@
     });
   }
   const tastoGioca = document.querySelector("[data-gioca]");
-  if (tastoGioca && preferisceFermo) {
+  function aggiornaTastoGioca() {
+    if (!tastoGioca) return;
+    tastoGioca.setAttribute("aria-pressed", fermo ? "false" : "true");
+    tastoGioca.title = fermo ? "Accendi le lotte" : "Spegni le lotte e lascia solo le notizie";
+  }
+  if (tastoGioca) {
     tastoGioca.hidden = false;
-    tastoGioca.setAttribute("aria-pressed", giocaComunque ? "true" : "false");
+    aggiornaTastoGioca();
     tastoGioca.addEventListener("click", () => {
-      try {
-        if (giocaComunque) window.localStorage.removeItem("mut-ring-gioca");
-        else window.localStorage.setItem("mut-ring-gioca", "1");
-      } catch (errore) { /* niente memoria: il tasto non può ricordare */ }
-      window.location.reload();
+      fermo = !fermo;
+      try { window.localStorage.setItem("mut-ring", fermo ? "off" : "on"); } catch (errore) { /* pazienza */ }
+      aggiornaTastoGioca();
+      if (fermo) spegni(); else accendi();
     });
   }
 
@@ -99,7 +104,7 @@
   let accento = "#ec3013";
   let passi = 0;
   // Le novità dell'01/10/2026 (telefoni, eventi, particelle, costumi).
-  let telefoni = [], particelle = [], banner = null, evento = null;
+  let telefoni = [], particelle = [], evento = null;
   let fermoColpo = 0, scossa = 0, moltG = 1, ritmo = 1, daSpawnare = 0;
   let prossimoEvento = 700, prossimoTelefono = 360;
   let costume = "nessuno", tavolozza = null;
@@ -281,7 +286,7 @@
     }
     lottatori = [crea("robot", cx0 - scarto, 1, base0), crea("mela", cx0 + scarto, -1, base0)];
     danni = [];
-    scritte = []; telefoni = []; particelle = []; banner = null; evento = null;
+    scritte = []; telefoni = []; particelle = []; evento = null;
     moltG = 1; ritmo = 1; daSpawnare = 0; fermoColpo = 0; scossa = 0;
     // Il robot si presenta con un costume e un colore a caso a ogni caricamento.
     costume = scegli([[2, "nessuno"], [2, "ninja"], [2, "cuoco"], [2, "astronauta"],
@@ -924,17 +929,18 @@
   }
 
   // --- Eventi a sorpresa -----------------------------------------------
-  function annuncia(testo) { banner = { testo, vita: 130 }; }
+  // Gli eventi NON si annunciano con scritte sulla pagina (01/10/2026, su
+  // richiesta: toglievano pulizia al sito): si vedono da quello che succede.
 
   function avviaEvento() {
     const quale = scegli([[3, "luna"], [3, "furia"], [3, "pioggia"], [2, "rallenta"], [2, "terremoto"]]);
-    if (quale === "luna") { moltG = 0.45; evento = { nome: quale, durata: 620 }; annuncia("GRAVITÀ LUNARE"); }
-    else if (quale === "pioggia") { daSpawnare = 7; annuncia("PIOGGIA DI TELEFONI!"); }
-    else if (quale === "rallenta") { ritmo = 0.45; evento = { nome: quale, durata: 150 }; annuncia("RALLENTATORE"); }
-    else if (quale === "terremoto") { evento = { nome: quale, durata: 230 }; annuncia("TERREMOTO!"); }
+    if (quale === "luna") { moltG = 0.45; evento = { nome: quale, durata: 620 };  }
+    else if (quale === "pioggia") { daSpawnare = 7;  }
+    else if (quale === "rallenta") { ritmo = 0.45; evento = { nome: quale, durata: 150 };  }
+    else if (quale === "terremoto") { evento = { nome: quale, durata: 230 };  }
     else {
       const f = lottatori[Math.floor(Math.random() * lottatori.length)];
-      f.furia = 560; annuncia("FURIA " + (f.tipo === "robot" ? "ROBOT" : "MELA") + "!");
+      f.furia = 560;
     }
   }
 
@@ -959,7 +965,6 @@
       if (--evento.durata <= 0) fineEvento();
     }
     for (const f of lottatori) if (f.furia > 0) f.furia--;
-    if (banner && --banner.vita <= 0) banner = null;
     if (scossa > 0) scossa--;
   }
 
@@ -1240,8 +1245,7 @@
       if (f.scalata) f.scalata.y -= dy;
       f.base -= dy;
     }
-    rileva();
-    if (fermo) disegna();
+    if (!fermo) rileva();
   }, { passive: true });
 
   // --- Il disegno ------------------------------------------------------
@@ -1645,16 +1649,6 @@
       ctx.strokeText(s.testo, s.x, s.y); ctx.fillText(s.testo, s.x, s.y);
       ctx.restore();
     }
-    if (banner) {
-      ctx.save();
-      const k = Math.min(1, banner.vita / 20, (130 - banner.vita) / 10 + 0.2);
-      ctx.globalAlpha = Math.max(0, k);
-      ctx.font = "800 " + Math.round(24 * S) + "px Archivo, sans-serif"; ctx.textAlign = "center";
-      ctx.lineWidth = 5 * S; ctx.strokeStyle = "#141414"; ctx.fillStyle = "#ffcf3a";
-      const y = Math.max(70, Math.min(H * 0.28, pavimento - 140 * S));
-      ctx.strokeText(banner.testo, W / 2, y); ctx.fillText(banner.testo, W / 2, y);
-      ctx.restore();
-    }
   }
 
   // --- Il ciclo --------------------------------------------------------
@@ -1663,7 +1657,7 @@
 
   function ciclo(adesso) {
     richiesta = null;
-    if (document.hidden) return;
+    if (document.hidden || fermo) return;
     if (!ultimo) ultimo = adesso;
     riserva += Math.min(100, adesso - ultimo) * ritmo;
     ultimo = adesso;
@@ -1684,31 +1678,41 @@
     richiesta = requestAnimationFrame(ciclo);
   }
 
-  function inGuardiaFermi() {
-    for (let i = 0; i < 90; i++) {
-      for (const f of lottatori) { f.azione = null; f.pensa = 1e9; }
-      passo();
-    }
-    disegna();
+  // Spegne il livello delle lotte: niente disegno, niente presa, niente
+  // danni sulla striscia. Restano le notizie, l'orologio e i tasti.
+  function spegni() {
+    presa.f = null; presa.tel = null; appenaLanciato = false;
+    radiceHtml("remove", "ring-trascina"); radiceHtml("remove", "ring-presa");
+    ctx.clearRect(0, 0, W, H);
+    if (tela.style) tela.style.display = "none";
+    lottatori = []; telefoni = []; particelle = []; danni = []; scritte = []; evento = null;
+    moltG = 1; ritmo = 1;
+    if (barra && barra.classList) barra.classList.remove("ultimora-guasta", "ultimora-colpita");
+    if (faccina && faccina.classList) faccina.classList.remove("stordito");
+  }
+  function accendi() {
+    if (tela.style) tela.style.display = "";
+    avvia();
+    riparti();
   }
 
-  avvia();
-  if (fermo) inGuardiaFermi(); else riparti();
+  if (fermo) { dimensiona(); spegni(); } else { avvia(); riparti(); }
 
   let attesa = null;
   window.addEventListener("resize", () => {
     clearTimeout(attesa);
     attesa = setTimeout(() => {
-      dimensiona(); rileva(); tara();
+      tara();
+      if (fermo) return;
+      dimensiona(); rileva();
       for (const f of lottatori) f.cx = Math.max(20 * S, Math.min(W - 20 * S, f.cx));
-      if (fermo) inGuardiaFermi();
     }, 150);
   });
   if (window.visualViewport && window.visualViewport.addEventListener) {
     window.visualViewport.addEventListener("resize", () => window.dispatchEvent && window.dispatchEvent(new Event("resize")));
   }
-  window.addEventListener("load", rileva);
-  window.addEventListener("mut:tema", () => { leggiColori(); if (fermo) disegna(); });
+  window.addEventListener("load", () => { if (!fermo) rileva(); });
+  window.addEventListener("mut:tema", () => { leggiColori(); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) riparti(); });
 
   // Per i test nel browser: lo stato del ring, in sola lettura.

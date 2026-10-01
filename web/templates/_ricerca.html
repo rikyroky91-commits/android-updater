@@ -17,9 +17,8 @@
      la vista in cima ogni volta che si arriva, e chi sta leggendo un
      risultato non ha chiesto di riscrivere la domanda. #}
   {# `list="ricerche-recenti"` collega il campo a un `<datalist>` popolato
-     da `ricerche-recenti.js` con le ultime ricerche fatte in QUESTO
-     browser (localStorage, non l'archivio: sono comode per chi cerca, non
-     un dato del progetto). Un `<datalist>` risponde da solo alla freccia
+     da `ricerche-recenti.js` con le ultime ricerche fatte da TUTTI
+     (le tiene il server: `/api/ricerche-recenti`, solo nomi di telefoni). Un `<datalist>` risponde da solo alla freccia
      giù quando il campo ha il fuoco — esattamente il gesto chiesto
      dall'utente — senza bisogno di un menu disegnato a mano.
      `autocomplete="off"` resta: senza, il suggerimento nativo del
@@ -48,10 +47,10 @@
     {% if ai_attiva %}<span class="powered-ai">powered by <b>AI</b></span>{% endif %}
   </div>
   {# IL TASTO «RECENTI» sta accanto a «Cerca» e apre l'elenco delle ricerche
-     fatte in questo browser (vedi `ricerche-recenti.js`). Nasce nascosto:
+     fatte da tutti (vedi `ricerche-recenti.js`). Nasce nascosto:
      senza JavaScript non farebbe niente, e un tasto che non fa niente è
      peggio di nessun tasto. #}
   <button type="button" class="tasto-recenti" hidden aria-haspopup="true"
           aria-expanded="false" aria-controls="pannello-recenti"
-          title="Le ricerche che hai fatto di recente">&#128339; Recenti</button>
+          title="Le ultime ricerche, di tutti">&#128339; Recenti</button>
 </form>

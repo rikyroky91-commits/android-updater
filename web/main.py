@@ -509,6 +509,12 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
         verifica = aiquery.verifica(risultato.get("nome") or domanda, contesto)
 
     risultato = _codici_da_mostrare(risultato, imei)
+    # RICERCHE RECENTI DI TUTTI: si registra il nome del telefono TROVATO (non
+    # il testo digitato, non un IMEI), e solo per visite di persone: né
+    # crawler né il secondo caricamento della stessa ricerca.
+    if (risultato.get("trovato") and not imei and not saved and not completo
+            and not _e_un_crawler(request)):
+        storage.registra_ricerca_recente(risultato.get("nome") or "")
     return _rendi(request, "ricerca.html", _contesto(
         request, attiva="cerca", query=q, stats=stats,
         risultato=risultato, imei=imei, verifica_ai=verifica,
@@ -2039,6 +2045,22 @@ def api_interpreta(q: str = Form(...)):
         "errore": None,
         "scartate": list(esito.scartate),
     })
+
+
+def _e_un_crawler(request: Request) -> bool:
+    ua = (request.headers.get("user-agent") or "").lower()
+    if not ua:
+        return True
+    if any(c.lower() in ua for c in _CRAWLER_AI):
+        return True
+    return any(x in ua for x in ("bot", "crawler", "spider", "curl", "python-requests", "httpx"))
+
+
+@app.get("/api/ricerche-recenti")
+def api_ricerche_recenti():
+    """Le ultime ricerche riuscite fatte da chiunque (nomi di telefoni)."""
+    return JSONResponse({"voci": storage.ricerche_recenti(10)},
+                        headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/api/suggerimenti")

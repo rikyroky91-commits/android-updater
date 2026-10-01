@@ -29,7 +29,7 @@ function riquadro(l, t, r, b) {
   return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
 }
 
-function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null } = {}) {
+function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {} } = {}) {
   const richieste = [];
   const ascoltatori = {};
   const contesto2d = new Proxy({}, {
@@ -48,6 +48,8 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
     getBoundingClientRect: () => riquadro(l, t, r, b), closest: () => null,
   }));
   const classi = new Set();
+  const tasto = { hidden: true, attr: {}, title: "", ascolta: {},
+    addEventListener(t, fn) { this.ascolta[t] = fn; }, setAttribute(k, v) { this.attr[k] = v; } };
   const documento = {
     hidden: false,
     documentElement: { classList: { add: (c) => classi.add(c), remove: (c) => classi.delete(c) } },
@@ -56,6 +58,7 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
     querySelector(sel) {
       if (sel === "[data-ring]") return tela;
       if (sel === ".ultimora-barra") return barra;
+      if (sel === "[data-gioca]") return tasto;
       if (sel === ".ricerca-grande input" && campo) return { getBoundingClientRect: () => riquadro(...campo) };
       return null;
     },
@@ -64,6 +67,7 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
   const finestra = {
     devicePixelRatio: 1, innerWidth: larghezza, innerHeight: altezza, scrollY: 0,
     matchMedia: () => ({ matches: ridotto }),
+    localStorage: { getItem: (k) => (k in memoria ? memoria[k] : null), setItem: (k, v) => { memoria[k] = String(v); } },
     addEventListener(tipo, fn) { (ascoltatori[tipo] = ascoltatori[tipo] || []).push(fn); },
   };
   const sandbox = {
@@ -84,7 +88,7 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
   }, extra);
   const amb = {
     finestra, documento, richieste, ascoltatori, classi, pavimento,
-    tela,
+    tela, tasto, memoria,
     stato: () => finestra.__ring.stato(),
     lottatore: (tipo) => finestra.__ring.stato().lottatori.find((f) => f.tipo === tipo),
     // Fa girare N fotogrammi da ~16,7 ms, come farebbe il browser.
@@ -221,13 +225,49 @@ test("per raggiungere l'avversario ci si arrampica", () => {
   assert.ok(scalato, "il robot non si è mai arrampicato");
 });
 
-test("chi ha chiesto meno movimento non ha animazione né presa", () => {
+test("chi ha chiesto meno movimento trova le lotte spente: niente animazione né presa", () => {
   const amb = ambiente({ ridotto: true });
   assert.strictEqual(amb.richieste.length, 0);
-  assert.strictEqual(amb.stato().lottatori.length, 2);
-  const f = amb.lottatore("robot");
-  const e = amb.premi(f.bacino.x, f.bacino.y - 8);
+  assert.strictEqual(amb.stato().lottatori.length, 0);
+  assert.strictEqual(amb.tela.style.display, "none");
+  const e = amb.premi(300, 300);
   assert.ok(!e.bloccato);
+});
+
+test("il tasto spegne tutto il livello delle lotte e lo riaccende", () => {
+  const amb = ambiente();
+  amb.avanza(60);
+  assert.strictEqual(amb.tasto.hidden, false);
+  assert.strictEqual(amb.stato().lottatori.length, 2);
+  amb.tasto.ascolta.click();
+  assert.strictEqual(amb.stato().lottatori.length, 0, "dopo lo spegnimento ci sono ancora lottatori");
+  assert.strictEqual(amb.tela.style.display, "none");
+  assert.strictEqual(amb.memoria["mut-ring"], "off");
+  assert.strictEqual(amb.stato().telefoni.length, 0);
+  amb.avanza(5);
+  assert.strictEqual(amb.richieste.length, 0, "il ciclo gira ancora da spento");
+  const e = amb.premi(300, 300);
+  assert.ok(!e.bloccato, "da spento il ring ruba ancora i clic");
+  amb.tasto.ascolta.click();
+  assert.strictEqual(amb.memoria["mut-ring"], "on");
+  assert.strictEqual(amb.stato().lottatori.length, 2);
+  assert.notStrictEqual(amb.tela.style.display, "none");
+  amb.avanza(120); dentro(amb);
+});
+
+test("la scelta «spento» si ricorda alla visita dopo; «acceso» batte il movimento ridotto", () => {
+  assert.strictEqual(ambiente({ memoria: { "mut-ring": "off" } }).stato().lottatori.length, 0);
+  const acceso = ambiente({ ridotto: true, memoria: { "mut-ring": "on" } });
+  assert.strictEqual(acceso.stato().lottatori.length, 2);
+  assert.ok(acceso.richieste.length > 0);
+});
+
+test("gli eventi non scrivono più scritte grandi sulla pagina", () => {
+  const amb = ambiente();
+  for (let blocco = 0; blocco < 30; blocco++) amb.avanza(60);
+  amb.finestra.__ring.avviaEvento("luna");
+  assert.ok(!/PIOGGIA|LUNARE|RALLENTATORE|TERREMOTO|FURIA/.test(SORGENTE.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "")),
+    "ci sono ancora annunci a schermo");
 });
 
 test("a scheda nascosta il ciclo si ferma, e riparte quando torna visibile", () => {

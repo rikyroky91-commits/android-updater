@@ -160,6 +160,17 @@ CREATE TABLE IF NOT EXISTS search_log (
     searched_at TEXT NOT NULL
 );
 
+-- LE RICERCHE RECENTI DI TUTTI (01/10/2026, su richiesta): il pannello
+-- «Recenti» accanto a «Cerca» mostra le ultime ricerche fatte da chiunque
+-- apra il sito, non solo da chi guarda. Si salva il NOME del telefono
+-- trovato (mai il testo digitato, mai un IMEI): niente numeri di serie di
+-- altri e niente testo libero di sconosciuti sulla home di tutti.
+CREATE TABLE IF NOT EXISTS ricerche_recenti (
+    chiave  TEXT PRIMARY KEY,
+    testo   TEXT NOT NULL,
+    quando  TEXT NOT NULL
+);
+
 -- Fotografia dello stato software al momento in cui si è dichiarato «testato».
 -- È il riferimento contro cui si dice «cosa è cambiato da allora»: senza,
 -- l'app sa dire solo qual è la versione attuale, che non è la domanda del QA.
@@ -1193,6 +1204,42 @@ def get_search_history(limit: int = 30) -> list[dict]:
             "SELECT * FROM search_log ORDER BY id DESC LIMIT ?", (limit,)
         ).fetchall()
     )
+
+
+_RE_CIFRE_LUNGHE = re.compile(r"\d{8,}")
+
+
+def registra_ricerca_recente(nome: str) -> bool:
+    """Aggiunge un telefono (per nome) alle ricerche recenti di tutti.
+
+    Vuole un nome già risolto da una ricerca riuscita. Scarta tutto ciò che
+    contiene otto o più cifre di fila (un IMEI, un TAC, un numero di serie)
+    e i testi troppo lunghi. Torna True se ha registrato."""
+    testo = " ".join((nome or "").split())
+    if not testo or len(testo) > 60 or _RE_CIFRE_LUNGHE.search(testo):
+        return False
+    if any(ord(c) < 32 for c in testo):
+        return False
+    with transaction() as conn:
+        conn.execute(
+            """INSERT INTO ricerche_recenti (chiave, testo, quando) VALUES (?, ?, ?)
+               ON CONFLICT(chiave) DO UPDATE SET testo = excluded.testo, quando = excluded.quando""",
+            (testo.lower(), testo, now_iso()),
+        )
+        # Ne bastano poche: le altre si buttano.
+        conn.execute(
+            """DELETE FROM ricerche_recenti WHERE chiave NOT IN
+               (SELECT chiave FROM ricerche_recenti ORDER BY quando DESC LIMIT 60)"""
+        )
+    return True
+
+
+def ricerche_recenti(limit: int = 10) -> list[str]:
+    conn = connect()
+    righe = conn.execute(
+        "SELECT testo FROM ricerche_recenti ORDER BY quando DESC LIMIT ?", (limit,)
+    ).fetchall()
+    return [r["testo"] if hasattr(r, "keys") else r[0] for r in righe]
 
 
 def clear_search_history() -> None:

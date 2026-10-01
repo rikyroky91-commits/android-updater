@@ -93,15 +93,16 @@
       <p class="ultimora-vuota">Nessuna novità in archivio per ora: la prossima scansione riempie questa striscia.</p>
       {% endif %}
     </div>
-    {# DUE TASTI A DESTRA. «Pausa» ferma lo scorrimento (chi legge una notizia
-       non deve inseguirla; vale anche per chi ha ridotto i movimenti).
-       «Gioca» compare SOLO a chi ha attivato «Riduci movimento» nel
-       telefono: per rispetto il ring parte fermo, ma con un tocco lo si
-       accende. Senza JavaScript restano nascosti. #}
+    {# DUE TASTI A DESTRA. «Pausa» ferma lo scorrimento delle notizie (chi
+       legge non deve inseguirle). «Lotte» spegne tutto il livello dei due
+       lottatori e lascia la pagina con le sole notizie; la scelta resta nel
+       browser, e chi ha ridotto i movimenti nel telefono lo trova spento.
+       Senza JavaScript restano nascosti. #}
     <button type="button" class="ultimora-tasto ultimora-pausa" data-pausa hidden
             aria-pressed="false" title="Ferma o riprendi lo scorrimento">&#10074;&#10074;</button>
     <button type="button" class="ultimora-tasto ultimora-gioca" data-gioca hidden
-            aria-pressed="false" title="Accendi o spegni i lottatori">&#129354;</button>
+            aria-pressed="true" aria-label="Lotte accese o spente"
+            title="Spegni le lotte e lascia solo le notizie">&#129354;</button>
   </div>
 </div>
 {% endblock %}
