@@ -756,3 +756,45 @@ test("i comandi della tendina riaccendono le lotte se erano spente", () => {
   assert.strictEqual(amb.stato().lottatori.length, 2);
   assert.ok(amb.stato().telefoni.some((t) => t.tipo === "spada"));
 });
+
+test("anche la mela va in pezzi e si rimonta; la vittoria va al robot", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  amb.finestra.__ring.esplodi("mela");
+  const s = amb.stato();
+  assert.ok(s.lottatori.find((f) => f.tipo === "mela").esploso);
+  assert.ok(s.pezzi >= 15, "troppi pochi pezzi: " + s.pezzi);
+  assert.strictEqual(s.punteggio.robot, 1);
+  let rimontata = false;
+  amb.avanza(60 * 12, (st) => {
+    for (const f of st.lottatori) assert.ok(Number.isFinite(f.testa.x) && Number.isFinite(f.bacino.y));
+    if (!st.lottatori.find((f) => f.tipo === "mela").esploso) { rimontata = true; return false; }
+  });
+  assert.ok(rimontata, "la mela non si è mai rimontata");
+  assert.strictEqual(amb.stato().pezzi, 0);
+  amb.avanza(300); dentro(amb);
+});
+
+test("tutti e due in pezzi insieme: ognuno si rimonta coi suoi", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  amb.finestra.__ring.esplodi("robot");
+  amb.finestra.__ring.esplodi("mela");
+  assert.ok(amb.stato().lottatori.every((f) => f.esploso));
+  amb.avanza(60 * 12);
+  assert.ok(amb.stato().lottatori.every((f) => !f.esploso), "qualcuno è rimasto in pezzi");
+  assert.strictEqual(amb.stato().pezzi, 0);
+  amb.avanza(120); dentro(amb);
+});
+
+test("una bomba che scoppia addosso fa a pezzi chi la prende in pieno, non chi è lontano", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  const r = amb.lottatore("robot");
+  amb.finestra.__ring.scoppia(r.bacino.x, r.bacino.y, true);
+  const s = amb.stato();
+  assert.ok(s.lottatori.find((f) => f.tipo === "robot").esploso, "preso in pieno, il robot non è andato in pezzi");
+  assert.ok(!s.lottatori.find((f) => f.tipo === "mela").esploso, "la mela era lontana");
+  amb.avanza(60 * 12); dentro(amb);
+  assert.ok(amb.stato().lottatori.every((f) => !f.esploso));
+});
