@@ -35,7 +35,7 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
   const contesto2d = new Proxy({}, {
     get(obj, nome) {
       if (nome in obj) return obj[nome];
-      if (nome === "createRadialGradient") return () => ({ addColorStop() {} });
+      if (nome === "createRadialGradient" || nome === "createLinearGradient") return () => ({ addColorStop() {} });
       return () => {};
     },
     set(obj, nome, valore) { obj[nome] = valore; return true; },
@@ -405,4 +405,50 @@ test("col dito si prende anche un po' più lontano che col mouse", () => {
   for (const fn of amb.ascoltatori.pointerdown || []) fn(e);
   assert.ok(e.bloccato, "il dito non ha preso il lottatore");
   amb.rilascia(lontano.x, lontano.y);
+});
+
+test("col jetpack si decolla e si resta in quota, dentro la finestra", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  const prima = amb.lottatore("robot").bacino.y;
+  amb.finestra.__ring.decolla("robot", false);
+  amb.avanza(150);
+  const f = amb.lottatore("robot");
+  assert.ok(f.vola, "il robot non risulta in volo");
+  assert.ok(f.bacino.y < prima - 40, "il robot non si è alzato da terra: " + prima + " → " + f.bacino.y);
+  assert.ok(f.testa.y < f.bacino.y, "in volo il robot è a testa in giù");
+  dentro(amb);
+});
+
+test("col jetpack impazzito si sbatte in giro ma non si esce dalla finestra né si esplode", () => {
+  const amb = ambiente({ solidi: [[300, 500, 700, 530], [800, 300, 1000, 330]] });
+  amb.avanza(20);
+  amb.finestra.__ring.decolla("robot", true);
+  amb.finestra.__ring.decolla("mela", true);
+  let visto = false;
+  for (let blocco = 0; blocco < 30; blocco++) {
+    amb.avanza(60); dentro(amb);
+    if (amb.stato().lottatori.some((f) => f.caos)) visto = true;
+  }
+  assert.ok(visto, "il jetpack non è mai impazzito");
+});
+
+test("finito il carburante si torna giù e si continua a lottare", () => {
+  const amb = ambiente();
+  amb.avanza(20);
+  amb.finestra.__ring.decolla("mela", false);
+  let atterrata = false;
+  amb.avanza(60 * 25, (s) => { if (!s.lottatori.find((f) => f.tipo === "mela").vola) { atterrata = true; return false; } });
+  dentro(amb);
+  assert.ok(atterrata, "il jetpack non finisce mai");
+});
+
+test("lottando prima o poi qualcuno si alza in volo da solo", () => {
+  let volato = false;
+  for (let prova = 0; prova < 6 && !volato; prova++) {
+    const amb = ambiente();
+    amb.avanza(60 * 60, (s) => { if (s.lottatori.some((f) => f.vola)) { volato = true; return false; } });
+    dentro(amb);
+  }
+  assert.ok(volato, "in sei minuti nessuno ha mai acceso il jetpack");
 });

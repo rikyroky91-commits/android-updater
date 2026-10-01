@@ -136,6 +136,7 @@
   // controlli — campi, tasti, immagini — e la testata intera. Tutto in
   // coordinate della finestra, come il canvas.
   const SOLIDI = "input, button, select, textarea, img";
+  const RIGA_MIN = 24;
   const FUORI = ".ultimora, script, style, canvas, noscript, datalist, [hidden], .sr-only";
 
   function riquadroUtile(r) {
@@ -168,7 +169,9 @@
         if (!padre || padre.closest(FUORI) || padre.closest(SOLIDI) ||
             (testata && padre.closest(".testata"))) continue;
         intervallo.selectNodeContents(nodo);
-        for (const r of intervallo.getClientRects()) aggiungi(r);
+        // Le scritte piccole (note, didascalie, righe di testo corrente) non
+        // sono solide: i lottatori ci si incastravano di continuo.
+        for (const r of intervallo.getClientRects()) if (r.height >= RIGA_MIN) aggiungi(r);
       }
     }
     // Le righe vicine sulla stessa linea diventano un pezzo solo: meno
@@ -243,6 +246,7 @@
       azione: null, t: 0, durata: 0, colpito: false, pensa: caso(20, 60), meta: x,
       passo: 0, dolore: 0, preso: null, scalata: null, inVolo: false, botta: 0, fantasma: false,
       aggr: caso(0.75, 1.3), furbo: caso(0.6, 1.4), furia: 0, tel: null, prendiTel: null, polv: 0,
+      jet: 0, volaY: 0, caos: 0, ix: 0, iy: 0, fiamma: 0,
     };
     const sch = scheletro(tipo);
     for (const nome in sch) {
@@ -432,8 +436,78 @@
     return o && o.b >= f.base - 60 * S && o.t < f.base - 6 * S;
   }
 
+  // --- Il jetpack: si decolla, si lotta in aria, ogni tanto impazzisce ----
+  function decolla(f, impazzito) {
+    const b = f.p.bacino;
+    f.jet = Math.round(caso(260, 560)); f.azione = null; f.scalata = null; f.pensa = 6;
+    f.volaY = Math.max(110, Math.min(pavimento - 90 * S, b.y - caso(70, 170) * S));
+    f.caos = impazzito ? Math.round(caso(200, 340)) : 0;
+    for (const n in f.p) f.p[n].oy = f.p[n].y + 3.5 * S;
+    scintille(b.x, b.y + 22 * S, 8, "#ffb62e");
+  }
+
+  function pensaVolo(f, altro) {
+    if (f.azione) {
+      f.t++;
+      if (f.t >= f.durata) { f.azione = null; f.pensa = Math.round(caso(2, 14)); }
+      return;
+    }
+    if (f.caos > 0 || --f.pensa > 0) return;
+    const ob = altro.p.bacino, mio = f.p.bacino;
+    f.dir = ob.x >= mio.x ? 1 : -1;
+    if (altro.ko || altro.preso) {
+      // L'avversario è a terra: si scende a festeggiare.
+      f.jet = Math.min(f.jet, 70); f.meta = altro.cx; f.volaY = Math.min(pavimento - 60 * S, ob.y - 30 * S);
+      f.pensa = 20; return;
+    }
+    f.volaY = Math.max(100, Math.min(pavimento - 70 * S, ob.y - caso(-8, 28) * S));
+    const dx = Math.abs(ob.x - mio.x) / S;
+    if (dx > 34) { f.meta = ob.x - f.dir * 27 * S; f.pensa = Math.round(caso(5, 16)); return; }
+    f.meta = f.cx;
+    inizia(f, scegli([[30 * f.aggr, "pugno"], [22 * f.aggr, "diretto"], [16, "montante"],
+                      [16 * f.aggr, "calcio"], [8 * f.furbo, "para"], [8 * f.furbo, "schiva"]]));
+  }
+
+  // La spinta del jetpack: tiene il corpo alla quota voluta (o lo sbatte
+  // in giro, se impazzisce). Si applica a tutti i punti, come una forza.
+  function applicaSpinta(f) {
+    const g = GRAVITA * S * moltG, b = f.p.bacino;
+    let spinta;
+    if (f.caos > 0) {
+      f.caos--;
+      if (f.caos % 12 === 0) {
+        const a = caso(0, Math.PI * 2), m = caso(1.8, 3.6) * S;
+        f.ix = Math.cos(a) * m; f.iy = Math.sin(a) * m - 1.2 * S;
+      }
+      spinta = g * 0.92;
+      for (const n in f.p) { f.p[n].x += f.ix * 0.28; f.p[n].y += f.iy * 0.28; }
+      f.p.testa.x += f.ix * 0.12; f.p.testa.y += f.iy * 0.12;
+      if (f.caos === 0) f.volaY = Math.max(110, Math.min(pavimento - 90 * S, b.y));
+      if (passi % 3 === 0) fiammata(f, -f.iy, -f.ix);
+    } else {
+      const err = b.y - f.volaY, vy = b.y - b.oy;
+      spinta = Math.max(0, Math.min(2.2 * g, g + 0.004 * err + 0.14 * vy));
+      // A secco di carburante si sente: la fiamma balbetta.
+      if (f.jet < 45 && (passi & 3) === 0) spinta *= 0.2;
+      if (passi % 2 === 0 && spinta > 0.5 * g) fiammata(f, 3.2, 0);
+    }
+    f.fiamma = spinta / (g * 1.6);
+    for (const n in f.p) f.p[n].y -= spinta;
+  }
+
+  function fiammata(f, vy, vx) {
+    const p = f.p, ang = Math.atan2(p.bacino.y - p.collo.y, p.bacino.x - p.collo.x);
+    const x = p.bacino.x - f.dir * 9 * S + Math.cos(ang) * 4 * S, y = p.bacino.y + Math.sin(ang) * 4 * S + 3 * S;
+    for (let i = 0; i < 2 && particelle.length < 170; i++) {
+      particelle.push({ tipo: "fiamma", x: x + caso(-2, 2) * S, y, vx: (vx + caso(-0.7, 0.7)) * S * 0.6,
+                        vy: (Math.max(1.5, vy) + caso(0, 1.4)) * S, vita: Math.round(caso(10, 18)), max: 18,
+                        colore: ["#ff7a1a", "#ffb62e", "#fff1a0"][Math.floor(Math.random() * 3)] });
+    }
+  }
+
   function pensa(f, altro) {
     if (f.ko || f.stordito || f.preso || f.scalata || f.inVolo) return;
+    if (f.jet > 0) { pensaVolo(f, altro); return; }
     if (f.azione) {
       f.t++;
       const vicino = Math.abs(altro.base - f.base) <= 18 * S &&
@@ -466,6 +540,8 @@
         f.dir = t.x >= f.cx ? 1 : -1; f.prendiTel = t; inizia(f, "avanza", t.x); return;
       }
     }
+    // Ogni tanto si accende il jetpack e si va a lottare in aria.
+    if (!f.tel && Math.random() < 0.07 * f.furbo) { decolla(f, Math.random() < 0.22); return; }
     // L'avversario sta per colpire: ci si para o si schiva.
     if (altro.azione && COLPI[altro.azione] && Math.abs(altro.cx - f.cx) < 34 * S &&
         Math.abs(altro.base - f.base) <= 18 * S && Math.random() < 0.3 * f.furbo) {
@@ -563,6 +639,7 @@
     }
     if (f.furia > 0) forza *= 1.5;
     if (altro.tel) lasciaCadere(altro);
+    if (altro.jet > 0 && Math.random() < 0.6) { altro.jet = 0; altro.caos = 0; }
     altro.danni++;
     const ko = altro.danni >= altro.soglia;
     scintille(x, y, ko ? 16 : 9, f.furia > 0 ? "#ff6a3a" : "#ffe27a");
@@ -796,6 +873,7 @@
       q.x += q.vx; q.y += q.vy; q.vita--;
       if (q.tipo === "scintilla") { q.vx *= 0.93; q.vy = q.vy * 0.93 + 0.12 * S; }
       else if (q.tipo === "polvere") { q.vx *= 0.96; q.vy *= 0.96; }
+      else if (q.tipo === "fiamma") { q.vx *= 0.94; q.vy *= 0.97; }
       else { q.vy += 0.3 * S * moltG; q.rot += 0.3; if (q.y > pavimento) { q.y = pavimento; q.vy *= -0.4; q.vx *= 0.7; } }
     }
     particelle = particelle.filter((q) => q.vita > 0);
@@ -933,10 +1011,11 @@
   // richiesta: toglievano pulizia al sito): si vedono da quello che succede.
 
   function avviaEvento() {
-    const quale = scegli([[3, "luna"], [3, "furia"], [3, "pioggia"], [2, "rallenta"], [2, "terremoto"]]);
+    const quale = scegli([[3, "luna"], [3, "furia"], [3, "pioggia"], [2, "rallenta"], [2, "terremoto"], [3, "jet"]]);
     if (quale === "luna") { moltG = 0.45; evento = { nome: quale, durata: 620 };  }
     else if (quale === "pioggia") { daSpawnare = 7;  }
     else if (quale === "rallenta") { ritmo = 0.45; evento = { nome: quale, durata: 150 };  }
+    else if (quale === "jet") { for (const f of lottatori) if (!f.ko && !f.preso) decolla(f, true); }
     else if (quale === "terremoto") { evento = { nome: quale, durata: 230 };  }
     else {
       const f = lottatori[Math.floor(Math.random() * lottatori.length)];
@@ -1103,10 +1182,14 @@
       if (f.dolore > 0) f.dolore--;
       if (f.botta > 0) f.botta--;
 
+      if (f.ko > 0 || f.preso) { f.jet = 0; f.caos = 0; }
+      if (f.caos > 0) f.forza = Math.min(f.forza, 0.35);
       if (!f.scalata) {
         const [y, chi] = appoggio(f);
         f.base = y; f.supporto = chi;
       }
+      // In volo la «base» è il corpo stesso: il busto resta dritto da solo.
+      if (f.jet > 0) { f.base = f.p.bacino.y + 30 * S; f.supporto = null; }
       pensa(f, altro);
 
       if (f.scalata) {
@@ -1121,6 +1204,10 @@
           for (const n in f.p) { f.p[n].oy = f.p[n].y + 4.5 * S; f.p[n].ox = f.p[n].x + s * 2.2 * S; }
           f.scalata = null; f.base = sc.o.t; f.supporto = sc.o; f.pensa = 8;
         }
+      } else if (f.jet > 0) {
+        f.jet--;
+        f.cx += Math.max(-2.2 * S, Math.min(2.2 * S, (f.meta - f.cx) * 0.08));
+        f.passo += 0.12;
       } else if (f.azione === "avanza") {
         const davanti = ostacoloDavanti(f);
         if (davanti) iniziaScalata(f, davanti, f.dir > 0 ? -1 : 1);
@@ -1177,6 +1264,10 @@
         pt.x += Math.max(-VELOCITA_MAX * S, Math.min(VELOCITA_MAX * S, presa.x - pt.x));
         pt.y += Math.max(-VELOCITA_MAX * S, Math.min(VELOCITA_MAX * S, presa.y - pt.y));
       }
+      // In volo si passa attraverso il testo e i campi (come un oggetto
+      // sollevato): urtandoli punto per punto il corpo si deformava. Restano
+      // solidi il pavimento (la striscia) e i bordi della finestra.
+      if (f.jet > 0 && !f.preso) { f.fantasma = true; applicaSpinta(f); } else f.fiamma = 0;
       // Verlet.
       for (const n in f.p) {
         const pt = f.p[n];
@@ -1305,6 +1396,49 @@
     ctx.closePath(); ctx.fill();
   }
 
+  // IL GUANTONE DA PUGILE, al posto della manina: il polsino bianco, il
+  // corpo del guanto lungo l'avambraccio, il pollice e un riflesso.
+  function guanto(gomito, mano, colore, r) {
+    const ang = Math.atan2(mano.y - gomito.y, mano.x - gomito.x);
+    ctx.save(); ctx.translate(mano.x, mano.y); ctx.rotate(ang);
+    ctx.fillStyle = "#f4f4f4"; ctx.strokeStyle = "#111"; ctx.lineWidth = 1.1 * S;
+    rettangoloTondo(-r * 1.9, -r * 0.7, r * 1.1, r * 1.4, r * 0.3); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = colore;
+    ctx.beginPath(); ctx.ellipse(r * 0.15, 0, r * 1.25, r * 1.05, 0, 0, Math.PI * 2); ctx.fill(); ctx.lineWidth = 1.3 * S; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(r * 0.05, r * 0.85, r * 0.55, r * 0.38, -0.3, 0, Math.PI * 2); ctx.fill(); ctx.lineWidth = 1 * S; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = 1 * S; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(r * 0.2, 0, r * 0.75, -2.2, -1.2); ctx.stroke();
+    ctx.restore();
+  }
+
+  // IL JETPACK: due bombole sul dorso, con gli ugelli e, quando spinge, la fiamma.
+  function zaino(f, indietro) {
+    const p = f.p, tx = p.bacino.x - p.collo.x, ty = p.bacino.y - p.collo.y, tl = Math.hypot(tx, ty) || 1;
+    const ux = tx / tl, uy = ty / tl;
+    let nx = -uy, ny = ux;
+    if (nx * f.dir > 0) { nx = -nx; ny = -ny; }          // verso la schiena
+    const cx = p.collo.x + tx * 0.5 + nx * indietro, cy = p.collo.y + ty * 0.5 + ny * indietro;
+    const ang = Math.atan2(ty, tx) - Math.PI / 2;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
+    for (const [dx, col] of [[-2.6, "#7d8696"], [2.6, "#b3bbc9"]]) {
+      ctx.fillStyle = col; ctx.strokeStyle = "#111"; ctx.lineWidth = 1 * S;
+      rettangoloTondo((dx - 2.6) * S, -9 * S, 5.2 * S, 18 * S, 2.4 * S); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#e8741a"; ctx.fillRect((dx - 2.6) * S, -3 * S, 5.2 * S, 2.2 * S);
+      ctx.fillStyle = "#2b2f3a"; ctx.beginPath();
+      ctx.moveTo((dx - 2.2) * S, 9 * S); ctx.lineTo((dx + 2.2) * S, 9 * S);
+      ctx.lineTo((dx + 3.2) * S, 12 * S); ctx.lineTo((dx - 3.2) * S, 12 * S); ctx.closePath(); ctx.fill();
+      if (f.fiamma > 0.05) {
+        const lung = (6 + 14 * Math.min(1.4, f.fiamma)) * S * (0.8 + 0.4 * Math.random());
+        const g = ctx.createLinearGradient(0, 12 * S, 0, 12 * S + lung);
+        g.addColorStop(0, "#fff7b0"); g.addColorStop(0.45, "#ffb62e"); g.addColorStop(1, "rgba(255,90,20,0)");
+        ctx.fillStyle = g; ctx.beginPath();
+        ctx.moveTo((dx - 2.6) * S, 12 * S); ctx.lineTo((dx + 2.6) * S, 12 * S); ctx.lineTo(dx * S, 12 * S + lung);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
   function mantello(f, p, colore) {
     const dietro = -f.dir;
     const lag = Math.max(-9 * S, Math.min(9 * S, (p.collo.ox - p.collo.x) * 7));
@@ -1383,16 +1517,13 @@
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.bacino.x, p.bacino.y - 14 * S, 38 * S, 0, Math.PI * 2); ctx.fill();
     }
     if (costume === "eroe") mantello(f, p, "#e8941c");
-    if (costume === "astronauta") {
-      ctx.fillStyle = "#cfd4de"; rettangoloTondo(Math.min(p.collo.x, p.bacino.x) - f.dir * 12 * S - 5 * S,
-        p.collo.y - 1 * S, 10 * S, 22 * S, 3 * S); ctx.fill();
-    }
+    zaino(f, 10.5 * S);
     // Arto lontano e gamba lontana.
     arto(p.bacino, p.ginocchioD, p.piedeD, 5 * S, scuro);
     tondo(p.ginocchioD.x, p.ginocchioD.y, 2.8 * S, mani);
     arto(p.collo, p.gomitoD, p.manoD, 4.4 * S, scuro);
     tondo(p.gomitoD.x, p.gomitoD.y, 2.4 * S, mani);
-    tondo(p.manoD.x, p.manoD.y, 3.3 * S, mani);
+    guanto(p.gomitoD, p.manoD, "#b92b22", 3.9 * S);
     // Busto.
     const ang = Math.atan2(p.bacino.y - p.collo.y, p.bacino.x - p.collo.x) - Math.PI / 2;
     const lung = Math.hypot(p.bacino.x - p.collo.x, p.bacino.y - p.collo.y);
@@ -1464,7 +1595,7 @@
     ctx.restore();
     arto(p.collo, p.gomitoA, p.manoA, 4.4 * S, verde);
     tondo(p.gomitoA.x, p.gomitoA.y, 2.4 * S, scuro);
-    tondo(p.manoA.x, p.manoA.y, 3.5 * S, mani);
+    guanto(p.gomitoA, p.manoA, "#e03a2f", 4.2 * S);
   }
 
   // LA MELA: polpa bianca dentro, contorni neri, occhi neri
@@ -1523,6 +1654,7 @@
       ctx.strokeStyle = nero; ctx.lineWidth = 1.2 * S; ctx.stroke();
     }
     const spalla = { x: p.collo.x * 0.4 + p.bacino.x * 0.6, y: p.collo.y * 0.4 + p.bacino.y * 0.6 };
+    zaino(f, 16 * S);
     // Le braccia partono dai FIANCHI del frutto, non dal centro: così non
     // attraversano la faccia.
     const tx = p.bacino.x - p.collo.x, ty = p.bacino.y - p.collo.y, tl = Math.hypot(tx, ty) || 1;
@@ -1576,11 +1708,9 @@
     ctx.restore();
     // Tutt'e due le braccia stanno DAVANTI al corpo: prima quella lontana
     // finiva dietro la polpa e la mela sembrava avere una mano sola.
-    for (const [gomito, mano, r] of [[p.gomitoD, p.manoD, 3.4], [p.gomitoA, p.manoA, 3.6]]) {
+    for (const [gomito, mano, r, colore] of [[p.gomitoD, p.manoD, 3.9, "#1f56b8"], [p.gomitoA, p.manoA, 4.2, "#2f72e0"]]) {
       if (mano !== p.manoD) arto(spallaA, gomito, mano, 3 * S, nero);
-      tondo(mano.x, mano.y, r * S, "#f7f7f7");
-      ctx.strokeStyle = nero; ctx.lineWidth = 1.3 * S;
-      ctx.beginPath(); ctx.arc(mano.x, mano.y, r * S, 0, Math.PI * 2); ctx.stroke();
+      guanto(gomito, mano, colore, r * S);
     }
   }
 
@@ -1613,6 +1743,9 @@
     if (q.tipo === "scintilla") {
       ctx.strokeStyle = q.colore; ctx.lineWidth = 1.6 * S; ctx.lineCap = "round";
       ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - q.vx * 1.6, q.y - q.vy * 1.6); ctx.stroke();
+    } else if (q.tipo === "fiamma") {
+      ctx.fillStyle = q.colore; ctx.beginPath();
+      ctx.arc(q.x, q.y, Math.max(0.5, (1 + 3.2 * (q.vita / q.max))) * S, 0, Math.PI * 2); ctx.fill();
     } else if (q.tipo === "polvere") {
       ctx.fillStyle = q.colore; ctx.beginPath(); ctx.arc(q.x, q.y, (2 + (1 - q.vita / q.max) * 4) * S, 0, Math.PI * 2); ctx.fill();
     } else {
@@ -1720,12 +1853,13 @@
     // Solo per i test: un telefono lanciato a mano.
     lanciaTelefono: (x, y, vx, vy) => { const t = nuovoTelefono(x, y, vx, vy); t.stato = "volo"; t.cool = 0; return telefoni.indexOf(t); },
     danneggiaStriscia: (x, forza) => danneggiaStriscia(x, forza),
+    decolla: (tipo, impazzito) => { const f = lottatori.find((l) => l.tipo === tipo); if (f) decolla(f, !!impazzito); },
     avviaEvento: (nome) => { prossimoEvento = 1e9; if (nome === "luna") { moltG = 0.45; evento = { nome, durata: 620 }; } },
     stato: () => ({ telefoni: telefoni.map((t) => ({ x: t.x, y: t.y, stato: t.stato, tipo: t.tipo })),
     costume, particelle: particelle.length, danniStriscia: danni.length,
     campoRicerca: !!document.querySelector(".ricerca-grande input"), evento: evento ? evento.nome : null, moltG,
     lottatori: lottatori.map((f) => ({
-    danni: f.danni, tel: !!f.tel, furia: f.furia,
+    danni: f.danni, tel: !!f.tel, furia: f.furia, vola: f.jet > 0, caos: f.caos > 0,
     tipo: f.tipo, ko: f.ko, azione: f.azione, preso: !!f.preso,
     scalando: !!f.scalata, base: f.base, sopraUnElemento: !!f.supporto,
     testa: { x: f.p.testa.x, y: f.p.testa.y }, bacino: { x: f.p.bacino.x, y: f.p.bacino.y },
