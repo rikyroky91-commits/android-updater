@@ -47,4 +47,11 @@
     <button type="submit">Cerca</button>
     {% if ai_attiva %}<span class="powered-ai">powered by <b>AI</b></span>{% endif %}
   </div>
+  {# IL TASTO «RECENTI» sta accanto a «Cerca» e apre l'elenco delle ricerche
+     fatte in questo browser (vedi `ricerche-recenti.js`). Nasce nascosto:
+     senza JavaScript non farebbe niente, e un tasto che non fa niente è
+     peggio di nessun tasto. #}
+  <button type="button" class="tasto-recenti" hidden aria-haspopup="true"
+          aria-expanded="false" aria-controls="pannello-recenti"
+          title="Le ricerche che hai fatto di recente">&#128339; Recenti</button>
 </form>

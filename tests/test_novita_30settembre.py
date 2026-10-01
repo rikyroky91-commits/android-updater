@@ -420,3 +420,71 @@ class TestFileStaticiFirmati(unittest.TestCase):
         a = contesto.statico("style.css")
         self.assertRegex(a, r"^/static/style\.css\?v=[0-9a-f]{10}$")
         self.assertEqual(contesto.statico("non-esiste.css"), "/static/non-esiste.css")
+
+
+class TestRecentiFaccinaStriscia(unittest.TestCase):
+    """Tasto «Recenti», faccina stordita, striscia verde (01/10/2026)."""
+
+    @classmethod
+    def setUpClass(cls):
+        from fastapi.testclient import TestClient
+        from web.main import app
+        cls.client = TestClient(app)
+        cls.home = cls.client.get("/").text
+        cls.css = cls.client.get("/static/style.css").text
+        cls.js = cls.client.get("/static/ricerche-recenti.js").text
+
+    def test_il_tasto_recenti_sta_accanto_a_cerca_e_nasce_nascosto(self):
+        i = self.home.index('class="tasto-recenti"')
+        self.assertGreater(i, self.home.index(">Cerca</button>"))
+        self.assertIn("hidden", self.home[i:i + 120])
+        self.assertIn('aria-controls="pannello-recenti"', self.home)
+
+    def test_lo_script_costruisce_il_pannello_e_salva_anche_dai_link(self):
+        for pezzo in ("costruisciPannello", "pannello-recenti", "Cancella tutte", "Escape"):
+            self.assertIn(pezzo, self.js)
+        self.assertIn("aggiungi(campo.value)", self.js)
+
+    def test_la_faccina_ha_la_versione_stordita(self):
+        self.assertIn("faccia-stordita", self.home)
+        self.assertIn("🥴", self.home)
+        self.assertIn(".furbetto.stordito .faccia-stordita", self.css)
+
+    def test_la_striscia_e_verde_e_non_rossa(self):
+        blocco = self.css[self.css.index(".ultimora-barra {"):self.css.index(".ultimora-ora {")]
+        self.assertIn("border-top: 3px solid var(--verde)", blocco)
+        self.assertNotIn("var(--accent)", blocco)
+        etichetta = self.css[self.css.index(".ultimora-etichetta {"):self.css.index(".ultimora-nastro {")]
+        self.assertIn("background: var(--verde)", etichetta)
+        self.assertIn("Barlow Condensed", self.css)
+        self.assertIn("Barlow+Condensed", self.home)
+
+
+class TestStrisciaSempreInMovimento(unittest.TestCase):
+    """Con «Riduci movimento» attivo (iPhone) le notizie devono scorrere lo
+    stesso, più piano, con un tasto per fermarle; il ring è opt-in."""
+
+    @classmethod
+    def setUpClass(cls):
+        from fastapi.testclient import TestClient
+        from web.main import app
+        cls.client = TestClient(app)
+        cls.home = cls.client.get("/").text
+        cls.css = cls.client.get("/static/style.css").text
+
+    def test_i_due_tasti_ci_sono_e_nascono_nascosti(self):
+        for marca in ("data-pausa", "data-gioca"):
+            i = self.home.index(marca)
+            self.assertIn("hidden", self.home[i:i + 40])
+
+    def test_ridurre_i_movimenti_non_spegne_piu_lo_scorrimento(self):
+        i = self.css.index("CHI HA RIDOTTO I MOVIMENTI")
+        blocco = self.css[i:self.css.index("@media print", i)]
+        self.assertNotIn("animation: none", blocco)
+        self.assertIn("animation-duration: calc(var(--durata, 90s) * 1.6)", blocco)
+        self.assertIn(".ultimora-barra.in-pausa .ultimora-scorre", blocco)
+
+    def test_il_ring_si_accende_con_un_tasto_e_si_ricorda(self):
+        js = self.client.get("/static/ring.js").text
+        self.assertIn("mut-ring-gioca", js)
+        self.assertIn("preferisceFermo", js)

@@ -29,7 +29,7 @@ function riquadro(l, t, r, b) {
   return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
 }
 
-function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [] } = {}) {
+function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null } = {}) {
   const richieste = [];
   const ascoltatori = {};
   const contesto2d = new Proxy({}, {
@@ -40,7 +40,7 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
     },
     set(obj, nome, valore) { obj[nome] = valore; return true; },
   });
-  const tela = { clientWidth: larghezza, clientHeight: altezza, width: 0, height: 0,
+  const tela = { clientWidth: larghezza, clientHeight: altezza, width: 0, height: 0, style: {},
                  getContext: () => contesto2d };
   const pavimento = altezza - 44;
   const barra = { getBoundingClientRect: () => riquadro(0, pavimento, larghezza, altezza) };
@@ -56,6 +56,7 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
     querySelector(sel) {
       if (sel === "[data-ring]") return tela;
       if (sel === ".ultimora-barra") return barra;
+      if (sel === ".ricerca-grande input" && campo) return { getBoundingClientRect: () => riquadro(...campo) };
       return null;
     },
     addEventListener(tipo, fn) { (ascoltatori["doc:" + tipo] = ascoltatori["doc:" + tipo] || []).push(fn); },
@@ -83,6 +84,7 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
   }, extra);
   const amb = {
     finestra, documento, richieste, ascoltatori, classi, pavimento,
+    tela,
     stato: () => finestra.__ring.stato(),
     lottatore: (tipo) => finestra.__ring.stato().lottatori.find((f) => f.tipo === tipo),
     // Fa girare N fotogrammi da ~16,7 ms, come farebbe il browser.
@@ -237,4 +239,130 @@ test("a scheda nascosta il ciclo si ferma, e riparte quando torna visibile", () 
   amb.documento.hidden = false;
   for (const fn of amb.ascoltatori["doc:visibilitychange"] || []) fn();
   assert.strictEqual(amb.richieste.length, 1);
+});
+
+test("i telefoni compaiono a caso, restano nella finestra e non esplodono", () => {
+  const amb = ambiente({ solidi: [[300, 600, 700, 630]] });
+  let visti = 0;
+  for (let blocco = 0; blocco < 120; blocco++) {
+    amb.avanza(60);
+    const s = amb.stato();
+    visti = Math.max(visti, s.telefoni.length);
+    for (const t of s.telefoni) {
+      assert.ok(Number.isFinite(t.x) && Number.isFinite(t.y), "telefono con coordinate non finite");
+      assert.ok(t.x >= 0 && t.x <= s.larghezza && t.y <= s.pavimento + 0.5, "telefono fuori dalla finestra");
+    }
+  }
+  assert.ok(visti > 0, "in due minuti non è comparso nessun telefono");
+});
+
+test("un telefono lanciato addosso a un lottatore gli fa male", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  const m = amb.lottatore("mela");
+  amb.finestra.__ring.lanciaTelefono(m.testa.x - 60, m.testa.y - 2, 8, 0);
+  const prima = m.danni;
+  let colpito = false;
+  amb.avanza(30, (s) => {
+    if (s.lottatori.find((f) => f.tipo === "mela").danni > prima || s.punteggio.robot + s.punteggio.mela > 0) { colpito = true; return false; }
+  });
+  assert.ok(colpito, "il telefono è passato attraverso la mela");
+});
+
+test("un telefono si prende col puntatore e si lancia", () => {
+  const amb = ambiente();
+  amb.avanza(10);
+  const i = amb.finestra.__ring.lanciaTelefono(200, 100, 0, 0);
+  amb.avanza(1);
+  let t = amb.stato().telefoni[i];
+  const e = amb.premi(t.x, t.y);
+  assert.ok(e.bloccato, "la presa sul telefono non ha trattenuto il gesto");
+  for (const x of [260, 340, 440]) { amb.muovi(x, 90); amb.avanza(1); }
+  assert.strictEqual(amb.stato().telefoni[i].stato, "preso");
+  amb.rilascia(440, 90);
+  const prima = amb.stato().telefoni[i].x;
+  amb.avanza(8);
+  assert.ok(amb.stato().telefoni[i].x - prima > 20, "il lancio non ha dato velocità al telefono");
+});
+
+test("gli eventi cambiano le regole: la gravità lunare rallenta la caduta", () => {
+  const amb = ambiente();
+  amb.avanza(5);
+  amb.finestra.__ring.avviaEvento("luna");
+  assert.strictEqual(amb.stato().moltG, 0.45);
+  assert.strictEqual(amb.stato().evento, "luna");
+  for (let blocco = 0; blocco < 20; blocco++) { amb.avanza(60); dentro(amb); }
+});
+
+test("il robot si presenta con un costume tra quelli previsti", () => {
+  const amb = ambiente();
+  assert.ok(["nessuno", "ninja", "cuoco", "astronauta", "mago", "pirata", "eroe"].includes(amb.stato().costume));
+});
+
+test("un lottatore raccoglie un telefono da terra e lo lancia", () => {
+  let lanciato = false;
+  for (let prova = 0; prova < 8 && !lanciato; prova++) {
+    const amb = ambiente();
+    amb.avanza(10);
+    const r = amb.lottatore("robot");
+    const i = amb.finestra.__ring.lanciaTelefono(r.bacino.x + 40, amb.pavimento - 12, 0, 0);
+    amb.avanza(1500, (s) => {
+      if (s.lottatori.some((f) => f.tel)) { lanciato = true; return false; }
+    });
+    dentro(amb);
+  }
+  assert.ok(lanciato, "nessuno ha mai raccolto un telefono da terra");
+});
+
+test("la partenza è sul bordo alto della barra di ricerca", () => {
+  const amb = ambiente({ campo: [100, 320, 1000, 380], solidi: [[100, 320, 1000, 380]] });
+  const s = amb.stato();
+  assert.ok(s.campoRicerca);
+  for (const f of s.lottatori) {
+    assert.ok(Math.abs(f.bacino.y - 320) < 70, f.tipo + " non parte dalla barra: " + f.bacino.y);
+    assert.ok(f.bacino.x > 300 && f.bacino.x < 800);
+  }
+  amb.avanza(60);
+  for (const f of amb.stato().lottatori) assert.ok(f.base < 400, "è già caduto giù dalla barra");
+});
+
+test("chi si schianta sulle notizie le danneggia, e poi si riparano", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  amb.porta("robot", 600, 120, 10);
+  amb.rilascia(600, 120);
+  let danneggiata = false;
+  amb.avanza(240, (s) => { if (s.danniStriscia > 0) { danneggiata = true; return false; } });
+  assert.ok(danneggiata, "una caduta dall'alto non ha lasciato segni sulla striscia");
+  amb.avanza(120); dentro(amb);
+  // Con le crepe disegnate niente deve esplodere; i danni non superano il
+  // massimo e, col tempo, si riparano (almeno una volta la striscia è intatta).
+  let intatta = false;
+  for (let blocco = 0; blocco < 300; blocco++) {
+    amb.avanza(60); dentro(amb);
+    const n = amb.stato().danniStriscia;
+    assert.ok(n <= 5, "troppi danni insieme: " + n);
+    if (n === 0) intatta = true;
+  }
+  assert.ok(intatta, "i danni non si riparano mai");
+});
+
+test("il canvas ha la dimensione esatta dell'area visibile, non 100vh (iPhone)", () => {
+  const amb = ambiente({ larghezza: 390, altezza: 664 });
+  assert.strictEqual(amb.tela.style.width, "390px");
+  assert.strictEqual(amb.tela.style.height, "664px");
+});
+
+test("col dito si prende anche un po' più lontano che col mouse", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  const f = amb.lottatore("robot");
+  const lontano = { x: f.bacino.x + 24, y: f.bacino.y - 8 };
+  const mouse = amb.premi(lontano.x, lontano.y);
+  amb.rilascia(lontano.x, lontano.y);
+  const e = Object.assign({ clientX: lontano.x, clientY: lontano.y, button: 0, pointerType: "touch",
+    preventDefault() { this.bloccato = true; }, stopPropagation() {} });
+  for (const fn of amb.ascoltatori.pointerdown || []) fn(e);
+  assert.ok(e.bloccato, "il dito non ha preso il lottatore");
+  amb.rilascia(lontano.x, lontano.y);
 });

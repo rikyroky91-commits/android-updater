@@ -86,6 +86,81 @@
     modulo.insertAdjacentElement("afterend", tasto);
   }
 
+  // IL PANNELLO DEI «RECENTI»: un elenco vero, con ogni ricerca cliccabile e
+  // una crocetta per toglierla, aperto dal tasto accanto a «Cerca». Il
+  // `<datalist>` resta (freccia giù), ma non si vede su telefono e non dice
+  // che esiste: questo è il modo visibile di arrivarci.
+  function costruisciPannello(modulo, tasto) {
+    const pannello = document.createElement("div");
+    pannello.id = "pannello-recenti";
+    pannello.className = "pannello-recenti";
+    pannello.hidden = true;
+    pannello.setAttribute("role", "region");
+    pannello.setAttribute("aria-label", "Ricerche recenti");
+    modulo.insertAdjacentElement("afterend", pannello);
+
+    function disegna() {
+      pannello.innerHTML = "";
+      const elenco = leggi();
+      if (!elenco.length) {
+        const vuoto = document.createElement("p");
+        vuoto.className = "pannello-recenti-vuoto";
+        vuoto.textContent = "Nessuna ricerca recente: compaiono qui appena ne fai una.";
+        pannello.appendChild(vuoto);
+        return;
+      }
+      const lista = document.createElement("ul");
+      elenco.forEach(function (voce) {
+        const riga = document.createElement("li");
+        const link = document.createElement("a");
+        link.href = "/?q=" + encodeURIComponent(voce);
+        link.textContent = voce;
+        const togli = document.createElement("button");
+        togli.type = "button";
+        togli.className = "pannello-recenti-togli";
+        togli.setAttribute("aria-label", "Togli «" + voce + "» dai recenti");
+        togli.textContent = "\u00d7";
+        togli.addEventListener("click", function () {
+          scrivi(leggi().filter(function (v) { return v !== voce; }));
+          const dl = document.querySelector("datalist#ricerche-recenti");
+          if (dl) popola(dl);
+          disegna();
+        });
+        riga.appendChild(link);
+        riga.appendChild(togli);
+        lista.appendChild(riga);
+      });
+      pannello.appendChild(lista);
+      const svuota = document.createElement("button");
+      svuota.type = "button";
+      svuota.className = "pannello-recenti-svuota link-discreto";
+      svuota.textContent = "Cancella tutte";
+      svuota.addEventListener("click", function () {
+        scrivi([]);
+        document.querySelectorAll("datalist#ricerche-recenti").forEach(popola);
+        document.querySelectorAll(".ricerche-recenti-cancella").forEach(function (t) { t.remove(); });
+        disegna();
+      });
+      pannello.appendChild(svuota);
+    }
+
+    function apri(aperto) {
+      if (aperto) disegna();
+      pannello.hidden = !aperto;
+      tasto.setAttribute("aria-expanded", aperto ? "true" : "false");
+    }
+    tasto.hidden = false;
+    tasto.addEventListener("click", function () { apri(pannello.hidden); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !pannello.hidden) { apri(false); tasto.focus(); }
+    });
+    document.addEventListener("click", function (e) {
+      if (pannello.hidden) return;
+      if (pannello.contains(e.target) || tasto.contains(e.target)) return;
+      apri(false);
+    });
+  }
+
   document.querySelectorAll("form.ricerca").forEach(function (modulo) {
     const campo = modulo.querySelector("input[name='q']");
     const datalist = modulo.querySelector("datalist#ricerche-recenti");
@@ -93,6 +168,13 @@
 
     popola(datalist);
     aggiungiTastoCancella(modulo, datalist);
+    const tastoRecenti = modulo.querySelector(".tasto-recenti");
+    if (tastoRecenti) costruisciPannello(modulo, tastoRecenti);
+
+    // Una ricerca arrivata da un link (un suggerimento, un recente, un
+    // segnalibro) non passa dall'invio del modulo: il campo però è già
+    // compilato dal server, e quella È una ricerca fatta.
+    if (campo.value && campo.value.trim()) aggiungi(campo.value);
 
     // SI SALVA ALL'INVIO, non a ogni carattere digitato: una ricerca
     // scritta e poi cancellata senza premere Invio non è una ricerca

@@ -289,6 +289,15 @@ a { color: inherit; }
 .faccia { grid-area: 1 / 1; display: inline-block; transform-origin: 50% 85%; }
 .faccia-furba { animation: cenno 3.2s ease-in-out infinite; }
 .faccia-ride { opacity: 0; transform: scale(.6); }
+.faccia-stordita { opacity: 0; transform: scale(.6); }
+/* Quando i lottatori (o i telefoni che si tirano) arrivano vicino, la
+   faccina perde il filo: lo decide `static/ring.js` con la classe. */
+.furbetto.stordito .faccia-furba, .furbetto.stordito .faccia-ride { opacity: 0; animation: none; }
+.furbetto.stordito .faccia-stordita { opacity: 1; animation: stordita .7s ease-in-out infinite; }
+@keyframes stordita {
+  0%, 100% { transform: scale(1.1) rotate(-14deg); }
+  50%      { transform: scale(1.1) rotate(14deg) translateY(2px); }
+}
 .furbetto:hover .faccia-furba, .furbetto:active .faccia-furba {
   opacity: 0; animation: none;
 }
@@ -1419,8 +1428,10 @@ body.con-ultimora { padding-bottom: 4.5rem; }
   /* DALL'01/10/2026 IL RING È TUTTA LA FINESTRA: i lottatori si lanciano
      dovunque e usano gli elementi della pagina come appoggi (vedi
      `static/ring.js`). Il canvas resta trasparente ai clic. */
-  position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2;
-  display: block; pointer-events: none;
+  /* Larghezza e altezza le scrive `ring.js` in pixel (area visibile vera):
+     `100vh` su iPhone è più alto della finestra e stirava il disegno. */
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2;
+  display: block; pointer-events: none; touch-action: none;
 }
 /* La manina sopra un lottatore, e il pugno chiuso mentre lo si tiene. */
 html.ring-presa, html.ring-presa * { cursor: grab !important; }
@@ -1428,10 +1439,13 @@ html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-sel
 .ultimora-barra {
   pointer-events: auto; position: relative; z-index: 1;
   display: flex; align-items: stretch; height: 44px;
-  border-top: 3px solid var(--accent);
+  border-top: 3px solid var(--verde);
   background: #ffffff; color: #141414;
   box-shadow: 0 -2px 14px rgba(0, 0, 0, .12);
-  font-family: "Archivo", sans-serif;
+  /* Il font da telegiornale all-news: condensato, in maiuscolo, più
+     alto a parità di larghezza (01/10/2026). */
+  font-family: "Barlow Condensed", "Archivo Narrow", "Archivo", sans-serif;
+  font-stretch: condensed;
 }
 :root[data-tema="scuro"] .ultimora-barra { background: #1b1a19; color: #f1efec; }
 .ultimora-ora {
@@ -1441,12 +1455,12 @@ html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-sel
 }
 .ultimora-etichetta {
   flex: none; display: grid; place-items: center; padding: 0 1rem;
-  background: var(--accent); color: #fff; text-decoration: none;
-  font-weight: 800; font-size: .92rem; letter-spacing: .03em; text-transform: uppercase;
+  background: var(--verde); color: var(--su-tinta, #fff); text-decoration: none;
+  font-weight: 700; font-size: 1.05rem; letter-spacing: .05em; text-transform: uppercase;
   clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
   padding-right: 1.4rem;
 }
-.ultimora-etichetta:hover { background: #c9240b; }
+.ultimora-etichetta:hover { background: var(--cerca-scuro); }
 .ultimora-nastro {
   flex: 1 1 auto; min-width: 0; overflow: hidden; position: relative;
   mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
@@ -1461,18 +1475,18 @@ html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-sel
 @keyframes ultimora-scorri { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 .ultimora-voce {
   display: inline-flex; align-items: center; gap: .5rem;
-  white-space: nowrap; padding: 0 1.1rem 0 0; font-size: .95rem;
+  white-space: nowrap; padding: 0 1.1rem 0 0; font-size: 1.12rem; font-weight: 500; letter-spacing: .01em;
 }
 .ultimora-voce::after {
-  content: ""; width: 7px; height: 7px; background: var(--accent);
+  content: ""; width: 7px; height: 7px; background: var(--verde);
   margin-left: 1.1rem; flex: none;
 }
 .ultimora-voce a { color: inherit; text-decoration: none; }
 .ultimora-voce a:hover { text-decoration: underline; }
-.ultimora-modello { font-weight: 800; text-transform: uppercase; letter-spacing: .01em; }
+.ultimora-modello { font-weight: 700; text-transform: uppercase; letter-spacing: .02em; color: var(--verde); }
 .ultimora-voce code { font-size: .78rem; padding: .02rem .3rem; }
-.ultimora-titolo { font-weight: 600; text-transform: uppercase; }
-.ultimora-quando { font-size: .8rem; opacity: .65; }
+.ultimora-titolo { font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
+.ultimora-quando { font-size: .95rem; opacity: .65; }
 .ultimora-verificato { color: var(--verde); font-weight: 800; }
 .ultimora-voce .distintivo { width: 22px; height: 22px; font-size: .72rem; border-radius: 4px; }
 .ultimora-vuota { padding: 0 1rem; align-self: center; font-weight: 600; }
@@ -1482,10 +1496,81 @@ html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-sel
   .ultimora-barra { height: 40px; }
   .ultimora-ora { display: none; }
   .ultimora-etichetta { padding: 0 1rem 0 .7rem; font-size: .8rem; }
-  .ultimora-voce { font-size: .86rem; }
+  .ultimora-voce { font-size: 1rem; }
+}
+/* CHI HA RIDOTTO I MOVIMENTI vede comunque le notizie scorrere, ma più
+   piano, e ha il tasto «Pausa» per fermarle (prima qui lo scorrimento era
+   spento del tutto: su iPhone con «Riduci movimento» la striscia restava
+   immobile e sembrava rotta). */
+@media (prefers-reduced-motion: reduce) {
+  .ultimora-scorre { animation-duration: calc(var(--durata, 90s) * 1.6); }
+}
+.ultimora-barra.in-pausa .ultimora-scorre { animation-play-state: paused; }
+.ultimora-tasto {
+  flex: none; width: 40px; border: 0; border-left: 1px solid color-mix(in srgb, var(--ink, #141414) 18%, transparent);
+  background: inherit; color: inherit; font: inherit; font-size: .85rem; cursor: pointer; padding: 0;
+}
+.ultimora-tasto[hidden] { display: none; }
+.ultimora-tasto:hover { background: var(--verde-tenue); }
+.ultimora-tasto[aria-pressed="true"] { background: var(--verde); color: var(--su-tinta, #fff); }
+@media print { .ultimora { display: none; } }
+
+/* --- Il tasto «Recenti» e il suo pannello (01/10/2026) -------------------
+   Accanto a «Cerca»: apre l'elenco delle ricerche fatte in questo browser.
+   Vuoto di sfondo, bordo sottile: è un'azione secondaria, il verde resta
+   a «Cerca». */
+.ricerca .tasto-recenti {
+  font: inherit; font-weight: 600; font-size: .9rem; line-height: 1.35;
+  padding: .5rem .95rem; border-radius: 8px; cursor: pointer; white-space: nowrap;
+  color: var(--ink); background: var(--carta); border: 1px solid var(--bordo, var(--ink));
+}
+.ricerca .tasto-recenti:hover { background: var(--fondo-firmware, var(--carta)); }
+.ricerca .tasto-recenti[hidden] { display: none; }
+.ricerca .tasto-recenti[aria-expanded="true"] { box-shadow: 0 0 0 3px var(--anello); }
+.pannello-recenti {
+  width: 100%; max-width: 940px; margin: -1.4rem auto 1.6rem;
+  padding: .5rem .75rem .65rem; border-radius: 12px;
+  background: var(--carta); color: var(--ink);
+  border: 1px solid var(--bordo, var(--ink)); box-shadow: var(--ombra);
+}
+.pannello-recenti[hidden] { display: none; }
+.pannello-recenti ul { list-style: none; margin: 0; padding: 0; }
+.pannello-recenti li {
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+  padding: .15rem 0; border-bottom: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+}
+.pannello-recenti li:last-child { border-bottom: 0; }
+.pannello-recenti a { flex: 1; text-align: left; padding: .35rem .2rem; text-decoration: none; color: inherit; overflow-wrap: anywhere; }
+.pannello-recenti a:hover, .pannello-recenti a:focus-visible { text-decoration: underline; }
+.pannello-recenti-togli {
+  font: inherit; font-size: 1.15rem; line-height: 1; cursor: pointer;
+  background: none; border: 0; color: inherit; opacity: .6; padding: .2rem .5rem;
+}
+.pannello-recenti-togli:hover { opacity: 1; }
+.pannello-recenti-svuota { display: block; margin: .4rem 0 0 auto; }
+.pannello-recenti-vuoto { margin: .4rem 0; opacity: .75; text-align: left; }
+@media (max-width: 640px) {
+  .ricerca .tasto-recenti { flex: 1; }
+  .pannello-recenti { margin-top: -1.2rem; }
+}
+.ingresso .pannello-recenti { margin-top: 0; }
+
+/* --- La striscia colpita dai lottatori (01/10/2026) ---------------------
+   Un colpo la fa sobbalzare; finché ha dei danni il nastro sfarfalla ogni
+   tanto, come un'insegna con un contatto che salta. Si ripara da sola. */
+.ultimora-barra.ultimora-colpita { animation: ultimora-botta .4s ease-out; }
+@keyframes ultimora-botta {
+  0%   { transform: translate(0, 0); }
+  15%  { transform: translate(-5px, 3px) rotate(-.25deg); }
+  35%  { transform: translate(4px, -2px) rotate(.2deg); }
+  60%  { transform: translate(-2px, 1px); }
+  100% { transform: translate(0, 0); }
+}
+.ultimora-barra.ultimora-guasta .ultimora-nastro { animation: ultimora-sfarfalla 3.1s steps(1) infinite; }
+@keyframes ultimora-sfarfalla {
+  0%, 100% { opacity: 1; } 8% { opacity: .35; } 10% { opacity: 1; } 12% { opacity: .55; }
+  14% { opacity: 1; } 61% { opacity: 1; } 62% { opacity: .4; } 63% { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ultimora-scorre { animation: none; }
-  .ultimora-nastro { overflow-x: auto; mask-image: none; }
+  .ultimora-barra.ultimora-colpita, .ultimora-barra.ultimora-guasta .ultimora-nastro { animation: none; }
 }
-@media print { .ultimora { display: none; } }
