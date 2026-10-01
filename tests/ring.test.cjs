@@ -798,3 +798,99 @@ test("una bomba che scoppia addosso fa a pezzi chi la prende in pieno, non chi �
   amb.avanza(60 * 12); dentro(amb);
   assert.ok(amb.stato().lottatori.every((f) => !f.esploso));
 });
+
+test("i bordi e il tetto della pagina si rompono quando ci si sbatte forte, e poi si riparano", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  amb.porta("robot", 1050, 300, 40);
+  // lanciato forte contro il bordo destro, da vicino
+  for (const x of [1090, 1130, 1170]) { amb.muovi(x, 300); amb.avanza(1); }
+  amb.rilascia(1170, 300);
+  let rotto = false;
+  amb.avanza(120, (s) => { if (s.danniBordi.includes("destra")) { rotto = true; return false; } });
+  assert.ok(rotto, "sbattendo forte sul bordo destro non si è rotto niente");
+  amb.finestra.__ring.danneggiaBordo("tetto", 400, 1);
+  amb.finestra.__ring.danneggiaBordo("sinistra", 300, 0.5);
+  assert.ok(amb.stato().danniBordi.includes("tetto") && amb.stato().danniBordi.includes("sinistra"));
+  // Il tetto lo si colpisce di rado: il suo danno deve sparire da solo.
+  let riparato = false;
+  for (let blocco = 0; blocco < 60 && !riparato; blocco++) { amb.avanza(60); riparato = !amb.stato().danniBordi.includes("tetto"); }
+  assert.ok(riparato, "il tetto non si ripara mai");
+  dentro(amb);
+});
+
+test("gravità sottosopra: si cade verso il tetto e lì si sta in piedi a testa in giù", () => {
+  const amb = ambiente({ solidi: [[0, 0, 1200, 64]] });
+  amb.avanza(30);
+  amb.finestra.__ring.comandi.gravita("su");
+  assert.strictEqual(amb.stato().verso, -1);
+  amb.avanza(60 * 6);
+  const aTestaInGiu = { robot: false, mela: false };
+  amb.avanza(60 * 20, (st) => {
+    for (const f of st.lottatori) {
+      assert.ok(f.bacino.y < 260, f.tipo + " non sta verso il tetto: " + f.bacino.y);
+      if (f.testa.y > f.bacino.y + 10) aTestaInGiu[f.tipo] = true;
+    }
+  });
+  assert.ok(aTestaInGiu.robot && aTestaInGiu.mela, "qualcuno non si è mai messo a testa in giù: " + JSON.stringify(aTestaInGiu));
+  dentro(amb);
+  amb.finestra.__ring.comandi.gravita("1");
+  assert.strictEqual(amb.stato().verso, 1);
+  amb.avanza(60 * 8);
+  for (const f of amb.stato().lottatori) assert.ok(f.bacino.y > 600, f.tipo + " non è tornato giù");
+  dentro(amb);
+});
+
+test("barre della vita: si accendono dalla tendina, si ricordano, e la vita scende coi colpi", () => {
+  const memoria = {};
+  const amb = ambiente({ memoria });
+  amb.avanza(30);
+  amb.finestra.__ring.comandi.barre(true);
+  assert.strictEqual(memoria["mut-ring-barre"], "on");
+  assert.strictEqual(ambiente({ memoria }).stato().barreVita, true);
+  const m = amb.lottatore("mela");
+  assert.strictEqual(m.vita, 1);
+  amb.finestra.__ring.lanciaTelefono(m.testa.x - 60, m.testa.y - 2, 8, 0, "pc");
+  let scesa = false;
+  amb.avanza(60, (s) => { if (s.lottatori.find((f) => f.tipo === "mela").vita < 1) { scesa = true; return false; } });
+  assert.ok(scesa, "la vita della mela non è scesa");
+  amb.finestra.__ring.ko("mela");
+  assert.strictEqual(amb.lottatore("mela").vita, 0, "a K.O. la barra non è vuota");
+  amb.avanza(60 * 5);
+  assert.strictEqual(amb.lottatore("mela").vita, 1, "dopo il K.O. la barra non torna piena");
+});
+
+test("super guerrieri: energia, onda energetica che colpisce e rompe il bordo, raffica, teletrasporto, potenziamento", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  const r = amb.finestra.__ring;
+  r.comandi.anime(true);
+  assert.strictEqual(amb.stato().anime, true);
+  assert.strictEqual(amb.stato().barreVita, true, "le barre non si accendono con la modalità anime");
+  let onda = false, colpita = false, bordo = false, teletr = false, potenziato = false, energia = false;
+  for (let prova = 0; prova < 6; prova++) {
+    r.comandi.colpo("onda");
+    amb.avanza(150, (s) => {
+      if (s.lottatori.some((f) => f.onda)) onda = true;
+      if (s.danniBordi.length) bordo = true;
+      if (s.lottatori.some((f) => f.danni > 0) || s.punteggio.robot + s.punteggio.mela > 0) colpita = true;
+    });
+  }
+  const prima = amb.lottatore("robot").bacino.x;
+  r.comandi.colpo("teletrasporto");
+  for (const f of amb.stato().lottatori) if (Math.abs(f.bacino.x - (f.tipo === "robot" ? prima : -1e9)) > 40) teletr = true;
+  for (let prova = 0; prova < 4 && !potenziato; prova++) {
+    r.comandi.colpo("carica");
+    amb.avanza(60 * 4, (s) => { if (s.lottatori.some((f) => f.potenziato)) { potenziato = true; return false; } });
+  }
+  amb.avanza(60 * 90, (s) => { if (s.proiettili > 0) { energia = true; return false; } });
+  dentro(amb);
+  assert.ok(onda, "nessuna onda energetica");
+  assert.ok(colpita || bordo, "l'onda non ha colpito niente");
+  assert.ok(teletr, "il teletrasporto non ha spostato nessuno");
+  assert.ok(potenziato, "caricando l'aura nessuno si è potenziato");
+  assert.ok(energia, "in 90 secondi nessuna sfera di energia");
+  r.comandi.anime(false);
+  assert.strictEqual(amb.memoria["mut-ring-anime"], "off");
+  dentro(amb);
+});

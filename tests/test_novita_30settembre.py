@@ -572,7 +572,9 @@ class TestTendinaDelRing(unittest.TestCase):
                       'data-metti="pistola"', 'data-metti="spada"', 'data-metti="bomba"', 'data-metti="tablet"',
                       'data-metti="pc"', 'data-metti="orologio"', 'data-metti="duo"', "data-gravita",
                       'data-imprevisto="acquazzone"', 'data-imprevisto="natale"', 'data-imprevisto="uragano"',
-                      "data-sorprese", "data-cruento", "data-ricomincia"):
+                      "data-sorprese", "data-cruento", "data-ricomincia", "data-barre", "data-anime",
+                      'data-colpo="onda"', 'data-colpo="teletrasporto"', 'value="su"',
+                      'data-colpo="esplodi-robot"', 'data-colpo="esplodi-mela"'):
             self.assertIn(marca, self.home)
 
     def test_la_tendina_riceve_i_clic_e_sale_dalla_striscia(self):
