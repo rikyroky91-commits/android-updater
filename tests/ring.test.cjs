@@ -894,3 +894,100 @@ test("super guerrieri: energia, onda energetica che colpisce e rompe il bordo, r
   assert.strictEqual(amb.memoria["mut-ring-anime"], "off");
   dentro(amb);
 });
+
+test("robot e mela sono alti uguali: il frutto va dal bacino alla testa e i colpi lo prendono", () => {
+  const amb = ambiente();
+  amb.avanza(60);
+  const r = amb.lottatore("robot"), m = amb.lottatore("mela");
+  assert.ok(Math.abs((r.bacino.y - r.testa.y) - (m.bacino.y - m.testa.y)) < 6, "altezze diverse");
+  assert.ok(Math.abs(r.testa.y - m.testa.y) < 12, "teste a quote diverse: " + r.testa.y + " / " + m.testa.y);
+});
+
+test("super guerrieri: niente jetpack, si vola, si scatta con le immagini residue e si torna giù", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  const r = amb.finestra.__ring;
+  r.comandi.anime(true);
+  r.scatta("robot");
+  let volato = false, alto = false;
+  amb.avanza(60 * 6, (s) => {
+    const f = s.lottatori.find((l) => l.tipo === "robot");
+    if (f.volo) volato = true;
+    if (f.bacino.y < s.pavimento - 120) alto = true;
+    dentro(amb);
+  });
+  assert.ok(volato, "il robot non ha preso il volo");
+  assert.ok(!/zaino\(f, 10\.5 \* S\);\n/.test(SORGENTE.replace("if (!anime) zaino(f, 10.5 * S);", "")), "il jetpack si disegna ancora in modalità anime");
+  let atterrati = false;
+  r.comandi.anime(false);
+  amb.avanza(60 * 6, (s) => { if (s.lottatori.every((f) => !f.volo)) { atterrati = true; return false; } });
+  assert.ok(atterrati, "spenta la modalità si resta in volo");
+  assert.ok(alto || volato);
+});
+
+test("super guerrieri: la raffica di pugni colpisce e il colpo finale scaraventa via", () => {
+  let lanciata = false;
+  for (let prova = 0; prova < 5 && !lanciata; prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    const r = amb.finestra.__ring;
+    r.comandi.anime(true);
+    // i due a contatto
+    const m = amb.lottatore("mela");
+    amb.porta("robot", m.bacino.x - 26, m.bacino.y - 8, 20); amb.rilascia(m.bacino.x - 26, m.bacino.y - 8);
+    amb.avanza(70);
+    r.rush("robot");
+    amb.avanza(60, (s) => { const f = s.lottatori.find((l) => l.tipo === "mela"); if (f.ko > 0 || f.danni > 0) { lanciata = true; return false; } });
+    dentro(amb);
+  }
+  assert.ok(lanciata, "la raffica non ha mai colpito");
+});
+
+test("super guerrieri in combattimento libero: volano, scattano e restano stabili", () => {
+  const amb = ambiente({ solidi: [[300, 500, 700, 530]] });
+  amb.avanza(30);
+  amb.finestra.__ring.comandi.anime(true);
+  let volo = false;
+  amb.avanza(60 * 60, (s) => { if (s.lottatori.some((f) => f.volo)) volo = true; dentro(amb); });
+  assert.ok(volo, "in un minuto in modalità anime nessuno ha volato");
+});
+
+test("la mela si smembra: morsi che si richiudono, taglio in due che si rincolla, picciolo che salta", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  const r = amb.finestra.__ring;
+  r.mordi();
+  assert.strictEqual(amb.lottatore("mela").morsi, 1, "nessun morso");
+  assert.ok(r.taglia(), "la mela non si taglia");
+  assert.ok(amb.lottatore("mela").tagliata);
+  let rincollata = false;
+  amb.avanza(60 * 8, (s) => { if (!s.lottatori.find((f) => f.tipo === "mela").tagliata) { rincollata = true; return false; } });
+  assert.ok(rincollata, "le due metà non si rincollano");
+  let picciolo = false;
+  for (let i = 0; i < 30 && !picciolo; i++) {
+    r.smembra("mela");
+    if (amb.lottatore("mela").staccati.includes("P")) picciolo = true;
+    amb.avanza(60 * 8);
+  }
+  assert.ok(picciolo, "il picciolo non salta mai");
+  amb.finestra.__ring.comandi.cruento(false);
+  r.mordi();
+  dentro(amb);
+});
+
+test("un omino portato col puntatore colpisce l'altro se ci sbatte contro", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  const m = amb.lottatore("mela");
+  amb.porta("robot", m.bacino.x - 200, m.bacino.y - 20, 10);
+  // lo si sbatte contro la mela
+  let colpita = false;
+  for (let i = 1; i <= 10 && !colpita; i++) {
+    amb.muovi(m.bacino.x - 200 + i * 30, m.bacino.y - 20); amb.avanza(1);
+    const s = amb.stato(), f = s.lottatori.find((l) => l.tipo === "mela");
+    if (f.danni > 0 || s.punteggio.robot > 0) colpita = true;
+  }
+  amb.rilascia(m.bacino.x + 100, m.bacino.y - 20);
+  assert.ok(colpita, "portato col puntatore, il robot non ha colpito la mela");
+  amb.avanza(120); dentro(amb);
+});
