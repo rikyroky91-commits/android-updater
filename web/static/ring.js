@@ -174,6 +174,11 @@
     gomitoD: 0.18, manoD: 0.24, ginocchioA: 0.2, piedeA: 0.26, ginocchioD: 0.2, piedeD: 0.26,
   };
 
+  // Le mani della mela stanno più in basso di quelle del robot: appena sotto
+  // gli occhi, dove una mela ha il «petto», non all'altezza della testa.
+  const SPALLA_MELA = ["gomitoA", "manoA", "gomitoD", "manoD"];
+  const ABBASSA_MELA = 12;
+
   function crea(tipo, x, dir) {
     const f = {
       tipo, dir, cx: x, base: pavimento, supporto: null, p: {}, aste: [],
@@ -182,7 +187,8 @@
       passo: 0, dolore: 0, preso: null, scalata: null, inVolo: false, botta: 0, fantasma: false,
     };
     for (const nome in SCHELETRO) {
-      const [h, dx, r] = SCHELETRO[nome];
+      let [h, dx, r] = SCHELETRO[nome];
+      if (tipo === "mela" && SPALLA_MELA.indexOf(nome) >= 0) h -= ABBASSA_MELA;
       const px = x + dx * dir * S, py = pavimento - h * S - 2 * S;
       f.p[nome] = { x: px, y: py, ox: px, oy: py, r: r * S };
     }
@@ -262,6 +268,7 @@
         q.piedeA = [10, 9]; q.piedeD = [10, -7]; q.ginocchioA = [20, 9]; q.ginocchioD = [20, -2];
         break;
     }
+    if (f.tipo === "mela") for (const nome of SPALLA_MELA) q[nome][0] -= ABBASSA_MELA;
     // In coordinate della finestra.
     const fuori = {};
     for (const nome in q) {
@@ -853,8 +860,9 @@
     ctx.restore();
     // Tutt'e due le braccia stanno DAVANTI al corpo: prima quella lontana
     // finiva dietro la polpa e la mela sembrava avere una mano sola.
+    const spalla = { x: p.collo.x * 0.4 + p.bacino.x * 0.6, y: p.collo.y * 0.4 + p.bacino.y * 0.6 };
     for (const [gomito, mano, r] of [[p.gomitoD, p.manoD, 3.4], [p.gomitoA, p.manoA, 3.6]]) {
-      arto(p.collo, gomito, mano, 3 * S, nero);
+      arto(spalla, gomito, mano, 3 * S, nero);
       tondo(mano.x, mano.y, r * S, "#f7f7f7");
       ctx.strokeStyle = nero; ctx.lineWidth = 1.3 * S;
       ctx.beginPath(); ctx.arc(mano.x, mano.y, r * S, 0, Math.PI * 2); ctx.stroke();
