@@ -3,7 +3,7 @@ name: tests
 on:
   pull_request:
   push:
-    branches: [main, 'codex/**']
+    branches: [main, 'codex/**', 'claude/**']
   workflow_dispatch:
 
 permissions:
@@ -26,4 +26,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test tests/confronto-installato.test.cjs tests/ring.test.cjs tests/lingue.test.cjs
+      # I test falliti finiscono nelle annotazioni del lavoro: si leggono dalla
+      # pagina del run (e dall'API) senza scaricare il registro intero.
+      - name: Test Node
+        run: |
+          set -o pipefail
+          node --version
+          if ! node --test --test-reporter=tap tests/confronto-installato.test.cjs tests/ring.test.cjs tests/lingue.test.cjs 2>&1 | tee esito-node.txt; then
+            grep -E "^ *(not ok|error:|code:|at )" esito-node.txt | head -40 | while IFS= read -r riga; do echo "::error::$riga"; done
+            exit 1
+          fi
