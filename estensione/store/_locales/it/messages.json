@@ -19,5 +19,71 @@
   },
   "sempreNegato": {
     "message": "Permesso non concesso: il tasto resta spento."
+  },
+  "guidaLink": {
+    "message": "Come funziona"
+  },
+  "guidaTitolo": {
+    "message": "Come funziona Page Brawl"
+  },
+  "guidaIntro": {
+    "message": "Due lottatori si picchiano sopra la pagina che stai guardando. La pagina sotto resta com'è: non viene letto né inviato niente."
+  },
+  "guidaP1T": {
+    "message": "Apri una pagina qualsiasi"
+  },
+  "guidaP1": {
+    "message": "Un sito di notizie, un negozio, quello che vuoi. Non può partire sulle pagine interne del browser, sul Chrome Web Store e nei PDF."
+  },
+  "guidaP2T": {
+    "message": "Clicca l'icona di Page Brawl"
+  },
+  "guidaP2": {
+    "message": "È nella barra del browser, dentro il menu delle estensioni (il pezzo di puzzle): fissala con la puntina per averla sempre a portata. Un clic e i lottatori entrano."
+  },
+  "guidaP3T": {
+    "message": "Spegni e riaccendi dal tasto in basso a destra"
+  },
+  "guidaP3": {
+    "message": "Il tasto di accensione resta sempre visibile: ferma la lotta e la fa ripartire senza ricaricare la pagina."
+  },
+  "guidaP4T": {
+    "message": "Prendili col mouse"
+  },
+  "guidaP4": {
+    "message": "Trascina un lottatore e lascialo per lanciarlo. Vale anche per gli oggetti che cadono dall'alto: fumogeni, barattoli e armi."
+  },
+  "guidaP5T": {
+    "message": "Apri la tendina col guantone"
+  },
+  "guidaP5": {
+    "message": "Lì scegli i personaggi, metti in campo gli oggetti, scateni terremoto e jetpack, accendi le barre della vita e scommetti i gettoni su chi vince."
+  },
+  "guidaSapereT": {
+    "message": "Cose da sapere"
+  },
+  "guidaS1": {
+    "message": "Si gioca a dieci: chi arriva a dieci K.O. manda l'avversario fuori dal ring, poi si riparte da zero."
+  },
+  "guidaS2": {
+    "message": "Un barattolo lanciato libera una creatura di fuoco, di fulmini o d'acqua che combatte per chi l'ha lanciato. Un fumogeno acceca chi finisce nella nube."
+  },
+  "guidaS3": {
+    "message": "I lottatori imparano: più lottano, più diventano bravi. Quello che imparano e i tuoi gettoni restano nel tuo browser."
+  },
+  "guidaS4": {
+    "message": "Gli effetti cruenti sono spenti: se li vuoi, si accendono dalla tendina."
+  },
+  "guidaS5": {
+    "message": "Super guerrieri, maghi, duellanti, armi, meteo e gravità fanno parte di Premium: nella tendina hanno il lucchetto."
+  },
+  "guidaS6": {
+    "message": "Vuoi il tasto di accensione su ogni sito, senza passare dall'icona? Si accende dalle opzioni."
+  },
+  "guidaOpzioni": {
+    "message": "Apri le opzioni"
+  },
+  "guidaPiede": {
+    "message": "Questa pagina si riapre quando vuoi da «Come funziona», in fondo alla tendina."
   }
 }

@@ -19,5 +19,71 @@
   },
   "sempreNegato": {
     "message": "Permiso no concedido: el botón sigue apagado."
+  },
+  "guidaLink": {
+    "message": "Cómo funciona"
+  },
+  "guidaTitolo": {
+    "message": "Cómo funciona Page Brawl"
+  },
+  "guidaIntro": {
+    "message": "Dos luchadores se pelean encima de la página que estás viendo. La página de debajo se queda como está: no se lee ni se envía nada."
+  },
+  "guidaP1T": {
+    "message": "Abre cualquier página"
+  },
+  "guidaP1": {
+    "message": "Un sitio de noticias, una tienda, lo que quieras. No puede arrancar en las páginas internas del navegador, en Chrome Web Store ni en los PDF."
+  },
+  "guidaP2T": {
+    "message": "Haz clic en el icono de Page Brawl"
+  },
+  "guidaP2": {
+    "message": "Está en la barra del navegador, dentro del menú de extensiones (la pieza de puzle): fíjalo con la chincheta para tenerlo a mano. Un clic y entran los luchadores."
+  },
+  "guidaP3T": {
+    "message": "Apaga y enciende con el botón de abajo a la derecha"
+  },
+  "guidaP3": {
+    "message": "El botón de encendido siempre está a la vista: detiene la pelea y la reanuda sin recargar la página."
+  },
+  "guidaP4T": {
+    "message": "Agárralos con el ratón"
+  },
+  "guidaP4": {
+    "message": "Arrastra a un luchador y suéltalo para lanzarlo. Lo mismo vale para los objetos que caen de arriba: bombas de humo, tarros y armas."
+  },
+  "guidaP5T": {
+    "message": "Abre el panel con el botón del guante"
+  },
+  "guidaP5": {
+    "message": "Ahí eliges los personajes, pones objetos en el ring, desatas un terremoto o los jetpacks, enciendes las barras de vida y apuestas tus fichas por el ganador."
+  },
+  "guidaSapereT": {
+    "message": "Cosas que conviene saber"
+  },
+  "guidaS1": {
+    "message": "Se juega a diez: quien llega a diez K.O. manda al rival fuera del ring y luego se vuelve a empezar de cero."
+  },
+  "guidaS2": {
+    "message": "Un tarro lanzado libera una criatura de fuego, de rayos o de agua que lucha por quien lo lanzó. Una bomba de humo ciega a quien queda dentro de la nube."
+  },
+  "guidaS3": {
+    "message": "Los luchadores aprenden: cuanto más pelean, mejores son. Lo que aprenden y tus fichas se quedan en tu navegador."
+  },
+  "guidaS4": {
+    "message": "Los efectos sangrientos están apagados: si los quieres, se encienden desde el panel."
+  },
+  "guidaS5": {
+    "message": "Los superguerreros, los magos, los duelistas, las armas, el clima y la gravedad forman parte de Premium: en el panel llevan un candado."
+  },
+  "guidaS6": {
+    "message": "¿Quieres el botón de encendido en todos los sitios, sin pasar por el icono? Se activa en las opciones."
+  },
+  "guidaOpzioni": {
+    "message": "Abrir las opciones"
+  },
+  "guidaPiede": {
+    "message": "Puedes volver a abrir esta página cuando quieras desde «Cómo funciona», al final del panel."
   }
 }

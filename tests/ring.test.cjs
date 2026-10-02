@@ -1116,8 +1116,15 @@ test("presa a distanza: l'avversario viene sollevato e poi va in pezzi", () => {
       if (s.lottatori.some((f) => f.esploso)) { pezzi = true; return false; }
       dentro(amb);
     });
-    amb.avanza(60 * 12);
-    assert.ok(amb.stato().lottatori.every((f) => !f.sollevato), "qualcuno resta sospeso per sempre");
+    // Nessuno resta sospeso per sempre. (Si conta quanto dura ogni presa: a
+    // un istante fisso può essercene in corso una nuova, e il test cadeva una volta su venti.)
+    const fila = {};
+    amb.avanza(60 * 12, (st) => {
+      for (const f of st.lottatori) {
+        fila[f.tipo] = f.sollevato ? (fila[f.tipo] || 0) + 1 : 0;
+        assert.ok(fila[f.tipo] < 60 * 6, "qualcuno resta sospeso per sempre");
+      }
+    });
     dentro(amb);
   }
   assert.ok(sollevato, "nessuno viene sollevato");
@@ -1249,7 +1256,8 @@ test("maghi: lo stile si sceglie e si ricorda; il gelo blocca e poi si scioglie,
   r.incanta("robot", "piccolo");
   amb.avanza(40);
   assert.ok(amb.lottatore("robot").piccolo && amb.lottatore("robot").scala < 0.7, "non rimpicciolisce");
-  amb.avanza(60 * 10);
+  // (Si aspetta finché torna: l'altro mago può rimpicciolirlo di nuovo, e i colpi fermano l'azione per qualche fotogramma.)
+  amb.avanza(60 * 40, (st) => { const f = st.lottatori.find((l) => l.tipo === "robot"); return f.piccolo || f.scala <= 0.95 ? undefined : false; });
   assert.ok(!amb.lottatore("robot").piccolo && amb.lottatore("robot").scala > 0.95, "non torna grande");
   dentro(amb);
   // Un altro ambiente con lo stile salvato riparte da maghi.
@@ -1408,4 +1416,200 @@ test("Premium: maghi, duellanti e le loro mosse sono chiusi come i super guerrie
   attivo = true;
   assert.notStrictEqual(c.stile("lame"), false);
   assert.strictEqual(amb.stato().stile, "lame");
+});
+
+// --- 02/10/2026: gambe, piattaforme, gran finale, fumogeni e barattoli ----
+function incrociano(a, b, c, d) {                 // i segmenti ab e cd si tagliano?
+  const o = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]));
+  return o(a, b, c) !== o(a, b, d) && o(c, d, a) !== o(c, d, b) && o(a, b, c) !== 0 && o(c, d, a) !== 0;
+}
+
+test("in piedi su una pagina piena: le gambe non restano incrociate, le ginocchia non si piegano all'indietro, nessuno resta piegato", () => {
+  // Una pagina vera: righe di testo, tasti e immagini all'altezza del corpo e della testa.
+  const solidi = [[60, 700, 420, 730], [460, 690, 700, 760], [720, 640, 1100, 700], [100, 600, 380, 640], [500, 560, 900, 600], [900, 730, 1180, 770]];
+  for (const stile of ["", "guerrieri", "lame"]) {
+    const amb = ambiente({ estensione: true, altezza: 800, solidi, memoria: { "mut-ring": "on", "mut-ring-cruento": "off" } });
+    amb.avanza(20);
+    if (stile) amb.finestra.__ring.comandi.stile(stile);
+    let fot = 0, incrociate = 0, ginocchia = 0, piegato = 0, fila = {}, filaMax = 0;
+    amb.avanza(60 * 45, (s) => {
+      for (const f of s.lottatori) {
+        // «In piedi»: non a terra, non in mano a qualcuno, non in volo, non stordito.
+        if (f.esploso || f.ko > 0 || f.preso || f.tenuto || f.vola || f.scalando || f.stordito > 0 || f.rialzo > 0 || f.inVolo || f.gelato || f.fuori || f.azione === "balla") { fila[f.tipo] = 0; continue; }
+        fot++;
+        const p = f.punti, gv = f.ginocchiaViste;
+        if (Math.hypot(p.piedeA[0] - p.piedeD[0], p.piedeA[1] - p.piedeD[1]) > 5 * s.scala &&
+            (incrociano(gv[0], p.piedeA, gv[1], p.piedeD) || incrociano(p.bacino, gv[0], gv[1], p.piedeD) || incrociano(gv[0], p.piedeA, p.bacino, gv[1]))) incrociate++;
+        if ([[gv[0], p.piedeA], [gv[1], p.piedeD]].some(([g, pd]) => (g[0] - (p.bacino[0] + pd[0]) / 2) * f.dir < -3 * s.scala)) ginocchia++;
+        const storto = Math.abs(Math.atan2(p.collo[0] - p.bacino[0], p.bacino[1] - p.collo[1])) > 0.7 || p.testa[1] > p.collo[1] + 2 * s.scala;
+        if (storto) { piegato++; fila[f.tipo] = (fila[f.tipo] || 0) + 1; filaMax = Math.max(filaMax, fila[f.tipo]); } else fila[f.tipo] = 0;
+      }
+    });
+    dentro(amb);
+    assert.ok(fot > 600, "quasi mai in piedi (" + fot + ") con lo stile «" + stile + "»");
+    // prima della correzione: gambe incrociate 16–55%, ginocchia al contrario 24–61%, piegati fino a 24 secondi di fila
+    // (i numeri su 46 pagine vere li dà `node tests/misura-posture.cjs`)
+    assert.ok(incrociate / fot < 0.08, "gambe incrociate per il " + Math.round(100 * incrociate / fot) + "% del tempo («" + stile + "»)");
+    assert.ok(ginocchia / fot < 0.04, "ginocchia all'indietro per il " + Math.round(100 * ginocchia / fot) + "% del tempo («" + stile + "»)");
+    assert.ok(piegato / fot < 0.12, "piegati per il " + Math.round(100 * piegato / fot) + "% del tempo («" + stile + "»)");
+    assert.ok(filaMax < 300, "qualcuno resta piegato per " + filaMax + " fotogrammi di fila («" + stile + "»)");
+  }
+});
+
+test("chi è in piedi passa davanti agli elementi della pagina e ci si posa solo da sopra", () => {
+  // Un muro davanti a ciascuno, all'altezza del busto: camminando non ci si ferma né ci si arrampica.
+  const amb = ambiente({ solidi: [[560, 640, 640, 756]] });
+  amb.avanza(30);
+  let scalate = 0;
+  amb.avanza(60 * 25, (s) => { if (s.lottatori.some((f) => f.scalando)) scalate++; });
+  assert.strictEqual(scalate, 0, "ci si arrampica su un elemento qualunque incontrato camminando");
+  dentro(amb);
+  // Da sopra invece regge: lasciato cadere sul muro, ci si posa.
+  const amb2 = ambiente({ solidi: [[520, 640, 680, 756]] });
+  amb2.avanza(30);
+  amb2.porta("robot", 600, 520);
+  amb2.rilascia(600, 520);
+  let sopra = 0;
+  amb2.avanza(60 * 2, (s) => { const f = s.lottatori.find((l) => l.tipo === "robot"); if (f.sopraUnElemento && Math.abs(f.base - 640) < 2) sopra++; });
+  assert.ok(sopra > 5, "lasciato sopra un elemento, ci è passato attraverso");
+});
+
+test("a dieci K.O. la partita finisce: lo sconfitto vola fuori dal ring, il conto riparte da zero e lui rientra", () => {
+  for (const stile of ["", "guerrieri"]) {
+    const amb = ambiente({ memoria: stile ? { "mut-ring-stile": stile, "mut-ring-anime": "on" } : {} });
+    amb.avanza(60);
+    const r = amb.finestra.__ring;
+    r.punti(9, 4);
+    r.ko("mela");
+    let s = amb.stato();
+    assert.ok(s.finale && s.finale.tipo === "robot" && s.finale.lancio, "il decimo K.O. non apre il finale");
+    assert.strictEqual(s.punteggio.robot, 10);
+    let volo = 0, uscito = false, sparito = false, rientrato = false;
+    amb.avanza(60 * 9, (st) => {
+      dentro(amb);
+      const m = st.lottatori.find((f) => f.tipo === "mela");
+      if (m.fuori) volo++;
+      if (st.finale && st.finale.uscito) uscito = true;
+      if (uscito && m.esploso) sparito = true;
+      if (sparito && !m.esploso) rientrato = true;
+    });
+    assert.ok(volo > 3 && volo < 90, "il volo fuori dal ring dura " + volo + " fotogrammi");
+    assert.ok(uscito && sparito && rientrato, "uscita " + uscito + ", sparito " + sparito + ", rientrato " + rientrato);
+    s = amb.stato();
+    assert.strictEqual(s.finale, null, "il finale non si chiude");
+    assert.ok(s.punteggio.robot + s.punteggio.mela <= 2 && s.punteggio.robot < 10, "il conto non riparte da zero: " + JSON.stringify(s.punteggio));
+    amb.avanza(60 * 20); dentro(amb);
+    assert.ok(amb.stato().lottatori.every((f) => !f.fuori), "qualcuno resta fuori dal ring");
+  }
+  // Sotto i dieci non succede niente di speciale.
+  const amb = ambiente();
+  amb.avanza(60);
+  amb.finestra.__ring.punti(3, 4);
+  amb.finestra.__ring.ko("mela");
+  assert.strictEqual(amb.stato().finale, null);
+});
+
+test("il barattolo lanciato libera una creatura che combatte per chi l'ha lanciato e poi se ne va; il fumogeno acceca chi sta nella nube", () => {
+  const amb = ambiente();
+  amb.avanza(60);
+  const r = amb.finestra.__ring;
+  // Messi in campo dalla tendina cadono dal cielo e restano interi: si aprono solo se lanciati.
+  r.comandi.metti("barattolo-fuoco"); r.comandi.metti("fumogeno");
+  amb.avanza(150);
+  let s = amb.stato();
+  assert.strictEqual(s.telefoni.map((t) => t.tipo).sort().join(","), "barattolo,fumogeno");
+  assert.strictEqual(s.creature.length + s.nubi, 0, "un oggetto caduto dal cielo si è aperto da solo");
+  // Lanciati: il barattolo si rompe e nasce la creatura del suo elemento, il fumogeno apre la nube.
+  const amb1 = ambiente();
+  amb1.avanza(60);
+  amb1.finestra.__ring.lanciaTelefono(120, 600, 0, 9, "barattolo-acqua");
+  amb1.finestra.__ring.lanciaTelefono(1080, 600, 0, 9, "fumogeno");
+  amb1.avanza(40);
+  s = amb1.stato();
+  assert.strictEqual(s.creature.map((c) => c.el).join(","), "acqua", "il barattolo lanciato non libera la sua creatura");
+  assert.strictEqual(s.nubi, 1, "il fumogeno lanciato non apre la nube");
+  assert.ok(!s.telefoni.some((t) => t.tipo === "barattolo" || t.tipo === "fumogeno"), "l'oggetto aperto resta in giro");
+  // Una creatura per parte: quella del robot attacca la mela, e viceversa; quella di nessuno il più vicino.
+  r.creatura("fuoco", "robot", 200); r.creatura("acqua", "mela", 1000); r.creatura("scossa", null, 600);
+  assert.strictEqual(amb.stato().creature.map((c) => c.el + ":" + c.per).join(" "), "fuoco:robot acqua:mela scossa:null");
+  const attacchi = {};
+  amb.avanza(60 * 9, (st) => { for (const c of st.creature) if (c.colpo) attacchi[c.el] = 1; dentro(amb); });
+  assert.strictEqual(Object.keys(attacchi).sort().join(","), "acqua,fuoco,scossa", "non tutte le creature attaccano");
+  // Dopo una decina di secondi se ne vanno (i colpi fermano l'azione per qualche fotogramma: si aspetta con margine).
+  amb.avanza(60 * 20, (st) => (st.creature.length ? undefined : false));
+  assert.strictEqual(amb.stato().creature.length, 0, "le creature non se ne vanno");
+  // il fumogeno: chi è nella nube non vede, tranne chi l'ha lanciato
+  const amb2 = ambiente();
+  amb2.avanza(60);
+  amb2.finestra.__ring.nube(amb2.lottatore("mela").bacino.x, "robot");
+  let ciecoMela = 0, ciecoRobot = 0;
+  amb2.avanza(60 * 3, (st) => { if (st.lottatori.find((f) => f.tipo === "mela").accecato) ciecoMela++; if (st.lottatori.find((f) => f.tipo === "robot").accecato) ciecoRobot++; });
+  assert.ok(ciecoMela > 20, "chi sta nella nube ci vede benissimo");
+  assert.strictEqual(ciecoRobot, 0, "il fumogeno acceca anche chi l'ha lanciato");
+  amb2.avanza(60 * 8);
+  assert.strictEqual(amb2.stato().nubi, 0, "la nube non si dirada");
+  assert.ok(!amb2.lottatore("mela").accecato, "accecato per sempre");
+});
+
+test("nell'estensione non piovono telefoni: solo fumogeni e barattoli, e con Premium anche le armi", () => {
+  const TELEFONI = ["classico", "grande", "pieghevole", "orologio", "tablet", "pc"];
+  let attivo = false;
+  const premio = { bloccate: { guerrieri: true, armi: true, meteo: true }, attivo: () => attivo, chiedi() {} };
+  const amb = ambiente({ estensione: true, premio, memoria: { "mut-ring": "on" } });
+  amb.avanza(30);
+  const r = amb.finestra.__ring, visti = {};
+  r.tempo(75);
+  const guarda = (st) => { for (const t of st.telefoni) { visti[t.tipo] = 1; assert.ok(!TELEFONI.includes(t.tipo), "nell'estensione è comparso un telefono: " + t.tipo); } };
+  amb.avanza(60 * 60, guarda);
+  r.comandi.colpo("telefoni");
+  amb.avanza(60 * 8, guarda);
+  assert.ok(visti.fumogeno || visti.barattolo, "non cade niente");
+  assert.ok(!visti.pistola && !visti.spada && !visti.bomba, "armi senza Premium");
+  // la pioggia arriva innescata: si aprono nubi e barattoli
+  attivo = true;
+  let aperti = 0;
+  for (let giro = 0; giro < 4; giro++) {
+    r.comandi.colpo("telefoni");
+    amb.avanza(60 * 8, (st) => { guarda(st); if (st.nubi || st.creature.length) aperti++; });
+  }
+  assert.ok(aperti > 0, "nella pioggia di oggetti non si apre niente");
+  assert.ok(visti.pistola || visti.spada || visti.bomba, "con Premium nella pioggia non arrivano le armi");
+  dentro(amb);
+  // sul sito i telefoni restano
+  const sito = ambiente();
+  sito.avanza(30);
+  sito.finestra.__ring.comandi.colpo("telefoni");
+  sito.avanza(60 * 4);
+  assert.ok(sito.stato().telefoni.some((t) => TELEFONI.includes(t.tipo)), "sul sito la pioggia di telefoni è sparita");
+});
+
+test("nessuno resta a terra per sempre: il conto del K.O. riparte anche per chi trema sul posto", () => {
+  // Il caso trovato il 02/10/2026: steso nel cratere (tenuto in posa) e rimesso «in volo» da uno
+  // scoppio vicino, il corpo tremava sul posto, la velocità non scendeva mai sotto la soglia e il
+  // conto alla rovescia non ripartiva: restava in fondo alla pagina finché non lo si prendeva.
+  // Col ring di prima succedeva una volta su due.
+  let crateri = 0;
+  for (let giro = 0; giro < 8; giro++) {
+    const amb = ambiente({ memoria: { "mut-ring-anime": "on", "mut-ring-stile": "guerrieri" } });
+    amb.avanza(30);
+    const r = amb.finestra.__ring;
+    r.mossa("robot", "avvinghia");
+    let nel = false;
+    amb.avanza(60 * 6, (s) => { if (s.lottatori.find((f) => f.tipo === "mela").cratere) { nel = true; return false; } });
+    if (!nel) continue;
+    crateri++;
+    amb.avanza(20);
+    const m = amb.lottatore("mela");
+    r.scoppia(m.bacino.x + 60, m.bacino.y - 10);
+    const fermo = {};
+    amb.avanza(60 * 20, (s) => {
+      for (const f of s.lottatori) {
+        const conta = f.ko > 0 && f.ko < 1e5 && !f.esploso && !f.preso && !f.tenuto;
+        fermo[f.tipo] = conta && fermo[f.tipo] && fermo[f.tipo].ko === f.ko ? { ko: f.ko, n: fermo[f.tipo].n + 1 } : { ko: f.ko, n: 0 };
+        assert.ok(fermo[f.tipo].n < 60 * 6, "a terra col conto fermo da sei secondi: " + f.tipo);
+      }
+    });
+    dentro(amb);
+  }
+  assert.ok(crateri >= 3, "il cratere non si forma quasi mai: " + crateri);
 });

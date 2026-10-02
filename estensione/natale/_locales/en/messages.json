@@ -19,5 +19,53 @@
   },
   "sempreNegato": {
     "message": "Permission not granted: the theme stays manual."
+  },
+  "guidaLink": {
+    "message": "How it works"
+  },
+  "guidaTitolo": {
+    "message": "How Page Snow works"
+  },
+  "guidaIntro": {
+    "message": "Snow falls on top of the page you are viewing and settles on headings, images and buttons. The page underneath stays as it is: nothing is read and nothing is sent anywhere."
+  },
+  "guidaP1T": {
+    "message": "Open any page"
+  },
+  "guidaP1": {
+    "message": "A news site, a shop, anything you like. It cannot start on the browser's internal pages, on the Chrome Web Store or in PDFs."
+  },
+  "guidaP2T": {
+    "message": "Click the Page Snow icon"
+  },
+  "guidaP2": {
+    "message": "It sits in the browser toolbar, inside the extensions menu (the puzzle piece): pin it to keep it at hand. One click and it starts snowing."
+  },
+  "guidaP3T": {
+    "message": "Turn it off and on with the snowflake button"
+  },
+  "guidaP3": {
+    "message": "It stays in the bottom right corner: it stops the snow and starts it again without reloading the page."
+  },
+  "guidaP4T": {
+    "message": "Play with what you find"
+  },
+  "guidaP4": {
+    "message": "Touch the snowmen with the pointer: they fall apart, and you can grab the pieces with the mouse. Click the gifts under the tree to open them. Every now and then the sleigh flies by."
+  },
+  "guidaSapereT": {
+    "message": "Good to know"
+  },
+  "guidaS1": {
+    "message": "The snow piles up over time: the longer you stay on the page, the higher the heaps."
+  },
+  "guidaS2": {
+    "message": "Want snow on every page you open, without clicking the icon? Turn it on in the options."
+  },
+  "guidaOpzioni": {
+    "message": "Open the options"
+  },
+  "guidaPiede": {
+    "message": "You can reopen this page any time from the extension's options."
   }
 }

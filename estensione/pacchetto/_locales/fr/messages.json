@@ -19,5 +19,71 @@
   },
   "sempreNegato": {
     "message": "Autorisation refusée : le bouton reste désactivé."
+  },
+  "guidaLink": {
+    "message": "Comment ça marche"
+  },
+  "guidaTitolo": {
+    "message": "Comment fonctionne Page Brawl"
+  },
+  "guidaIntro": {
+    "message": "Deux combattants se battent par-dessus la page que vous regardez. La page en dessous reste telle quelle : rien n'est lu, rien n'est envoyé."
+  },
+  "guidaP1T": {
+    "message": "Ouvrez n'importe quelle page"
+  },
+  "guidaP1": {
+    "message": "Un site d'actualités, une boutique, ce que vous voulez. Il ne peut pas démarrer sur les pages internes du navigateur, sur le Chrome Web Store ni dans les PDF."
+  },
+  "guidaP2T": {
+    "message": "Cliquez sur l'icône de Page Brawl"
+  },
+  "guidaP2": {
+    "message": "Elle se trouve dans la barre du navigateur, dans le menu des extensions (la pièce de puzzle) : épinglez-la pour l'avoir sous la main. Un clic et les combattants arrivent."
+  },
+  "guidaP3T": {
+    "message": "Arrêtez et relancez avec le bouton en bas à droite"
+  },
+  "guidaP3": {
+    "message": "Le bouton de mise en marche reste toujours visible : il arrête le combat et le relance sans recharger la page."
+  },
+  "guidaP4T": {
+    "message": "Attrapez-les à la souris"
+  },
+  "guidaP4": {
+    "message": "Faites glisser un combattant et lâchez-le pour le lancer. Pareil pour les objets qui tombent d'en haut : fumigènes, bocaux et armes."
+  },
+  "guidaP5T": {
+    "message": "Ouvrez le panneau avec le bouton au gant"
+  },
+  "guidaP5": {
+    "message": "Vous y choisissez les personnages, déposez des objets sur le ring, déclenchez un séisme ou les jetpacks, affichez les barres de vie et pariez vos jetons sur le vainqueur."
+  },
+  "guidaSapereT": {
+    "message": "Bon à savoir"
+  },
+  "guidaS1": {
+    "message": "La partie se joue en dix : celui qui atteint dix K.-O. envoie l'adversaire hors du ring, puis on repart de zéro."
+  },
+  "guidaS2": {
+    "message": "Un bocal lancé libère une créature de feu, de foudre ou d'eau qui se bat pour celui qui l'a lancé. Un fumigène aveugle quiconque se trouve dans le nuage."
+  },
+  "guidaS3": {
+    "message": "Les combattants apprennent : plus ils se battent, meilleurs ils deviennent. Ce qu'ils apprennent et vos jetons restent dans votre navigateur."
+  },
+  "guidaS4": {
+    "message": "Les effets sanglants sont désactivés : si vous les voulez, activez-les depuis le panneau."
+  },
+  "guidaS5": {
+    "message": "Super guerriers, mages, duellistes, armes, météo et gravité font partie de Premium : dans le panneau, ils portent un cadenas."
+  },
+  "guidaS6": {
+    "message": "Vous voulez le bouton de mise en marche sur tous les sites, sans passer par l'icône ? Activez-le dans les options."
+  },
+  "guidaOpzioni": {
+    "message": "Ouvrir les options"
+  },
+  "guidaPiede": {
+    "message": "Vous pouvez rouvrir cette page à tout moment depuis « Comment ça marche », en bas du panneau."
   }
 }

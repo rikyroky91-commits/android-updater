@@ -19,5 +19,53 @@
   },
   "sempreNegato": {
     "message": "Permiso no concedido: el tema sigue siendo manual."
+  },
+  "guidaLink": {
+    "message": "Cómo funciona"
+  },
+  "guidaTitolo": {
+    "message": "Cómo funciona Page Snow"
+  },
+  "guidaIntro": {
+    "message": "Nieva encima de la página que estás viendo, y la nieve se posa sobre los títulos, las imágenes y los botones. La página de debajo se queda como está: no se lee ni se envía nada."
+  },
+  "guidaP1T": {
+    "message": "Abre cualquier página"
+  },
+  "guidaP1": {
+    "message": "Un sitio de noticias, una tienda, lo que quieras. No puede arrancar en las páginas internas del navegador, en Chrome Web Store ni en los PDF."
+  },
+  "guidaP2T": {
+    "message": "Haz clic en el icono de Page Snow"
+  },
+  "guidaP2": {
+    "message": "Está en la barra del navegador, dentro del menú de extensiones (la pieza de puzle): fíjalo con la chincheta para tenerlo a mano. Un clic y empieza a nevar."
+  },
+  "guidaP3T": {
+    "message": "Apaga y enciende con el botón del copo"
+  },
+  "guidaP3": {
+    "message": "Se queda abajo a la derecha: detiene la nieve y la reanuda sin recargar la página."
+  },
+  "guidaP4T": {
+    "message": "Juega con lo que encuentres"
+  },
+  "guidaP4": {
+    "message": "Toca los muñecos de nieve con el puntero: se desmontan, y las piezas se agarran con el ratón. Haz clic en los regalos bajo el árbol para abrirlos. De vez en cuando pasa el trineo."
+  },
+  "guidaSapereT": {
+    "message": "Cosas que conviene saber"
+  },
+  "guidaS1": {
+    "message": "La nieve se acumula con el tiempo: cuanto más te quedas en la página, más crecen los montones."
+  },
+  "guidaS2": {
+    "message": "¿Quieres nieve en cada página que abras, sin pulsar el icono? Se activa en las opciones."
+  },
+  "guidaOpzioni": {
+    "message": "Abrir las opciones"
+  },
+  "guidaPiede": {
+    "message": "Puedes volver a abrir esta página cuando quieras desde las opciones de la extensión."
   }
 }

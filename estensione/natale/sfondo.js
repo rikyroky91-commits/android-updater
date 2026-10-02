@@ -28,3 +28,7 @@ chrome.permissions.onRemoved.addListener(async () => {
     await chrome.storage.local.set({ "ps-sempre": "off" });
   } catch (errore) { /* non era registrato */ }
 });
+// Appena installata: la pagina che spiega come si usa.
+chrome.runtime.onInstalled.addListener((dettagli) => {
+  if (dettagli && dettagli.reason === "install") chrome.tabs.create({ url: chrome.runtime.getURL("benvenuto.html") });
+});

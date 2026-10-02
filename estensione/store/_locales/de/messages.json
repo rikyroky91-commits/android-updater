@@ -19,5 +19,71 @@
   },
   "sempreNegato": {
     "message": "Berechtigung nicht erteilt: Der Knopf bleibt aus."
+  },
+  "guidaLink": {
+    "message": "So funktioniert es"
+  },
+  "guidaTitolo": {
+    "message": "So funktioniert Page Brawl"
+  },
+  "guidaIntro": {
+    "message": "Zwei Kämpfer prügeln sich über der Seite, die du gerade ansiehst. Die Seite darunter bleibt, wie sie ist: Es wird nichts gelesen und nichts gesendet."
+  },
+  "guidaP1T": {
+    "message": "Öffne irgendeine Seite"
+  },
+  "guidaP1": {
+    "message": "Eine Nachrichtenseite, ein Shop, was du willst. Auf den internen Seiten des Browsers, im Chrome Web Store und in PDFs kann es nicht starten."
+  },
+  "guidaP2T": {
+    "message": "Klicke auf das Page-Brawl-Symbol"
+  },
+  "guidaP2": {
+    "message": "Es sitzt in der Symbolleiste des Browsers, im Erweiterungsmenü (das Puzzleteil): Hefte es an, damit es immer griffbereit ist. Ein Klick und die Kämpfer kommen herein."
+  },
+  "guidaP3T": {
+    "message": "Aus- und einschalten mit dem Knopf unten rechts"
+  },
+  "guidaP3": {
+    "message": "Der Einschaltknopf bleibt immer sichtbar: Er stoppt den Kampf und startet ihn wieder, ohne die Seite neu zu laden."
+  },
+  "guidaP4T": {
+    "message": "Pack sie mit der Maus"
+  },
+  "guidaP4": {
+    "message": "Zieh einen Kämpfer und lass los, um ihn zu werfen. Das gilt auch für alles, was von oben fällt: Rauchbomben, Gläser und Waffen."
+  },
+  "guidaP5T": {
+    "message": "Öffne das Menü mit dem Handschuh-Knopf"
+  },
+  "guidaP5": {
+    "message": "Dort wählst du die Figuren, wirfst Gegenstände in den Ring, löst ein Erdbeben oder Jetpacks aus, schaltest die Lebensbalken ein und setzt deine Jetons auf den Sieger."
+  },
+  "guidaSapereT": {
+    "message": "Gut zu wissen"
+  },
+  "guidaS1": {
+    "message": "Gespielt wird bis zehn: Wer zehn K.o. erreicht, schleudert den Gegner aus dem Ring, dann geht es wieder bei null los."
+  },
+  "guidaS2": {
+    "message": "Ein geworfenes Glas befreit ein Wesen aus Feuer, Blitz oder Wasser, das für den Werfer kämpft. Eine Rauchbombe blendet jeden, der in der Wolke steht."
+  },
+  "guidaS3": {
+    "message": "Die Kämpfer lernen dazu: Je mehr sie kämpfen, desto besser werden sie. Was sie lernen und deine Jetons bleiben in deinem Browser."
+  },
+  "guidaS4": {
+    "message": "Blutige Effekte sind aus: Wenn du sie willst, schaltest du sie im Menü ein."
+  },
+  "guidaS5": {
+    "message": "Superkrieger, Magier, Duellanten, Waffen, Wetter und Schwerkraft gehören zu Premium: Im Menü tragen sie ein Schloss."
+  },
+  "guidaS6": {
+    "message": "Du willst den Einschaltknopf auf jeder Website, ohne über das Symbol zu gehen? Schalte ihn in den Optionen ein."
+  },
+  "guidaOpzioni": {
+    "message": "Optionen öffnen"
+  },
+  "guidaPiede": {
+    "message": "Diese Seite öffnest du jederzeit wieder über „So funktioniert es“ unten im Menü."
   }
 }

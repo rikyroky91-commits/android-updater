@@ -3,4 +3,5 @@ h1 { font-size: 18px; margin: 0 0 12px; }
 label { display: flex; gap: 8px; align-items: flex-start; font-weight: 600; }
 p { margin: 10px 0 0; color: #4a4744; }
 #esito { color: #b3261e; min-height: 1.4em; }
-@media (prefers-color-scheme: dark) { body { background: #1c1b1a; color: #ebe9e6; } p { color: #bdb9b3; } }
+a { color: #1f7a5a; font-weight: 600; }
+@media (prefers-color-scheme: dark) { body { background: #1c1b1a; color: #ebe9e6; } p { color: #bdb9b3; } a { color: #46c291; } }

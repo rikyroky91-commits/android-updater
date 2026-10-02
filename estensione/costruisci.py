@@ -24,13 +24,14 @@ Il test `tests/test_estensione.py` usa `--verifica`: chi cambia il ring e
 dimentica di rigenerare l'estensione se ne accorge subito.
 """
 import json
+import re
 import sys
 from pathlib import Path
 
 RADICE = Path(__file__).resolve().parent.parent
 QUI = Path(__file__).resolve().parent
 VARIANTI = {"pacchetto": {"premium_di_prova": True}, "store": {"premium_di_prova": False}}
-VERSIONE = "0.3.0"
+VERSIONE = "0.4.0"
 NOME = "Page Brawl"
 
 MANIFEST = {
@@ -94,6 +95,212 @@ MESSAGGI = {
     },
 }
 
+# ---------------------------------------------------------------------------
+# LA GUIDA PER CHI HA APPENA INSTALLATO (02/10/2026, su richiesta).
+# Una pagina dell'estensione (`benvenuto.html`) che si apre da sola alla prima
+# installazione e si riapre dalla tendina («Come funziona») e dalle opzioni.
+# I testi stanno nei messaggi dell'estensione, come quelli delle opzioni.
+# ---------------------------------------------------------------------------
+GUIDA = {
+    "en": {
+        "guidaLink": "How it works",
+        "guidaTitolo": "How Page Brawl works",
+        "guidaIntro": "Two fighters brawl on top of the page you are viewing. The page underneath stays as it is: nothing is read and nothing is sent anywhere.",
+        "guidaP1T": "Open any page",
+        "guidaP1": "A news site, a shop, anything you like. It cannot start on the browser's internal pages, on the Chrome Web Store or in PDFs.",
+        "guidaP2T": "Click the Page Brawl icon",
+        "guidaP2": "It sits in the browser toolbar, inside the extensions menu (the puzzle piece): pin it to keep it at hand. One click and the fighters walk in.",
+        "guidaP3T": "Turn it off and on with the button in the bottom right",
+        "guidaP3": "The power button is always visible: it stops the brawl and starts it again without reloading the page.",
+        "guidaP4T": "Grab them with the mouse",
+        "guidaP4": "Drag a fighter and let go to throw them. The same goes for the things that fall from above: smoke bombs, jars and weapons.",
+        "guidaP5T": "Open the panel with the glove button",
+        "guidaP5": "There you pick the characters, drop items into the ring, trigger an earthquake or jetpacks, turn on the health bars and bet your tokens on the winner.",
+        "guidaSapereT": "Good to know",
+        "guidaS1": "First to ten: whoever reaches ten K.O.s sends the opponent flying out of the ring, then the score starts again from zero.",
+        "guidaS2": "A thrown jar releases a creature of fire, lightning or water that fights for whoever threw it. A smoke bomb blinds anyone caught in the cloud.",
+        "guidaS3": "The fighters learn: the more they fight, the better they get. What they learn and your tokens stay in your browser.",
+        "guidaS4": "Gore effects are off: if you want them, turn them on from the panel.",
+        "guidaS5": "Super warriors, wizards, duelists, weapons, weather and gravity are part of Premium: in the panel they carry a padlock.",
+        "guidaS6": "Want the power button on every site, without going through the icon? Turn it on in the options.",
+        "guidaOpzioni": "Open the options",
+        "guidaPiede": "You can reopen this page any time from “How it works”, at the bottom of the panel.",
+    },
+    "it": {
+        "guidaLink": "Come funziona",
+        "guidaTitolo": "Come funziona Page Brawl",
+        "guidaIntro": "Due lottatori si picchiano sopra la pagina che stai guardando. La pagina sotto resta com'è: non viene letto né inviato niente.",
+        "guidaP1T": "Apri una pagina qualsiasi",
+        "guidaP1": "Un sito di notizie, un negozio, quello che vuoi. Non può partire sulle pagine interne del browser, sul Chrome Web Store e nei PDF.",
+        "guidaP2T": "Clicca l'icona di Page Brawl",
+        "guidaP2": "È nella barra del browser, dentro il menu delle estensioni (il pezzo di puzzle): fissala con la puntina per averla sempre a portata. Un clic e i lottatori entrano.",
+        "guidaP3T": "Spegni e riaccendi dal tasto in basso a destra",
+        "guidaP3": "Il tasto di accensione resta sempre visibile: ferma la lotta e la fa ripartire senza ricaricare la pagina.",
+        "guidaP4T": "Prendili col mouse",
+        "guidaP4": "Trascina un lottatore e lascialo per lanciarlo. Vale anche per gli oggetti che cadono dall'alto: fumogeni, barattoli e armi.",
+        "guidaP5T": "Apri la tendina col guantone",
+        "guidaP5": "Lì scegli i personaggi, metti in campo gli oggetti, scateni terremoto e jetpack, accendi le barre della vita e scommetti i gettoni su chi vince.",
+        "guidaSapereT": "Cose da sapere",
+        "guidaS1": "Si gioca a dieci: chi arriva a dieci K.O. manda l'avversario fuori dal ring, poi si riparte da zero.",
+        "guidaS2": "Un barattolo lanciato libera una creatura di fuoco, di fulmini o d'acqua che combatte per chi l'ha lanciato. Un fumogeno acceca chi finisce nella nube.",
+        "guidaS3": "I lottatori imparano: più lottano, più diventano bravi. Quello che imparano e i tuoi gettoni restano nel tuo browser.",
+        "guidaS4": "Gli effetti cruenti sono spenti: se li vuoi, si accendono dalla tendina.",
+        "guidaS5": "Super guerrieri, maghi, duellanti, armi, meteo e gravità fanno parte di Premium: nella tendina hanno il lucchetto.",
+        "guidaS6": "Vuoi il tasto di accensione su ogni sito, senza passare dall'icona? Si accende dalle opzioni.",
+        "guidaOpzioni": "Apri le opzioni",
+        "guidaPiede": "Questa pagina si riapre quando vuoi da «Come funziona», in fondo alla tendina.",
+    },
+    "es": {
+        "guidaLink": "Cómo funciona",
+        "guidaTitolo": "Cómo funciona Page Brawl",
+        "guidaIntro": "Dos luchadores se pelean encima de la página que estás viendo. La página de debajo se queda como está: no se lee ni se envía nada.",
+        "guidaP1T": "Abre cualquier página",
+        "guidaP1": "Un sitio de noticias, una tienda, lo que quieras. No puede arrancar en las páginas internas del navegador, en Chrome Web Store ni en los PDF.",
+        "guidaP2T": "Haz clic en el icono de Page Brawl",
+        "guidaP2": "Está en la barra del navegador, dentro del menú de extensiones (la pieza de puzle): fíjalo con la chincheta para tenerlo a mano. Un clic y entran los luchadores.",
+        "guidaP3T": "Apaga y enciende con el botón de abajo a la derecha",
+        "guidaP3": "El botón de encendido siempre está a la vista: detiene la pelea y la reanuda sin recargar la página.",
+        "guidaP4T": "Agárralos con el ratón",
+        "guidaP4": "Arrastra a un luchador y suéltalo para lanzarlo. Lo mismo vale para los objetos que caen de arriba: bombas de humo, tarros y armas.",
+        "guidaP5T": "Abre el panel con el botón del guante",
+        "guidaP5": "Ahí eliges los personajes, pones objetos en el ring, desatas un terremoto o los jetpacks, enciendes las barras de vida y apuestas tus fichas por el ganador.",
+        "guidaSapereT": "Cosas que conviene saber",
+        "guidaS1": "Se juega a diez: quien llega a diez K.O. manda al rival fuera del ring y luego se vuelve a empezar de cero.",
+        "guidaS2": "Un tarro lanzado libera una criatura de fuego, de rayos o de agua que lucha por quien lo lanzó. Una bomba de humo ciega a quien queda dentro de la nube.",
+        "guidaS3": "Los luchadores aprenden: cuanto más pelean, mejores son. Lo que aprenden y tus fichas se quedan en tu navegador.",
+        "guidaS4": "Los efectos sangrientos están apagados: si los quieres, se encienden desde el panel.",
+        "guidaS5": "Los superguerreros, los magos, los duelistas, las armas, el clima y la gravedad forman parte de Premium: en el panel llevan un candado.",
+        "guidaS6": "¿Quieres el botón de encendido en todos los sitios, sin pasar por el icono? Se activa en las opciones.",
+        "guidaOpzioni": "Abrir las opciones",
+        "guidaPiede": "Puedes volver a abrir esta página cuando quieras desde «Cómo funciona», al final del panel.",
+    },
+    "fr": {
+        "guidaLink": "Comment ça marche",
+        "guidaTitolo": "Comment fonctionne Page Brawl",
+        "guidaIntro": "Deux combattants se battent par-dessus la page que vous regardez. La page en dessous reste telle quelle : rien n'est lu, rien n'est envoyé.",
+        "guidaP1T": "Ouvrez n'importe quelle page",
+        "guidaP1": "Un site d'actualités, une boutique, ce que vous voulez. Il ne peut pas démarrer sur les pages internes du navigateur, sur le Chrome Web Store ni dans les PDF.",
+        "guidaP2T": "Cliquez sur l'icône de Page Brawl",
+        "guidaP2": "Elle se trouve dans la barre du navigateur, dans le menu des extensions (la pièce de puzzle) : épinglez-la pour l'avoir sous la main. Un clic et les combattants arrivent.",
+        "guidaP3T": "Arrêtez et relancez avec le bouton en bas à droite",
+        "guidaP3": "Le bouton de mise en marche reste toujours visible : il arrête le combat et le relance sans recharger la page.",
+        "guidaP4T": "Attrapez-les à la souris",
+        "guidaP4": "Faites glisser un combattant et lâchez-le pour le lancer. Pareil pour les objets qui tombent d'en haut : fumigènes, bocaux et armes.",
+        "guidaP5T": "Ouvrez le panneau avec le bouton au gant",
+        "guidaP5": "Vous y choisissez les personnages, déposez des objets sur le ring, déclenchez un séisme ou les jetpacks, affichez les barres de vie et pariez vos jetons sur le vainqueur.",
+        "guidaSapereT": "Bon à savoir",
+        "guidaS1": "La partie se joue en dix : celui qui atteint dix K.-O. envoie l'adversaire hors du ring, puis on repart de zéro.",
+        "guidaS2": "Un bocal lancé libère une créature de feu, de foudre ou d'eau qui se bat pour celui qui l'a lancé. Un fumigène aveugle quiconque se trouve dans le nuage.",
+        "guidaS3": "Les combattants apprennent : plus ils se battent, meilleurs ils deviennent. Ce qu'ils apprennent et vos jetons restent dans votre navigateur.",
+        "guidaS4": "Les effets sanglants sont désactivés : si vous les voulez, activez-les depuis le panneau.",
+        "guidaS5": "Super guerriers, mages, duellistes, armes, météo et gravité font partie de Premium : dans le panneau, ils portent un cadenas.",
+        "guidaS6": "Vous voulez le bouton de mise en marche sur tous les sites, sans passer par l'icône ? Activez-le dans les options.",
+        "guidaOpzioni": "Ouvrir les options",
+        "guidaPiede": "Vous pouvez rouvrir cette page à tout moment depuis « Comment ça marche », en bas du panneau.",
+    },
+    "de": {
+        "guidaLink": "So funktioniert es",
+        "guidaTitolo": "So funktioniert Page Brawl",
+        "guidaIntro": "Zwei Kämpfer prügeln sich über der Seite, die du gerade ansiehst. Die Seite darunter bleibt, wie sie ist: Es wird nichts gelesen und nichts gesendet.",
+        "guidaP1T": "Öffne irgendeine Seite",
+        "guidaP1": "Eine Nachrichtenseite, ein Shop, was du willst. Auf den internen Seiten des Browsers, im Chrome Web Store und in PDFs kann es nicht starten.",
+        "guidaP2T": "Klicke auf das Page-Brawl-Symbol",
+        "guidaP2": "Es sitzt in der Symbolleiste des Browsers, im Erweiterungsmenü (das Puzzleteil): Hefte es an, damit es immer griffbereit ist. Ein Klick und die Kämpfer kommen herein.",
+        "guidaP3T": "Aus- und einschalten mit dem Knopf unten rechts",
+        "guidaP3": "Der Einschaltknopf bleibt immer sichtbar: Er stoppt den Kampf und startet ihn wieder, ohne die Seite neu zu laden.",
+        "guidaP4T": "Pack sie mit der Maus",
+        "guidaP4": "Zieh einen Kämpfer und lass los, um ihn zu werfen. Das gilt auch für alles, was von oben fällt: Rauchbomben, Gläser und Waffen.",
+        "guidaP5T": "Öffne das Menü mit dem Handschuh-Knopf",
+        "guidaP5": "Dort wählst du die Figuren, wirfst Gegenstände in den Ring, löst ein Erdbeben oder Jetpacks aus, schaltest die Lebensbalken ein und setzt deine Jetons auf den Sieger.",
+        "guidaSapereT": "Gut zu wissen",
+        "guidaS1": "Gespielt wird bis zehn: Wer zehn K.o. erreicht, schleudert den Gegner aus dem Ring, dann geht es wieder bei null los.",
+        "guidaS2": "Ein geworfenes Glas befreit ein Wesen aus Feuer, Blitz oder Wasser, das für den Werfer kämpft. Eine Rauchbombe blendet jeden, der in der Wolke steht.",
+        "guidaS3": "Die Kämpfer lernen dazu: Je mehr sie kämpfen, desto besser werden sie. Was sie lernen und deine Jetons bleiben in deinem Browser.",
+        "guidaS4": "Blutige Effekte sind aus: Wenn du sie willst, schaltest du sie im Menü ein.",
+        "guidaS5": "Superkrieger, Magier, Duellanten, Waffen, Wetter und Schwerkraft gehören zu Premium: Im Menü tragen sie ein Schloss.",
+        "guidaS6": "Du willst den Einschaltknopf auf jeder Website, ohne über das Symbol zu gehen? Schalte ihn in den Optionen ein.",
+        "guidaOpzioni": "Optionen öffnen",
+        "guidaPiede": "Diese Seite öffnest du jederzeit wieder über „So funktioniert es“ unten im Menü.",
+    },
+}
+for _lingua, _testi in GUIDA.items():
+    MESSAGGI[_lingua].update(_testi)
+
+
+def pagina_guida(nome: str, passi: int, sapere: list) -> str:
+    """La pagina di benvenuto: `passi` passi numerati e le cose da sapere (`sapere`: le chiavi dei messaggi)."""
+    righe = "\n".join(f'<li><h2 data-msg="guidaP{i}T"></h2><p data-msg="guidaP{i}"></p></li>' for i in range(1, passi + 1))
+    note = "\n".join(f'<li data-msg="{chiave}"></li>' for chiave in sapere)
+    return f"""<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{nome}</title>
+<link rel="stylesheet" href="benvenuto.css">
+</head>
+<body>
+<main>
+<header><img src="icone/128.png" width="64" height="64" alt=""><div><h1 data-msg="guidaTitolo"></h1><p data-msg="guidaIntro"></p></div></header>
+<ol>
+{righe}
+</ol>
+<h2 class="sapere" data-msg="guidaSapereT"></h2>
+<ul>
+{note}
+</ul>
+<p><button type="button" id="opzioni" data-msg="guidaOpzioni"></button></p>
+<p class="piede" data-msg="guidaPiede"></p>
+</main>
+<script src="benvenuto.js"></script>
+</body>
+</html>
+"""
+
+
+GUIDA_CSS = """:root { --carta: #ffffff; --fondo: #f4f1ea; --ink: #201e1d; --tenue: #5a5652; --filo: #dcd7cd; --tinta: #1f7a5a; --su-tinta: #ffffff; }
+@media (prefers-color-scheme: dark) { :root { --carta: #1c1b1a; --fondo: #121110; --ink: #ebe9e6; --tenue: #b3aea7; --filo: #3a3835; --tinta: #46c291; --su-tinta: #10201a; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fondo); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 680px; margin: 0 auto; padding: 40px 20px 56px; }
+header { display: flex; gap: 18px; align-items: center; margin-bottom: 28px; }
+header img { border-radius: 14px; flex: none; }
+h1 { font-size: 28px; line-height: 1.15; margin: 0 0 8px; text-wrap: balance; }
+header p { margin: 0; color: var(--tenue); }
+ol { list-style: none; margin: 0; padding: 0; counter-reset: passo; display: grid; gap: 12px; }
+ol li { counter-increment: passo; position: relative; background: var(--carta); border: 1px solid var(--filo); border-radius: 12px; padding: 16px 18px 16px 62px; }
+ol li::before { content: counter(passo); position: absolute; left: 16px; top: 16px; width: 32px; height: 32px; border-radius: 50%;
+  background: var(--tinta); color: var(--su-tinta); font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+h2 { font-size: 17px; margin: 0 0 4px; }
+ol p { margin: 0; color: var(--tenue); }
+h2.sapere { margin: 32px 0 10px; font-size: 19px; }
+ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--tenue); }
+button { font: inherit; font-weight: 600; margin-top: 22px; padding: 10px 18px; border-radius: 10px; border: 0; background: var(--tinta); color: var(--su-tinta); cursor: pointer; }
+button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.piede { margin: 18px 0 0; font-size: 14px; color: var(--tenue); }
+@media (max-width: 480px) { header { align-items: flex-start; } h1 { font-size: 23px; } main { padding-top: 24px; } }
+"""
+GUIDA_JS = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
+ *
+ * La pagina di benvenuto: riempie i testi nella lingua del browser e porta
+ * alle opzioni.
+ */
+(function () {
+  "use strict";
+  var m = function (chiave) { return chrome.i18n.getMessage(chiave) || chiave; };
+  document.querySelectorAll("[data-msg]").forEach(function (el) { el.textContent = m(el.getAttribute("data-msg")); });
+  document.title = m("guidaTitolo");
+  try { document.documentElement.lang = chrome.i18n.getUILanguage(); } catch (e) { /* resta senza */ }
+  document.getElementById("opzioni").addEventListener("click", function () { chrome.runtime.openOptionsPage(); });
+})();
+"""
+# In coda al service worker: la guida si apre alla prima installazione (non agli aggiornamenti).
+SFONDO_GUIDA = """// Appena installata: la pagina che spiega come si usa.
+chrome.runtime.onInstalled.addListener((dettagli) => {
+  if (dettagli && dettagli.reason === "install") chrome.tabs.create({ url: chrome.runtime.getURL("benvenuto.html") });
+});
+"""
+
 SFONDO = """/* Il service worker dell'estensione: al clic sull'icona accende il ring
  * sulla scheda attiva; a un secondo clic lo spegne (e poi lo riaccende). */
 async function avvia(tab) {
@@ -126,6 +333,7 @@ chrome.runtime.onMessage.addListener((messaggio, mittente) => {
   if (!messaggio) return;
   if (messaggio.tipo === "avvia" && mittente.tab) avvia(mittente.tab);
   if (messaggio.tipo === "opzioni") chrome.runtime.openOptionsPage();
+  if (messaggio.tipo === "guida") chrome.tabs.create({ url: chrome.runtime.getURL("benvenuto.html") });
 });
 // Tolto il permesso su tutti i siti dalle impostazioni del browser: via anche il tasto.
 chrome.permissions.onRemoved.addListener(async () => {
@@ -253,6 +461,7 @@ OPZIONI_HTML = """<!doctype html>
 <label><input type="checkbox" id="sempre"> <span data-msg="sempreEtichetta"></span></label>
 <p data-msg="sempreSpiega"></p>
 <p id="esito" role="status"></p>
+<p><a href="benvenuto.html" target="_blank" rel="noopener" data-msg="guidaLink"></a></p>
 <script src="opzioni.js"></script>
 </body>
 </html>
@@ -262,7 +471,8 @@ h1 { font-size: 18px; margin: 0 0 12px; }
 label { display: flex; gap: 8px; align-items: flex-start; font-weight: 600; }
 p { margin: 10px 0 0; color: #4a4744; }
 #esito { color: #b3261e; min-height: 1.4em; }
-@media (prefers-color-scheme: dark) { body { background: #1c1b1a; color: #ebe9e6; } p { color: #bdb9b3; } }
+a { color: #1f7a5a; font-weight: 600; }
+@media (prefers-color-scheme: dark) { body { background: #1c1b1a; color: #ebe9e6; } p { color: #bdb9b3; } a { color: #46c291; } }
 """
 OPZIONI_JS = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
  *
@@ -385,6 +595,10 @@ PREPARA = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
   if (versoOpzioni) versoOpzioni.addEventListener("click", function () {
     try { chrome.runtime.sendMessage({ tipo: "opzioni" }); } catch (e) { /* estensione ricaricata */ }
   });
+  var versoGuida = radice.querySelector("[data-guida]");
+  if (versoGuida) versoGuida.addEventListener("click", function () {
+    try { chrome.runtime.sendMessage({ tipo: "guida" }); } catch (e) { /* estensione ricaricata */ }
+  });
 
   // Il riquadro Premium: cosa sblocca, il tasto per comprarlo e, nella sola
   // variante di prova, un interruttore per vedere il gioco aperto e chiuso.
@@ -477,6 +691,7 @@ RIQUADRO_PREMIO = """
     </section>"""
 VERSO_OPZIONI = """  <section class="ring-sezione">
       <button type="button" class="ring-tasto ring-largo" data-opzioni-estensione>&#9881; Tasto di accensione su tutti i siti</button>
+      <button type="button" class="ring-tasto ring-largo" data-guida>&#10067; Come funziona</button>
     </section>
   """
 TASTO_PROVA = """
@@ -507,6 +722,13 @@ def file_attesi(variante: str) -> dict:
     if scelte["premium"]:
         riquadro = RIQUADRO_PREMIO.replace("__PROVA__", TASTO_PROVA if opzioni["premium_di_prova"] else "")
         pannello = pannello[:fine_testa] + riquadro + pannello[fine_testa:]
+    # Nell'estensione non ci sono telefoni (02/10/2026, su richiesta): via i
+    # tasti che li mettono in campo, e la pioggia diventa di oggetti.
+    for forma in ("classico", "orologio", "tablet", "pc"):
+        pannello = re.sub(r'\s*<button type="button" class="ring-tasto" data-metti="%s">[^<]*</button>' % forma, "", pannello)
+    assert 'data-metti="classico"' not in pannello and 'data-metti="fumogeno"' in pannello
+    assert "Pioggia di telefoni" in pannello
+    pannello = pannello.replace("&#128242; Pioggia di telefoni", "&#127776; Pioggia di oggetti")
     # In fondo alla tendina, la strada per le opzioni dell'estensione.
     fine = pannello.rindex("</div>")
     pannello = pannello[:fine] + VERSO_OPZIONI + pannello[fine:]
@@ -520,7 +742,9 @@ def file_attesi(variante: str) -> dict:
                .replace("__HTML__", json.dumps(html, ensure_ascii=False)))
     attesi = {
         "manifest.json": json.dumps(MANIFEST, ensure_ascii=False, indent=2) + "\n",
-        "sfondo.js": SFONDO.replace("__STILE_PAGINA__", json.dumps(STILE_PAGINA, ensure_ascii=False)),
+        "sfondo.js": SFONDO.replace("__STILE_PAGINA__", json.dumps(STILE_PAGINA, ensure_ascii=False)) + SFONDO_GUIDA,
+        "benvenuto.html": pagina_guida(NOME, 5, ["guidaS1", "guidaS2", "guidaS3", "guidaS4"] + (["guidaS5"] if scelte["premium"] else []) + ["guidaS6"]),
+        "benvenuto.css": GUIDA_CSS, "benvenuto.js": GUIDA_JS,
         "prepara.js": prepara,
         "ring.js": (RADICE / "web/static/ring.js").read_text(encoding="utf-8"),
         "lingue.js": (RADICE / "web/static/lingue.js").read_text(encoding="utf-8"),
@@ -545,7 +769,7 @@ def file_attesi(variante: str) -> dict:
 # dove mettere il canvas e gli si mette accanto un tasto per accendere e
 # spegnere. Gratis, nessun Premium.
 # ---------------------------------------------------------------------------
-NATALE_VERSIONE = "0.1.0"
+NATALE_VERSIONE = "0.2.0"
 NATALE_NOME = "Page Snow"
 NATALE_MANIFEST = {
     "manifest_version": 3,
@@ -603,6 +827,100 @@ NATALE_MESSAGGI = {
         "sempreNegato": "Berechtigung nicht erteilt: Das Design bleibt manuell.",
     },
 }
+NATALE_GUIDA = {
+    "en": {
+        "guidaLink": "How it works",
+        "guidaTitolo": "How Page Snow works",
+        "guidaIntro": "Snow falls on top of the page you are viewing and settles on headings, images and buttons. The page underneath stays as it is: nothing is read and nothing is sent anywhere.",
+        "guidaP1T": "Open any page",
+        "guidaP1": "A news site, a shop, anything you like. It cannot start on the browser's internal pages, on the Chrome Web Store or in PDFs.",
+        "guidaP2T": "Click the Page Snow icon",
+        "guidaP2": "It sits in the browser toolbar, inside the extensions menu (the puzzle piece): pin it to keep it at hand. One click and it starts snowing.",
+        "guidaP3T": "Turn it off and on with the snowflake button",
+        "guidaP3": "It stays in the bottom right corner: it stops the snow and starts it again without reloading the page.",
+        "guidaP4T": "Play with what you find",
+        "guidaP4": "Touch the snowmen with the pointer: they fall apart, and you can grab the pieces with the mouse. Click the gifts under the tree to open them. Every now and then the sleigh flies by.",
+        "guidaSapereT": "Good to know",
+        "guidaS1": "The snow piles up over time: the longer you stay on the page, the higher the heaps.",
+        "guidaS2": "Want snow on every page you open, without clicking the icon? Turn it on in the options.",
+        "guidaOpzioni": "Open the options",
+        "guidaPiede": "You can reopen this page any time from the extension's options.",
+    },
+    "it": {
+        "guidaLink": "Come funziona",
+        "guidaTitolo": "Come funziona Page Snow",
+        "guidaIntro": "Nevica sopra la pagina che stai guardando, e la neve si posa sui titoli, sulle immagini e sui tasti. La pagina sotto resta com'è: non viene letto né inviato niente.",
+        "guidaP1T": "Apri una pagina qualsiasi",
+        "guidaP1": "Un sito di notizie, un negozio, quello che vuoi. Non può partire sulle pagine interne del browser, sul Chrome Web Store e nei PDF.",
+        "guidaP2T": "Clicca l'icona di Page Snow",
+        "guidaP2": "È nella barra del browser, dentro il menu delle estensioni (il pezzo di puzzle): fissala con la puntina per averla sempre a portata. Un clic e comincia a nevicare.",
+        "guidaP3T": "Spegni e riaccendi dal tasto col fiocco",
+        "guidaP3": "Resta in basso a destra: ferma la neve e la fa ripartire senza ricaricare la pagina.",
+        "guidaP4T": "Gioca con quello che trovi",
+        "guidaP4": "Tocca i pupazzi di neve col puntatore: vanno in pezzi, e i pezzi si prendono col mouse. Clicca i regali sotto l'albero per aprirli. Ogni tanto passa la slitta.",
+        "guidaSapereT": "Cose da sapere",
+        "guidaS1": "La neve si accumula col tempo: più resti sulla pagina, più i mucchi crescono.",
+        "guidaS2": "Vuoi la neve su ogni pagina che apri, senza cliccare l'icona? Si accende dalle opzioni.",
+        "guidaOpzioni": "Apri le opzioni",
+        "guidaPiede": "Questa pagina si riapre quando vuoi dalle opzioni dell'estensione.",
+    },
+    "es": {
+        "guidaLink": "Cómo funciona",
+        "guidaTitolo": "Cómo funciona Page Snow",
+        "guidaIntro": "Nieva encima de la página que estás viendo, y la nieve se posa sobre los títulos, las imágenes y los botones. La página de debajo se queda como está: no se lee ni se envía nada.",
+        "guidaP1T": "Abre cualquier página",
+        "guidaP1": "Un sitio de noticias, una tienda, lo que quieras. No puede arrancar en las páginas internas del navegador, en Chrome Web Store ni en los PDF.",
+        "guidaP2T": "Haz clic en el icono de Page Snow",
+        "guidaP2": "Está en la barra del navegador, dentro del menú de extensiones (la pieza de puzle): fíjalo con la chincheta para tenerlo a mano. Un clic y empieza a nevar.",
+        "guidaP3T": "Apaga y enciende con el botón del copo",
+        "guidaP3": "Se queda abajo a la derecha: detiene la nieve y la reanuda sin recargar la página.",
+        "guidaP4T": "Juega con lo que encuentres",
+        "guidaP4": "Toca los muñecos de nieve con el puntero: se desmontan, y las piezas se agarran con el ratón. Haz clic en los regalos bajo el árbol para abrirlos. De vez en cuando pasa el trineo.",
+        "guidaSapereT": "Cosas que conviene saber",
+        "guidaS1": "La nieve se acumula con el tiempo: cuanto más te quedas en la página, más crecen los montones.",
+        "guidaS2": "¿Quieres nieve en cada página que abras, sin pulsar el icono? Se activa en las opciones.",
+        "guidaOpzioni": "Abrir las opciones",
+        "guidaPiede": "Puedes volver a abrir esta página cuando quieras desde las opciones de la extensión.",
+    },
+    "fr": {
+        "guidaLink": "Comment ça marche",
+        "guidaTitolo": "Comment fonctionne Page Snow",
+        "guidaIntro": "Il neige par-dessus la page que vous regardez, et la neige se pose sur les titres, les images et les boutons. La page en dessous reste telle quelle : rien n'est lu, rien n'est envoyé.",
+        "guidaP1T": "Ouvrez n'importe quelle page",
+        "guidaP1": "Un site d'actualités, une boutique, ce que vous voulez. Il ne peut pas démarrer sur les pages internes du navigateur, sur le Chrome Web Store ni dans les PDF.",
+        "guidaP2T": "Cliquez sur l'icône de Page Snow",
+        "guidaP2": "Elle se trouve dans la barre du navigateur, dans le menu des extensions (la pièce de puzzle) : épinglez-la pour l'avoir sous la main. Un clic et il se met à neiger.",
+        "guidaP3T": "Arrêtez et relancez avec le bouton au flocon",
+        "guidaP3": "Il reste en bas à droite : il arrête la neige et la relance sans recharger la page.",
+        "guidaP4T": "Jouez avec ce que vous trouvez",
+        "guidaP4": "Touchez les bonshommes de neige avec le pointeur : ils tombent en morceaux, et les morceaux s'attrapent à la souris. Cliquez sur les cadeaux sous le sapin pour les ouvrir. De temps en temps, le traîneau passe.",
+        "guidaSapereT": "Bon à savoir",
+        "guidaS1": "La neige s'accumule avec le temps : plus vous restez sur la page, plus les tas grandissent.",
+        "guidaS2": "Vous voulez de la neige sur chaque page ouverte, sans cliquer sur l'icône ? Activez-la dans les options.",
+        "guidaOpzioni": "Ouvrir les options",
+        "guidaPiede": "Vous pouvez rouvrir cette page à tout moment depuis les options de l'extension.",
+    },
+    "de": {
+        "guidaLink": "So funktioniert es",
+        "guidaTitolo": "So funktioniert Page Snow",
+        "guidaIntro": "Es schneit über der Seite, die du gerade ansiehst, und der Schnee bleibt auf Überschriften, Bildern und Knöpfen liegen. Die Seite darunter bleibt, wie sie ist: Es wird nichts gelesen und nichts gesendet.",
+        "guidaP1T": "Öffne irgendeine Seite",
+        "guidaP1": "Eine Nachrichtenseite, ein Shop, was du willst. Auf den internen Seiten des Browsers, im Chrome Web Store und in PDFs kann es nicht starten.",
+        "guidaP2T": "Klicke auf das Page-Snow-Symbol",
+        "guidaP2": "Es sitzt in der Symbolleiste des Browsers, im Erweiterungsmenü (das Puzzleteil): Hefte es an, damit es immer griffbereit ist. Ein Klick und es beginnt zu schneien.",
+        "guidaP3T": "Aus- und einschalten mit dem Flocken-Knopf",
+        "guidaP3": "Er bleibt unten rechts: Er stoppt den Schnee und startet ihn wieder, ohne die Seite neu zu laden.",
+        "guidaP4T": "Spiel mit dem, was du findest",
+        "guidaP4": "Berühre die Schneemänner mit dem Zeiger: Sie fallen auseinander, und die Teile kannst du mit der Maus packen. Klicke auf die Geschenke unter dem Baum, um sie zu öffnen. Ab und zu fliegt der Schlitten vorbei.",
+        "guidaSapereT": "Gut zu wissen",
+        "guidaS1": "Der Schnee sammelt sich mit der Zeit: Je länger du auf der Seite bleibst, desto höher werden die Haufen.",
+        "guidaS2": "Du willst Schnee auf jeder Seite, die du öffnest, ohne das Symbol anzuklicken? Schalte es in den Optionen ein.",
+        "guidaOpzioni": "Optionen öffnen",
+        "guidaPiede": "Diese Seite öffnest du jederzeit wieder über die Optionen der Erweiterung.",
+    },
+}
+for _lingua, _testi in NATALE_GUIDA.items():
+    NATALE_MESSAGGI[_lingua].update(_testi)
 NATALE_PAGINA_CSS = ("html.natale-presa, html.natale-presa * { cursor: grab !important; }\n"
                      "html.natale-trascina, html.natale-trascina * { cursor: grabbing !important; user-select: none !important; }\n")
 NATALE_SFONDO = """/* Il service worker di Page Snow: al clic sull'icona accende la neve sulla
@@ -741,7 +1059,10 @@ def file_natale() -> dict:
     html = '<div class="barretta"><button type="button" aria-pressed="true">' + ICONA_FIOCCO + "</button></div>"
     attesi = {
         "manifest.json": json.dumps(NATALE_MANIFEST, ensure_ascii=False, indent=2) + "\n",
-        "sfondo.js": NATALE_SFONDO,
+        "sfondo.js": NATALE_SFONDO + SFONDO_GUIDA,
+        "benvenuto.html": pagina_guida(NATALE_NOME, 4, ["guidaS1", "guidaS2"]),
+        "benvenuto.css": GUIDA_CSS.replace("--tinta: #1f7a5a", "--tinta: #c8102e").replace("--tinta: #46c291; --su-tinta: #10201a", "--tinta: #ff6b81; --su-tinta: #2a0a10"),
+        "benvenuto.js": GUIDA_JS,
         "prepara.js": (NATALE_PREPARA.replace("__HTML__", json.dumps(html)).replace("__STILE__", json.dumps(NATALE_STILE))),
         "natale.js": (RADICE / "web/static/natale.js").read_text(encoding="utf-8"),
         "pagina.css": NATALE_PAGINA_CSS,

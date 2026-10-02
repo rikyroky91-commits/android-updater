@@ -35,10 +35,28 @@ Di suo l'estensione entra in una pagina solo quando clicchi l'icona (`activeTab`
 
 ### Cosa è gratis e cosa è Premium
 
-- **Gratis:** la lotta fra il robot e la mela, prese e lanci col mouse, telefoni, smartwatch, tablet e portatili, terremoto, jetpack, furia, barre della vita, scommesse, quello che i lottatori imparano.
+- **Gratis:** la lotta fra il robot e la mela, prese e lanci col mouse, fumogeni e barattoli con le creature, la pioggia di oggetti, terremoto, jetpack, furia, barre della vita, scommesse, la partita a dieci col volo fuori dal ring, quello che i lottatori imparano.
 - **Premium:** i personaggi (super guerrieri, maghi, duellanti) con le loro mosse; pistola, spada, bomba, pieghevole e le due esplosioni; pioggia, uragano, rallentatore e le gravità diverse dalla Terra.
 
 I tasti Premium portano un lucchetto. Cliccandone uno si apre il riquadro in cima alla tendina.
+
+### Niente telefoni, ma fumogeni e barattoli (02/10/2026)
+
+Nell'estensione non piovono telefoni (sul sito sì: è un sito di telefoni). Cadono:
+
+- **Fumogeni.** Lanciati aprono una nube: chi ci finisce dentro non vede e barcolla per qualche secondo, tranne chi l'ha lanciato.
+- **Barattoli.** Lanciati si rompono e liberano una creatura che per dieci secondi combatte per chi l'ha lanciato: **Tizzo** (fuoco, soffia fiamme), **Zip** (elettricità, chiama un fulmine), **Bolla** (acqua, un getto che spinge lontano). Al massimo tre creature insieme. Sono personaggi inventati qui.
+- **Armi** (pistola, spada, bomba), solo con Premium.
+
+Caduti dal cielo restano interi: si aprono solo se lanciati, dai lottatori o col mouse. Nella **pioggia di oggetti** arrivano già innescati.
+
+### La partita a dieci
+
+Chi arriva a dieci K.O. chiude la partita: sul colpo l'azione si ferma un attimo, lo sconfitto parte dritto fuori dalla finestra, dal punto in cui esce si apre un ventaglio di luce, poi il conto riparte da zero e lui rientra dall'alto.
+
+### La guida per chi installa
+
+Alla prima installazione si apre `benvenuto.html`: cinque passi e le cose da sapere, nelle cinque lingue (i testi sono nei messaggi dell'estensione, in `costruisci.py`). Si riapre da «Come funziona» in fondo alla tendina e dalla pagina delle opzioni. Page Snow ha la sua, più corta.
 
 ### I personaggi
 

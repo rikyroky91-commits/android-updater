@@ -19,5 +19,53 @@
   },
   "sempreNegato": {
     "message": "Permesso non concesso: il tema resta manuale."
+  },
+  "guidaLink": {
+    "message": "Come funziona"
+  },
+  "guidaTitolo": {
+    "message": "Come funziona Page Snow"
+  },
+  "guidaIntro": {
+    "message": "Nevica sopra la pagina che stai guardando, e la neve si posa sui titoli, sulle immagini e sui tasti. La pagina sotto resta com'è: non viene letto né inviato niente."
+  },
+  "guidaP1T": {
+    "message": "Apri una pagina qualsiasi"
+  },
+  "guidaP1": {
+    "message": "Un sito di notizie, un negozio, quello che vuoi. Non può partire sulle pagine interne del browser, sul Chrome Web Store e nei PDF."
+  },
+  "guidaP2T": {
+    "message": "Clicca l'icona di Page Snow"
+  },
+  "guidaP2": {
+    "message": "È nella barra del browser, dentro il menu delle estensioni (il pezzo di puzzle): fissala con la puntina per averla sempre a portata. Un clic e comincia a nevicare."
+  },
+  "guidaP3T": {
+    "message": "Spegni e riaccendi dal tasto col fiocco"
+  },
+  "guidaP3": {
+    "message": "Resta in basso a destra: ferma la neve e la fa ripartire senza ricaricare la pagina."
+  },
+  "guidaP4T": {
+    "message": "Gioca con quello che trovi"
+  },
+  "guidaP4": {
+    "message": "Tocca i pupazzi di neve col puntatore: vanno in pezzi, e i pezzi si prendono col mouse. Clicca i regali sotto l'albero per aprirli. Ogni tanto passa la slitta."
+  },
+  "guidaSapereT": {
+    "message": "Cose da sapere"
+  },
+  "guidaS1": {
+    "message": "La neve si accumula col tempo: più resti sulla pagina, più i mucchi crescono."
+  },
+  "guidaS2": {
+    "message": "Vuoi la neve su ogni pagina che apri, senza cliccare l'icona? Si accende dalle opzioni."
+  },
+  "guidaOpzioni": {
+    "message": "Apri le opzioni"
+  },
+  "guidaPiede": {
+    "message": "Questa pagina si riapre quando vuoi dalle opzioni dell'estensione."
   }
 }

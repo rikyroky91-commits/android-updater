@@ -19,5 +19,71 @@
   },
   "sempreNegato": {
     "message": "Permission not granted: the button stays off."
+  },
+  "guidaLink": {
+    "message": "How it works"
+  },
+  "guidaTitolo": {
+    "message": "How Page Brawl works"
+  },
+  "guidaIntro": {
+    "message": "Two fighters brawl on top of the page you are viewing. The page underneath stays as it is: nothing is read and nothing is sent anywhere."
+  },
+  "guidaP1T": {
+    "message": "Open any page"
+  },
+  "guidaP1": {
+    "message": "A news site, a shop, anything you like. It cannot start on the browser's internal pages, on the Chrome Web Store or in PDFs."
+  },
+  "guidaP2T": {
+    "message": "Click the Page Brawl icon"
+  },
+  "guidaP2": {
+    "message": "It sits in the browser toolbar, inside the extensions menu (the puzzle piece): pin it to keep it at hand. One click and the fighters walk in."
+  },
+  "guidaP3T": {
+    "message": "Turn it off and on with the button in the bottom right"
+  },
+  "guidaP3": {
+    "message": "The power button is always visible: it stops the brawl and starts it again without reloading the page."
+  },
+  "guidaP4T": {
+    "message": "Grab them with the mouse"
+  },
+  "guidaP4": {
+    "message": "Drag a fighter and let go to throw them. The same goes for the things that fall from above: smoke bombs, jars and weapons."
+  },
+  "guidaP5T": {
+    "message": "Open the panel with the glove button"
+  },
+  "guidaP5": {
+    "message": "There you pick the characters, drop items into the ring, trigger an earthquake or jetpacks, turn on the health bars and bet your tokens on the winner."
+  },
+  "guidaSapereT": {
+    "message": "Good to know"
+  },
+  "guidaS1": {
+    "message": "First to ten: whoever reaches ten K.O.s sends the opponent flying out of the ring, then the score starts again from zero."
+  },
+  "guidaS2": {
+    "message": "A thrown jar releases a creature of fire, lightning or water that fights for whoever threw it. A smoke bomb blinds anyone caught in the cloud."
+  },
+  "guidaS3": {
+    "message": "The fighters learn: the more they fight, the better they get. What they learn and your tokens stay in your browser."
+  },
+  "guidaS4": {
+    "message": "Gore effects are off: if you want them, turn them on from the panel."
+  },
+  "guidaS5": {
+    "message": "Super warriors, wizards, duelists, weapons, weather and gravity are part of Premium: in the panel they carry a padlock."
+  },
+  "guidaS6": {
+    "message": "Want the power button on every site, without going through the icon? Turn it on in the options."
+  },
+  "guidaOpzioni": {
+    "message": "Open the options"
+  },
+  "guidaPiede": {
+    "message": "You can reopen this page any time from “How it works”, at the bottom of the panel."
   }
 }

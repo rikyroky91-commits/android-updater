@@ -51,7 +51,8 @@ class TestEstensione(unittest.TestCase):
                 self.assertEqual(m["name"], "__MSG_nome__")
                 for lingua in LINGUE:
                     messaggi = json.loads((cartella / "_locales" / lingua / "messages.json").read_text(encoding="utf-8"))
-                    self.assertEqual(set(messaggi), {"nome", "descrizione", "titolo", "opzioniTitolo", "sempreEtichetta", "sempreSpiega", "sempreNegato"})
+                    self.assertEqual({k for k in messaggi if not k.startswith("guida")},
+                                     {"nome", "descrizione", "titolo", "opzioniTitolo", "sempreEtichetta", "sempreSpiega", "sempreNegato"})
                     self.assertLessEqual(len(messaggi["nome"]["message"]), 45)          # limite del Chrome Web Store
                     self.assertLessEqual(len(messaggi["descrizione"]["message"]), 132)  # idem
 
@@ -129,6 +130,55 @@ class TestEstensione(unittest.TestCase):
         self.assertNotIn("data-premio-prova aria-pressed", (VARIANTI["store"] / "prepara.js").read_text(encoding="utf-8"))
         self.assertIn('"premiumDiProva": false', (VARIANTI["store"] / "prepara.js").read_text(encoding="utf-8"))
 
+    def test_niente_telefoni_nell_estensione_ma_fumogeni_e_barattoli(self):
+        """02/10/2026: nel plug-in non piovono telefoni. Via i tasti che li mettono in campo;
+        restano le armi (Premium) e arrivano fumogeni e barattoli. Sul sito i telefoni restano."""
+        import re
+        for nome, cartella in VARIANTI.items():
+            with self.subTest(variante=nome):
+                testo = (cartella / "prepara.js").read_text(encoding="utf-8")
+                messi = set(re.findall(r'data-metti=\\"([a-z-]+)\\"', testo))
+                self.assertEqual(messi, {"pistola", "spada", "bomba", "duo", "fumogeno", "barattolo-fuoco", "barattolo-scossa", "barattolo-acqua"})
+                self.assertIn("Pioggia di oggetti", testo)
+                self.assertNotIn("Pioggia di telefoni", testo)
+        casa = (RADICE / "web" / "templates" / "home.html").read_text(encoding="utf-8")
+        for forma in ("classico", "orologio", "tablet", "pc", "fumogeno", "barattolo-fuoco"):
+            self.assertIn(f'data-metti="{forma}"', casa)
+        self.assertIn("Pioggia di telefoni", casa)
+        ring = (RADICE / "web" / "static" / "ring.js").read_text(encoding="utf-8")
+        self.assertIn("const senzaTelefoni = !!ospite;", ring)
+
+    def test_la_guida_per_chi_ha_appena_installato(self):
+        """Una pagina di benvenuto che si apre alla prima installazione e si riapre dalla tendina e dalle opzioni."""
+        import re
+        for nome, cartella in list(VARIANTI.items()) + [("natale", NATALE)]:
+            with self.subTest(estensione=nome):
+                pagina = (cartella / "benvenuto.html").read_text(encoding="utf-8")
+                chiavi = set(re.findall(r'data-msg="([A-Za-z0-9]+)"', pagina))
+                self.assertGreaterEqual(len(chiavi), 12)
+                self.assertNotIn("<script>", pagina)                      # niente script scritti nella pagina (CSP delle estensioni)
+                self.assertIn('<script src="benvenuto.js"></script>', pagina)
+                for file in ("benvenuto.css", "benvenuto.js", "icone/128.png"):
+                    self.assertTrue((cartella / file).exists(), file)
+                for lingua in LINGUE:
+                    messaggi = json.loads((cartella / "_locales" / lingua / "messages.json").read_text(encoding="utf-8"))
+                    for chiave in chiavi | {"guidaLink"}:
+                        self.assertTrue(messaggi.get(chiave, {}).get("message"), f"{nome}/{lingua}: manca {chiave}")
+                sfondo = (cartella / "sfondo.js").read_text(encoding="utf-8")
+                self.assertIn("chrome.runtime.onInstalled.addListener", sfondo)
+                self.assertIn('dettagli.reason === "install"', sfondo)     # non a ogni aggiornamento
+                self.assertIn('href="benvenuto.html"', (cartella / "opzioni.html").read_text(encoding="utf-8"))
+                for vietato in ("fetch(", "XMLHttpRequest", "eval(", "new Function"):
+                    self.assertNotIn(vietato, (cartella / "benvenuto.js").read_text(encoding="utf-8"))
+        for nome, cartella in VARIANTI.items():
+            testo = (cartella / "prepara.js").read_text(encoding="utf-8")
+            self.assertIn("data-guida", testo)
+            self.assertIn('tipo: "guida"', testo)
+            self.assertIn('messaggio.tipo === "guida"', (cartella / "sfondo.js").read_text(encoding="utf-8"))
+        # la riga su Premium c'è solo se Premium è chiuso
+        scelte = json.loads((ESTENSIONE / "premium.json").read_text(encoding="utf-8"))
+        self.assertEqual("guidaS5" in (VARIANTI["store"] / "benvenuto.html").read_text(encoding="utf-8"), bool(scelte.get("premium_attivo", True)))
+
     def test_l_indirizzo_di_acquisto_e_vuoto_o_https(self):
         dati = json.loads((ESTENSIONE / "premium.json").read_text(encoding="utf-8"))
         url = dati.get("url_acquisto", "")
@@ -162,7 +212,8 @@ class TestEstensioneDiNatale(unittest.TestCase):
             messaggi = json.loads((NATALE / "_locales" / lingua / "messages.json").read_text(encoding="utf-8"))
             self.assertEqual(messaggi["nome"]["message"], "Page Snow")
             self.assertLessEqual(len(messaggi["descrizione"]["message"]), 132)
-            self.assertEqual(set(messaggi), {"nome", "descrizione", "titolo", "opzioniTitolo", "sempreEtichetta", "sempreSpiega", "sempreNegato"})
+            self.assertEqual({k for k in messaggi if not k.startswith("guida")},
+                             {"nome", "descrizione", "titolo", "opzioniTitolo", "sempreEtichetta", "sempreSpiega", "sempreNegato"})
 
     def test_niente_codice_da_fuori_e_niente_rete(self):
         for file in ("prepara.js", "sfondo.js", "natale.js", "opzioni.js"):

@@ -2,6 +2,24 @@
 
 Testi pronti da incollare nella console dello sviluppatore, per le due estensioni. Gli zip da caricare li scrive `python3 estensione/costruisci.py --zip` in `estensione/zip/`.
 
+# Pubblicare, passo per passo
+
+Controllato sulla documentazione di Chrome il 02/10/2026 (developer.chrome.com/docs/webstore).
+
+1. **Account.** Vai su `chrome.google.com/webstore/devconsole` con l'account Google che vuoi usare come editore (l'email si vede sulla scheda e non si cambia facilmente: meglio una dedicata). Paga l'iscrizione: 5 dollari, una volta sola, vale per tutte le estensioni. Accendi la verifica in due passaggi dell'account Google: senza, la console non lascia pubblicare.
+2. **Profilo dell'editore.** In «Account» metti il nome dell'editore e verifica l'email di contatto. Un editore nuovo può avere al massimo **due estensioni pubblicate**: Page Brawl e Page Snow ci stanno giuste.
+3. **Decidi Premium prima di caricare** (vedi «Prima di premere Invia» qui sotto): o `premium_attivo: false` in `premium.json`, o un `url_acquisto` vero. Poi `python3 estensione/costruisci.py --zip`.
+4. **Carica.** «Nuovo elemento» → scegli `estensione/zip/page-brawl-<versione>-store.zip` → «Carica». Lo zip ha `manifest.json` in cima, come vuole lo store.
+5. **Scheda dello store.** Descrizione lunga (qui sotto, in inglese; con «Aggiungi lingua» anche l'italiano), categoria, lingua. Immagini: icona 128×128, almeno una schermata 1280×800 (ce ne sono cinque), riquadro promozionale 440×280 (`scheda/promo-440x280.png`).
+6. **Privacy.** Scopo unico, una giustificazione per ogni permesso, «No, non uso codice remoto», nessun dato raccolto, le tre dichiarazioni finali. I testi sono qui sotto, da incollare.
+7. **Distribuzione.** Gratis, pubblica, tutti i paesi. (Se vendi Premium fuori dallo store, l'estensione resta «gratis» qui: il pagamento non passa da Google.)
+8. **Istruzioni per la verifica.** Non servono credenziali. Conviene scrivere due righe: «Open any web page, click the toolbar icon: two characters start fighting. The power button in the bottom right corner turns it off.»
+9. **Invia.** «Invia per la revisione». Se togli la spunta «Pubblica automaticamente», dopo l'approvazione hai 30 giorni per pubblicare a mano; scaduti, va reinviata.
+10. **Attesa.** Di solito pochi giorni, a volte qualche settimana. Il permesso facoltativo su tutti i siti (`<all_urls>`) è fra quelli che allungano la revisione: la giustificazione qui sotto serve a quello. Oltre tre settimane si scrive all'assistenza.
+11. **Aggiornamenti.** Si alza `VERSIONE` in `costruisci.py` (lo store rifiuta uno zip con la stessa versione), si rifà lo zip e si carica con «Carica nuova versione». Ogni aggiornamento ripassa dalla revisione.
+
+Per Page Snow gli stessi passi con `page-snow-<versione>.zip` e la sua scheda in fondo.
+
 # Page Brawl
 
 Zip: `page-brawl-<versione>-store.zip`.
@@ -32,12 +50,13 @@ Click the icon and a little robot and an apple start fighting on whatever page y
 
 Join in:
 • Pick a fighter up with the mouse and throw it, or use it to hit the other one.
-• Drop phones, smartwatches, tablets and laptops into the ring.
-• Trigger an earthquake, hand out jetpacks, or start a phone shower.
+• Smoke bombs and glass jars fall into the ring. A thrown smoke bomb blinds whoever is caught in the cloud. A thrown jar breaks and releases a small creature of fire, lightning or water that fights for whoever threw it.
+• Trigger an earthquake, hand out jetpacks, or start an item shower.
 • Turn on health bars and bet tokens on the winner.
+• First to ten wins: the tenth K.O. sends the loser flying out of the ring, then the match starts over.
 • The fighters learn: the more they fight, the more varied their moves get.
 
-Click the icon again and everything disappears. The page itself is never changed.
+The power button in the corner turns everything off and on again. The page itself is never changed. A short "How it works" page opens after installation and can be reopened from the panel.
 
 Premium adds:
 • Three sets of original characters, each with its own moves. Super warriors fly, fire energy waves and transform. Wizards cast freezing, shrinking and lightning spells and ride brooms. Duelists fight with energy blades.
@@ -58,12 +77,13 @@ Clicca l'icona e un robottino e una mela cominciano a picchiarsi sulla pagina ch
 
 Partecipa anche tu:
 • Prendi un lottatore col mouse e lancialo, oppure usalo per colpire l'altro.
-• Metti in campo telefoni, smartwatch, tablet e portatili.
-• Scatena un terremoto, distribuisci i jetpack o fai piovere telefoni.
+• Nel ring cadono fumogeni e barattoli di vetro. Il fumogeno lanciato acceca chi finisce nella nube. Il barattolo lanciato si rompe e libera una piccola creatura di fuoco, di fulmini o d'acqua, che combatte per chi l'ha lanciato.
+• Scatena un terremoto, distribuisci i jetpack o fai piovere oggetti.
 • Accendi le barre della vita e scommetti i gettoni su chi vince.
+• Si gioca a dieci: il decimo K.O. manda lo sconfitto fuori dal ring, poi si ricomincia.
 • I lottatori imparano: più combattono, più le mosse diventano varie.
 
-Un altro clic sull'icona e sparisce tutto. La pagina non viene mai modificata.
+Il tasto di accensione nell'angolo spegne e riaccende tutto. La pagina non viene mai modificata. Dopo l'installazione si apre una breve pagina «Come funziona», che si riapre dalla tendina.
 
 Premium aggiunge:
 • Tre coppie di personaggi originali, ognuna con le sue mosse. I super guerrieri volano, lanciano onde di energia e si trasformano. I maghi congelano, rimpiccioliscono, scagliano fulmini e volano sulla scopa. I duellanti combattono con lame di energia.
@@ -104,12 +124,12 @@ Page Brawl shows an animated cartoon fight on top of the page the user is viewin
 
 - **Icona 128×128:** `store/icone/128.png`.
 - **Schermate 1280×800** (cartella `scheda/`, su una pagina dimostrativa inventata, senza marchi; effetti cruenti spenti):
-  1. `1-ko.png`: fine dell'incontro fra il robot e la mela.
-  2. `2-opzioni.png`: la tendina, coi personaggi e i tasti Premium.
+  1. `1-creature.png`: il robot e la mela con le creature dei barattoli (fuoco e acqua).
+  2. `2-opzioni.png`: la tendina, con le scommesse e gli oggetti da mettere in campo.
   3. `3-premium-guerrieri.png`: i super guerrieri trasformati.
   4. `4-premium-maghi.png`: i maghi, il fulmine.
   5. `5-premium-duellanti.png`: i duellanti, le lame incrociate.
-- **Riquadro promozionale 440×280:** da fare (facoltativo, ma senza non si entra nelle vetrine dello store).
+- **Riquadro promozionale 440×280:** `scheda/promo-440x280.png` (senza, lo store mostra l'estensione dopo quelle che ce l'hanno).
 
 ## Altri store
 
@@ -198,3 +218,4 @@ Page Snow decorates the page the user is viewing with an animated winter theme (
 
 - **Icona 128×128:** `natale/icone/128.png`.
 - **Schermate 1280×800** (cartella `scheda-natale/`): `1-pagina-chiara.png`, `2-pagina-scura.png`.
+- **Riquadro promozionale 440×280:** `scheda-natale/promo-440x280.png`.

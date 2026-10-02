@@ -19,5 +19,53 @@
   },
   "sempreNegato": {
     "message": "Berechtigung nicht erteilt: Das Design bleibt manuell."
+  },
+  "guidaLink": {
+    "message": "So funktioniert es"
+  },
+  "guidaTitolo": {
+    "message": "So funktioniert Page Snow"
+  },
+  "guidaIntro": {
+    "message": "Es schneit über der Seite, die du gerade ansiehst, und der Schnee bleibt auf Überschriften, Bildern und Knöpfen liegen. Die Seite darunter bleibt, wie sie ist: Es wird nichts gelesen und nichts gesendet."
+  },
+  "guidaP1T": {
+    "message": "Öffne irgendeine Seite"
+  },
+  "guidaP1": {
+    "message": "Eine Nachrichtenseite, ein Shop, was du willst. Auf den internen Seiten des Browsers, im Chrome Web Store und in PDFs kann es nicht starten."
+  },
+  "guidaP2T": {
+    "message": "Klicke auf das Page-Snow-Symbol"
+  },
+  "guidaP2": {
+    "message": "Es sitzt in der Symbolleiste des Browsers, im Erweiterungsmenü (das Puzzleteil): Hefte es an, damit es immer griffbereit ist. Ein Klick und es beginnt zu schneien."
+  },
+  "guidaP3T": {
+    "message": "Aus- und einschalten mit dem Flocken-Knopf"
+  },
+  "guidaP3": {
+    "message": "Er bleibt unten rechts: Er stoppt den Schnee und startet ihn wieder, ohne die Seite neu zu laden."
+  },
+  "guidaP4T": {
+    "message": "Spiel mit dem, was du findest"
+  },
+  "guidaP4": {
+    "message": "Berühre die Schneemänner mit dem Zeiger: Sie fallen auseinander, und die Teile kannst du mit der Maus packen. Klicke auf die Geschenke unter dem Baum, um sie zu öffnen. Ab und zu fliegt der Schlitten vorbei."
+  },
+  "guidaSapereT": {
+    "message": "Gut zu wissen"
+  },
+  "guidaS1": {
+    "message": "Der Schnee sammelt sich mit der Zeit: Je länger du auf der Seite bleibst, desto höher werden die Haufen."
+  },
+  "guidaS2": {
+    "message": "Du willst Schnee auf jeder Seite, die du öffnest, ohne das Symbol anzuklicken? Schalte es in den Optionen ein."
+  },
+  "guidaOpzioni": {
+    "message": "Optionen öffnen"
+  },
+  "guidaPiede": {
+    "message": "Diese Seite öffnest du jederzeit wieder über die Optionen der Erweiterung."
   }
 }

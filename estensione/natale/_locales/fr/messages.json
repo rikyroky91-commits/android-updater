@@ -19,5 +19,53 @@
   },
   "sempreNegato": {
     "message": "Autorisation refusée : le thème reste manuel."
+  },
+  "guidaLink": {
+    "message": "Comment ça marche"
+  },
+  "guidaTitolo": {
+    "message": "Comment fonctionne Page Snow"
+  },
+  "guidaIntro": {
+    "message": "Il neige par-dessus la page que vous regardez, et la neige se pose sur les titres, les images et les boutons. La page en dessous reste telle quelle : rien n'est lu, rien n'est envoyé."
+  },
+  "guidaP1T": {
+    "message": "Ouvrez n'importe quelle page"
+  },
+  "guidaP1": {
+    "message": "Un site d'actualités, une boutique, ce que vous voulez. Il ne peut pas démarrer sur les pages internes du navigateur, sur le Chrome Web Store ni dans les PDF."
+  },
+  "guidaP2T": {
+    "message": "Cliquez sur l'icône de Page Snow"
+  },
+  "guidaP2": {
+    "message": "Elle se trouve dans la barre du navigateur, dans le menu des extensions (la pièce de puzzle) : épinglez-la pour l'avoir sous la main. Un clic et il se met à neiger."
+  },
+  "guidaP3T": {
+    "message": "Arrêtez et relancez avec le bouton au flocon"
+  },
+  "guidaP3": {
+    "message": "Il reste en bas à droite : il arrête la neige et la relance sans recharger la page."
+  },
+  "guidaP4T": {
+    "message": "Jouez avec ce que vous trouvez"
+  },
+  "guidaP4": {
+    "message": "Touchez les bonshommes de neige avec le pointeur : ils tombent en morceaux, et les morceaux s'attrapent à la souris. Cliquez sur les cadeaux sous le sapin pour les ouvrir. De temps en temps, le traîneau passe."
+  },
+  "guidaSapereT": {
+    "message": "Bon à savoir"
+  },
+  "guidaS1": {
+    "message": "La neige s'accumule avec le temps : plus vous restez sur la page, plus les tas grandissent."
+  },
+  "guidaS2": {
+    "message": "Vous voulez de la neige sur chaque page ouverte, sans cliquer sur l'icône ? Activez-la dans les options."
+  },
+  "guidaOpzioni": {
+    "message": "Ouvrir les options"
+  },
+  "guidaPiede": {
+    "message": "Vous pouvez rouvrir cette page à tout moment depuis les options de l'extension."
   }
 }

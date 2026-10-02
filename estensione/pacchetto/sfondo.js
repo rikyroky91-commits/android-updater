@@ -30,6 +30,7 @@ chrome.runtime.onMessage.addListener((messaggio, mittente) => {
   if (!messaggio) return;
   if (messaggio.tipo === "avvia" && mittente.tab) avvia(mittente.tab);
   if (messaggio.tipo === "opzioni") chrome.runtime.openOptionsPage();
+  if (messaggio.tipo === "guida") chrome.tabs.create({ url: chrome.runtime.getURL("benvenuto.html") });
 });
 // Tolto il permesso su tutti i siti dalle impostazioni del browser: via anche il tasto.
 chrome.permissions.onRemoved.addListener(async () => {
@@ -38,4 +39,8 @@ chrome.permissions.onRemoved.addListener(async () => {
     await chrome.scripting.unregisterContentScripts({ ids: ["pb-tasto"] });
     await chrome.storage.local.set({ "pb-sempre": "off" });
   } catch (errore) { /* non era registrato */ }
+});
+// Appena installata: la pagina che spiega come si usa.
+chrome.runtime.onInstalled.addListener((dettagli) => {
+  if (dettagli && dettagli.reason === "install") chrome.tabs.create({ url: chrome.runtime.getURL("benvenuto.html") });
 });
