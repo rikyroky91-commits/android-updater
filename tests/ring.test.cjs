@@ -726,7 +726,7 @@ test("i colpi lasciano segni sul corpo", () => {
   assert.ok(segnato, "in un minuto di lotta nessun segno");
 });
 
-test("imprevisti a mano: pioggia, Natale con le palle di neve, uragano, gravità; tutto resta stabile", () => {
+test("imprevisti a mano: pioggia, palle di neve col tema natalizio, uragano, gravità; tutto resta stabile", () => {
   const amb = ambiente({ solidi: [[300, 600, 700, 630]] });
   amb.avanza(30);
   const c = amb.finestra.__ring.comandi;
@@ -736,13 +736,17 @@ test("imprevisti a mano: pioggia, Natale con le palle di neve, uragano, gravità
   amb.avanza(60 * 20); dentro(amb);
   assert.ok(amb.stato().particelleTipi.pioggia > 0, "non piove");
   c.imprevisto("acquazzone", false);
-  c.imprevisto("natale", true);
+  // Il tema natalizio lo accende il sito (natale.js) con un evento: ai
+  // lottatori dà cappellini e palle di neve; la neve non è più del ring.
+  for (const fn of amb.ascoltatori["mut:natale"] || []) fn({ detail: { acceso: true } });
+  assert.strictEqual(amb.stato().natale, true, "l'evento del tema natalizio non arriva al ring");
   let palla = false;
   amb.avanza(60 * 60, (s) => { if (s.lottatori.some((f) => f.azione === "palla")) palla = true; });
   dentro(amb);
-  assert.ok(amb.stato().particelleTipi.fiocco > 0, "non nevica");
+  assert.ok(!(amb.stato().particelleTipi.fiocco > 0), "il ring nevica ancora per conto suo");
   assert.ok(palla, "a Natale nessuno ha tirato palle di neve");
-  c.imprevisto("natale", false);
+  for (const fn of amb.ascoltatori["mut:natale"] || []) fn({ detail: { acceso: false } });
+  assert.strictEqual(amb.stato().natale, false);
   c.imprevisto("uragano", true);
   let alzato = false;
   amb.avanza(60 * 40, (s) => { if (s.lottatori.some((f) => f.bacino.y < s.pavimento - 120)) alzato = true; dentro(amb); });
@@ -1084,4 +1088,25 @@ test("disco tagliente, lampo accecante e barriera", () => {
   }
   assert.ok(retto, "la barriera non ha fermato il colpo");
   dentro(amb);
+});
+
+test("presa a distanza: l'avversario viene sollevato e poi va in pezzi", () => {
+  let sollevato = false, pezzi = false;
+  for (let prova = 0; prova < 5 && !pezzi; prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    amb.finestra.__ring.comandi.colpo("telecinesi");
+    let base = null;
+    amb.avanza(60 * 4, (s) => {
+      const v = s.lottatori.find((f) => f.sollevato);
+      if (v) { sollevato = true; if (base === null) base = v.bacino.y; if (v.bacino.y < base - 80) sollevato = true; }
+      if (s.lottatori.some((f) => f.esploso)) { pezzi = true; return false; }
+      dentro(amb);
+    });
+    amb.avanza(60 * 12);
+    assert.ok(amb.stato().lottatori.every((f) => !f.sollevato), "qualcuno resta sospeso per sempre");
+    dentro(amb);
+  }
+  assert.ok(sollevato, "nessuno viene sollevato");
+  assert.ok(pezzi, "chi è sollevato non va mai in pezzi");
 });

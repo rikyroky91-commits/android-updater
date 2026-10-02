@@ -116,7 +116,12 @@
   const CALMA = 60 * 60, ARMI = 70 * 60;
   let tempo = 0, prossimaArma = 0, prossimoDuo = 0, prossimaBombaRobot = 0, proiettili = [], pezzi = [];
   // Gli imprevisti scelti a mano dalla tendina (o arrivati a sorpresa).
-  let acquazzone = false, natale = false, uragano = null, gravitaScelta = 1, sorprese = true;
+  let acquazzone = false, uragano = null, gravitaScelta = 1, sorprese = true;
+  // Il tema natalizio è di tutto il sito (tasto nella testata, `natale.js`):
+  // ai lottatori dà il cappellino rosso e le palle di neve.
+  const radiceNatale = document.documentElement;
+  let natale = !!(radiceNatale && radiceNatale.classList && radiceNatale.classList.contains && radiceNatale.classList.contains("natale"));
+  window.addEventListener("mut:natale", (e) => { natale = !!(e && e.detail && e.detail.acceso); });
   let arti = [], macchie = [], cumulo = 0, danniBordi = [], testataBasso = 0;
   // Gravità: verso il basso (1) o verso il tetto (-1, «sottosopra»).
   let verso = 1;
@@ -540,6 +545,13 @@
         q.manoA = [50, 22]; q.gomitoA = [49, 12]; q.manoD = [50, -20]; q.gomitoD = [49, -10];
         q.piedeA = [0, 13]; q.piedeD = [0, -13]; q.bacino[0] -= 2;
         break;
+      case "telecinesi": {
+        // Una mano alzata e aperta; al botto si chiude a pugno, in basso.
+        const k = f.t < 104 ? Math.min(1, f.t / 12) : Math.max(0, 1 - (f.t - 104) / 6);
+        q.manoA = [50 + 28 * k, 14 + 4 * k]; q.gomitoA = [46 + 12 * k, 10 + 3 * k];
+        q.manoD = [38, -6]; q.gomitoD = [42, -3]; q.testa[1] += 1;
+        break;
+      }
       case "avvinghia":
         q.manoA = [50, 26]; q.gomitoA = [49, 14]; q.manoD = [44, 24]; q.gomitoD = [44, 12];
         q.ginocchioA = [22, 12]; q.piedeA = [14, 22]; q.ginocchioD = [20, 10]; q.piedeD = [10, 20];
@@ -698,7 +710,7 @@
                    solleva: 16, lancia: 26, para: 26, schiva: 30,
                    spara: 26, fendente: 26, presa: 42, estrai: 36, balla: 170, palla: 30,
                    carica: 70, onda: 80, raffica: 40, rush: 44,
-                   sfera: 150, disco: 56, lampo: 40, barriera: 110, avvinghia: 96 };
+                   sfera: 150, disco: 56, lampo: 40, barriera: 110, avvinghia: 96, telecinesi: 124 };
 
   function inizia(f, azione, meta) {
     f.azione = azione; f.t = 0; f.durata = DURATE[azione]; f.colpito = false;
@@ -2167,12 +2179,8 @@
         particelle.push({ tipo: "pioggia", x: caso(-40, W + 40), y: -10, vx: -1.6 * S, vy: caso(9, 12) * S, vita: 200, max: 200 });
       }
     }
-    if (natale) {
-      if (passi % 2 === 0 && particelle.length < MAX_PARTICELLE) {
-        particelle.push({ tipo: "fiocco", x: caso(0, W), y: -6, vx: 0, vy: caso(0.5, 1.1) * S, vita: 2000, max: 2000,
-                          r: caso(2.4, 4) * S, fase: caso(0, 6) });
-      }
-    } else if (cumulo > 0) cumulo = Math.max(0, cumulo - 0.02 * S);
+    // La neve, l'albero e i pupazzi del tema natalizio li fa `natale.js` per
+    // tutto il sito: qui restano solo i cappellini e le palle di neve.
     if (uragano) {
       const u = uragano;
       u.t++;
@@ -2680,6 +2688,7 @@
     // L'altro sta preparando qualcosa di grosso: barriera.
     if (f.ki >= 20 && (altro.azione === "onda" || altro.azione === "raffica" || altro.azione === "disco" || altro.sfera) && Math.random() < 0.4) { inizia(f, "barriera"); return true; }
     if (f.ki >= 85 && d > 110 && Math.random() < 0.35) { inizia(f, "sfera"); return true; }
+    if (f.ki >= 60 && d > 50 && !altro.tenuto && (altro.stordito > 0 || altro.accecato > 0 ? Math.random() < 0.5 : Math.random() < 0.06)) { inizia(f, "telecinesi"); return true; }
     if (f.ki >= 25 && d > 70 && Math.random() < 0.12) { inizia(f, "disco"); return true; }
     if (f.ki >= 15 && d < 200 && !(altro.accecato > 0) && Math.random() < 0.07) { inizia(f, "lampo"); return true; }
     return false;
@@ -2728,6 +2737,66 @@
       if (f.ki <= 0) { f.ki = 0; f.azione = null; f.pensa = 10; }
     }
     if (f.azione === "avvinghia") eseguiAvvinghia(f, altro);
+    if (f.azione === "telecinesi") eseguiTelecinesi(f, altro);
+  }
+  // La presa a distanza: con una mano alzata si solleva l'avversario, che
+  // resta sospeso a braccia e gambe larghe mentre una luce gli cresce dentro;
+  // quando il pugno si chiude, va in mille pezzi (e poi si rimonta).
+  const TELE_BOTTO = 112;
+  function eseguiTelecinesi(f, altro) {
+    if (f.t === 1) {
+      if (altro.ko || altro.esploso || altro.preso || altro.tenuto || f.ki < 50) { f.azione = null; return; }
+      f.ki -= 50;
+      if (altro.tel) lasciaCadere(altro);
+      if (altro.arma) lasciaArma(altro);
+      if (altro.tiene) molla(altro);
+      altro.jet = 0; altro.volo = false; altro.scatto = 0; altro.azione = null; altro.onda = null; altro.sfera = null; altro.paracadute = 0;
+      altro.tenuto = { da: f, x: altro.p.collo.x, y: altro.p.collo.y, tele: 0 };
+      altro.fantasma = true;
+      zip(altro.p.bacino.x, altro.p.bacino.y, COLORI_ANIME[f.tipo]);
+    }
+    const t = altro.tenuto;
+    if (!t || t.da !== f || altro.preso || altro.esploso) { f.azione = null; return; }
+    t.tele = f.t;
+    // Su, piano, fino a mezz'aria; poi fermo lì a tremare.
+    const quota = Math.max(testataBasso + 90 * S, Math.min(pavimento - 230 * S, altro.base - 230 * S));
+    if (t.y > quota) t.y -= 2.2 * S;
+    t.x += caso(-1, 1) * S * Math.min(1, f.t / 60);
+    t.x = Math.max(40 * S, Math.min(W - 40 * S, t.x));
+    // Braccia e gambe tirate in fuori.
+    const c = altro.p.collo;
+    for (const n of ["manoA", "manoD", "piedeA", "piedeD"]) {
+      const q = altro.p[n], lato = (n.endsWith("A") ? 1 : -1) * altro.dir;
+      q.x += lato * 1.1 * S; q.y += (n.startsWith("mano") ? -0.9 : 0.25) * S;
+    }
+    if (f.t % 6 === 0) scintille(c.x + caso(-12, 12) * S, c.y + caso(-6, 20) * S, 2, "#fff3b0");
+    if (f.t > 60) scossa = Math.max(scossa, 2);
+    if (f.t >= TELE_BOTTO) {
+      altro.tenuto = null;
+      esplodiLottatore(altro, f);
+      f.azione = null; f.pensa = 30;
+    }
+  }
+  function disegnaTelecinesi(f) {
+    // La luce che cresce dentro chi è sollevato, coi raggi che escono.
+    const p = f.p, k = Math.min(1, f.tenuto.tele / TELE_BOTTO), x = (p.collo.x + p.bacino.x) / 2, y = (p.collo.y + p.bacino.y) / 2;
+    ctx.save();
+    const n = 9, lung = (10 + 46 * k) * S * (0.85 + 0.15 * Math.sin(passi * 0.9));
+    ctx.fillStyle = "rgba(255,214,90," + (0.35 + 0.4 * k) + ")";
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + 0.3 * Math.sin(passi * 0.1 + i), w = (3 + 4 * k) * S;
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(a + 1.57) * w, y + Math.sin(a + 1.57) * w);
+      ctx.lineTo(x + Math.cos(a) * lung * (i % 2 ? 1 : 0.7), y + Math.sin(a) * lung * (i % 2 ? 1 : 0.7));
+      ctx.lineTo(x + Math.cos(a - 1.57) * w, y + Math.sin(a - 1.57) * w);
+      ctx.closePath(); ctx.fill();
+    }
+    for (const [dx, dy, r] of [[0, 0, 1], [-0.6, 0.5, 0.7], [0.6, 0.4, 0.75], [-0.4, -0.6, 0.6], [0.5, -0.5, 0.65], [0, 0.9, 0.6]]) {
+      const rr = (4 + 15 * k) * S * r, g = ctx.createRadialGradient(x + dx * rr, y + dy * rr, 0, x + dx * rr, y + dy * rr, rr);
+      g.addColorStop(0, "rgba(255,255,235," + (0.5 + 0.45 * k) + ")"); g.addColorStop(1, "rgba(255,190,60,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x + dx * rr, y + dy * rr, rr, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
   }
   // La barriera ferma tutto, ma costa energia a ogni colpo; finita quella, va in frantumi.
   function barrieraRegge(f, forza, x, y) {
@@ -3168,6 +3237,8 @@
       if (f.tiene && (f.ko > 0 || f.preso || f.tenuto)) molla(f);
       if (f.polv > 0) f.polv--;
       if (f.scendeApposta > 0) f.scendeApposta--;
+      // Chi era sollevato a distanza cade se chi lo teneva smette (o viene colpito).
+      if (f.tenuto && f.tenuto.tele !== undefined && (f.tenuto.da.azione !== "telecinesi" || f.preso)) { f.tenuto = null; f.ko = Math.max(f.ko, 40); f.inVolo = true; }
       if (f.preso || f.tenuto) { f.forza = 0; f.jet = 0; f.paracadute = 0; continue; }
       aggiornaCratere(f);
       if (f.sfera && f.azione !== "sfera") { scintille(f.sfera.x, f.sfera.y, 14, COLORI_ANIME[f.tipo]); f.sfera = null; }
@@ -4342,7 +4413,6 @@
       for (let x = 0; x <= W + 20; x += 20) ctx.lineTo(x, pavimento - cumulo * (0.7 + 0.3 * Math.sin(x * 0.05)));
       ctx.lineTo(W, pavimento + 1); ctx.closePath(); ctx.fill(); ctx.stroke();
     }
-    if (natale) disegnaAlbero();
     if (uragano) disegnaUragano();
     for (const t of telefoni) if (t.stato !== "impugnato") disegnaTelefono(t);
     for (const pz of pezzi) disegnaPezzo(pz);
@@ -4368,6 +4438,7 @@
     }
     for (const f of lottatori) {
       if (f.esploso) continue;
+      if (f.tenuto && f.tenuto.tele !== undefined) disegnaTelecinesi(f);
       if (f.azione === "barriera") disegnaBarriera(f);
       if (f.sfera) disegnaSferaGrande(f.sfera.x, f.sfera.y, f.sfera.r, COLORI_ANIME[f.tipo]);
       if (f.azione === "disco" && f.t < 30) disegnaDisco(f.p.manoA.x, f.p.manoA.y - 12 * S, (3 + 8 * f.t / 30) * S, COLORI_ANIME[f.tipo]);
@@ -4511,7 +4582,7 @@
     try { window.localStorage.setItem("mut-ring", "on"); } catch (errore) { /* pazienza */ }
     aggiornaTastoGioca(); accendi();
   }
-  const MOSSE_TENDINA = { sfera: "sfera", disco: "disco", lampo: "lampo", barriera: "barriera", autodistruzione: "avvinghia" };
+  const MOSSE_TENDINA = { sfera: "sfera", disco: "disco", lampo: "lampo", barriera: "barriera", autodistruzione: "avvinghia", telecinesi: "telecinesi" };
   const comandi = {
     metti(forma) {
       assicuraAcceso();
@@ -4736,6 +4807,7 @@
     ki: f.ki, potenziato: f.potenziato > 0, onda: !!f.onda, vita: vitaVera(f),
     morsi: f.morsi ? f.morsi.length : 0, tagliata: !!f.taglio, volo: !!(f.volo && f.jet > 0),
     accecato: f.accecato > 0, cratere: !!(f.cratere && !f.cratere.attesa), sfera: !!f.sfera,
+    sollevato: !!(f.tenuto && f.tenuto.tele !== undefined),
     tipo: f.tipo, ko: f.ko, azione: f.azione, preso: !!f.preso,
     scalando: !!f.scalata, base: f.base, sopraUnElemento: !!f.supporto,
     testa: { x: f.p.testa.x, y: f.p.testa.y }, bacino: { x: f.p.bacino.x, y: f.p.bacino.y },

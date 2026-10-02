@@ -22,7 +22,14 @@
      privata, dati bloccati): allora si usa il sistema e basta. #}
   <script>(function(){var t=null;try{t=localStorage.getItem("mut-tema");}catch(e){}
     if(t!=="scuro"&&t!=="chiaro"){t=(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)?"scuro":"chiaro";}
-    document.documentElement.setAttribute("data-tema",t);})();</script>
+    document.documentElement.setAttribute("data-tema",t);
+    try{if(localStorage.getItem("mut-natale")==="on")document.documentElement.classList.add("natale");}catch(e){}
+    /* Lingua diversa dall'italiano: la pagina resta nascosta finché `lingue.js`
+       non l'ha tradotta (al massimo un secondo e mezzo), così non si vede il
+       lampo di italiano. */
+    try{var l=localStorage.getItem("mut-lingua");if(l&&l!=="it"){document.documentElement.classList.add("lingua-attesa");
+      setTimeout(function(){document.documentElement.classList.remove("lingua-attesa");},1500);}}catch(e){}
+    })();</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap"
@@ -73,6 +80,27 @@
         <svg class="icona-luna" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
              stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg>
       </button>
+      {# IL TEMA NATALIZIO (02/10/2026): neve che si posa sugli elementi,
+         pupazzi che si smontano e si rimontano, cappellini. Vale per tutto
+         il sito e non c'entra col ring; lo pilota `static/natale.js`. #}
+      <button type="button" class="tema-tasto natale-tasto" data-natale-tasto aria-pressed="false"
+              aria-label="Tema natalizio" title="Accendi il tema natalizio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"
+             stroke-linecap="round" aria-hidden="true"><path d="M12 2.5l4 5.5h-2.2l3.7 5h-2.3l3.8 5H5l3.8-5H6.5l3.7-5H8z"/><path d="M12 18v3.5"/></svg>
+      </button>
+      {# LA LINGUA (02/10/2026): un velo di traduzione nel browser, vedi
+         `static/lingue.js`. I nomi delle lingue non si traducono. #}
+      <div class="lingua">
+        <button type="button" class="tema-tasto lingua-tasto" data-lingua-tasto aria-haspopup="true"
+                aria-expanded="false" aria-label="Lingua" title="Cambia lingua"><span data-lingua-codice data-notrad>IT</span></button>
+        <div class="lingua-menu" data-lingua-menu data-notrad role="menu" hidden>
+          <button type="button" role="menuitemradio" aria-checked="true" data-lingua-scelta="it" lang="it">Italiano</button>
+          <button type="button" role="menuitemradio" aria-checked="false" data-lingua-scelta="en" lang="en">English</button>
+          <button type="button" role="menuitemradio" aria-checked="false" data-lingua-scelta="es" lang="es">Español</button>
+          <button type="button" role="menuitemradio" aria-checked="false" data-lingua-scelta="fr" lang="fr">Français</button>
+          <button type="button" role="menuitemradio" aria-checked="false" data-lingua-scelta="de" lang="de">Deutsch</button>
+        </div>
+      </div>
       {# Il parco di test è l'unica pagina dietro login (vedi web/account.py):
          qui si vede solo chi è collegato adesso, non un vero pannello. #}
       {% if utente %}
@@ -107,6 +135,8 @@
   {% block fuori %}{% endblock %}
 
   <script src="{{ statico('tema.js') }}" defer></script>
+  <script src="{{ statico('natale.js') }}" defer></script>
+  <script src="{{ statico('lingue.js') }}" defer></script>
   <script src="{{ statico('rete.js') }}" defer></script>
   <script src="{{ statico('ricerca.js') }}" defer></script>
   <script src="{{ statico('ricerche-recenti.js') }}" defer></script>

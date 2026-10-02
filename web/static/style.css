@@ -114,7 +114,7 @@ a { color: inherit; }
 
 /* --- Testata ---------------------------------------------------------- */
 .testata {
-  position: relative; z-index: 1;
+  position: relative; z-index: 6;   /* sopra il contenuto: il menu della lingua esce dalla testata */
   background: var(--paper);
   border-bottom: 2px solid var(--regola);
 }
@@ -1377,6 +1377,65 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
 .tema-tasto .icona-luna { display: none; }
 :root[data-tema="scuro"] .tema-tasto .icona-sole { display: none; }
 :root[data-tema="scuro"] .tema-tasto .icona-luna { display: block; }
+
+/* ======================================================================
+   SCELTA DELLA LINGUA (02/10/2026) — il tasto tondo con la sigla e il suo menu
+   ====================================================================== */
+html.lingua-attesa body { visibility: hidden; }
+/* I tre tasti tondi (tema, Natale, lingua) stanno vicini: sono un gruppo. */
+.tema-tasto + .tema-tasto, .tema-tasto + .lingua { margin-left: -1.35rem; }
+@media (max-width: 760px) { .tema-tasto + .tema-tasto, .tema-tasto + .lingua { margin-left: -.7rem; } }
+.lingua { position: relative; flex: none; }
+.lingua-tasto { font: inherit; font-size: .72rem; font-weight: 700; letter-spacing: .02em; }
+.lingua-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 9.5rem;
+  background: var(--carta); color: var(--ink); border: 1px solid var(--filo); border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .16); padding: .3rem; display: grid; gap: .1rem;
+}
+.lingua-menu[hidden] { display: none; }
+.lingua-menu button {
+  font: inherit; font-size: .9rem; text-align: left; padding: .4rem .6rem; border: 0; border-radius: 7px;
+  background: none; color: inherit; cursor: pointer;
+}
+.lingua-menu button:hover { background: var(--verde-tenue); }
+.lingua-menu button[aria-checked="true"] { font-weight: 700; color: var(--verde); }
+
+/* ======================================================================
+   TEMA NATALIZIO (02/10/2026) — `html.natale`, acceso dal tasto con l'albero
+   La neve, l'albero e i pupazzi li disegna `natale.js` su un canvas che non
+   riceve clic. Qui: il tasto, i cappellini e le lucine.
+   ====================================================================== */
+.natale-tasto[aria-pressed="true"] { background: #c8102e; border-color: #c8102e; color: #fff; }
+.natale-tela {
+  position: fixed; top: 0; left: 0; z-index: 19; pointer-events: none; display: block;
+}
+html.natale-presa, html.natale-presa * { cursor: grab !important; }
+html.natale-trascina, html.natale-trascina * { cursor: grabbing !important; user-select: none !important; }
+/* Il cappellino: un disegno nostro, appoggiato in alto a sinistra. */
+html.natale .marchio .iniziale, html.natale .pieduccio .sigla .iniziale:first-child,
+html.natale .furbetto, html.natale .ingresso-titolo .punti:first-child { position: relative; }
+html.natale .marchio .iniziale::after, html.natale .pieduccio .sigla .iniziale:first-child::after,
+html.natale .furbetto::after {
+  content: ""; position: absolute; pointer-events: none;
+  left: -.22em; top: -.42em; width: .95em; height: .8em;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 34'%3E%3Cpath d='M6 26C8 10 20 3 30 9c4 2.5 6 7 7 12l-5 1c-1-5-3-8-6-9 2 5 2 9 1 13z' fill='%23d8343f' stroke='%23111' stroke-width='1.5'/%3E%3Crect x='2' y='24' width='27' height='8' rx='4' fill='%23fff' stroke='%23111' stroke-width='1.5'/%3E%3Ccircle cx='34.5' cy='22' r='4' fill='%23fff' stroke='%23111' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat center / contain;
+  transform: rotate(-16deg);
+}
+html.natale .furbetto::after { left: .02em; top: -.3em; width: .8em; height: .68em; transform: rotate(-12deg); z-index: 1; }
+/* Le lucine sotto la testata: una fila di lampadine che si accendono a turno. */
+html.natale .testata::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -9px; height: 8px; pointer-events: none;
+  background:
+    radial-gradient(circle at 12px 4px, #d8343f 3px, transparent 3.6px),
+    radial-gradient(circle at 36px 4px, #ffcf3a 3px, transparent 3.6px),
+    radial-gradient(circle at 60px 4px, #2e8b4e 3px, transparent 3.6px),
+    radial-gradient(circle at 84px 4px, #2f72e0 3px, transparent 3.6px);
+  background-size: 96px 8px; background-repeat: repeat-x;
+  animation: lucine 1.6s steps(2, jump-none) infinite;
+}
+@keyframes lucine { 0% { opacity: 1; } 100% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { html.natale .testata::after { animation: none; } }
+@media print { .natale-tela { display: none; } }
 
 /* ======================================================================
    CODICE MODELLO ACCANTO AL NOME (30/09/2026)

@@ -571,10 +571,12 @@ class TestTendinaDelRing(unittest.TestCase):
         for marca in ('data-punta="robot"', 'data-punta="mela"', "data-gettoni", "data-esito",
                       'data-metti="pistola"', 'data-metti="spada"', 'data-metti="bomba"', 'data-metti="tablet"',
                       'data-metti="pc"', 'data-metti="orologio"', 'data-metti="duo"', "data-gravita",
-                      'data-imprevisto="acquazzone"', 'data-imprevisto="natale"', 'data-imprevisto="uragano"',
+                      'data-imprevisto="acquazzone"', 'data-imprevisto="uragano"',
                       "data-sorprese", "data-cruento", "data-ricomincia", "data-barre", "data-anime",
                       'data-colpo="onda"', 'data-colpo="teletrasporto"', 'value="su"',
-                      'data-colpo="esplodi-robot"', 'data-colpo="esplodi-mela"'):
+                      'data-colpo="esplodi-robot"', 'data-colpo="esplodi-mela"', 'data-colpo="sfera"',
+                      'data-colpo="disco"', 'data-colpo="lampo"', 'data-colpo="barriera"',
+                      'data-colpo="autodistruzione"', 'data-colpo="telecinesi"'):
             self.assertIn(marca, self.home)
 
     def test_la_tendina_riceve_i_clic_e_sale_dalla_striscia(self):
@@ -582,3 +584,60 @@ class TestTendinaDelRing(unittest.TestCase):
         self.assertIn("pointer-events: auto", blocco)
         self.assertIn("bottom: calc(100% + 8px)", blocco)
         self.assertIn(".ultimora-gioca[aria-pressed=\"false\"] .omino-taglio { display: none; }", self.css)
+
+
+class TestLinguaENatale(unittest.TestCase):
+    """02/10/2026: accanto al tasto del tema scuro ci sono il tema natalizio
+    (di tutto il sito, non del ring) e la scelta della lingua."""
+
+    @classmethod
+    def setUpClass(cls):
+        from fastapi.testclient import TestClient
+        from web.main import app
+        cls.client = TestClient(app)
+        cls.home = cls.client.get("/").text
+        cls.novita = cls.client.get("/novita").text
+        cls.css = cls.client.get("/static/style.css").text
+
+    def test_i_tre_tasti_stanno_nella_testata_di_ogni_pagina(self):
+        for pagina in (self.home, self.novita):
+            testata = pagina[pagina.index('<header class="testata">'):pagina.index("</header>")]
+            for marca in ("data-tema-tasto", "data-natale-tasto", "data-lingua-tasto"):
+                self.assertIn(marca, testata)
+            self.assertLess(testata.index("data-tema-tasto"), testata.index("data-natale-tasto"))
+            self.assertLess(testata.index("data-natale-tasto"), testata.index("data-lingua-tasto"))
+
+    def test_le_cinque_lingue_e_i_loro_nomi_non_si_traducono(self):
+        for codice in ("it", "en", "es", "fr", "de"):
+            self.assertIn('data-lingua-scelta="%s"' % codice, self.home)
+        i = self.home.index("data-lingua-menu")
+        self.assertIn("data-notrad", self.home[i:i + 60])
+
+    def test_gli_script_si_caricano_su_ogni_pagina_e_sono_firmati(self):
+        for pagina in (self.home, self.novita):
+            for nome in ("natale.js", "lingue.js"):
+                self.assertRegex(pagina, r'/static/%s\?v=[0-9a-f]{10}' % nome.replace(".", r"\."))
+        for nome in ("natale.js", "lingue.js"):
+            self.assertEqual(self.client.get("/static/" + nome).status_code, 200)
+
+    def test_natale_e_lingua_si_decidono_prima_del_primo_disegno(self):
+        testa = self.home[:self.home.index("</head>")]
+        self.assertIn('"mut-natale"', testa)
+        self.assertIn('"mut-lingua"', testa)
+        self.assertIn("html.lingua-attesa body { visibility: hidden; }", self.css)
+
+    def test_il_canvas_della_neve_non_riceve_clic(self):
+        blocco = self.css[self.css.index(".natale-tela {"):]
+        self.assertIn("pointer-events: none", blocco[:200])
+        self.assertIn("html.natale .furbetto::after", self.css)
+        self.assertIn("html.natale .testata::after", self.css)
+
+    def test_il_natale_non_e_piu_un_imprevisto_del_ring(self):
+        self.assertNotIn('data-imprevisto="natale"', self.home)
+        js = self.client.get("/static/ring.js").text
+        self.assertIn('"mut:natale"', js)
+
+    def test_il_dizionario_copre_le_voci_della_testata(self):
+        js = self.client.get("/static/lingue.js").text
+        for voce in ('"Cerca"', '"Novità"', '"Parco di test"', '"Accedi"', '"Ultim\'ora"'):
+            self.assertIn(voce, js)
