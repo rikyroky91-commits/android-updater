@@ -1,0 +1,23 @@
+{
+  "nome": {
+    "message": "Page Snow"
+  },
+  "descrizione": {
+    "message": "Snow falls on the page you are viewing and piles up on it. Lights, icicles, a tree with gifts, snowmen to take apart."
+  },
+  "titolo": {
+    "message": "Turn the snow on or off on this page"
+  },
+  "opzioniTitolo": {
+    "message": "Page Snow options"
+  },
+  "sempreEtichetta": {
+    "message": "Turn the Christmas theme on automatically on every site"
+  },
+  "sempreSpiega": {
+    "message": "Every page you open gets the snow without clicking the toolbar icon; the snowflake button in the bottom right corner turns it off and on again everywhere. To do this, the browser will ask you to let Page Snow run on all sites. Nothing is read from the pages and nothing is sent anywhere."
+  },
+  "sempreNegato": {
+    "message": "Permission not granted: the theme stays manual."
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "nome": {
+    "message": "Page Snow"
+  },
+  "descrizione": {
+    "message": "Il neige sur la page que vous regardez et la neige s'accumule. Guirlandes, glaçons, sapin et cadeaux, bonshommes de neige."
+  },
+  "titolo": {
+    "message": "Activer ou arrêter la neige sur cette page"
+  },
+  "opzioniTitolo": {
+    "message": "Options de Page Snow"
+  },
+  "sempreEtichetta": {
+    "message": "Activer automatiquement le thème de Noël sur tous les sites"
+  },
+  "sempreSpiega": {
+    "message": "Chaque page ouverte a sa neige sans cliquer sur l'icône de la barre ; le bouton au flocon, en bas à droite, l'arrête et la relance partout. Pour cela, le navigateur vous demandera de laisser Page Snow fonctionner sur tous les sites. Rien n'est lu dans les pages et rien n'est envoyé."
+  },
+  "sempreNegato": {
+    "message": "Autorisation refusée : le thème reste manuel."
+  }
+}

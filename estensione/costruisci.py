@@ -539,14 +539,242 @@ def file_attesi(variante: str) -> dict:
     return attesi
 
 
+# ---------------------------------------------------------------------------
+# PAGE SNOW: la seconda estensione, solo il tema di Natale (02/10/2026).
+# Il cuore è `web/static/natale.js`, lo stesso file del sito: qui gli si dice
+# dove mettere il canvas e gli si mette accanto un tasto per accendere e
+# spegnere. Gratis, nessun Premium.
+# ---------------------------------------------------------------------------
+NATALE_VERSIONE = "0.1.0"
+NATALE_NOME = "Page Snow"
+NATALE_MANIFEST = {
+    "manifest_version": 3,
+    "name": "__MSG_nome__",
+    "version": NATALE_VERSIONE,
+    "description": "__MSG_descrizione__",
+    "default_locale": "en",
+    "action": {"default_title": "__MSG_titolo__"},
+    "background": {"service_worker": "sfondo.js"},
+    "permissions": ["activeTab", "scripting", "storage"],
+    # Facoltativo: solo per chi sceglie, nelle opzioni, il Natale su tutti i siti.
+    "optional_host_permissions": ["<all_urls>"],
+    "options_ui": {"page": "opzioni.html", "open_in_tab": False},
+    "icons": {"16": "icone/16.png", "48": "icone/48.png", "128": "icone/128.png"},
+}
+NATALE_MESSAGGI = {
+    "en": {
+        "descrizione": "Snow falls on the page you are viewing and piles up on it. Lights, icicles, a tree with gifts, snowmen to take apart.",
+        "titolo": "Turn the snow on or off on this page",
+        "opzioniTitolo": "Page Snow options",
+        "sempreEtichetta": "Turn the Christmas theme on automatically on every site",
+        "sempreSpiega": "Every page you open gets the snow without clicking the toolbar icon; the snowflake button in the bottom right corner turns it off and on again everywhere. To do this, the browser will ask you to let Page Snow run on all sites. Nothing is read from the pages and nothing is sent anywhere.",
+        "sempreNegato": "Permission not granted: the theme stays manual.",
+    },
+    "it": {
+        "descrizione": "Nevica sulla pagina che stai guardando, e la neve si accumula. Lucine, ghiaccioli, un albero coi regali, pupazzi da smontare.",
+        "titolo": "Accendi o spegni la neve su questa pagina",
+        "opzioniTitolo": "Opzioni di Page Snow",
+        "sempreEtichetta": "Accendi da solo il tema di Natale su tutti i siti",
+        "sempreSpiega": "Ogni pagina che apri ha la neve senza cliccare l'icona nella barra; il tasto col fiocco in basso a destra la spegne e la riaccende dappertutto. Per farlo il browser ti chiede di lasciar funzionare Page Snow su tutti i siti. Dalle pagine non viene letto niente e non viene inviato niente.",
+        "sempreNegato": "Permesso non concesso: il tema resta manuale.",
+    },
+    "es": {
+        "descrizione": "Nieva sobre la página que estás viendo y la nieve se acumula. Luces, carámbanos, un árbol con regalos y muñecos de nieve.",
+        "titolo": "Enciende o apaga la nieve en esta página",
+        "opzioniTitolo": "Opciones de Page Snow",
+        "sempreEtichetta": "Encender solo el tema de Navidad en todos los sitios",
+        "sempreSpiega": "Cada página que abres tiene nieve sin pulsar el icono de la barra; el botón del copo, abajo a la derecha, la apaga y la vuelve a encender en todas partes. Para ello, el navegador te pedirá que dejes funcionar Page Snow en todos los sitios. No se lee nada de las páginas y no se envía nada.",
+        "sempreNegato": "Permiso no concedido: el tema sigue siendo manual.",
+    },
+    "fr": {
+        "descrizione": "Il neige sur la page que vous regardez et la neige s'accumule. Guirlandes, glaçons, sapin et cadeaux, bonshommes de neige.",
+        "titolo": "Activer ou arrêter la neige sur cette page",
+        "opzioniTitolo": "Options de Page Snow",
+        "sempreEtichetta": "Activer automatiquement le thème de Noël sur tous les sites",
+        "sempreSpiega": "Chaque page ouverte a sa neige sans cliquer sur l'icône de la barre ; le bouton au flocon, en bas à droite, l'arrête et la relance partout. Pour cela, le navigateur vous demandera de laisser Page Snow fonctionner sur tous les sites. Rien n'est lu dans les pages et rien n'est envoyé.",
+        "sempreNegato": "Autorisation refusée : le thème reste manuel.",
+    },
+    "de": {
+        "descrizione": "Es schneit auf der Seite, die du ansiehst, und der Schnee bleibt liegen. Lichter, Eiszapfen, ein Baum mit Geschenken, Schneemänner.",
+        "titolo": "Schnee auf dieser Seite ein- oder ausschalten",
+        "opzioniTitolo": "Optionen von Page Snow",
+        "sempreEtichetta": "Weihnachtsdesign auf allen Websites automatisch einschalten",
+        "sempreSpiega": "Jede geöffnete Seite bekommt Schnee, ohne das Symbol in der Leiste anzuklicken; der Knopf mit der Flocke unten rechts schaltet ihn überall aus und wieder ein. Dafür fragt der Browser, ob Page Snow auf allen Websites laufen darf. Aus den Seiten wird nichts gelesen und nichts wird gesendet.",
+        "sempreNegato": "Berechtigung nicht erteilt: Das Design bleibt manuell.",
+    },
+}
+NATALE_PAGINA_CSS = ("html.natale-presa, html.natale-presa * { cursor: grab !important; }\n"
+                     "html.natale-trascina, html.natale-trascina * { cursor: grabbing !important; user-select: none !important; }\n")
+NATALE_SFONDO = """/* Il service worker di Page Snow: al clic sull'icona accende la neve sulla
+ * scheda attiva; a un secondo clic la spegne (e poi la riaccende). */
+async function avvia(tab) {
+  if (!tab || !tab.id) return "nessuna scheda";
+  const dove = { tabId: tab.id };
+  try {
+    const [{ result: gia }] = await chrome.scripting.executeScript({ target: dove, func: () => !!window.__nataleEstensione });
+    if (gia) {
+      await chrome.scripting.executeScript({ target: dove, func: () => window.__nataleEstensione.alterna() });
+      return "alternato";
+    }
+    // `__nataleAvvio`: chiesto con un clic, parte acceso (da solo, su tutti i siti, guarda prima se è stato spento).
+    await chrome.scripting.executeScript({ target: dove, func: () => { window.__nataleAvvio = true; } });
+    await chrome.scripting.insertCSS({ target: dove, files: ["pagina.css"] });
+    await chrome.scripting.executeScript({ target: dove, files: ["prepara.js", "natale.js"] });
+    return "acceso";
+  } catch (errore) {
+    // Pagine dove un'estensione non può entrare (chrome://, il Web Store, i PDF).
+    return "non permesso: " + (errore && errore.message);
+  }
+}
+chrome.action.onClicked.addListener(avvia);
+// Tolto il permesso su tutti i siti dalle impostazioni del browser: il tema torna manuale.
+chrome.permissions.onRemoved.addListener(async () => {
+  try {
+    if (await chrome.permissions.contains({ origins: ["<all_urls>"] })) return;
+    await chrome.scripting.unregisterContentScripts({ ids: ["ps-auto"] });
+    await chrome.storage.local.set({ "ps-sempre": "off" });
+  } catch (errore) { /* non era registrato */ }
+});
+"""
+ICONA_FIOCCO = ('<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">'
+                '<path d="M12 2.5v19M3.8 7.2l16.4 9.6M20.2 7.2L3.8 16.8"/>'
+                '<path d="M9.6 4.4L12 6.6l2.4-2.2M9.6 19.6L12 17.4l2.4 2.2M4.2 10.4l3-.8-.8-3M19.8 13.6l-3 .8.8 3M19.8 10.4l-3-.8.8-3M4.2 13.6l3 .8-.8 3"/></svg>')
+NATALE_STILE = """
+*, *::before, *::after { box-sizing: border-box; }
+.natale-tela { position: fixed; top: 0; left: 0; display: block; pointer-events: none; }
+.barretta { position: fixed; right: 12px; bottom: 68px; pointer-events: auto; }
+button {
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid #d4d0c8; background: #ffffff; color: #6b6660;
+  cursor: pointer; display: grid; place-items: center; padding: 0; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); opacity: .8;
+}
+button:hover { opacity: 1; }
+button[aria-pressed="true"] { background: #c8102e; border-color: #c8102e; color: #ffffff; opacity: 1; }
+@media (prefers-color-scheme: dark) { button { background: #1c1b1a; color: #bdb9b3; border-color: #3a3835; } }
+@media print { :host { display: none; } }
+"""
+NATALE_PREPARA = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
+ *
+ * Prepara la pagina per il tema di Natale: uno shadow DOM che tiene il
+ * canvas della neve (`natale.js` ce lo mette da sé) e il tasto col fiocco
+ * per spegnere e riaccendere.
+ */
+(function () {
+  "use strict";
+  if (window.top !== window || window.__nataleEstensione) return;
+  // Caricato da solo (scelta «su tutti i siti») parte spento e guarda se l'utente l'aveva spento;
+  // caricato da un clic sull'icona parte acceso.
+  var daSolo = !window.__nataleAvvio;
+  var ospite = document.createElement("div");
+  ospite.id = "page-snow";
+  ospite.style.cssText = "all: initial; position: fixed; inset: 0; z-index: 2147483645; pointer-events: none;";
+  var radice = ospite.attachShadow({ mode: "open" });
+  radice.innerHTML = __HTML__;
+  try {
+    var foglio = new CSSStyleSheet();
+    foglio.replaceSync(__STILE__);
+    radice.adoptedStyleSheets = [foglio];
+  } catch (e) {
+    var stile = document.createElement("style");
+    stile.textContent = __STILE__;
+    radice.appendChild(stile);
+  }
+  document.documentElement.appendChild(ospite);
+  var tasto = radice.querySelector("button"), titolo = "";
+  try { titolo = chrome.i18n.getMessage("titolo"); } catch (e) { /* niente titolo */ }
+  tasto.title = titolo; tasto.setAttribute("aria-label", titolo);
+  function mostra(acceso) { tasto.setAttribute("aria-pressed", acceso ? "true" : "false"); }
+  mostra(!daSolo);
+  window.__nataleEstensione = {
+    radice: radice, ospite: ospite, acceso: !daSolo,
+    // Dal tasto o da un altro clic sull'icona: spegne o riaccende. Con «su tutti i siti» la scelta vale ovunque.
+    alterna: function () {
+      var nuovo = !window.__natale.acceso();
+      window.__natale.imposta(nuovo); mostra(nuovo);
+      if (daSolo) { try { chrome.storage.local.set({ "ps-spento": nuovo ? "off" : "on" }); } catch (e) { /* solo per questa pagina */ } }
+    },
+  };
+  tasto.addEventListener("click", function () { window.__nataleEstensione.alterna(); });
+  if (daSolo) {
+    try {
+      chrome.storage.local.get("ps-spento").then(function (dati) {
+        var su = dati["ps-spento"] !== "on";
+        if (su && window.__natale) window.__natale.imposta(true);
+        mostra(su);
+      });
+    } catch (e) { /* resta spento */ }
+  }
+})();
+"""
+NATALE_OPZIONI_JS = OPZIONI_JS.replace('ID = "pb-tasto"', 'ID = "ps-auto"').replace(
+    '{ id: ID, js: ["tasto.js"], matches: ["<all_urls>"], runAt: "document_idle" }',
+    '{ id: ID, js: ["prepara.js", "natale.js"], css: ["pagina.css"], matches: ["<all_urls>"], runAt: "document_idle" }'
+).replace('"pb-sempre"', '"ps-sempre"').replace(
+    "La pagina delle opzioni: una sola scelta, il tasto di accensione su tutti i\n * siti. Accenderla fa chiedere al browser il permesso (facoltativo) su tutti\n * i siti e registra lo script del tasto; spegnerla toglie l'uno e l'altro.",
+    "La pagina delle opzioni: una sola scelta, il tema di Natale acceso da solo\n * su tutti i siti. Accenderla fa chiedere al browser il permesso (facoltativo)\n * su tutti i siti e registra gli script del tema; spegnerla toglie tutto.")
+
+
+def icona_natale(lato: int) -> bytes:
+    """Un fiocco di neve bianco su fondo rosso, disegnato qui."""
+    import io
+    import math
+    from PIL import Image, ImageDraw
+    k = 4
+    n = lato * k
+    img = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([0, 0, n - 1, n - 1], radius=n * 0.22, fill=(200, 16, 46, 255))
+    c, r, w = n / 2, n * 0.34, max(2, round(n * 0.07))
+    for i in range(6):
+        a = math.pi / 2 + i * math.pi / 3
+        x, y = c + math.cos(a) * r, c + math.sin(a) * r
+        d.line([c, c, x, y], fill=(255, 255, 255, 255), width=w)
+        mx, my = c + math.cos(a) * r * 0.62, c + math.sin(a) * r * 0.62
+        for lato_barba in (0.8, -0.8):
+            d.line([mx, my, mx + math.cos(a + lato_barba) * r * 0.32, my + math.sin(a + lato_barba) * r * 0.32], fill=(255, 255, 255, 255), width=max(2, w - 2))
+    d.ellipse([c - w, c - w, c + w, c + w], fill=(255, 255, 255, 255))
+    uscita = io.BytesIO()
+    img.resize((lato, lato), Image.LANCZOS).save(uscita, format="PNG", optimize=True)
+    return uscita.getvalue()
+
+
+def file_natale() -> dict:
+    html = '<div class="barretta"><button type="button" aria-pressed="true">' + ICONA_FIOCCO + "</button></div>"
+    attesi = {
+        "manifest.json": json.dumps(NATALE_MANIFEST, ensure_ascii=False, indent=2) + "\n",
+        "sfondo.js": NATALE_SFONDO,
+        "prepara.js": (NATALE_PREPARA.replace("__HTML__", json.dumps(html)).replace("__STILE__", json.dumps(NATALE_STILE))),
+        "natale.js": (RADICE / "web/static/natale.js").read_text(encoding="utf-8"),
+        "pagina.css": NATALE_PAGINA_CSS,
+        "opzioni.html": OPZIONI_HTML.replace("<title>Page Brawl</title>", "<title>Page Snow</title>"),
+        "opzioni.css": OPZIONI_CSS, "opzioni.js": NATALE_OPZIONI_JS,
+    }
+    for lingua, testi in NATALE_MESSAGGI.items():
+        if set(testi) != set(NATALE_MESSAGGI["en"]):
+            raise SystemExit(f"messaggi di Natale {lingua}: chiavi diverse dall'inglese")
+        if len(testi["descrizione"]) > 132:
+            raise SystemExit(f"descrizione di Natale {lingua} troppo lunga per lo store: {len(testi['descrizione'])} caratteri")
+        messaggi = {"nome": {"message": NATALE_NOME}}
+        messaggi.update({chiave: {"message": testo} for chiave, testo in testi.items()})
+        attesi[f"_locales/{lingua}/messages.json"] = json.dumps(messaggi, ensure_ascii=False, indent=2) + "\n"
+    return attesi
+
+
+# Le cartelle che si costruiscono: i file attesi, l'icona, il nome dello zip.
+PRODOTTI = {
+    "pacchetto": (lambda: file_attesi("pacchetto"), icona, f"page-brawl-{VERSIONE}-prova.zip"),
+    "store": (lambda: file_attesi("store"), icona, f"page-brawl-{VERSIONE}-store.zip"),
+    "natale": (file_natale, icona_natale, f"page-snow-{NATALE_VERSIONE}.zip"),
+}
+
+
 def main() -> int:
     verifica = "--verifica" in sys.argv
     vecchi = []
-    for variante in VARIANTI:
-        uscita = QUI / variante
-        attesi = file_attesi(variante)
+    for cartella, (attesi_di, icona_di, _zip) in PRODOTTI.items():
+        uscita = QUI / cartella
+        attesi = attesi_di()
         if verifica:
-            vecchi += [f"{variante}/{nome}" for nome, testo in attesi.items()
+            vecchi += [f"{cartella}/{nome}" for nome, testo in attesi.items()
                        if not (uscita / nome).exists() or (uscita / nome).read_text(encoding="utf-8") != testo]
             continue
         for nome, testo in attesi.items():
@@ -556,7 +784,7 @@ def main() -> int:
         for lato in (16, 48, 128):
             percorso = uscita / "icone" / f"{lato}.png"
             if not percorso.exists():
-                percorso.write_bytes(icona(lato))
+                percorso.write_bytes(icona_di(lato))
         print("scritto " + str(uscita))
     if not verifica and premium()["premium"] and not premium()["urlAcquisto"]:
         print("ATTENZIONE: Premium è chiuso ma manca l'indirizzo di acquisto: in store/ le funzioni Premium "
@@ -565,20 +793,20 @@ def main() -> int:
     if "--zip" in sys.argv and not verifica:
         import zipfile
         (QUI / "zip").mkdir(exist_ok=True)
-        for variante in VARIANTI:
-            nome = QUI / "zip" / f"page-brawl-{VERSIONE}-{'prova' if variante == 'pacchetto' else 'store'}.zip"
+        for cartella, (_attesi, _icona, nome_zip) in PRODOTTI.items():
+            nome = QUI / "zip" / nome_zip
             with zipfile.ZipFile(nome, "w", zipfile.ZIP_DEFLATED) as z:
                 # I file stanno alla RADICE dello zip: lo vuole lo store, e così la
                 # cartella estratta si carica a mano senza scendere di un livello.
-                for f in sorted((QUI / variante).rglob("*")):
+                for f in sorted((QUI / cartella).rglob("*")):
                     if f.is_file():
-                        z.write(f, f.relative_to(QUI / variante).as_posix())
+                        z.write(f, f.relative_to(QUI / cartella).as_posix())
             print("zip " + str(nome))
     if verifica:
         if vecchi:
             print("estensione vecchia: " + ", ".join(vecchi) + " (rigenera con python3 estensione/costruisci.py)")
             return 1
-        print("estensione aggiornata (pacchetto/ e store/)")
+        print("estensioni aggiornate (pacchetto/, store/ e natale/)")
     return 0
 
 

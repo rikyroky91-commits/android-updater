@@ -135,5 +135,62 @@ class TestEstensione(unittest.TestCase):
         self.assertTrue(url == "" or url.startswith("https://"), url)
 
 
+NATALE = ESTENSIONE / "natale"
+
+
+class TestEstensioneDiNatale(unittest.TestCase):
+    """«Page Snow»: la seconda estensione, solo il tema di Natale."""
+
+    def test_manifest_v3_col_permesso_minimo_e_quello_su_tutti_i_siti_facoltativo(self):
+        m = json.loads((NATALE / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(m["manifest_version"], 3)
+        self.assertEqual(sorted(m["permissions"]), ["activeTab", "scripting", "storage"])
+        self.assertNotIn("host_permissions", m)
+        self.assertNotIn("content_scripts", m)
+        self.assertEqual(m["optional_host_permissions"], ["<all_urls>"])
+        for lato in ("16", "48", "128"):
+            self.assertTrue((NATALE / m["icons"][lato]).exists())
+        for file in (m["background"]["service_worker"], m["options_ui"]["page"], "pagina.css"):
+            self.assertTrue((NATALE / file).exists(), file)
+
+    def test_il_cuore_e_lo_stesso_file_del_sito(self):
+        self.assertEqual((NATALE / "natale.js").read_text(encoding="utf-8"),
+                         (RADICE / "web" / "static" / "natale.js").read_text(encoding="utf-8"))
+
+    def test_nome_e_descrizione_in_cinque_lingue_dentro_i_limiti_dello_store(self):
+        for lingua in LINGUE:
+            messaggi = json.loads((NATALE / "_locales" / lingua / "messages.json").read_text(encoding="utf-8"))
+            self.assertEqual(messaggi["nome"]["message"], "Page Snow")
+            self.assertLessEqual(len(messaggi["descrizione"]["message"]), 132)
+            self.assertEqual(set(messaggi), {"nome", "descrizione", "titolo", "opzioniTitolo", "sempreEtichetta", "sempreSpiega", "sempreNegato"})
+
+    def test_niente_codice_da_fuori_e_niente_rete(self):
+        for file in ("prepara.js", "sfondo.js", "natale.js", "opzioni.js"):
+            testo = (NATALE / file).read_text(encoding="utf-8")
+            for vietato in ("fetch(", "XMLHttpRequest", "eval(", "new Function", "importScripts(", "<script"):
+                self.assertNotIn(vietato, testo, f"{file}: {vietato}")
+
+    def test_il_tema_parte_al_clic_e_da_solo_soltanto_per_chi_lo_sceglie(self):
+        sfondo = (NATALE / "sfondo.js").read_text(encoding="utf-8")
+        self.assertIn("window.__nataleAvvio = true", sfondo)
+        self.assertLess(sfondo.index('"prepara.js"'), sfondo.index('"natale.js"'))
+        self.assertNotIn("scripting.registerContentScripts", sfondo)
+        opzioni = (NATALE / "opzioni.js").read_text(encoding="utf-8")
+        self.assertLess(opzioni.index("chrome.permissions.request(TUTTI)"), opzioni.index("registerContentScripts"))
+        self.assertIn('js: ["prepara.js", "natale.js"]', opzioni)
+        prepara = (NATALE / "prepara.js").read_text(encoding="utf-8")
+        self.assertIn("attachShadow", prepara)
+        self.assertIn("window.top !== window", prepara)
+        self.assertIn('"ps-spento"', prepara)                 # spento dal tasto, resta spento sulle altre pagine
+
+    def test_natale_js_sa_stare_fuori_dal_sito(self):
+        js = (RADICE / "web" / "static" / "natale.js").read_text(encoding="utf-8")
+        self.assertIn("window.__nataleEstensione", js)
+        self.assertIn("est && est.radice ? est.radice : document.body", js)    # il canvas nello shadow DOM
+        # Sul sito non cambia niente: la scelta resta in `mut-natale` e il tasto è quello della testata.
+        self.assertIn('"mut-natale"', js)
+        self.assertIn("[data-natale-tasto]", js)
+
+
 if __name__ == "__main__":
     unittest.main()

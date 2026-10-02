@@ -1,59 +1,94 @@
-# Page Brawl: il ring come estensione del browser
+# Le estensioni del browser
 
-Il robot e la mela del sito, su qualunque pagina. Nome provvisorio.
+Due estensioni, costruite dagli stessi file del sito:
 
-## Le due varianti
+| Estensione | Cosa fa | Cartelle | Sorgente |
+| --- | --- | --- | --- |
+| **Page Brawl** | Il ring: due lottatori che si picchiano sulla pagina aperta | `pacchetto/` (prova a mano), `store/` (da pubblicare) | `web/static/ring.js`, `web/static/lingue.js`, la tendina di `web/templates/home.html` |
+| **Page Snow** | Il tema di Natale: neve che si accumula, lucine, ghiaccioli, albero, pupazzi | `natale/` | `web/static/natale.js` |
+
+I nomi sono provvisori. Tutto si rigenera con `python3 estensione/costruisci.py`; il test `tests/test_estensione.py` fallisce se una cartella è rimasta indietro rispetto ai file del sito.
+
+## Provarle in Chrome (o Edge, Brave, Opera, Vivaldi)
+
+1. `python3 estensione/costruisci.py --zip` scrive gli zip in `estensione/zip/`. Scompattane uno: la cartella che ottieni contiene direttamente `manifest.json`.
+2. Apri `chrome://extensions` e accendi **Modalità sviluppatore** in alto a destra.
+3. **Carica estensione non pacchettizzata** e scegli quella cartella. Se Chrome risponde «File manifest mancante», hai scelto una cartella sopra o sotto: va scelta quella con dentro `manifest.json`.
+4. Fissa l'icona nella barra (il menu a forma di puzzle), apri un sito qualunque e clicca l'icona.
+
+Non funzionano, per regola di Chrome, su `chrome://…`, sul Chrome Web Store e sui PDF.
+
+## Page Brawl
+
+Un clic sull'icona accende la lotta sulla scheda aperta. In basso a destra compaiono due tasti: il guantone apre le opzioni, quello di accensione spegne tutto e resta da solo in vista, pronto a riaccendere. Un altro clic sull'icona fa lo stesso del tasto di accensione.
+
+### Il tasto su tutti i siti
+
+Di suo l'estensione entra in una pagina solo quando clicchi l'icona (`activeTab`). Chi vuole il tasto di accensione su ogni pagina lo accende nelle opzioni (in fondo alla tendina, o dal menu dell'estensione): il browser chiede allora il permesso su tutti i siti, che è **facoltativo** e si toglie spegnendo la stessa spunta. Chi non lo accende non vede mai l'avviso sui dati di tutti i siti.
+
+### Le due varianti
 
 | Cartella | A cosa serve | Premium |
 | --- | --- | --- |
 | `pacchetto/` | Provarla caricandola a mano | Chiuso, con un interruttore **Premium di prova** in cima alla tendina per vederla aperta e chiusa |
 | `store/` | Quella da pubblicare | Chiuso, senza interruttore di prova. Il tasto dice «Premium arriva presto» finché manca l'indirizzo di acquisto |
 
-Sono generate tutte e due da `costruisci.py`; cambia solo quel tasto.
+### Cosa è gratis e cosa è Premium
 
-## Provarla in Chrome (o Edge, Brave, Opera, Vivaldi)
-
-1. Scompatta `page-brawl-…-prova.zip`. La cartella che ottieni contiene direttamente `manifest.json`.
-2. Apri `chrome://extensions` e accendi **Modalità sviluppatore** in alto a destra.
-3. **Carica estensione non pacchettizzata** e scegli quella cartella. Se Chrome risponde «File manifest mancante», hai scelto una cartella sopra o sotto: va scelta quella con dentro `manifest.json`.
-4. Fissa l'icona col guantone nella barra (il menu a forma di puzzle), apri un sito qualunque e clicca l'icona.
-
-Un clic sull'icona accende la lotta sulla scheda aperta; un altro clic la spegne e nasconde tutto. In basso a destra ci sono due tasti: il guantone apre le opzioni, l'omino barrato mette in pausa le lotte.
-
-Non funziona, per regola di Chrome, su `chrome://…`, sul Chrome Web Store e sui PDF.
-
-## Cosa è gratis e cosa è Premium
-
-- **Gratis:** la lotta, prese e lanci col mouse, telefoni, smartwatch, tablet e portatili, terremoto, jetpack, furia, barre della vita, scommesse, quello che i lottatori imparano.
-- **Premium:** i super guerrieri con le nove mosse speciali; pistola, spada, bomba, pieghevole e le due esplosioni; pioggia, uragano, rallentatore e le gravità diverse dalla Terra.
+- **Gratis:** la lotta fra il robot e la mela, prese e lanci col mouse, telefoni, smartwatch, tablet e portatili, terremoto, jetpack, furia, barre della vita, scommesse, quello che i lottatori imparano.
+- **Premium:** i personaggi (super guerrieri, maghi, duellanti) con le loro mosse; pistola, spada, bomba, pieghevole e le due esplosioni; pioggia, uragano, rallentatore e le gravità diverse dalla Terra.
 
 I tasti Premium portano un lucchetto. Cliccandone uno si apre il riquadro in cima alla tendina.
+
+### I personaggi
+
+Scelto uno stile, in campo non ci sono più il robot e la mela ma due personaggi inventati per quel tema:
+
+- **Super guerrieri** (Zefir e Brasa): volano, onde di energia, sfera gigante, teletrasporto, e la **trasformazione** («sovraccarico», due forme: anelli di luce sopra la testa, bordi e occhi accesi, colpi più forti).
+- **Maghi** (Merlo e Ortica): bacchetta e scopa; dardi, raggio, gelo, rimpicciolimento, fulmine, levitazione, scudo, sparizione.
+- **Duellanti** (Rovo e Scia): lama di energia; fendenti, affondi, lo scatto che attraversa l'avversario, la lama lanciata, le lame incrociate.
+
+Nomi, facce e vestiti sono inventati qui: non richiamano personaggi di altri. Vale la pena tenerlo così anche nelle schede degli store.
+
+### Premium: cosa c'è e cosa manca
 
 Le scelte stanno in `premium.json`:
 
 - `premium_attivo`: `true` chiude le funzioni Premium; `false` toglie lucchetti e riquadro, tutto gratis.
 - `url_acquisto`: la pagina dove si compra (deve cominciare con `https://`). Vuoto: il tasto resta spento con «Premium arriva presto».
 
-**Cosa manca per vendere davvero:** la verifica dell'acquisto. Oggi Premium si accende solo scrivendo `pb-premium = on` nella memoria dell'estensione (lo fa l'interruttore di prova). Il passo successivo è collegare un servizio di licenze, che controlla la chiave e scrive quel valore. Il blocco è nel codice dell'estensione, quindi chi sa usare gli strumenti per sviluppatori può aggirarlo: vale come barriera per l'utente normale, non come protezione.
+**Manca la verifica dell'acquisto.** Oggi Premium si accende solo scrivendo `pb-premium = on` nella memoria dell'estensione (lo fa l'interruttore di prova). Il passo successivo è collegare un servizio di licenze, che controlla la chiave e scrive quel valore. Il blocco è nel codice dell'estensione, quindi chi sa usare gli strumenti per sviluppatori può aggirarlo: vale come barriera per l'utente normale, non come protezione.
 
-## Lingua ed effetti cruenti
+### Lingua ed effetti cruenti
 
 - La tendina e le scritte seguono la lingua del browser: italiano, inglese, spagnolo, francese, tedesco. Ogni altra lingua vede l'inglese. Il dizionario è `web/static/lingue.js`, lo stesso del sito; nell'estensione traduce solo la tendina, mai la pagina.
 - Schizzi e arti staccati partono **spenti**. Si accendono dalla tendina (Imprevisti → «Schizzi e arti staccati»).
 
-## Come è fatta
+## Page Snow
 
-- **Una sola sorgente.** Le due cartelle sono generate da `costruisci.py` a partire da `web/static/ring.js`, `web/static/lingue.js`, dalla tendina di `web/templates/home.html` e dal suo stile. Dopo ogni modifica al ring: `python3 estensione/costruisci.py`. Il test `tests/test_estensione.py` fallisce se ci si dimentica.
-- **Permesso minimo.** `activeTab` + `scripting` + `storage`: l'estensione vede una pagina solo quando ci clicchi sopra l'icona. Non legge e non manda niente: nessuna richiesta di rete.
-- **Isolata dalla pagina.** Canvas, tasti e tendina stanno in uno shadow DOM: lo stile del sito non li deforma, e una Content-Security-Policy severa non li blocca.
+Un clic sull'icona accende il Natale sulla scheda aperta; il tasto col fiocco, in basso a destra, lo spegne e lo riaccende. È gratis, senza Premium.
+
+- Nevica a tre profondità; i fiocchi vicini si posano su campi, tasti, immagini e titoli della pagina, e la neve si accumula, luccica, frana, si spazza col puntatore.
+- Sotto gli elementi crescono i ghiaccioli: gocciolano, e toccati si staccano.
+- Lucine in cima alla finestra, cappellini rossi sui titoli e sulle immagini piccole, brina agli angoli.
+- Sul fondo l'albero coi regali (un clic e si aprono) e i pupazzi di neve, che toccati vanno in pezzi e si rimontano a mano.
+- Ogni tanto passa una slitta con le renne.
+
+Nelle opzioni c'è una sola scelta: **accendere da solo il tema su tutti i siti**. Anche qui il permesso su tutti i siti è facoltativo. Con quella scelta accesa, spegnere dal tasto col fiocco vale per tutte le pagine, finché non lo riaccendi.
+
+## Come sono fatte
+
+- **Una sola sorgente.** Le cartelle sono generate da `costruisci.py` a partire dai file del sito. Dopo ogni modifica al ring o al tema di Natale: `python3 estensione/costruisci.py`.
+- **Permesso minimo.** `activeTab` + `scripting` + `storage`. Non leggono e non mandano niente: nessuna richiesta di rete.
+- **Isolate dalla pagina.** Canvas, tasti e tendina stanno in uno shadow DOM: lo stile del sito non li deforma, e una Content-Security-Policy severa non li blocca.
 - **Memoria dell'estensione.** Quello che i lottatori imparano, i gettoni, le opzioni e lo stato di Premium stanno in `chrome.storage.local`: sono gli stessi su tutti i siti.
 
 ## Pubblicare
 
-`python3 estensione/costruisci.py --zip` scrive in `estensione/zip/` i due zip, con i file alla radice. Quello da caricare nello store è `page-brawl-…-store.zip`. Testi, giustificazioni dei permessi e schermate sono in `SCHEDA-STORE.md` e `scheda/`.
+`python3 estensione/costruisci.py --zip` scrive in `estensione/zip/` tre zip coi file alla radice: `page-brawl-…-prova.zip` (da provare a mano), `page-brawl-…-store.zip` e `page-snow-….zip` (da caricare negli store). Testi, giustificazioni dei permessi e schermate sono in `SCHEDA-STORE.md`, `scheda/` e `scheda-natale/`.
 
 ## Limiti noti
 
-- Il pavimento è il fondo della finestra; gli ostacoli sono campi, tasti, immagini e scritte grandi della pagina.
-- Su pagine molto lunghe e piene la ricerca degli ostacoli è limitata ai primi 160.
+- Il pavimento è il fondo della finestra; gli ostacoli del ring sono campi, tasti, immagini e scritte grandi della pagina (i primi 160).
+- La richiesta del permesso su tutti i siti (la finestrella del browser) non è stata provata in un Chrome vero: nelle prove automatiche il permesso era già dato.
 - Le traduzioni in spagnolo, francese e tedesco non sono state riviste da un madrelingua.

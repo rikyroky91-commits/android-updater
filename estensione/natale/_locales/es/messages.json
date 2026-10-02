@@ -1,0 +1,23 @@
+{
+  "nome": {
+    "message": "Page Snow"
+  },
+  "descrizione": {
+    "message": "Nieva sobre la página que estás viendo y la nieve se acumula. Luces, carámbanos, un árbol con regalos y muñecos de nieve."
+  },
+  "titolo": {
+    "message": "Enciende o apaga la nieve en esta página"
+  },
+  "opzioniTitolo": {
+    "message": "Opciones de Page Snow"
+  },
+  "sempreEtichetta": {
+    "message": "Encender solo el tema de Navidad en todos los sitios"
+  },
+  "sempreSpiega": {
+    "message": "Cada página que abres tiene nieve sin pulsar el icono de la barra; el botón del copo, abajo a la derecha, la apaga y la vuelve a encender en todas partes. Para ello, el navegador te pedirá que dejes funcionar Page Snow en todos los sitios. No se lee nada de las páginas y no se envía nada."
+  },
+  "sempreNegato": {
+    "message": "Permiso no concedido: el tema sigue siendo manual."
+  }
+}

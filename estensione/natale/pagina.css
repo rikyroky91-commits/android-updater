@@ -1,0 +1,2 @@
+html.natale-presa, html.natale-presa * { cursor: grab !important; }
+html.natale-trascina, html.natale-trascina * { cursor: grabbing !important; user-select: none !important; }

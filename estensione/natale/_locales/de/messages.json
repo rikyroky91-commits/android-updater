@@ -1,0 +1,23 @@
+{
+  "nome": {
+    "message": "Page Snow"
+  },
+  "descrizione": {
+    "message": "Es schneit auf der Seite, die du ansiehst, und der Schnee bleibt liegen. Lichter, Eiszapfen, ein Baum mit Geschenken, Schneemänner."
+  },
+  "titolo": {
+    "message": "Schnee auf dieser Seite ein- oder ausschalten"
+  },
+  "opzioniTitolo": {
+    "message": "Optionen von Page Snow"
+  },
+  "sempreEtichetta": {
+    "message": "Weihnachtsdesign auf allen Websites automatisch einschalten"
+  },
+  "sempreSpiega": {
+    "message": "Jede geöffnete Seite bekommt Schnee, ohne das Symbol in der Leiste anzuklicken; der Knopf mit der Flocke unten rechts schaltet ihn überall aus und wieder ein. Dafür fragt der Browser, ob Page Snow auf allen Websites laufen darf. Aus den Seiten wird nichts gelesen und nichts wird gesendet."
+  },
+  "sempreNegato": {
+    "message": "Berechtigung nicht erteilt: Das Design bleibt manuell."
+  }
+}
