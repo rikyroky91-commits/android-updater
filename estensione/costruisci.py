@@ -8,9 +8,17 @@ browser: il manifest, il service worker che parte al clic sull'icona, e
 `prepara.js`, che crea canvas e tendina dentro uno shadow DOM (così lo stile
 dei siti non li tocca) prima di far partire il ring.
 
+Si costruiscono DUE varianti, uguali in tutto tranne una cosa:
+  - `pacchetto/`  da caricare a mano per provare: nella tendina c'è un
+    interruttore «Premium di prova» per vedere il gioco bloccato e sbloccato;
+  - `store/`      da pubblicare: niente interruttore di prova. Premium si
+    compra dall'indirizzo scritto in `premium.json` (`url_acquisto`); finché è
+    vuoto il tasto dice «Premium arriva presto».
+
 Uso:
-    python3 estensione/costruisci.py            # rigenera pacchetto/
-    python3 estensione/costruisci.py --verifica # esce con 1 se pacchetto/ è vecchio
+    python3 estensione/costruisci.py            # rigenera pacchetto/ e store/
+    python3 estensione/costruisci.py --verifica # esce con 1 se sono vecchi
+    python3 estensione/costruisci.py --zip      # rigenera e prepara i due zip in estensione/zip/
 
 Il test `tests/test_estensione.py` usa `--verifica`: chi cambia il ring e
 dimentica di rigenerare l'estensione se ne accorge subito.
@@ -20,21 +28,37 @@ import sys
 from pathlib import Path
 
 RADICE = Path(__file__).resolve().parent.parent
-USCITA = Path(__file__).resolve().parent / "pacchetto"
-VERSIONE = "0.1.0"
+QUI = Path(__file__).resolve().parent
+VARIANTI = {"pacchetto": {"premium_di_prova": True}, "store": {"premium_di_prova": False}}
+VERSIONE = "0.2.0"
 NOME = "Page Brawl"
 
 MANIFEST = {
     "manifest_version": 3,
-    "name": NOME,
+    "name": "__MSG_nome__",
     "version": VERSIONE,
-    "description": "Un robot e una mela si picchiano sulla pagina che stai guardando: "
-                   "prendili col mouse, lanciali, scommetti su chi vince.",
-    "action": {"default_title": "Accendi o spegni la lotta su questa pagina"},
+    "description": "__MSG_descrizione__",
+    "default_locale": "en",
+    "action": {"default_title": "__MSG_titolo__"},
     "background": {"service_worker": "sfondo.js"},
     # Il permesso minimo: solo la scheda su cui si clicca l'icona.
     "permissions": ["activeTab", "scripting", "storage"],
     "icons": {"16": "icone/16.png", "48": "icone/48.png", "128": "icone/128.png"},
+}
+
+# Nome, descrizione breve (al massimo 132 caratteri: è il limite dello store)
+# e titolo del tasto, nelle lingue dell'estensione.
+MESSAGGI = {
+    "en": ("A robot and an apple brawl on the page you are viewing. Grab them, throw them, bet on the winner.",
+           "Start or stop the brawl on this page"),
+    "it": ("Un robot e una mela si picchiano sulla pagina che stai guardando. Prendili, lanciali, scommetti su chi vince.",
+           "Accendi o spegni la lotta su questa pagina"),
+    "es": ("Un robot y una manzana se pelean en la página que estás viendo. Agárralos, lánzalos y apuesta por el ganador.",
+           "Enciende o apaga la pelea en esta página"),
+    "fr": ("Un robot et une pomme se battent sur la page que vous regardez. Attrapez-les, lancez-les, pariez sur le vainqueur.",
+           "Lancer ou arrêter le combat sur cette page"),
+    "de": ("Ein Roboter und ein Apfel prügeln sich auf der Seite, die du gerade ansiehst. Pack sie, wirf sie, wette auf den Sieger.",
+           "Kampf auf dieser Seite starten oder stoppen"),
 }
 
 SFONDO = """/* Il service worker dell'estensione: al clic sull'icona accende il ring
@@ -51,11 +75,12 @@ async function avvia(tab) {
     // La memoria dei lottatori (quello che hanno imparato, i gettoni, le
     // opzioni) è dell'estensione: uguale su tutti i siti.
     const dati = await chrome.storage.local.get(null);
-    await chrome.scripting.executeScript({ target: dove, func: (d) => { window.__ringDati = d; }, args: [dati] });
+    // `__lingueSoloDizionario`: il dizionario delle lingue serve solo alla tendina, la pagina non si tocca.
+    await chrome.scripting.executeScript({ target: dove, func: (d) => { window.__ringDati = d; window.__lingueSoloDizionario = true; }, args: [dati] });
     // Il cursore a manina sopra i lottatori: inserito dall'estensione, così passa anche
     // sui siti con una Content-Security-Policy che vieta gli stili scritti nella pagina.
     await chrome.scripting.insertCSS({ target: dove, css: __STILE_PAGINA__ });
-    await chrome.scripting.executeScript({ target: dove, files: ["prepara.js", "ring.js"] });
+    await chrome.scripting.executeScript({ target: dove, files: ["lingue.js", "prepara.js", "ring.js"] });
     return "acceso";
   } catch (errore) {
     // Pagine dove un'estensione non può entrare (chrome://, il Web Store, i PDF).
@@ -99,6 +124,15 @@ STILE_BASE = """
 .tasto[data-gioca][aria-pressed="false"] { opacity: .6; }
 .tasto[data-gioca][aria-pressed="false"] .omino-taglio { display: none; }
 h3 { font-weight: 700; }
+/* Premium: i tasti chiusi portano il lucchetto; in cima alla tendina il riquadro che spiega e sblocca. */
+.ring-tasto.bloccato { opacity: .72; }
+.ring-tasto.bloccato::after { content: "\\1F512"; float: right; margin-left: .3rem; font-size: .8em; }
+.premio { border: 1px solid var(--bordo); border-radius: 10px; padding: .55rem .65rem; margin: .5rem 0 .2rem; background: var(--fondo-firmware); }
+.premio p { margin: 0 0 .45rem; font-size: .84rem; }
+.premio .premio-avviso { font-weight: 700; color: #b3261e; }
+.premio.cercato { outline: 2px solid var(--verde); }
+.premio .ring-tasto { margin-top: .3rem; }
+.premio [data-premio-compra] { background: var(--verde); border-color: var(--verde); color: var(--su-tinta); font-weight: 700; }
 """
 
 STILE_PAGINA = ("html.ring-presa, html.ring-presa * { cursor: grab !important; } "
@@ -129,15 +163,39 @@ PREPARA = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
 (function () {
   "use strict";
   if (window.__ringEstensione) return;
+  var CONFIG = __CONFIG__;
   var memoria = Object.assign({}, window.__ringDati || {});
   memoria["mut-ring"] = "on";                    // chi clicca l'icona vuole la lotta accesa
+  // Schizzi e arti staccati partono spenti: si accendono dalla tendina.
+  if (!Object.prototype.hasOwnProperty.call(memoria, "mut-ring-cruento")) memoria["mut-ring-cruento"] = "off";
+  function ricorda(k, v) {
+    memoria[k] = String(v);
+    try { var o = {}; o[k] = String(v); chrome.storage.local.set(o); } catch (e) { /* resta in memoria */ }
+  }
   window.__ringDeposito = {
     getItem: function (k) { return Object.prototype.hasOwnProperty.call(memoria, k) ? memoria[k] : null; },
     setItem: function (k, v) {
-      memoria[k] = String(v);
-      if (k === "mut-ring") return;              // acceso/spento vale solo per questa pagina
-      try { var o = {}; o[k] = String(v); chrome.storage.local.set(o); } catch (e) { /* resta in memoria */ }
+      if (k === "mut-ring") { memoria[k] = String(v); return; }   // acceso/spento vale solo per questa pagina
+      ricorda(k, v);
     },
+  };
+
+  // PREMIUM. Tre gruppi di funzioni sono a pagamento; lo stato sta nella
+  // memoria dell'estensione. Il ring chiede qui se un gruppo è libero e, se
+  // non lo è, fa aprire il riquadro in cima alla tendina.
+  var premiumAttivo = memoria["pb-premium"] === "on", inAscolto = [];
+  function impostaPremium(valore) {
+    premiumAttivo = !!valore;
+    ricorda("pb-premium", premiumAttivo ? "on" : "off");
+    for (var i = 0; i < inAscolto.length; i++) { try { inAscolto[i](); } catch (e) { /* un ascoltatore rotto non ferma gli altri */ } }
+    aggiornaRiquadro(false);
+  }
+  // `premium_attivo: false` in premium.json: niente di chiuso, tutto gratis.
+  if (CONFIG.premium) window.__ringPremium = {
+    bloccate: { guerrieri: true, armi: true, meteo: true },
+    attivo: function () { return premiumAttivo; },
+    chiedi: function () { aggiornaRiquadro(true); },
+    ascolta: function (fn) { inAscolto.push(fn); },
   };
   var ospite = document.createElement("div");
   ospite.id = "page-brawl";
@@ -157,8 +215,45 @@ PREPARA = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
   }
   document.documentElement.appendChild(ospite);
   window.__ringRadice = radice;
+
+  // Il riquadro Premium: cosa sblocca, il tasto per comprarlo e, nella sola
+  // variante di prova, un interruttore per vedere il gioco aperto e chiuso.
+  function aggiornaRiquadro(cercato) {
+    var q = function (sel) { return radice.querySelector(sel); };
+    var riquadro = q("[data-premio]");
+    if (!riquadro) return;
+    q("[data-premio-avviso]").hidden = premiumAttivo || !cercato;
+    q("[data-premio-attivo]").hidden = !premiumAttivo;
+    q("[data-premio-cosa]").hidden = premiumAttivo;
+    var compra = q("[data-premio-compra]");
+    compra.hidden = premiumAttivo;
+    compra.disabled = !CONFIG.urlAcquisto;
+    compra.textContent = CONFIG.urlAcquisto ? "Sblocca Premium" : "Premium arriva presto";
+    var prova = q("[data-premio-prova]");
+    if (prova) prova.setAttribute("aria-pressed", premiumAttivo ? "true" : "false");
+    riquadro.classList.toggle("cercato", !!cercato && !premiumAttivo);
+    if (cercato && !premiumAttivo) {
+      var pannello = q("[data-pannello]"), apri = q("[data-opzioni]");
+      if (pannello && !pannello.classList.contains("aperto") && apri) apri.click();
+      if (pannello) pannello.scrollTop = 0;
+    }
+  }
+  (function () {
+    var compra = radice.querySelector("[data-premio-compra]"), prova = radice.querySelector("[data-premio-prova]");
+    if (compra) compra.addEventListener("click", function () { if (CONFIG.urlAcquisto) window.open(CONFIG.urlAcquisto, "_blank", "noopener"); });
+    if (prova) prova.addEventListener("click", function () { impostaPremium(!premiumAttivo); });
+    aggiornaRiquadro(false);
+  })();
+
+  // La lingua: quella del browser, se è una delle cinque; altrimenti inglese.
+  // Il dizionario è lo stesso del sito (`lingue.js`), applicato solo qui dentro.
+  try {
+    var lingua = (memoria["pb-lingua"] || (chrome.i18n && chrome.i18n.getUILanguage()) || navigator.language || "en").slice(0, 2).toLowerCase();
+    if (window.__lingue) window.__lingue.copri(radice, window.__lingue.codici.indexOf(lingua) >= 0 ? lingua : "en");
+  } catch (e) { /* resta in italiano */ }
   window.__ringEstensione = {
     ospite: ospite,
+    premium: impostaPremium,
     // Un altro clic sull'icona: spegne e nasconde tutto, o riaccende.
     alterna: function () {
       var tasto = radice.querySelector("[data-gioca]"), acceso = tasto.getAttribute("aria-pressed") === "true";
@@ -207,39 +302,104 @@ def icona(lato: int) -> bytes:
     return uscita.getvalue()
 
 
-def file_attesi() -> dict:
-    html = '<canvas class="tela" data-ring aria-hidden="true"></canvas>\n<div class="ancora">\n  ' + tendina() + "\n</div>" + BARRETTA
+RIQUADRO_PREMIO = """
+    <section class="premio" data-premio>
+      <p class="premio-avviso" data-premio-avviso hidden>Questa funzione fa parte di Premium.</p>
+      <p data-premio-attivo hidden>Premium attivo.</p>
+      <p data-premio-cosa>Premium sblocca i super guerrieri con le mosse speciali, le armi e le bombe, il meteo e la gravità.</p>
+      <button type="button" class="ring-tasto ring-largo" data-premio-compra>Sblocca Premium</button>__PROVA__
+    </section>"""
+TASTO_PROVA = """
+      <button type="button" class="ring-tasto ring-largo" data-premio-prova aria-pressed="false">Premium di prova (solo in questa versione)</button>"""
+
+
+def premium() -> dict:
+    """Le due scelte di `premium.json`.
+
+    `premium_attivo`: se falso non c'è niente di chiuso (utile per uscire con
+    tutto gratis finché non si vende). `url_acquisto`: dove si compra; finché è
+    vuoto il tasto resta «Premium arriva presto».
+    """
+    percorso = QUI / "premium.json"
+    dati = json.loads(percorso.read_text(encoding="utf-8")) if percorso.exists() else {}
+    url = str(dati.get("url_acquisto") or "").strip()
+    if url and not url.startswith("https://"):
+        raise SystemExit("premium.json: url_acquisto deve cominciare con https://")
+    return {"premium": bool(dati.get("premium_attivo", True)), "urlAcquisto": url}
+
+
+def file_attesi(variante: str) -> dict:
+    opzioni = VARIANTI[variante]
+    pannello = tendina()
+    testa = '<div class="ring-pannello-testa">'
+    fine_testa = pannello.index("</div>", pannello.index(testa)) + len("</div>")
+    scelte = premium()
+    if scelte["premium"]:
+        riquadro = RIQUADRO_PREMIO.replace("__PROVA__", TASTO_PROVA if opzioni["premium_di_prova"] else "")
+        pannello = pannello[:fine_testa] + riquadro + pannello[fine_testa:]
+    html = '<canvas class="tela" data-ring aria-hidden="true"></canvas>\n<div class="ancora">\n  ' + pannello + "\n</div>" + BARRETTA
     if "style=" in html:
         raise SystemExit("la tendina ha stili in linea: una CSP severa li bloccherebbe")
+    config = dict(scelte, premiumDiProva=scelte["premium"] and opzioni["premium_di_prova"])
     prepara = (PREPARA
+               .replace("__CONFIG__", json.dumps(config, ensure_ascii=False))
                .replace("__STILE__", json.dumps(STILE_BASE + stile_tendina(), ensure_ascii=False))
                .replace("__HTML__", json.dumps(html, ensure_ascii=False)))
-    return {
+    attesi = {
         "manifest.json": json.dumps(MANIFEST, ensure_ascii=False, indent=2) + "\n",
         "sfondo.js": SFONDO.replace("__STILE_PAGINA__", json.dumps(STILE_PAGINA, ensure_ascii=False)),
         "prepara.js": prepara,
         "ring.js": (RADICE / "web/static/ring.js").read_text(encoding="utf-8"),
+        "lingue.js": (RADICE / "web/static/lingue.js").read_text(encoding="utf-8"),
     }
+    for lingua, (descrizione, titolo) in MESSAGGI.items():
+        if len(descrizione) > 132:
+            raise SystemExit(f"descrizione {lingua} troppo lunga per lo store: {len(descrizione)} caratteri")
+        messaggi = {"nome": {"message": NOME}, "descrizione": {"message": descrizione}, "titolo": {"message": titolo}}
+        attesi[f"_locales/{lingua}/messages.json"] = json.dumps(messaggi, ensure_ascii=False, indent=2) + "\n"
+    return attesi
 
 
 def main() -> int:
-    attesi = file_attesi()
-    if "--verifica" in sys.argv:
-        vecchi = [nome for nome, testo in attesi.items()
-                  if not (USCITA / nome).exists() or (USCITA / nome).read_text(encoding="utf-8") != testo]
+    verifica = "--verifica" in sys.argv
+    vecchi = []
+    for variante in VARIANTI:
+        uscita = QUI / variante
+        attesi = file_attesi(variante)
+        if verifica:
+            vecchi += [f"{variante}/{nome}" for nome, testo in attesi.items()
+                       if not (uscita / nome).exists() or (uscita / nome).read_text(encoding="utf-8") != testo]
+            continue
+        for nome, testo in attesi.items():
+            (uscita / nome).parent.mkdir(parents=True, exist_ok=True)
+            (uscita / nome).write_text(testo, encoding="utf-8")
+        (uscita / "icone").mkdir(parents=True, exist_ok=True)
+        for lato in (16, 48, 128):
+            percorso = uscita / "icone" / f"{lato}.png"
+            if not percorso.exists():
+                percorso.write_bytes(icona(lato))
+        print("scritto " + str(uscita))
+    if not verifica and premium()["premium"] and not premium()["urlAcquisto"]:
+        print("ATTENZIONE: Premium è chiuso ma manca l'indirizzo di acquisto: in store/ le funzioni Premium "
+              "non si possono sbloccare. Prima di pubblicare metti url_acquisto in premium.json, "
+              "oppure premium_attivo: false per uscire con tutto gratis.")
+    if "--zip" in sys.argv and not verifica:
+        import zipfile
+        (QUI / "zip").mkdir(exist_ok=True)
+        for variante in VARIANTI:
+            nome = QUI / "zip" / f"page-brawl-{VERSIONE}-{'prova' if variante == 'pacchetto' else 'store'}.zip"
+            with zipfile.ZipFile(nome, "w", zipfile.ZIP_DEFLATED) as z:
+                # I file stanno alla RADICE dello zip: lo vuole lo store, e così la
+                # cartella estratta si carica a mano senza scendere di un livello.
+                for f in sorted((QUI / variante).rglob("*")):
+                    if f.is_file():
+                        z.write(f, f.relative_to(QUI / variante).as_posix())
+            print("zip " + str(nome))
+    if verifica:
         if vecchi:
-            print("estensione/pacchetto è vecchio: " + ", ".join(vecchi) + " (rigenera con python3 estensione/costruisci.py)")
+            print("estensione vecchia: " + ", ".join(vecchi) + " (rigenera con python3 estensione/costruisci.py)")
             return 1
-        print("estensione/pacchetto è aggiornato")
-        return 0
-    (USCITA / "icone").mkdir(parents=True, exist_ok=True)
-    for nome, testo in attesi.items():
-        (USCITA / nome).write_text(testo, encoding="utf-8")
-    for lato in (16, 48, 128):
-        percorso = USCITA / "icone" / f"{lato}.png"
-        if not percorso.exists():
-            percorso.write_bytes(icona(lato))
-    print("scritto " + str(USCITA))
+        print("estensione aggiornata (pacchetto/ e store/)")
     return 0
 
 

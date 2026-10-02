@@ -7,3 +7,4 @@ __pycache__/
 *.tac.sqlite3*
 release.json
 .venv/
+estensione/zip/

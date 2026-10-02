@@ -29,7 +29,7 @@ function riquadro(l, t, r, b) {
   return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
 }
 
-function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false } = {}) {
+function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false, premio = null } = {}) {
   const richieste = [];
   const ascoltatori = {};
   const contesto2d = new Proxy({}, {
@@ -80,6 +80,7 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
     finestra.__ringDeposito = finestra.localStorage;
     finestra.localStorage = { getItem() { throw new Error("il ring dell'estensione non deve usare localStorage"); }, setItem() { throw new Error("no"); } };
   }
+  if (premio) finestra.__ringPremium = premio;
   const sandbox = {
     window: finestra, document: documento, Math, Date, Object, JSON, String, Number,
     getComputedStyle: () => ({ getPropertyValue: () => "" }),
@@ -1136,4 +1137,49 @@ test("nell'estensione: i pezzi stanno in una radice a parte, il pavimento è il 
               preventDefault() { this.bloccato = true; }, stopPropagation() {} };
   for (const fn of amb.ascoltatori.pointerdown || []) fn(e);
   assert.ok(!e.bloccato, "un clic sui tasti dell'estensione ha preso un lottatore");
+});
+
+test("Premium: senza sblocco armi, super guerrieri e meteo restano chiusi (e si chiede), il resto è libero", () => {
+  let attivo = false;
+  const chieste = [];
+  const premio = { bloccate: { guerrieri: true, armi: true, meteo: true }, attivo: () => attivo, chiedi: (g) => chieste.push(g) };
+  const amb = ambiente({ premio, memoria: { "mut-ring-anime": "on" } });
+  amb.avanza(30);
+  const c = amb.finestra.__ring.comandi;
+  assert.strictEqual(amb.stato().anime, false, "la modalità a pagamento salvata si riaccende da sola senza Premium");
+  assert.strictEqual(c.metti("spada"), false);
+  assert.strictEqual(c.anime(true), false);
+  assert.strictEqual(c.colpo("sfera"), false);
+  assert.strictEqual(c.colpo("esplodi-robot"), false);
+  assert.strictEqual(c.gravita("0.45"), false);
+  assert.strictEqual(c.imprevisto("uragano", true), false);
+  assert.deepStrictEqual(chieste, ["armi", "guerrieri", "guerrieri", "armi", "meteo", "meteo"]);
+  const s = amb.stato();
+  assert.ok(!s.telefoni.some((t) => t.tipo === "spada") && !s.anime && s.moltG === 1 && !s.uragano && !s.lottatori.some((f) => f.esploso));
+  // quello che è gratis funziona
+  c.metti("tablet"); c.barre(true); c.colpo("terremoto");
+  assert.ok(amb.stato().telefoni.some((t) => t.tipo === "tablet"));
+  assert.strictEqual(amb.stato().barreVita, true);
+  // e in tre minuti di lotta non compare da sola nessuna arma né esplosione da jetpack
+  amb.finestra.__ring.tempo(70);
+  amb.avanza(60 * 180, (st) => {
+    for (const t of st.telefoni) assert.ok(!["pistola", "spada", "bomba", "duo"].includes(t.tipo), "arma comparsa senza Premium: " + t.tipo);
+  });
+  dentro(amb);
+  // con Premium attivo si apre tutto
+  attivo = true;
+  assert.notStrictEqual(c.metti("spada"), false);
+  assert.notStrictEqual(c.anime(true), false);
+  assert.strictEqual(amb.stato().anime, true);
+  assert.notStrictEqual(c.gravita("0.45"), false);
+  assert.strictEqual(amb.stato().moltG, 0.45);
+});
+
+test("sul sito (senza Premium dichiarato) è tutto libero", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  const c = amb.finestra.__ring.comandi;
+  assert.notStrictEqual(c.metti("spada"), false);
+  assert.notStrictEqual(c.anime(true), false);
+  assert.ok(amb.stato().telefoni.some((t) => t.tipo === "spada"));
 });

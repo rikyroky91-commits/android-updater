@@ -1586,7 +1586,7 @@ html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-sel
    passare alla pagina). */
 .ring-pannello {
   position: absolute; right: 8px; bottom: calc(100% + 8px);
-  width: min(360px, calc(100vw - 16px)); max-height: min(70vh, 620px); overflow: auto;
+  width: min(360px, calc(100vw - 16px)); max-height: min(70vh, 620px); overflow: hidden auto;
   pointer-events: auto; z-index: 3;
   background: var(--carta, #fff); color: var(--ink, #141414);
   border: 1px solid var(--bordo, #d4d0c8); border-radius: 12px;
@@ -1605,8 +1605,8 @@ html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-sel
 .ring-gettoni { margin: 0 0 .45rem; display: flex; align-items: center; gap: .5rem; }
 .ring-riga { display: flex; gap: .45rem; margin-bottom: .45rem; flex-wrap: wrap; }
 .ring-griglia { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; margin-bottom: .45rem; }
-.ring-etichetta { display: flex; align-items: center; gap: .45rem; font-size: .88rem; }
-.ring-etichetta select { font: inherit; padding: .25rem .4rem; border-radius: 6px; border: 1px solid var(--bordo, #c9c5bd); background: var(--carta, #fff); color: inherit; }
+.ring-etichetta { display: flex; align-items: center; gap: .45rem; font-size: .88rem; min-width: 0; max-width: 100%; }
+.ring-etichetta select { min-width: 0; max-width: 100%; flex: 0 1 auto; font: inherit; padding: .25rem .4rem; border-radius: 6px; border: 1px solid var(--bordo, #c9c5bd); background: var(--carta, #fff); color: inherit; }
 .ring-tasto {
   font: inherit; font-size: .85rem; line-height: 1.2; text-align: left; cursor: pointer;
   padding: .45rem .55rem; border-radius: 8px; color: inherit;

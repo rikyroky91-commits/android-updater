@@ -43,6 +43,29 @@
   let deposito = null;
   try { deposito = window.__ringDeposito || window.localStorage; } catch (errore) { /* niente memoria */ }
 
+  // PREMIUM (02/10/2026). Sul sito è tutto libero. L'estensione può dichiarare
+  // in `window.__ringPremium` quali gruppi di funzioni sono a pagamento
+  // (`bloccate`: guerrieri, armi, meteo), se sono già sbloccate (`attivo()`) e
+  // cosa fare quando si tocca una funzione bloccata (`chiedi(gruppo)`).
+  const premio = window.__ringPremium || null;
+  const libero = (gruppo) => !premio || premio.attivo() || !premio.bloccate[gruppo];
+  function concesso(gruppo) {
+    if (libero(gruppo)) return true;
+    try { premio.chiedi(gruppo); } catch (errore) { /* resta bloccata */ }
+    return false;
+  }
+  const ARMI_PREMIO = { pistola: 1, spada: 1, bomba: 1, duo: 1 };
+  const MOSSE_PREMIO = { onda: 1, carica: 1, teletrasporto: 1, sfera: 1, disco: 1, lampo: 1, barriera: 1, autodistruzione: 1, telecinesi: 1 };
+  // A quale gruppo a pagamento appartiene un tasto della tendina (o nessuno).
+  function gruppoDi(tasto) {
+    const metti = tasto.getAttribute("data-metti"), colpo = tasto.getAttribute("data-colpo");
+    if (metti) return ARMI_PREMIO[metti] ? "armi" : null;
+    if (colpo) return MOSSE_PREMIO[colpo] ? "guerrieri" : colpo.indexOf("esplodi-") === 0 ? "armi" : null;
+    if (tasto.hasAttribute("data-anime")) return "guerrieri";
+    if (tasto.hasAttribute("data-imprevisto") || tasto.hasAttribute("data-gravita")) return "meteo";
+    return null;
+  }
+
   const tela = mio.querySelector("[data-ring]");
   const scorre = mio.querySelector("[data-scorre]");
   const orologio = mio.querySelector("[data-orologio]");
@@ -141,6 +164,7 @@
     barreVita = deposito.getItem("mut-ring-barre") === "on";
     anime = deposito.getItem("mut-ring-anime") === "on";
   } catch (errore) { /* restano spente */ }
+  if (!libero("guerrieri")) anime = false;
   // Schizzi e arti staccati: si possono spegnere dalla tendina.
   let cruento = true;
   try { cruento = deposito.getItem("mut-ring-cruento") !== "off"; } catch (errore) { /* resta acceso */ }
@@ -913,7 +937,7 @@
     // La mela, ogni tanto e solo passato il primo minuto, tira fuori dal
     // jetpack il suo pieghevole: se prende il robot, lo fa a pezzi.
     const turno = f.tipo === "mela" ? prossimoDuo : prossimaBombaRobot;
-    if (tempo >= turno && !f.tel && !f.arma && !(altro.jet > 0) && !altro.esploso &&
+    if (tempo >= turno && libero("armi") && !f.tel && !f.arma && !(altro.jet > 0) && !altro.esploso &&
         Math.abs(altro.cx - f.cx) < 480 * S && Math.random() < 0.35) {
       if (f.tipo === "mela") prossimoDuo = tempo + Math.round(caso(2400, 4200));
       else prossimaBombaRobot = tempo + Math.round(caso(2400, 4200));
@@ -1077,8 +1101,16 @@
     }
   }
 
+  // Le scritte disegnate seguono la lingua scelta, se il dizionario c'è (sul
+  // sito è `lingue.js`; nell'estensione lo stesso file, accanto a questo).
+  function dici(testo) {
+    try {
+      const l = window.__lingue;
+      return (l && l.lingua() !== "it" && l.traduci(testo, l.lingua())) || testo;
+    } catch (errore) { return testo; }
+  }
   function scrivi(testo, x, y, grande) {
-    scritte.push({ testo, x: Math.max(50, Math.min(W - 50, x)), y: Math.max(26, y), vita: grande ? 70 : 26, grande });
+    scritte.push({ testo: dici(testo), x: Math.max(50, Math.min(W - 50, x)), y: Math.max(26, y), vita: grande ? 70 : 26, grande });
   }
 
   const SUONI_TEL = ["DRIIN!", "CRACK!", "BIP!", "SPLASH!", "NOTIFICA!", "TRIIN!"];
@@ -2998,7 +3030,7 @@
       ctx.fillRect(ax, y, aw, h);
       ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.fillRect(ax, y, aw, h * 0.35);
       ctx.textAlign = sinistra ? "left" : "right";
-      const nome = f.tipo === "robot" ? "ROBOT" : "MELA";
+      const nome = f.tipo === "robot" ? "ROBOT" : dici("Mela").toUpperCase();
       ctx.fillStyle = "#141414"; ctx.strokeText(nome, sinistra ? x : x + w, y - 3 * S); ctx.fillText(nome, sinistra ? x : x + w, y - 3 * S);
       if (anime) {
         const yk = y + h + 4 * S, hk = 5 * S;
@@ -3020,7 +3052,7 @@
   // richiesta: toglievano pulizia al sito): si vedono da quello che succede.
 
   function avviaEvento() {
-    const quale = scegli([[3, "luna"], [3, "furia"], [3, "pioggia"], [2, "rallenta"], [2, "terremoto"], [3, "jet"], [uragano ? 0 : 1, "uragano"]]);
+    const quale = scegli([[3, "luna"], [3, "furia"], [3, "pioggia"], [2, "rallenta"], [2, "terremoto"], [3, "jet"], [uragano || !libero("meteo") ? 0 : 1, "uragano"]]);
     if (quale === "uragano") { uragano = { x: Math.random() < 0.5 ? 100 * S : W - 100 * S, vx: 1.1 * S, t: 0 }; evento = { nome: quale, durata: 600 }; return; }
     if (quale === "luna") { moltG = 0.45; evento = { nome: quale, durata: 620 };  }
     else if (quale === "pioggia") { daSpawnare = 7;  }
@@ -3048,7 +3080,7 @@
       prossimoTelefono = Math.round(calmo ? caso(600, 1200) : caso(380, 950));
     }
     // Dopo 70 secondi piovono anche le armi, una alla volta.
-    if (tempo >= ARMI && --prossimaArma <= 0) {
+    if (tempo >= ARMI && libero("armi") && --prossimaArma <= 0) {
       if (telefoni.filter((t) => eArma(t) || t.tipo === "bomba").length < 2) {
         nuovoTelefono(caso(80, W - 80), -16 * S, caso(-1, 1) * S, 0, scegli([[2, "pistola"], [2, "spada"], [1, "bomba"]]));
       }
@@ -4597,6 +4629,7 @@
   const MOSSE_TENDINA = { sfera: "sfera", disco: "disco", lampo: "lampo", barriera: "barriera", autodistruzione: "avvinghia", telecinesi: "telecinesi" };
   const comandi = {
     metti(forma) {
+      if (ARMI_PREMIO[forma] && !concesso("armi")) return false;
       assicuraAcceso();
       if (!lottatori.length) return;
       if (forma === "duo") {
@@ -4609,6 +4642,7 @@
       if (t.tipo === "bomba") t.miccia = 380;
     },
     gravita(v) {
+      if (String(v) !== "1" && !concesso("meteo")) return false;
       if (v === "su") {
         // Sottosopra: la gravità tira verso il tetto.
         assicuraAcceso();
@@ -4624,6 +4658,7 @@
       if (!evento || evento.nome !== "luna") moltG = v;
     },
     imprevisto(nome, acceso) {
+      if (acceso && !concesso("meteo")) return false;
       if (acceso) assicuraAcceso();
       if (nome === "acquazzone") acquazzone = !!acceso;
       else if (nome === "natale") natale = !!acceso;
@@ -4634,6 +4669,8 @@
       } else if (nome === "rallenta") { rallentaFisso = !!acceso; ritmo = acceso ? 0.45 : 1; }
     },
     colpo(nome) {
+      const gruppo = MOSSE_PREMIO[nome] ? "guerrieri" : nome.indexOf("esplodi-") === 0 ? "armi" : null;
+      if (gruppo && !concesso(gruppo)) return false;
       assicuraAcceso();
       if (nome === "terremoto") evento = { nome, durata: 230 };
       else if (nome === "jet") { for (const f of lottatori) if (!f.ko && !f.preso && !f.tenuto && !f.esploso) decolla(f, Math.random() < 0.4); }
@@ -4671,6 +4708,7 @@
       try { deposito.setItem("mut-ring-barre", barreVita ? "on" : "off"); } catch (errore) { /* pazienza */ }
     },
     anime(acceso) {
+      if (acceso && !concesso("guerrieri")) return false;
       if (acceso) assicuraAcceso();
       anime = !!acceso;
       try { deposito.setItem("mut-ring-anime", anime ? "on" : "off"); } catch (errore) { /* pazienza */ }
@@ -4734,11 +4772,11 @@
       b.addEventListener("click", () => {
         const acceso = b.getAttribute("aria-pressed") !== "true";
         b.setAttribute("aria-pressed", acceso ? "true" : "false");
-        comandi.imprevisto(b.getAttribute("data-imprevisto"), acceso);
+        if (comandi.imprevisto(b.getAttribute("data-imprevisto"), acceso) === false) b.setAttribute("aria-pressed", "false");
       });
     }
     const gravita = pannello.querySelector("[data-gravita]");
-    if (gravita) gravita.addEventListener("change", () => comandi.gravita(gravita.value));
+    if (gravita) gravita.addEventListener("change", () => { if (comandi.gravita(gravita.value) === false) gravita.value = "1"; });
     const sorp = pannello.querySelector("[data-sorprese]");
     if (sorp) sorp.addEventListener("click", () => { const a = sorp.getAttribute("aria-pressed") !== "true"; sorp.setAttribute("aria-pressed", String(a)); comandi.sorprese(a); });
     const crue = pannello.querySelector("[data-cruento]");
@@ -4764,6 +4802,26 @@
     const ricarica = pannello.querySelector("[data-ricarica]");
     if (ricarica) ricarica.addEventListener("click", () => comandi.ricarica());
     aggiornaPannello();
+    segnaBloccati();
+    if (premio && premio.ascolta) premio.ascolta(segnaBloccati);
+  }
+  // I tasti delle funzioni a pagamento portano il lucchetto finché Premium non
+  // è attivo; se Premium viene tolto, quello che era acceso si spegne.
+  function segnaBloccati() {
+    if (!premio || !pannello) return;
+    for (const b of dentroPannello("[data-metti], [data-colpo], [data-anime], [data-imprevisto]")) {
+      const g = gruppoDi(b);
+      b.classList.toggle("bloccato", !!g && !libero(g));
+    }
+    if (!libero("guerrieri") && anime) { comandi.anime(false); aggiornaInterruttori(); }
+    if (!libero("meteo")) {
+      for (const b of dentroPannello("[data-imprevisto]")) {
+        if (b.getAttribute("aria-pressed") === "true") { b.setAttribute("aria-pressed", "false"); comandi.imprevisto(b.getAttribute("data-imprevisto"), false); }
+      }
+      const gravita = pannello.querySelector("[data-gravita]");
+      if (gravita && gravita.value !== "1") { gravita.value = "1"; comandi.gravita("1"); }
+      else if (verso < 0 || gravitaScelta !== 1) comandi.gravita("1");
+    }
   }
 
   // Per i test nel browser: lo stato del ring, in sola lettura.

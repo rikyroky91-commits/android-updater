@@ -1,0 +1,11 @@
+{
+  "nome": {
+    "message": "Page Brawl"
+  },
+  "descrizione": {
+    "message": "Un robot e una mela si picchiano sulla pagina che stai guardando. Prendili, lanciali, scommetti su chi vince."
+  },
+  "titolo": {
+    "message": "Accendi o spegni la lotta su questa pagina"
+  }
+}

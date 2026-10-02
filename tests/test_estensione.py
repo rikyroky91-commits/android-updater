@@ -14,43 +14,102 @@ import unittest
 from pathlib import Path
 
 RADICE = Path(__file__).resolve().parent.parent
-PACCHETTO = RADICE / "estensione" / "pacchetto"
+ESTENSIONE = RADICE / "estensione"
+# Due varianti: `pacchetto` si carica a mano e ha l'interruttore «Premium di
+# prova»; `store` è quella da pubblicare e non ce l'ha.
+VARIANTI = {nome: ESTENSIONE / nome for nome in ("pacchetto", "store")}
+LINGUE = ("en", "it", "es", "fr", "de")
 
 
 class TestEstensione(unittest.TestCase):
 
-    def test_il_pacchetto_e_aggiornato_con_i_file_del_sito(self):
-        esito = subprocess.run([sys.executable, str(RADICE / "estensione" / "costruisci.py"), "--verifica"],
+    def test_le_due_varianti_sono_aggiornate_con_i_file_del_sito(self):
+        esito = subprocess.run([sys.executable, str(ESTENSIONE / "costruisci.py"), "--verifica"],
                                capture_output=True, text=True)
         self.assertEqual(esito.returncode, 0, esito.stdout + esito.stderr)
 
     def test_manifest_v3_col_permesso_minimo(self):
-        m = json.loads((PACCHETTO / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(m["manifest_version"], 3)
-        self.assertEqual(sorted(m["permissions"]), ["activeTab", "scripting", "storage"])
-        self.assertNotIn("host_permissions", m)
-        self.assertNotIn("content_scripts", m)       # parte solo al clic sull'icona
-        for lato in ("16", "48", "128"):
-            self.assertTrue((PACCHETTO / m["icons"][lato]).exists())
-        self.assertTrue((PACCHETTO / m["background"]["service_worker"]).exists())
+        for nome, cartella in VARIANTI.items():
+            with self.subTest(variante=nome):
+                m = json.loads((cartella / "manifest.json").read_text(encoding="utf-8"))
+                self.assertEqual(m["manifest_version"], 3)
+                self.assertEqual(sorted(m["permissions"]), ["activeTab", "scripting", "storage"])
+                self.assertNotIn("host_permissions", m)
+                self.assertNotIn("content_scripts", m)       # parte solo al clic sull'icona
+                for lato in ("16", "48", "128"):
+                    self.assertTrue((cartella / m["icons"][lato]).exists())
+                self.assertTrue((cartella / m["background"]["service_worker"]).exists())
 
-    def test_il_ring_e_lo_stesso_file_del_sito(self):
-        self.assertEqual((PACCHETTO / "ring.js").read_text(encoding="utf-8"),
-                         (RADICE / "web" / "static" / "ring.js").read_text(encoding="utf-8"))
+    def test_nome_e_descrizione_in_cinque_lingue_dentro_i_limiti_dello_store(self):
+        for nome, cartella in VARIANTI.items():
+            with self.subTest(variante=nome):
+                m = json.loads((cartella / "manifest.json").read_text(encoding="utf-8"))
+                self.assertEqual(m["default_locale"], "en")
+                self.assertEqual(m["name"], "__MSG_nome__")
+                for lingua in LINGUE:
+                    messaggi = json.loads((cartella / "_locales" / lingua / "messages.json").read_text(encoding="utf-8"))
+                    self.assertEqual(set(messaggi), {"nome", "descrizione", "titolo"})
+                    self.assertLessEqual(len(messaggi["nome"]["message"]), 45)          # limite del Chrome Web Store
+                    self.assertLessEqual(len(messaggi["descrizione"]["message"]), 132)  # idem
+
+    def test_ring_e_dizionario_sono_gli_stessi_file_del_sito(self):
+        for nome, cartella in VARIANTI.items():
+            for file in ("ring.js", "lingue.js"):
+                with self.subTest(variante=nome, file=file):
+                    self.assertEqual((cartella / file).read_text(encoding="utf-8"),
+                                     (RADICE / "web" / "static" / file).read_text(encoding="utf-8"))
 
     def test_niente_codice_da_fuori_e_niente_rete(self):
-        for nome in ("prepara.js", "sfondo.js", "ring.js"):
-            testo = (PACCHETTO / nome).read_text(encoding="utf-8")
-            for vietato in ("fetch(", "XMLHttpRequest", "eval(", "new Function", "importScripts(", "<script"):
-                self.assertNotIn(vietato, testo, f"{nome}: {vietato}")
+        for nome, cartella in VARIANTI.items():
+            for file in ("prepara.js", "sfondo.js", "ring.js", "lingue.js"):
+                testo = (cartella / file).read_text(encoding="utf-8")
+                for vietato in ("fetch(", "XMLHttpRequest", "eval(", "new Function", "importScripts(", "<script"):
+                    self.assertNotIn(vietato, testo, f"{nome}/{file}: {vietato}")
 
     def test_la_tendina_sta_in_uno_shadow_dom_con_lo_stile_costruito(self):
-        testo = (PACCHETTO / "prepara.js").read_text(encoding="utf-8")
-        self.assertIn("attachShadow", testo)
-        self.assertIn("adoptedStyleSheets", testo)
-        self.assertIn("data-pannello", testo)
-        self.assertIn("__ringDeposito", testo)
-        self.assertIn("chrome.storage.local", testo)
+        for nome, cartella in VARIANTI.items():
+            with self.subTest(variante=nome):
+                testo = (cartella / "prepara.js").read_text(encoding="utf-8")
+                self.assertIn("attachShadow", testo)
+                self.assertIn("adoptedStyleSheets", testo)
+                self.assertIn("data-pannello", testo)
+                self.assertIn("__ringDeposito", testo)
+                self.assertIn("chrome.storage.local", testo)
+
+    def test_la_lingua_e_quella_del_browser_e_la_pagina_non_viene_tradotta(self):
+        for nome, cartella in VARIANTI.items():
+            with self.subTest(variante=nome):
+                prepara = (cartella / "prepara.js").read_text(encoding="utf-8")
+                sfondo = (cartella / "sfondo.js").read_text(encoding="utf-8")
+                self.assertIn("chrome.i18n.getUILanguage()", prepara)
+                self.assertIn("__lingue.copri(radice", prepara)
+                self.assertIn("__lingueSoloDizionario = true", sfondo)      # il dizionario non tocca la pagina
+                self.assertLess(sfondo.index('"lingue.js"'), sfondo.index('"prepara.js"'))
+                self.assertLess(sfondo.index('"prepara.js"'), sfondo.index('"ring.js"'))
+
+    def test_gli_effetti_cruenti_partono_spenti(self):
+        # Lo store non ammette violenza gratuita: schizzi e arti staccati li accende chi li vuole.
+        for nome, cartella in VARIANTI.items():
+            with self.subTest(variante=nome):
+                testo = (cartella / "prepara.js").read_text(encoding="utf-8")
+                self.assertIn('memoria["mut-ring-cruento"] = "off"', testo)
+
+    def test_premium_e_predisposto_e_la_prova_gratis_non_arriva_nello_store(self):
+        for nome, cartella in VARIANTI.items():
+            with self.subTest(variante=nome):
+                testo = (cartella / "prepara.js").read_text(encoding="utf-8")
+                self.assertIn("window.__ringPremium", testo)
+                self.assertIn("bloccate: { guerrieri: true, armi: true, meteo: true }", testo)
+                self.assertIn("data-premio-compra", testo)
+        # L'interruttore di prova sblocca tutto gratis: nella variante da pubblicare non c'è il tasto.
+        self.assertIn("data-premio-prova aria-pressed", (VARIANTI["pacchetto"] / "prepara.js").read_text(encoding="utf-8"))
+        self.assertNotIn("data-premio-prova aria-pressed", (VARIANTI["store"] / "prepara.js").read_text(encoding="utf-8"))
+        self.assertIn('"premiumDiProva": false', (VARIANTI["store"] / "prepara.js").read_text(encoding="utf-8"))
+
+    def test_l_indirizzo_di_acquisto_e_vuoto_o_https(self):
+        dati = json.loads((ESTENSIONE / "premium.json").read_text(encoding="utf-8"))
+        url = dati.get("url_acquisto", "")
+        self.assertTrue(url == "" or url.startswith("https://"), url)
 
 
 if __name__ == "__main__":

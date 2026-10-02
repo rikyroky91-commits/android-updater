@@ -1,0 +1,11 @@
+{
+  "nome": {
+    "message": "Page Brawl"
+  },
+  "descrizione": {
+    "message": "Un robot y una manzana se pelean en la página que estás viendo. Agárralos, lánzalos y apuesta por el ganador."
+  },
+  "titolo": {
+    "message": "Enciende o apaga la pelea en esta página"
+  }
+}

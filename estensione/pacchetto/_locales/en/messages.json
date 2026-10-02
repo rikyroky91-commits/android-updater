@@ -1,0 +1,11 @@
+{
+  "nome": {
+    "message": "Page Brawl"
+  },
+  "descrizione": {
+    "message": "A robot and an apple brawl on the page you are viewing. Grab them, throw them, bet on the winner."
+  },
+  "titolo": {
+    "message": "Start or stop the brawl on this page"
+  }
+}
