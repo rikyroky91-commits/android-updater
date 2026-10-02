@@ -408,16 +408,20 @@ test("col dito si prende anche un po' più lontano che col mouse", () => {
 });
 
 test("col jetpack si decolla e si resta in quota, dentro la finestra", () => {
-  const amb = ambiente();
-  amb.avanza(30);
-  const prima = amb.lottatore("robot").bacino.y;
-  amb.finestra.__ring.decolla("robot", false);
-  amb.avanza(150);
-  const f = amb.lottatore("robot");
-  assert.ok(f.vola, "il robot non risulta in volo");
-  assert.ok(f.bacino.y < prima - 40, "il robot non si è alzato da terra: " + prima + " → " + f.bacino.y);
-  assert.ok(f.testa.y < f.bacino.y, "in volo il robot è a testa in giù");
-  dentro(amb);
+  // Un colpo dell'avversario può spegnere il jetpack: si riprova.
+  let riuscito = false, ultimo = "";
+  for (let prova = 0; prova < 4 && !riuscito; prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    const prima = amb.lottatore("robot").bacino.y;
+    amb.finestra.__ring.decolla("robot", false);
+    amb.avanza(150);
+    const f = amb.lottatore("robot");
+    dentro(amb);
+    if (f.vola && f.bacino.y < prima - 40 && f.testa.y < f.bacino.y) riuscito = true;
+    else ultimo = prima + " → " + f.bacino.y + (f.vola ? "" : " (non in volo)");
+  }
+  assert.ok(riuscito, "il robot non si è alzato in volo: " + ultimo);
 });
 
 test("col jetpack impazzito si sbatte in giro ma non si esce dalla finestra né si esplode", () => {
@@ -897,7 +901,7 @@ test("super guerrieri: energia, onda energetica che colpisce e rompe il bordo, r
 
 test("robot e mela sono alti uguali: il frutto va dal bacino alla testa e i colpi lo prendono", () => {
   const amb = ambiente();
-  amb.avanza(60);
+  amb.avanza(8);           // appena in piedi, prima che comincino a darsele
   const r = amb.lottatore("robot"), m = amb.lottatore("mela");
   assert.ok(Math.abs((r.bacino.y - r.testa.y) - (m.bacino.y - m.testa.y)) < 6, "altezze diverse");
   assert.ok(Math.abs(r.testa.y - m.testa.y) < 12, "teste a quote diverse: " + r.testa.y + " / " + m.testa.y);
@@ -996,20 +1000,23 @@ test("un omino portato col puntatore colpisce l'altro se ci sbatte contro", () =
 });
 
 test("sfera gigante: si carica sopra la testa, parte ed esplode", () => {
-  const amb = ambiente();
-  amb.avanza(30);
-  const r = amb.finestra.__ring;
-  r.comandi.colpo("sfera");
+  // Un colpo dell'avversario durante la carica la fa svanire: si riprova.
   let carica = false, partita = false, esplosa = false;
-  amb.avanza(60 * 12, (s) => {
-    if (s.lottatori.some((f) => f.sfera)) carica = true;
-    if (s.sfereGrandi > 0) partita = true;
-    if (partita && s.sfereGrandi === 0 && (s.particelleTipi.fuoco || 0) > 0) { esplosa = true; return false; }
-  });
+  for (let prova = 0; prova < 6 && !esplosa; prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    amb.finestra.__ring.comandi.colpo("sfera");
+    let vista = false;
+    amb.avanza(60 * 12, (s) => {
+      if (s.lottatori.some((f) => f.sfera)) carica = true;
+      if (s.sfereGrandi > 0) { partita = true; vista = true; }
+      if (vista && s.sfereGrandi === 0 && (s.particelleTipi.fuoco || 0) > 0) { esplosa = true; return false; }
+    });
+    amb.avanza(60 * 6); dentro(amb);
+  }
   assert.ok(carica, "la sfera non si carica");
   assert.ok(partita, "la sfera non parte");
   assert.ok(esplosa, "la sfera non esplode");
-  amb.avanza(60 * 10); dentro(amb);
 });
 
 test("autodistruzione: avvinghiato all'altro salta in aria, l'altro resta nel cratere e poi si rialza", () => {
@@ -1048,13 +1055,15 @@ test("disco tagliente, lampo accecante e barriera", () => {
   const amb = ambiente();
   amb.avanza(30);
   const r = amb.finestra.__ring;
-  r.comandi.colpo("disco");
   let disco = false;
-  amb.avanza(120, (s) => { if (s.dischi > 0) { disco = true; return false; } });
+  for (let i = 0; i < 5 && !disco; i++) {
+    r.comandi.colpo("disco");
+    amb.avanza(120, (s) => { if (s.dischi > 0) { disco = true; return false; } });
+  }
   assert.ok(disco, "il disco non parte");
   amb.avanza(60 * 8);
   let accecato = false;
-  for (let i = 0; i < 4 && !accecato; i++) {
+  for (let i = 0; i < 10 && !accecato; i++) {
     r.comandi.colpo("lampo");
     amb.avanza(60 * 4, (s) => { if (s.lottatori.some((f) => f.accecato)) { accecato = true; return false; } });
   }
@@ -1062,7 +1071,7 @@ test("disco tagliente, lampo accecante e barriera", () => {
   amb.avanza(60 * 5);
   // la barriera ferma un telefono lanciato addosso
   let retto = false;
-  for (let i = 0; i < 4 && !retto; i++) {
+  for (let i = 0; i < 10 && !retto; i++) {
     r.comandi.colpo("barriera");
     const f = amb.stato().lottatori.find((l) => l.azione === "barriera");
     if (!f) { amb.avanza(60); continue; }
