@@ -1250,7 +1250,9 @@ test("maghi: lo stile si sceglie e si ricorda; il gelo blocca e poi si scioglie,
   assert.strictEqual(amb.memoria["mut-ring-anime"], "off");
   r.incanta("mela", "gelo");
   assert.strictEqual(amb.lottatore("mela").gelato, true);
+  // (Si aspetta finché si scioglie: l'altro mago può congelarla di nuovo.)
   amb.avanza(60 * 5);
+  amb.avanza(60 * 30, (st) => (st.lottatori.find((l) => l.tipo === "mela").gelato ? undefined : false));
   assert.strictEqual(amb.lottatore("mela").gelato, false, "il ghiaccio non si scioglie");
   dentro(amb);
   r.incanta("robot", "piccolo");
@@ -1612,4 +1614,39 @@ test("nessuno resta a terra per sempre: il conto del K.O. riparte anche per chi 
     dentro(amb);
   }
   assert.ok(crateri >= 3, "il cratere non si forma quasi mai: " + crateri);
+});
+
+test("gli oggetti entrano anche dai lati, e quelli rimasti dove nessuno arriva scivolano giù", () => {
+  // Una pagina con la testata e un titolo larghi quanto la finestra: tutto quello che cade
+  // dall'alto ci si ferma sopra. Prima restava lì, e in campo non arrivava più niente.
+  for (const estensione of [false, true]) {
+    const amb = ambiente({ estensione, solidi: [[0, 60, 1200, 100], [0, 170, 1200, 210]], memoria: { "mut-ring": "on" } });
+    amb.avanza(30);
+    const r = amb.finestra.__ring;
+    r.tempo(75);
+    let dalLato = 0, dallAlto = 0, inCampo = 0;
+    const fermi = new Map();
+    amb.avanza(60 * 150, (s) => {
+      const aTerra = s.lottatori.every((f) => f.esploso || f.base >= s.pavimento - 1);
+      const visti = new Set();
+      for (const t of s.telefoni) {
+        assert.ok(Number.isFinite(t.x) && Number.isFinite(t.y) && t.x >= 0 && t.x <= s.larghezza && t.y <= s.pavimento + 0.5, "oggetto fuori dalla finestra");
+        if ((t.x <= 1 || t.x >= s.larghezza - 1) && t.y > 20) dalLato++;
+        if (t.y < 0) dallAlto++;
+        if (t.stato === "libero" && t.y > s.pavimento - 40) inCampo++;
+        if (aTerra && t.stato === "libero" && t.y < 215) {
+          const k = Math.round(t.x) + ":" + Math.round(t.y);
+          visti.add(k);
+          const n = (fermi.get(k) || 0) + 1;
+          fermi.set(k, n);
+          assert.ok(n < 60 * 9, "un oggetto resta fermo in alto, dove nessuno arriva");
+        }
+      }
+      for (const k of fermi.keys()) if (!visti.has(k)) fermi.delete(k);
+    });
+    assert.ok(dalLato > 0, "nessun oggetto è entrato da un lato");
+    assert.ok(dallAlto > 0, "nessun oggetto è caduto dall'alto");
+    assert.ok(inCampo > 60, "in campo, all'altezza dei lottatori, non arriva quasi niente");
+    dentro(amb);
+  }
 });

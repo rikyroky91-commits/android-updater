@@ -1737,7 +1737,7 @@
     telefoni.push({ x, y, ox: x - vx, oy: y - vy, a: caso(0, 6.28), va: caso(-0.15, 0.15), tipo,
                     w, h, r: Math.max(5, Math.min(11, Math.max(F.w, F.h) * 0.42)) * S, sch, peso: F.peso,
                     stato: "libero", da: null, protetto: 0, cool: 0, apre: 1, fine: 0, morto: false, miccia: 0,
-                    ultimo: null, crepe: 0, rotture: [],
+                    ultimo: null, crepe: 0, rotture: [], entra: 0, isolato: 0, scende: 0,
                     colore: tipo === "duo" ? "#d9d4cc" : colori[Math.floor(Math.random() * colori.length)] });
     if (tipo === "barattolo") telefoni[telefoni.length - 1].el = ELEMENTI[el] ? el : scegli([[1, "fuoco"], [1, "scossa"], [1, "acqua"]]);
     if (telefoni.length > 7) {
@@ -1745,6 +1745,26 @@
       if (vecchio >= 0) telefoni.splice(vecchio, 1);
     }
     return telefoni[telefoni.length - 1];
+  }
+
+  // GLI OGGETTI ENTRANO ANCHE DAI LATI (02/10/2026, su richiesta). Su certe
+  // pagine quelli caduti dall'alto si fermavano tutti sulla testata o sul
+  // primo titolo, dove nessuno arriva. Circa una volta su due arrivano da un
+  // bordo, con un lancio morbido che li posa all'altezza dei lottatori; mentre
+  // entrano non fanno male a nessuno.
+  function faEntrare(forma, xAlto, vxAlto) {
+    const vivi = lottatori.filter((f) => f.p && !f.esploso);
+    if (!vivi.length || verso < 0 || Math.random() < 0.45) return nuovoTelefono(xAlto, -16 * S, vxAlto, 0, forma);
+    const da = Math.random() < 0.5 ? -1 : 1;                           // −1: dal bordo sinistro
+    const base = Math.max.apply(null, vivi.map((f) => f.base)), centro = vivi.reduce((t, f) => t + f.p.bacino.x, 0) / vivi.length;
+    const x0 = da < 0 ? 0 : W, y0 = Math.max(30 * S, base - caso(70, 170) * S);
+    const tx = Math.max(40 * S, Math.min(W - 40 * S, centro + caso(-170, 170) * S)), ty = base - 10 * S, T = caso(38, 58);
+    const lim = VELOCITA_MAX * S * 0.9;
+    const vx = Math.max(-lim, Math.min(lim, (tx - x0) / T));
+    const vy = Math.max(-lim * 0.6, (ty - y0) / T - 0.5 * GRAVITA * S * moltG * T);
+    const t = nuovoTelefono(x0, y0, vx, vy, forma);
+    t.entra = 24; t.cool = Math.round(T) + 12;
+    return t;
   }
 
   function velocitaTel(t) { return Math.hypot(t.x - t.ox, t.y - t.oy); }
@@ -1799,14 +1819,16 @@
       rim(vx * 0.86, vy > 1.1 * S ? -vy * 0.45 : 0, Math.abs(vy));
     }
     for (const o of ostacoli) {
+      if (t.scende > 0) break;                     // sta scivolando giù dall'elemento su cui era rimasto
       if (t.x < o.l - r || t.x > o.r + r || t.y < o.t - r || t.y > o.b + r) continue;
       if (t.oy <= o.t - r + 1) { t.y = o.t - r; rim(vx * 0.86, vy > 1.1 * S ? -vy * 0.45 : 0, Math.abs(vy)); }
       else if (t.oy >= o.b + r - 1) { t.y = o.b + r; rim(vx, Math.abs(vy) * 0.3, Math.abs(vy)); }
       else if (t.ox <= o.l - r + 1) { t.x = o.l - r; rim(-Math.abs(vx) * 0.5, vy, Math.abs(vx)); }
       else if (t.ox >= o.r + r - 1) { t.x = o.r + r; rim(Math.abs(vx) * 0.5, vy, Math.abs(vx)); }
     }
-    if (t.x < r) { if (-vx > 12.5 * S) danneggiaBordo("sinistra", t.y, 0.8); t.x = r; rim(Math.abs(vx) * 0.5, vy, Math.abs(vx)); }
-    if (t.x > W - r) { if (vx > 12.5 * S) danneggiaBordo("destra", t.y, 0.8); t.x = W - r; rim(-Math.abs(vx) * 0.5, vy, Math.abs(vx)); }
+    if (t.entra > 0) { /* sta entrando da un bordo: il bordo non lo ferma */ }
+    else if (t.x < r) { if (-vx > 12.5 * S) danneggiaBordo("sinistra", t.y, 0.8); t.x = r; rim(Math.abs(vx) * 0.5, vy, Math.abs(vx)); }
+    else if (t.x > W - r) { if (vx > 12.5 * S) danneggiaBordo("destra", t.y, 0.8); t.x = W - r; rim(-Math.abs(vx) * 0.5, vy, Math.abs(vx)); }
     if (t.y < r) {
       if (-vy > 12.5 * S) danneggiaBordo("tetto", t.x, 0.8);
       t.y = r;
@@ -1820,6 +1842,8 @@
     for (const t of telefoni) {
       if (t.protetto > 0) t.protetto--;
       if (t.cool > 0) t.cool--;
+      if (t.entra > 0) t.entra--;
+      if (t.scende > 0) t.scende--;
       if (t.tipo === "bomba") {
         if (!t.miccia && (t.stato === "portato" || t.stato === "preso")) t.miccia = t.stato === "preso" ? 300 : 150;
         if (t.miccia > 0) {
@@ -1870,7 +1894,23 @@
           scrivi(eArma(t) ? "CLANG!" : Math.random() < 0.5 ? "CRACK!" : "CLONK!", t.x, t.y - 14 * S, false);
         }
       }
-      if (t.stato === "volo" && velocitaTel(t) < 1.2 * S && t.y > pavimento - t.r - 2) { t.stato = "libero"; t.da = null; }
+      // Un lancio finisce quando l'oggetto si ferma: sul pavimento subito, altrove
+      // (sopra un elemento della pagina) dopo qualche fotogramma da fermo. Prima,
+      // fermo su un elemento, restava «in volo» per sempre e nessuno lo raccoglieva.
+      if (t.stato === "volo") {
+        t.lento = velocitaTel(t) < 1.2 * S ? (t.lento || 0) + 1 : 0;
+        if ((t.lento > 0 && t.y > pavimento - t.r - 2) || t.lento > 8) {
+          // Un fumogeno o un barattolo lanciato che si è posato piano si apre lo stesso.
+          if (t.armato && apri(t)) continue;
+          t.stato = "libero"; t.da = null; t.lento = 0;
+        }
+      }
+      // Fermo su un elemento dove nessun lottatore arriva (la testata, un titolo
+      // in alto): dopo cinque secondi scivola giù fino al primo appoggio sotto.
+      if (t.stato === "libero" && verso > 0 && t.tipo !== "duo" && t.y < pavimento - t.r - 3 * S && velocitaTel(t) < 0.8 * S &&
+          !lottatori.some((f) => !f.esploso && Math.abs(t.y - (f.base - 6 * S)) <= 22 * S)) {
+        if (++t.isolato > 300) { t.isolato = 0; t.scende = 8; }
+      } else t.isolato = 0;
       // Il pieghevole della mela che non ha preso nessuno si spegne in uno sbuffo.
       if (t.tipo === "duo" && t.stato === "libero" && ++t.fine > 90) { t.morto = true; polvere(t.x, t.y, 6); continue; }
       // Un telefono veloce che tocca un lottatore gli fa male.
@@ -4379,19 +4419,19 @@
     if (--prossimoEvento <= 0) { if (sorprese && !evento) avviaEvento(); prossimoEvento = Math.round(caso(1500, 2700)); }
     if (--prossimoTelefono <= 0) {
       const calmo = tempo < CALMA, inGiro = telefoni.filter((t) => !eArma(t)).length;
-      if (inGiro < (calmo ? 2 : 4)) nuovoTelefono(caso(60, W - 60), -16 * S, caso(-1.5, 1.5) * S, 0);
+      if (inGiro < (calmo ? 2 : 4)) faEntrare(undefined, caso(60, W - 60), caso(-1.5, 1.5) * S);
       prossimoTelefono = Math.round(calmo ? caso(600, 1200) : caso(380, 950));
     }
     // Dopo 70 secondi piovono anche le armi, una alla volta.
     if (tempo >= ARMI && libero("armi") && --prossimaArma <= 0) {
       if (telefoni.filter((t) => eArma(t) || t.tipo === "bomba").length < 2) {
-        nuovoTelefono(caso(80, W - 80), -16 * S, caso(-1, 1) * S, 0, scegli([[2, "pistola"], [2, "spada"], [1, "bomba"]]));
+        faEntrare(scegli([[2, "pistola"], [2, "spada"], [1, "bomba"]]), caso(80, W - 80), caso(-1, 1) * S);
       }
       prossimaArma = Math.round(caso(800, 1600));
     }
     if (daSpawnare > 0 && passi % 14 === 0) {
       daSpawnare--;
-      const t = nuovoTelefono(caso(60, W - 60), -16 * S, caso(-2, 2) * S, 0, senzaTelefoni ? oggettoACaso() : undefined);
+      const t = faEntrare(senzaTelefoni ? oggettoACaso() : undefined, caso(60, W - 60), caso(-2, 2) * S);
       // Nella pioggia di oggetti dell'estensione tutto arriva già innescato.
       if (senzaTelefoni) { t.armato = !!SPECIALI[t.tipo]; if (t.tipo === "bomba") t.miccia = Math.round(caso(140, 260)); }
     }
@@ -6018,7 +6058,7 @@
       }
       const cx = lottatori.reduce((t, l) => t + l.p.bacino.x, 0) / lottatori.length;
       const x = Math.max(40 * S, Math.min(W - 40 * S, cx + caso(-160, 160) * S));
-      const t = nuovoTelefono(x, -16 * S, caso(-1, 1) * S, 0, forma);
+      const t = faEntrare(forma, x, caso(-1, 1) * S);
       if (t.tipo === "bomba") t.miccia = 380;
     },
     gravita(v) {
