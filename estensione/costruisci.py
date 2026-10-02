@@ -30,7 +30,7 @@ from pathlib import Path
 RADICE = Path(__file__).resolve().parent.parent
 QUI = Path(__file__).resolve().parent
 VARIANTI = {"pacchetto": {"premium_di_prova": True}, "store": {"premium_di_prova": False}}
-VERSIONE = "0.2.0"
+VERSIONE = "0.3.0"
 NOME = "Page Brawl"
 
 MANIFEST = {
@@ -306,7 +306,7 @@ RIQUADRO_PREMIO = """
     <section class="premio" data-premio>
       <p class="premio-avviso" data-premio-avviso hidden>Questa funzione fa parte di Premium.</p>
       <p data-premio-attivo hidden>Premium attivo.</p>
-      <p data-premio-cosa>Premium sblocca i super guerrieri con le mosse speciali, le armi e le bombe, il meteo e la gravità.</p>
+      <p data-premio-cosa>Premium sblocca i personaggi (super guerrieri, maghi e duellanti) con le loro mosse, le armi e le bombe, il meteo e la gravità.</p>
       <button type="button" class="ring-tasto ring-largo" data-premio-compra>Sblocca Premium</button>__PROVA__
     </section>"""
 TASTO_PROVA = """

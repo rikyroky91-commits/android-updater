@@ -81,7 +81,18 @@
       <h3>Modalità</h3>
       <div class="ring-griglia">
         <button type="button" class="ring-tasto" data-barre aria-pressed="false">&#10084; Barre della vita</button>
+      </div>
+    </section>
+    <section class="ring-sezione">
+      <h3>Personaggi</h3>
+      <div class="ring-griglia">
         <button type="button" class="ring-tasto" data-anime aria-pressed="false">&#9889; Super guerrieri</button>
+        <button type="button" class="ring-tasto" data-stile="maghi" aria-pressed="false">&#129668; Maghi</button>
+        <button type="button" class="ring-tasto" data-stile="lame" aria-pressed="false">&#9876; Duellanti</button>
+      </div>
+      <p class="ring-esito" data-mosse-nota>Scegli i personaggi per vedere le loro mosse.</p>
+      <div class="ring-griglia" data-mosse="guerrieri" hidden>
+        <button type="button" class="ring-tasto" data-colpo="trasforma">&#127775; Trasformazione</button>
         <button type="button" class="ring-tasto" data-colpo="onda">&#127744; Onda energetica</button>
         <button type="button" class="ring-tasto" data-colpo="carica">&#128293; Carica l'aura</button>
         <button type="button" class="ring-tasto" data-colpo="teletrasporto">&#10024; Teletrasporto</button>
@@ -91,6 +102,21 @@
         <button type="button" class="ring-tasto" data-colpo="barriera">&#128737; Barriera</button>
         <button type="button" class="ring-tasto" data-colpo="autodistruzione">&#128165; Autodistruzione</button>
         <button type="button" class="ring-tasto" data-colpo="telecinesi">&#9995; Presa a distanza</button>
+      </div>
+      <div class="ring-griglia" data-mosse="maghi" hidden>
+        <button type="button" class="ring-tasto" data-colpo="dardi">&#10024; Dardi magici</button>
+        <button type="button" class="ring-tasto" data-colpo="raggio">&#127744; Raggio</button>
+        <button type="button" class="ring-tasto" data-colpo="gelo">&#10052; Gelo</button>
+        <button type="button" class="ring-tasto" data-colpo="rimpicciolisci">&#128302; Rimpicciolisci</button>
+        <button type="button" class="ring-tasto" data-colpo="fulmine">&#9889; Fulmine</button>
+        <button type="button" class="ring-tasto" data-colpo="levita">&#127880; Levitazione</button>
+        <button type="button" class="ring-tasto" data-colpo="scudo">&#128737; Scudo magico</button>
+        <button type="button" class="ring-tasto" data-colpo="sparizione">&#128168; Sparizione</button>
+      </div>
+      <div class="ring-griglia" data-mosse="lame" hidden>
+        <button type="button" class="ring-tasto" data-colpo="scatto-lama">&#128168; Scatto tagliente</button>
+        <button type="button" class="ring-tasto" data-colpo="lancio-lama">&#127919; Lama lanciata</button>
+        <button type="button" class="ring-tasto" data-colpo="duello">&#9876; Incrocio di lame</button>
       </div>
     </section>
     <section class="ring-sezione">
@@ -106,8 +132,8 @@
         </label>
       </div>
       <div class="ring-riga">
-        <button type="button" class="ring-tasto ring-scelta" data-punta="robot">&#129302; Robot <span data-quota="robot">×2</span></button>
-        <button type="button" class="ring-tasto ring-scelta" data-punta="mela">&#127822; Mela <span data-quota="mela">×2</span></button>
+        <button type="button" class="ring-tasto ring-scelta" data-punta="robot"><span data-nome="robot">&#129302; Robot</span> <span data-quota="robot">×2</span></button>
+        <button type="button" class="ring-tasto ring-scelta" data-punta="mela"><span data-nome="mela">&#127822; Mela</span> <span data-quota="mela">×2</span></button>
       </div>
       <p class="ring-esito" data-esito aria-live="polite">Punta su chi vince il prossimo K.O.</p>
     </section>

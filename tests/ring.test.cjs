@@ -936,7 +936,9 @@ test("super guerrieri: niente jetpack, si vola, si scatta con le immagini residu
     dentro(amb);
   });
   assert.ok(volato, "il robot non ha preso il volo");
-  assert.ok(!/zaino\(f, 10\.5 \* S\);\n/.test(SORGENTE.replace("if (!anime) zaino(f, 10.5 * S);", "")), "il jetpack si disegna ancora in modalità anime");
+  // In modalità anime in campo ci sono i personaggi inventati, e il loro jetpack si disegna solo fuori dal motore a energia.
+  assert.ok(SORGENTE.includes("(stile ? disegnaUmano : f.tipo === \"robot\" ? disegnaRobot : disegnaMela)(f);"), "con uno stile acceso si disegnano ancora robot e mela");
+  assert.ok(SORGENTE.includes("if (!anime) zaino(f, 9.5 * S);"), "il jetpack si disegna ancora in modalità anime");
   let atterrati = false;
   r.comandi.anime(false);
   amb.avanza(60 * 6, (s) => { if (s.lottatori.every((f) => !f.volo)) { atterrati = true; return false; } });
@@ -946,7 +948,7 @@ test("super guerrieri: niente jetpack, si vola, si scatta con le immagini residu
 
 test("super guerrieri: la raffica di pugni colpisce e il colpo finale scaraventa via", () => {
   let lanciata = false;
-  for (let prova = 0; prova < 5 && !lanciata; prova++) {
+  for (let prova = 0; prova < 9 && !lanciata; prova++) {
     const amb = ambiente();
     amb.avanza(30);
     const r = amb.finestra.__ring;
@@ -1182,4 +1184,228 @@ test("sul sito (senza Premium dichiarato) è tutto libero", () => {
   assert.notStrictEqual(c.metti("spada"), false);
   assert.notStrictEqual(c.anime(true), false);
   assert.ok(amb.stato().telefoni.some((t) => t.tipo === "spada"));
+});
+
+// --- I personaggi nuovi (02/10/2026): trasformazione, maghi, duellanti ---
+
+test("super guerrieri: la trasformazione accende la prima forma, poi la seconda, e cambiando personaggi finisce", () => {
+  let prima = false, seconda = false;
+  for (let prova = 0; prova < 5 && !seconda; prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    const r = amb.finestra.__ring;
+    r.mossa("robot", "trasforma");
+    assert.strictEqual(amb.stato().stile, "", "una mossa di prova non deve cambiare lo stile da sola");
+    r.comandi.stile("guerrieri");
+    r.mossa("robot", "trasforma");
+    amb.avanza(110, (s) => { if (s.lottatori[0].forma === 1 && s.lottatori[0].potenziato) { prima = true; return false; } });
+    if (!prima) continue;
+    for (let i = 0; i < 4 && !seconda; i++) {
+      r.mossa("robot", "trasforma");
+      amb.avanza(110, (s) => { if (s.lottatori[0].forma === 2) { seconda = true; return false; } });
+    }
+    dentro(amb);
+    if (seconda) {
+      r.comandi.stile("");
+      assert.strictEqual(amb.stato().lottatori[0].forma, 0);
+      assert.strictEqual(amb.stato().lottatori[0].potenziato, false);
+      assert.strictEqual(amb.stato().anime, false);
+    }
+  }
+  assert.ok(prima, "la trasformazione non parte");
+  assert.ok(seconda, "la seconda forma non arriva");
+});
+
+test("super guerrieri: dalla tendina la trasformazione parte e, lottando, prima o poi ci si trasforma da soli", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  const r = amb.finestra.__ring;
+  r.comandi.colpo("trasforma");
+  assert.strictEqual(amb.stato().stile, "guerrieri");
+  assert.ok(amb.stato().lottatori.some((f) => f.azione === "trasforma"));
+  let daSoli = false;
+  for (let prova = 0; prova < 3 && !daSoli; prova++) {
+    r.comandi.ricomincia();
+    amb.avanza(60 * 240, (s) => { if (s.lottatori.some((f) => f.forma > 0)) { daSoli = true; return false; } });
+    dentro(amb);
+  }
+  assert.ok(daSoli, "in quattro minuti nessuno si è trasformato da solo");
+});
+
+test("maghi: lo stile si sceglie e si ricorda; il gelo blocca e poi si scioglie, il rimpicciolimento passa", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  const r = amb.finestra.__ring;
+  r.comandi.stile("maghi");
+  assert.strictEqual(amb.stato().stile, "maghi");
+  assert.strictEqual(amb.stato().anime, true, "i maghi usano il motore a energia");
+  assert.strictEqual(amb.memoria["mut-ring-stile"], "maghi");
+  assert.strictEqual(amb.memoria["mut-ring-anime"], "off");
+  r.incanta("mela", "gelo");
+  assert.strictEqual(amb.lottatore("mela").gelato, true);
+  amb.avanza(60 * 5);
+  assert.strictEqual(amb.lottatore("mela").gelato, false, "il ghiaccio non si scioglie");
+  dentro(amb);
+  r.incanta("robot", "piccolo");
+  amb.avanza(40);
+  assert.ok(amb.lottatore("robot").piccolo && amb.lottatore("robot").scala < 0.7, "non rimpicciolisce");
+  amb.avanza(60 * 10);
+  assert.ok(!amb.lottatore("robot").piccolo && amb.lottatore("robot").scala > 0.95, "non torna grande");
+  dentro(amb);
+  // Un altro ambiente con lo stile salvato riparte da maghi.
+  const amb2 = ambiente({ memoria: { "mut-ring-stile": "maghi" } });
+  amb2.avanza(10);
+  assert.strictEqual(amb2.stato().stile, "maghi");
+});
+
+test("maghi: nel ghiaccio non ci si muove, e un colpo lo manda in pezzi", () => {
+  // Il ghiaccio si scioglie da solo dopo 190 fotogrammi: se va in pezzi prima, è stato un colpo.
+  let colpito = false;
+  for (let prova = 0; prova < 8 && !colpito; prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    const r = amb.finestra.__ring;
+    r.comandi.stile("lame");                     // l'altro ha una lama: prima o poi il colpo arriva
+    amb.avanza(60);
+    r.incanta("mela", "gelo");
+    assert.strictEqual(amb.lottatore("mela").gelato, true);
+    let schegge = false;
+    amb.avanza(150, (s) => {
+      const m = s.lottatori.find((f) => f.tipo === "mela");
+      if (m.gelato) assert.strictEqual(m.azione, null, "nel ghiaccio non si agisce");
+      if (s.particelleTipi.scheggia) schegge = true;
+      if (!m.gelato && schegge) { colpito = true; return false; }
+    });
+    dentro(amb);
+  }
+  assert.ok(colpito, "il ghiaccio non è mai andato in pezzi sotto i colpi");
+});
+
+test("maghi: dardi, gelo, fulmine e levitazione dalla tendina", () => {
+  let dardi = false, gelato = false, fulmine = false, tetto = false, sollevato = false, sceso = false;
+  for (let prova = 0; prova < 6 && !(dardi && gelato && fulmine && sollevato && sceso); prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    const r = amb.finestra.__ring;
+    r.comandi.colpo("dardi");
+    assert.strictEqual(amb.stato().stile, "maghi", "una mossa da mago non accende i maghi");
+    amb.avanza(60, (s) => { if (s.proiettili > 0) { dardi = true; return false; } });
+    for (let i = 0; i < 4 && !gelato; i++) {
+      r.comandi.colpo("gelo");
+      amb.avanza(120, (s) => { if (s.lottatori.some((f) => f.gelato)) { gelato = true; return false; } });
+    }
+    r.comandi.colpo("fulmine");
+    amb.avanza(90, (s) => { if (s.fulmini > 0) fulmine = true; if (s.danniBordi.includes("tetto")) tetto = true; });
+    for (let i = 0; i < 4 && !sceso; i++) {
+      r.comandi.colpo("levita");
+      amb.avanza(160, (s) => {
+        if (s.lottatori.some((f) => f.sollevato)) sollevato = true;
+        if (sollevato && !s.lottatori.some((f) => f.sollevato)) { sceso = true; return false; }
+      });
+    }
+    amb.avanza(60 * 4); dentro(amb);
+  }
+  assert.ok(dardi, "nessun dardo");
+  assert.ok(gelato, "il gelo non ha preso nessuno");
+  assert.ok(fulmine && tetto, "il fulmine non è caduto dal tetto");
+  assert.ok(sollevato && sceso, "la levitazione non alza e non lascia cadere");
+});
+
+test("maghi in combattimento libero: incantesimi, e tutto resta stabile", () => {
+  const amb = ambiente({ solidi: [[300, 560, 700, 590]] });
+  amb.avanza(30);
+  amb.finestra.__ring.comandi.stile("maghi");
+  let incanti = false, colpi = false;
+  amb.avanza(60 * 120, (s) => {
+    if (s.proiettili > 0 || s.fulmini > 0 || s.lottatori.some((f) => f.gelato || f.piccolo || f.sollevato)) incanti = true;
+    if (s.punteggio.robot + s.punteggio.mela > 0) colpi = true;
+  });
+  dentro(amb);
+  assert.ok(incanti, "in due minuti nessun incantesimo");
+  assert.ok(colpi, "in due minuti nessun K.O. fra maghi");
+});
+
+test("duellanti: hanno la lama, si colpiscono, lo scatto attraversa l'avversario, la lama lanciata torna", () => {
+  let lame = false, passato = false, lanciata = false, tornata = false, danno = false;
+  for (let prova = 0; prova < 6 && !(passato && tornata && danno); prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    const r = amb.finestra.__ring;
+    r.comandi.stile("lame");
+    const s0 = amb.stato();
+    assert.strictEqual(s0.stile, "lame");
+    assert.strictEqual(s0.anime, false, "i duellanti non usano il motore a energia");
+    lame = s0.lottatori.every((f) => f.lama);
+    // Lo scatto: chi lo fa finisce dall'altra parte.
+    for (let i = 0; i < 4 && !passato; i++) {
+      const a = amb.lottatore("robot").bacino.x < amb.lottatore("mela").bacino.x;
+      r.mossa("robot", "scattoLama");
+      amb.avanza(16);
+      const b = amb.lottatore("robot").bacino.x < amb.lottatore("mela").bacino.x;
+      if (a !== b) passato = true;
+      amb.avanza(60, (s) => { if (s.lottatori.some((f) => f.danni > 0) || s.punteggio.robot + s.punteggio.mela > 0) danno = true; });
+    }
+    r.comandi.colpo("lancio-lama");
+    amb.avanza(300, (s) => {
+      if (s.lottatori.some((f) => f.lamaLanciata)) lanciata = true;
+      if (lanciata && !s.lottatori.some((f) => f.lamaLanciata)) { tornata = true; return false; }
+    });
+    amb.avanza(60 * 20, (s) => { if (s.lottatori.some((f) => f.danni > 0) || s.punteggio.robot + s.punteggio.mela > 0) danno = true; });
+    dentro(amb);
+    r.comandi.stile("");
+    assert.ok(amb.stato().lottatori.every((f) => !f.lama), "tolto lo stile la lama resta");
+  }
+  assert.ok(lame, "non hanno la lama");
+  assert.ok(passato, "lo scatto non attraversa l'avversario");
+  assert.ok(lanciata && tornata, "la lama lanciata non parte o non torna");
+  assert.ok(danno, "con le lame nessuno si fa male");
+});
+
+test("duellanti: le lame si incrociano; con gli effetti spenti non si stacca niente, accesi sì", () => {
+  let pressa = false;
+  for (let prova = 0; prova < 5 && !pressa; prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    const r = amb.finestra.__ring;
+    r.comandi.colpo("duello");
+    assert.strictEqual(amb.stato().stile, "lame");
+    amb.avanza(60 * 12, (s) => { if (s.lottatori.every((f) => f.azione === "pressa")) { pressa = true; return false; } });
+    amb.avanza(120); dentro(amb);
+  }
+  assert.ok(pressa, "le lame non si incrociano");
+  const spento = ambiente({ memoria: { "mut-ring-cruento": "off" } });
+  spento.avanza(30);
+  spento.finestra.__ring.comandi.stile("lame");
+  spento.avanza(60 * 60, (s) => {
+    assert.strictEqual(s.arti, 0, "un arto staccato con gli effetti spenti");
+    assert.ok(!s.lottatori.some((f) => f.tagliata), "mela tagliata con gli effetti spenti");
+  });
+  dentro(spento);
+  let tagli = false;
+  for (let prova = 0; prova < 4 && !tagli; prova++) {
+    const acceso = ambiente();
+    acceso.avanza(30);
+    acceso.finestra.__ring.comandi.stile("lame");
+    acceso.avanza(60 * 90, (s) => { if (s.arti > 0 || s.lottatori.some((f) => f.tagliata || f.staccati.length)) { tagli = true; return false; } });
+    dentro(acceso);
+  }
+  assert.ok(tagli, "in un minuto e mezzo di lame nessun taglio");
+});
+
+test("Premium: maghi, duellanti e le loro mosse sono chiusi come i super guerrieri", () => {
+  let attivo = false;
+  const chieste = [];
+  const premio = { bloccate: { guerrieri: true, armi: true, meteo: true }, attivo: () => attivo, chiedi: (g) => chieste.push(g) };
+  const amb = ambiente({ premio, memoria: { "mut-ring-stile": "maghi" } });
+  amb.avanza(30);
+  const c = amb.finestra.__ring.comandi;
+  assert.strictEqual(amb.stato().stile, "", "lo stile a pagamento salvato si riaccende da solo senza Premium");
+  assert.strictEqual(c.stile("maghi"), false);
+  assert.strictEqual(c.stile("lame"), false);
+  for (const mossa of ["trasforma", "gelo", "fulmine", "levita", "scatto-lama", "duello"]) assert.strictEqual(c.colpo(mossa), false, mossa);
+  assert.ok(chieste.length === 8 && chieste.every((g) => g === "guerrieri"));
+  assert.strictEqual(amb.stato().stile, "");
+  attivo = true;
+  assert.notStrictEqual(c.stile("lame"), false);
+  assert.strictEqual(amb.stato().stile, "lame");
 });

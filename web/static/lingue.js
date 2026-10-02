@@ -95,6 +95,26 @@
     "Modalità": ["Modes", "Modos", "Modes", "Modi"],
     "Barre della vita": ["Health bars", "Barras de vida", "Barres de vie", "Lebensbalken"],
     "Super guerrieri": ["Super warriors", "Superguerreros", "Super guerriers", "Superkrieger"],
+    // I personaggi nuovi (02/10/2026): maghi e duellanti, con le loro mosse.
+    "Personaggi": ["Characters", "Personajes", "Personnages", "Figuren"],
+    "Maghi": ["Wizards", "Magos", "Mages", "Zauberer"],
+    "Duellanti": ["Duelists", "Duelistas", "Duellistes", "Duellanten"],
+    "Scegli i personaggi per vedere le loro mosse.": ["Pick the characters to see their moves.", "Elige los personajes para ver sus movimientos.",
+      "Choisissez les personnages pour voir leurs coups.", "Wähle die Figuren, um ihre Angriffe zu sehen."],
+    "Trasformazione": ["Transformation", "Transformación", "Transformation", "Verwandlung"],
+    "Dardi magici": ["Magic bolts", "Dardos mágicos", "Traits magiques", "Zauberpfeile"],
+    "Raggio": ["Beam", "Rayo", "Rayon", "Strahl"],
+    "Gelo": ["Freeze", "Hielo", "Gel", "Frost"],
+    "Rimpicciolisci": ["Shrink", "Encoger", "Rétrécir", "Schrumpfen"],
+    "Fulmine": ["Lightning", "Relámpago", "Foudre", "Blitz"],
+    "Levitazione": ["Levitation", "Levitación", "Lévitation", "Schweben"],
+    "Scudo magico": ["Magic shield", "Escudo mágico", "Bouclier magique", "Zauberschild"],
+    "Sparizione": ["Vanish", "Desaparición", "Disparition", "Verschwinden"],
+    "Scatto tagliente": ["Dash slash", "Tajo relámpago", "Ruée tranchante", "Blitzschnitt"],
+    "Lama lanciata": ["Thrown blade", "Hoja lanzada", "Lame lancée", "Klingenwurf"],
+    "Incrocio di lame": ["Blade lock", "Cruce de hojas", "Lames croisées", "Klingenkreuzen"],
+    "SOVRACCARICO!": ["OVERDRIVE!", "¡SOBRECARGA!", "SURCHARGE !", "ÜBERLADUNG!"],
+    "SOVRACCARICO II!": ["OVERDRIVE II!", "¡SOBRECARGA II!", "SURCHARGE II !", "ÜBERLADUNG II!"],
     "Onda energetica": ["Energy wave", "Onda de energía", "Onde d'énergie", "Energiewelle"],
     "Carica l'aura": ["Charge aura", "Cargar el aura", "Charger l'aura", "Aura aufladen"],
     "Teletrasporto": ["Teleport", "Teletransporte", "Téléportation", "Teleport"],
@@ -145,11 +165,11 @@
     "Spegni le lotte": ["Turn off the fights", "Apaga las peleas", "Désactiver les combats", "Kämpfe ausschalten"],
     "Premium attivo.": ["Premium is active.", "Premium activo.", "Premium actif.", "Premium ist aktiv."],
     "Questa funzione fa parte di Premium.": ["This feature is part of Premium.", "Esta función forma parte de Premium.", "Cette fonction fait partie de Premium.", "Diese Funktion gehört zu Premium."],
-    "Premium sblocca i super guerrieri con le mosse speciali, le armi e le bombe, il meteo e la gravità.": [
-      "Premium unlocks the super warriors with their special moves, weapons and bombs, weather and gravity.",
-      "Premium desbloquea los superguerreros con sus movimientos especiales, las armas y las bombas, el clima y la gravedad.",
-      "Premium débloque les super guerriers et leurs coups spéciaux, les armes et les bombes, la météo et la gravité.",
-      "Premium schaltet die Superkrieger mit ihren Spezialangriffen, Waffen und Bomben, Wetter und Schwerkraft frei."],
+    "Premium sblocca i personaggi (super guerrieri, maghi e duellanti) con le loro mosse, le armi e le bombe, il meteo e la gravità.": [
+      "Premium unlocks the characters (super warriors, wizards and duelists) with their moves, weapons and bombs, weather and gravity.",
+      "Premium desbloquea los personajes (superguerreros, magos y duelistas) con sus movimientos, las armas y las bombas, el clima y la gravedad.",
+      "Premium débloque les personnages (super guerriers, mages et duellistes) et leurs coups, les armes et les bombes, la météo et la gravité.",
+      "Premium schaltet die Figuren (Superkrieger, Zauberer und Duellanten) mit ihren Angriffen, Waffen und Bomben, Wetter und Schwerkraft frei."],
     // Le scritte disegnate nel ring (i versi restano uguali in ogni lingua).
     "AHIA!": ["OUCH!", "¡AY!", "AÏE !", "AUA!"],
     "OPS!": ["OOPS!", "¡UPS!", "OUPS !", "UPS!"],
@@ -315,6 +335,8 @@
   }
   var CHI = { "il robot": ["the robot", "el robot", "le robot", "der Roboter"], "la mela": ["the apple", "la manzana", "la pomme", "der Apfel"] };
   var SU_CHI = { "sul robot": ["on the robot", "al robot", "sur le robot", "auf den Roboter"], "sulla mela": ["on the apple", "a la manzana", "sur la pomme", "auf den Apfel"] };
+  // I personaggi inventati hanno un nome proprio, uguale in ogni lingua.
+  function suChi(testo, li) { return SU_CHI[testo] ? SU_CHI[testo][li] : ["on ", "por ", "sur ", "auf "][li] + testo.slice(3); }
   var FINITI = [" Out of tokens: you can refill them.", " Sin fichas: puedes recargarlas.", " Plus de jetons : vous pouvez les recharger.", " Keine Chips mehr: Du kannst sie aufladen."];
 
   var REGOLE = [
@@ -327,20 +349,20 @@
     [/^(\d+)\/(\d+) fonti attive$/, function (m, li) { return m[1] + "/" + m[2] + " " + ["sources active", "fuentes activas", "sources actives", "Quellen aktiv"][li]; }],
     [/^Aggiornamenti di (.+)$/, function (m, li) { return ["Updates for ", "Actualizaciones de ", "Mises à jour de ", "Updates für "][li] + m[1]; }],
     [/^e altre (\d+)$/, function (m, li) { return ["and " + m[1] + " more", "y otras " + m[1], "et " + m[1] + " autres", "und " + m[1] + " weitere"][li]; }],
-    [/^Puntati (\d+) gettoni (sul robot|sulla mela) \(×([\d.]+)\): si decide al prossimo K\.O\.$/, function (m, li) {
-      var su = SU_CHI[m[2]][li];
+    [/^Puntati (\d+) gettoni (sul robot|sulla mela|su [A-Z][a-z]+) \(×([\d.]+)\): si decide al prossimo K\.O\.$/, function (m, li) {
+      var su = suChi(m[2], li);
       return ["Staked " + m[1] + " tokens " + su + " (×" + m[3] + "): decided at the next K.O.",
               "Apostadas " + m[1] + " fichas " + su + " (×" + m[3] + "): se decide en el próximo K.O.",
               m[1] + " jetons misés " + su + " (×" + m[3] + ") : décision au prochain K.O.",
               m[1] + " Chips " + su + " gesetzt (×" + m[3] + "): Entscheidung beim nächsten K.o."][li];
     }],
-    [/^Vinto! Ha vinto (il robot|la mela): \+(\d+) gettoni\.( Gettoni finiti: puoi ricaricarli\.)?$/, function (m, li) {
-      var chi = CHI[m[1]][li];
+    [/^Vinto! Ha vinto (il robot|la mela|[A-Z][a-z]+): \+(\d+) gettoni\.( Gettoni finiti: puoi ricaricarli\.)?$/, function (m, li) {
+      var chi = CHI[m[1]] ? CHI[m[1]][li] : m[1];
       return ["You won! Winner: " + chi + ". +" + m[2] + " tokens.", "¡Has ganado! Gana " + chi + ": +" + m[2] + " fichas.",
               "Gagné ! Vainqueur : " + chi + ". +" + m[2] + " jetons.", "Gewonnen! Sieger: " + chi + ". +" + m[2] + " Chips."][li] + (m[3] ? FINITI[li] : "");
     }],
-    [/^Perso: ha vinto (il robot|la mela)\. Meno (\d+) gettoni\.( Gettoni finiti: puoi ricaricarli\.)?$/, function (m, li) {
-      var chi = CHI[m[1]][li];
+    [/^Perso: ha vinto (il robot|la mela|[A-Z][a-z]+)\. Meno (\d+) gettoni\.( Gettoni finiti: puoi ricaricarli\.)?$/, function (m, li) {
+      var chi = CHI[m[1]] ? CHI[m[1]][li] : m[1];
       return ["You lost: " + chi + " won. −" + m[2] + " tokens.", "Has perdido: ha ganado " + chi + ". −" + m[2] + " fichas.",
               "Perdu : " + chi + " a gagné. −" + m[2] + " jetons.", "Verloren: Sieger ist " + chi + ". −" + m[2] + " Chips."][li] + (m[3] ? FINITI[li] : "");
     }],
