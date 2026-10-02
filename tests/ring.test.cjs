@@ -29,7 +29,7 @@ function riquadro(l, t, r, b) {
   return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
 }
 
-function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {} } = {}) {
+function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false } = {}) {
   const richieste = [];
   const ascoltatori = {};
   const contesto2d = new Proxy({}, {
@@ -56,9 +56,12 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
     fonts: null,
     body: { querySelectorAll: () => elementi },
     querySelector(sel) {
-      if (sel === "[data-ring]") return tela;
-      if (sel === ".ultimora-barra") return barra;
-      if (sel === "[data-gioca]") return tasto;
+      // Nell'estensione i pezzi del ring non stanno nella pagina.
+      if (!estensione) {
+        if (sel === "[data-ring]") return tela;
+        if (sel === ".ultimora-barra") return barra;
+        if (sel === "[data-gioca]") return tasto;
+      }
       if (sel === ".ricerca-grande input" && campo) return { getBoundingClientRect: () => riquadro(...campo) };
       return null;
     },
@@ -70,6 +73,13 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
     localStorage: { getItem: (k) => (k in memoria ? memoria[k] : null), setItem: (k, v) => { memoria[k] = String(v); } },
     addEventListener(tipo, fn) { (ascoltatori[tipo] = ascoltatori[tipo] || []).push(fn); },
   };
+  if (estensione) {
+    // Come fa `estensione/pacchetto/prepara.js`: i pezzi in una radice a parte
+    // (senza striscia: il pavimento è il fondo della finestra) e una memoria propria.
+    finestra.__ringRadice = { host: {}, querySelector: (sel) => (sel === "[data-ring]" ? tela : sel === "[data-gioca]" ? tasto : null) };
+    finestra.__ringDeposito = finestra.localStorage;
+    finestra.localStorage = { getItem() { throw new Error("il ring dell'estensione non deve usare localStorage"); }, setItem() { throw new Error("no"); } };
+  }
   const sandbox = {
     window: finestra, document: documento, Math, Date, Object, JSON, String, Number,
     getComputedStyle: () => ({ getPropertyValue: () => "" }),
@@ -1109,4 +1119,21 @@ test("presa a distanza: l'avversario viene sollevato e poi va in pezzi", () => {
   }
   assert.ok(sollevato, "nessuno viene sollevato");
   assert.ok(pezzi, "chi è sollevato non va mai in pezzi");
+});
+
+test("nell'estensione: i pezzi stanno in una radice a parte, il pavimento è il fondo della finestra, la memoria è la sua", () => {
+  const memoria = { "mut-ring": "on" };
+  const amb = ambiente({ estensione: true, memoria, ridotto: true });
+  const s = amb.stato();
+  assert.strictEqual(s.lottatori.length, 2, "il ring non parte dalla radice dell'estensione");
+  assert.strictEqual(s.pavimento, 800, "senza striscia il pavimento è il fondo della finestra");
+  amb.avanza(60 * 20); dentro(amb);
+  amb.finestra.__ring.comandi.barre(true);
+  assert.strictEqual(memoria["mut-ring-barre"], "on", "le opzioni non finiscono nella memoria dell'estensione");
+  // un clic dentro l'ospite (tasti e tendina) non deve prendere un lottatore
+  const f = amb.lottatore("robot");
+  const e = { clientX: f.bacino.x, clientY: f.bacino.y - 8, button: 0, pointerType: "mouse", target: amb.finestra.__ringRadice.host,
+              preventDefault() { this.bloccato = true; }, stopPropagation() {} };
+  for (const fn of amb.ascoltatori.pointerdown || []) fn(e);
+  assert.ok(!e.bloccato, "un clic sui tasti dell'estensione ha preso un lottatore");
 });
