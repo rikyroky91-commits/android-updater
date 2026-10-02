@@ -2163,6 +2163,12 @@
     if (eMela(f)) schizza(f, c.x, c.y, 10, 3);
     scrivi("KABOOM!", c.x, c.y - 40 * S, true);
     f.cratere = null; f.accecato = 0; f.sfera = null;
+    // Il corpo non c'è più finché non si rimonta: i suoi punti restano fermi, dentro la finestra
+    // (lo scoppio li spingeva sotto il pavimento, e lì restavano fino al rimontaggio).
+    for (const n in f.p) {
+      const pt = f.p[n];
+      pt.x = pt.ox = Math.max(pt.r + 2, Math.min(W - pt.r - 2, pt.x)); pt.y = pt.oy = Math.max(pt.r, Math.min(pavimento - pt.r, pt.y));
+    }
     if (senzaPunto) { salvaCervello(true); return; }
     const vincitore = att && att.tipo && att !== f ? att.tipo : altroTipo(f.tipo);
     risolviScommessa(vincitore);
