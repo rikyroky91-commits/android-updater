@@ -875,8 +875,10 @@ test("barre della vita: si accendono dalla tendina, si ricordano, e la vita scen
   assert.ok(scesa, "la vita della mela non è scesa");
   amb.finestra.__ring.ko("mela");
   assert.strictEqual(amb.lottatore("mela").vita, 0, "a K.O. la barra non è vuota");
-  amb.avanza(60 * 5);
-  assert.strictEqual(amb.lottatore("mela").vita, 1, "dopo il K.O. la barra non torna piena");
+  // (Si guarda quando si rialza: ora che si lotta più fitto, cinque secondi dopo può averne già prese altre.)
+  let piena = false;
+  amb.avanza(60 * 8, (s) => { const f = s.lottatori.find((l) => l.tipo === "mela"); if (!f.ko && f.vita === 1) { piena = true; return false; } });
+  assert.ok(piena, "dopo il K.O. la barra non torna piena");
 });
 
 test("super guerrieri: energia, onda energetica che colpisce e rompe il bordo, raffica, teletrasporto, potenziamento", () => {
@@ -1517,7 +1519,7 @@ test("il barattolo lanciato libera una creatura che combatte per chi l'ha lancia
   const r = amb.finestra.__ring;
   // Messi in campo dalla tendina cadono dal cielo e restano interi: si aprono solo se lanciati.
   r.comandi.metti("barattolo-fuoco"); r.comandi.metti("fumogeno");
-  amb.avanza(150);
+  amb.avanza(75);                              // il tempo di toccare terra, non quello di raccoglierli e lanciarli
   let s = amb.stato();
   assert.strictEqual(s.telefoni.map((t) => t.tipo).sort().join(","), "barattolo,fumogeno");
   assert.strictEqual(s.creature.length + s.nubi, 0, "un oggetto caduto dal cielo si è aperto da solo");
@@ -1644,9 +1646,64 @@ test("gli oggetti entrano anche dai lati, e quelli rimasti dove nessuno arriva s
       }
       for (const k of fermi.keys()) if (!visti.has(k)) fermi.delete(k);
     });
+    // (Se in campo ci sono già quattro oggetti non ne nascono altri: qualcuno si mette a mano.)
+    for (let i = 0; i < 20 && !(dalLato && dallAlto); i++) {
+      r.comandi.metti(estensione ? "fumogeno" : "orologio");
+      const t = amb.stato().telefoni.slice(-1)[0];
+      if (t && (t.x <= 1 || t.x >= amb.stato().larghezza - 1) && t.y > 20) dalLato++;
+      if (t && t.y < 0) dallAlto++;
+      amb.avanza(30);
+    }
     assert.ok(dalLato > 0, "nessun oggetto è entrato da un lato");
     assert.ok(dallAlto > 0, "nessun oggetto è caduto dall'alto");
     assert.ok(inCampo > 60, "in campo, all'altezza dei lottatori, non arriva quasi niente");
     dentro(amb);
+  }
+});
+
+test("si lotta davvero: pochi tempi morti, e chi sta sopra un elemento scende a cercare l'altro", () => {
+  // 02/10/2026, su segnalazione («a volte sembrano fermi»). Prima: 24 colpi a segno al minuto,
+  // il 22% del tempo in piedi passato in pause di oltre quattro secondi senza un colpo, il 15%
+  // con tutti e due fermi. I numeri su 46 pagine li dà `node tests/misura-lotta.cjs`.
+  let fot = 0, pronti = 0, colpi = 0, inPausa = 0, fermi2 = 0;
+  for (let giro = 0; giro < 8; giro++) {
+    const amb = ambiente({ estensione: true, memoria: { "mut-ring": "on" } });
+    amb.avanza(20);
+    let prima = null, senza = 0;
+    amb.avanza(60 * 45, (s) => {
+      const [a, b] = s.lottatori;
+      fot++;
+      const colpo = prima && s.lottatori.some((f, i) => f.danni > prima[i].danni || (f.ko > 0 && !(prima[i].ko > 0)));
+      prima = s.lottatori.map((f) => ({ danni: f.danni, ko: f.ko }));
+      if (colpo) colpi++;
+      if (a.ko > 0 || b.ko > 0 || a.esploso || b.esploso) { senza = 0; return; }
+      pronti++;
+      const fermo = (f) => (!f.azione && !f.vola && !(f.stordito > 0) && !f.inVolo && !f.scalando) || f.azione === "provoca";
+      if (fermo(a) && fermo(b)) fermi2++;
+      if (colpo) { if (senza > 240) inPausa += senza; senza = 0; } else senza++;
+    });
+    if (senza > 240) inPausa += senza;
+    dentro(amb);
+  }
+  const alMinuto = colpi / (fot / 3600);
+  assert.ok(alMinuto > 27, "pochi colpi a segno: " + alMinuto.toFixed(1) + " al minuto");
+  assert.ok(inPausa / pronti < 0.22, "troppe pause lunghe: " + Math.round(100 * inPausa / pronti) + "% del tempo in piedi");
+  assert.ok(fermi2 / pronti < 0.11, "fermi tutti e due per il " + Math.round(100 * fermi2 / pronti) + "% del tempo");
+  // Uno sopra un elemento largo quanto la pagina, l'altro sotto e senza modo di salire: chi sta
+  // sopra si lascia cadere attraverso. Prima camminava fino al bordo (20 secondi), o non scendeva mai.
+  for (let giro = 0; giro < 3; giro++) {
+    const amb = ambiente({ solidi: [[60, 420, 1140, 450]] });
+    amb.avanza(30);
+    amb.porta("mela", 600, 330);
+    amb.rilascia(600, 330);
+    let sopra = false, insieme = false;
+    amb.avanza(60 * 10, (s) => {
+      const m = s.lottatori.find((f) => f.tipo === "mela"), r = s.lottatori.find((f) => f.tipo === "robot");
+      dentro(amb);
+      if (m.sopraUnElemento && !m.ko) sopra = true;
+      if (sopra && Math.abs(m.bacino.y - r.bacino.y) < 20 && !m.ko && !r.ko && !m.inVolo) { insieme = true; return false; }
+    });
+    assert.ok(sopra, "la mela non si è posata sull'elemento");
+    assert.ok(insieme, "chi sta sopra non scende a cercare l'altro");
   }
 });

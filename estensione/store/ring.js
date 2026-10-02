@@ -392,7 +392,7 @@
     if (base === undefined) base = pavimento;
     const f = {
       tipo, dir, cx: x, base, supporto: null, p: {}, aste: [],
-      forza: 1, ko: 0, rialzo: 0, stordito: 0, danni: 0, soglia: Math.round(caso(3, 6)),
+      forza: 1, ko: 0, rialzo: 0, stordito: 0, danni: 0, soglia: Math.round(caso(4, 7)),
       azione: null, t: 0, durata: 0, colpito: false, pensa: caso(20, 60), meta: x,
       passo: 0, dolore: 0, preso: null, scalata: null, inVolo: false, botta: 0, fantasma: false,
       aggr: caso(0.75, 1.3), furbo: caso(0.6, 1.4), furia: 0, tel: null, prendiTel: null, polv: 0,
@@ -488,6 +488,7 @@
     for (const o of ostacoli) {
       if (f.cx < o.l - 3 * S || f.cx > o.r + 3 * S) continue;
       if (o.t < piede - 10 * S) continue;
+      if (f.attraversa && Math.abs(o.t - f.attraversa.y) < 2) continue;      // ci sta scendendo attraverso
       if (o.t < y) { y = o.t; chi = o; }
     }
     return [y, chi];
@@ -507,6 +508,11 @@
       q.piedeD = [Math.max(0, -5 * Math.cos(ph)), -8 - 7 * Math.sin(ph)];
       q.ginocchioA = [14 + Math.max(0, 3 * Math.cos(ph)), 6 + 4 * Math.sin(ph)];
       q.ginocchioD = [14 + Math.max(0, -3 * Math.cos(ph)), -3 - 4 * Math.sin(ph)];
+      // Di corsa: busto in avanti e falcata più lunga.
+      if (f.azione === "avanza" && f.corsa) {
+        q.collo[1] += 3; q.testa[1] += 5; q.bacino[1] += 1;
+        q.piedeA[1] *= 1.3; q.piedeD[1] *= 1.3;
+      }
     }
     // Prima di colpire ci si carica un attimo all'indietro (anticipazione).
     const carica = COLPI[f.azione] ? Math.max(0, 1 - f.t / 5) : 0;
@@ -913,7 +919,9 @@
       f.jet = Math.min(f.jet, 70); f.meta = altro.cx; f.volaY = Math.min(pavimento - 60 * S, ob.y - 30 * S);
       f.pensa = 20; return;
     }
-    f.volaY = Math.max(100, Math.min(pavimento - 70 * S, ob.y - caso(-8, 28) * S));
+    // Chi vola scende fino all'altezza dell'altro, anche se quello è a terra: prima
+    // restava più su, i colpi andavano a vuoto e chi stava sotto non poteva attaccare.
+    f.volaY = Math.max(100, Math.min(pavimento - 44 * S, ob.y - caso(-6, 18) * S));
     const dx = Math.abs(ob.x - mio.x) / S;
     if (f.arma && f.arma.tipo === "pistola" && dx > 40 && Math.random() < 0.5) { inizia(f, "spara"); return; }
     if (anime && f.ki >= 45 && dx > 70 && Math.random() < 0.3) { inizia(f, "onda"); return; }
@@ -1025,7 +1033,10 @@
           const piano = f.dopo; f.dopo = null; f.azione = null;
           if (raggiungibile(f, piano.o)) { iniziaScalata(f, piano.o, piano.lato); return; }
         }
-        f.azione = null; f.pensa = f.combo ? 1 : caso(3, 22);
+        // Arrivati a tiro si colpisce subito: le attese più lunghe (e più visibili)
+        // erano quelle dei due fermi uno davanti all'altro dopo essersi raggiunti.
+        f.pensa = f.combo ? 1 : f.azione === "avanza" ? caso(1, 4) : caso(2, 12);
+        f.azione = null;
       }
       return;
     }
@@ -1110,11 +1121,12 @@
       f.dir = altro.p.bacino.x >= f.p.bacino.x ? 1 : -1;
       const distanza = Math.abs(altro.cx - f.cx) / S;
       if (distanza > 34) {
-        const azione = scegli([[74 * f.aggr, "avanza"], [14 * pesoMossa(f, "provoca"), "provoca"], [12 * pesoMossa(f, "salto"), "salto"]]);
+        // Le provocazioni si fanno da lontano; a mezza distanza si va sotto.
+        const azione = scegli([[74 * f.aggr, "avanza"], [(distanza > 150 ? 12 : 3) * pesoMossa(f, "provoca"), "provoca"], [9 * pesoMossa(f, "salto"), "salto"]]);
         inizia(f, azione, altro.cx);
       } else if (distanza < 22) {
-        inizia(f, scegli([[45 * pesoMossa(f, "indietro"), "indietro"], [25 * pesoMossa(f, "montante"), "montante"],
-                          [30 * pesoMossa(f, "pugno"), "pugno"], [pesoPresa * 1.5, "presa"]]));
+        inizia(f, scegli([[24 * pesoMossa(f, "indietro"), "indietro"], [30 * pesoMossa(f, "montante"), "montante"],
+                          [36 * pesoMossa(f, "pugno"), "pugno"], [pesoPresa * 1.5, "presa"]]));
       } else {
         // Dopo un colpo a segno o una parata si va in serie: solo attacchi,
         // scelti ancora più in base a quel che ha funzionato.
@@ -1132,7 +1144,12 @@
       // l'elemento su cui siamo, verso il bordo più vicino per scendere.
       const o = f.supporto;
       let meta = altro.cx;
-      if (o && altro.cx >= o.l - 4 * S && altro.cx <= o.r + 4 * S) {
+      if (o && verso > 0 && !altro.scalata && !raggiungibile(altro, o) && Math.min(f.cx - o.l, o.r - f.cx) > 60 * S) {
+        // Il bordo è lontano e l'altro da sotto non può arrampicarsi: l'elemento è
+        // una piattaforma, ci si lascia cadere attraverso. Prima si camminava fino in fondo (anche dieci secondi su
+        // una testata larga quanto la pagina) mentre l'altro aspettava sotto.
+        f.attraversa = { y: o.t, t: 120 };
+      } else if (o && altro.cx >= o.l - 4 * S && altro.cx <= o.r + 4 * S) {
         meta = (f.cx - o.l < o.r - f.cx) ? o.l - 14 * S : o.r + 14 * S;
       }
       f.dir = meta >= f.cx ? 1 : -1;
@@ -1142,7 +1159,7 @@
     } else {
       // Più in alto: ci si arrampica sul fianco dell'elemento su cui sta.
       const o = altro.supporto;
-      if (raggiungibile(f, o)) {
+      if (raggiungibile(f, o) && !altro.attraversa) {
         const lato = f.cx < (o.l + o.r) / 2 ? -1 : 1;
         const xw = lato < 0 ? o.l : o.r;
         const meta = xw + lato * 11 * S;
@@ -1151,8 +1168,13 @@
         inizia(f, "avanza", meta);
         f.dopo = { o, lato };
       } else {
-        // Irraggiungibile: aspetta che scenda lui, provocandolo.
-        inizia(f, scegli([[70, "provoca"], [30, "salto"]]));
+        // Irraggiungibile: gli si va sotto (l'altro scende attraverso l'elemento),
+        // e passato il primo minuto ogni tanto lo si raggiunge col jetpack.
+        f.dir = altro.cx >= f.cx ? 1 : -1;
+        const sotto = altro.cx - f.dir * 30 * S;
+        if (tempo >= CALMA && !f.tel && Math.random() < 0.3) { decolla(f, false); return; }
+        if (Math.abs(altro.cx - f.cx) > 60 * S) inizia(f, "avanza", Math.max(10 * S, Math.min(W - 10 * S, sotto)));
+        else inizia(f, scegli([[35, "provoca"], [65, "salto"]]));
       }
     }
   }
@@ -1284,7 +1306,7 @@
   function segnaKO(f, altro) {
     altro.koVero = true;
     risolviScommessa(f.tipo && f !== altro ? f.tipo : (altro.tipo === "robot" ? "mela" : "robot"));
-    altro.ko = Math.round(caso(110, 170)); altro.danni = 0; altro.soglia = Math.round(caso(3, 6));
+    altro.ko = Math.round(caso(110, 170)); altro.danni = 0; altro.soglia = Math.round(caso(4, 7));
     if (f.tipo) punteggio[f.tipo]++;
     // Chi vince balla (01/10/2026, su richiesta), appena l'altro è giù.
     if (f.p && f !== altro) f.daBallare = true;
@@ -1545,6 +1567,11 @@
     if (piattaforma) {
       for (const o of ostacoli) {
         if (pt.x < o.l - r || pt.x > o.r + r) continue;
+        if (f.attraversa && Math.abs(o.t - f.attraversa.y) < 2) continue;
+        // Regge solo l'elemento su cui si poggiano i piedi (o uno più in basso): a
+        // quelli più in alto non ci si resta appesi con le mani o con la testa
+        // dopo un salto o un colpo preso da sotto.
+        if (o.t < f.base - 2 * S) continue;
         // Solo scendendo, e solo se un attimo prima si era sopra il bordo alto.
         if (pt.oy <= o.t - r + 1 && pt.y > o.t - r) {
           const vx = pt.x - pt.ox, vy = pt.y - pt.oy;
@@ -1798,7 +1825,13 @@
     if (!t) return;
     t.stato = "volo"; t.protetto = 14; t.da = f; t.lanciatore = f; t.armato = !!SPECIALI[t.tipo];
     const T = caso(32, 44);
-    const tx = altro.p.collo.x + caso(-7, 7) * S, ty = altro.p.collo.y + caso(-7, 7) * S;
+    // Si mira dove l'altro SARÀ: ora che si corre, un lancio verso dov'è adesso
+    // arrivava quasi sempre alle spalle. Chi viene incontro si ferma a tiro, quindi
+    // l'anticipo non supera mai chi lancia.
+    const lato = Math.sign(altro.p.collo.x - t.x) || f.dir;
+    let tx = altro.p.collo.x + (altro.vcx || 0) * T * 0.85 + caso(-7, 7) * S;
+    if ((tx - (t.x + lato * 30 * S)) * lato < 0) tx = t.x + lato * 30 * S;
+    const ty = altro.p.collo.y + caso(-7, 7) * S;
     let vx = (tx - t.x) / T, vy = (ty - t.y) / T - 0.5 * GRAVITA * S * moltG * verso * T;
     const lim = VELOCITA_MAX * S * 0.9;
     vx = Math.max(-lim, Math.min(lim, vx)); vy = Math.max(-lim, Math.min(lim * 0.5, vy));
@@ -2404,7 +2437,7 @@
         particelle.push({ tipo: "fumo", x: n.x + caso(-42, 42) * S, y: n.y + caso(-26, 22) * S, vx: caso(-0.5, 0.5) * S, vy: -caso(0.1, 0.5) * S,
                           vita: 80, max: 80, r: caso(9, 15) * S, colore: passi % 4 < 2 ? "#bdb8cc" : "#dedbe8" });
       }
-      if (n.t > 260) continue;
+      if (n.t > 150) continue;                    // acceca per due secondi e mezzo, poi è solo fumo
       for (const f of lottatori) {
         if (f.tipo === n.per || f.esploso || f.fuori || f.ko > 0 || f.preso || f.tenuto) continue;
         if (Math.hypot(f.p.testa.x - n.x, f.p.testa.y - n.y) < 64 * S) {
@@ -4632,6 +4665,8 @@
 
     for (const [f, altro] of [[a, b], [b, a]]) {
       if (f.esploso) continue;
+      // La velocità con cui ci si sposta, per chi deve mirare.
+      f.vcx = 0.7 * (f.vcx || 0) + 0.3 * Math.max(-3 * S, Math.min(3 * S, f.cxPrima === undefined ? 0 : f.cx - f.cxPrima)); f.cxPrima = f.cx;
       if (f.tel && (f.ko > 0 || f.stordito || f.preso || f.dolore || f.tenuto)) lasciaCadere(f);
       if (f.arma && (f.ko > 0 || f.preso || f.tenuto)) lasciaArma(f);
       if (f.tiene && (f.ko > 0 || f.preso || f.tenuto)) molla(f);
@@ -4669,6 +4704,10 @@
       if (!(f.jet > 0)) { f.volo = false; f.scatto = 0; }
       if (anime) aggiornaInseguimento(f, altro);
       if (f.caos > 0) f.forza = Math.min(f.forza, 0.35);
+      // Finisce quando tutto il corpo è passato sotto (non solo i piedi: testa e
+      // mani resterebbero appese all'elemento).
+      if (f.attraversa && (--f.attraversa.t <= 0 || f.ko > 0 || f.preso || f.tenuto || f.jet > 0 ||
+                           Object.keys(f.p).every((n) => f.p[n].y - f.p[n].r > f.attraversa.y + 2))) f.attraversa = null;
       if (!f.scalata) {
         const [y, chi] = appoggio(f);
         f.base = y; f.supporto = chi;
@@ -4728,10 +4767,14 @@
       } else if (f.azione === "avanza") {
         // Camminando si passa davanti agli elementi: ci si arrampica solo per
         // raggiungere l'avversario che sta più in alto (lo decide `pensa`).
-        const lato = Math.sign(f.meta - f.cx) || f.dir;
-        f.dir = lato;
-        f.cx += lato * (Math.abs(f.meta - f.cx) > 220 * S ? 1.6 : 0.95) * S;
-        f.passo += 0.28;
+        // PIÙ SVELTI (02/10/2026, su richiesta: «a volte sembrano fermi»). Si
+        // passava il 40% del tempo a camminare verso l'altro a passo lento: ora
+        // da vicino si va di buon passo, da lontano si corre.
+        const lato = Math.sign(f.meta - f.cx) || f.dir, manca = Math.abs(f.meta - f.cx);
+        const vel = manca > 220 * S ? 2.6 : manca > 80 * S ? 1.9 : 1.3;
+        f.dir = lato; f.corsa = vel > 1.5;
+        f.cx += lato * Math.min(vel * S, manca);
+        f.passo += 0.2 + 0.1 * vel;
       } else if (f.azione === "indietro") { f.cx -= f.dir * 1.0 * S; f.passo += 0.3; }
       else f.passo += 0.08;
 
@@ -4802,7 +4845,7 @@
         const v = Math.hypot(vx, vy), lim = VELOCITA_MAX * S;
         if (v > lim) { vx *= lim / v; vy *= lim / v; }
         // Col paracadute si scende piano, ondeggiando un po'.
-        if (f.para > 0.3) { vy = Math.min(vy, 1.5 * S); vx = vx * 0.96 + Math.sin(passi * 0.05) * 0.05 * S; }
+        if (f.para > 0.3) { vy = Math.min(vy, 3 * S); vx = vx * 0.96 + Math.sin(passi * 0.05) * 0.05 * S; }
         pt.ox = pt.x; pt.oy = pt.y;
         pt.x += vx; pt.y += vy + GRAVITA * S * moltG * verso;
       }
