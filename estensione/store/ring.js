@@ -116,7 +116,7 @@
   function aggiornaTastoGioca() {
     if (!tastoGioca) return;
     tastoGioca.setAttribute("aria-pressed", fermo ? "false" : "true");
-    tastoGioca.title = fermo ? "Accendi le lotte" : "Spegni le lotte e lascia solo le notizie";
+    tastoGioca.title = fermo ? "Accendi le lotte" : ospite ? "Spegni le lotte" : "Spegni le lotte e lascia solo le notizie";
   }
   if (tastoGioca) {
     tastoGioca.hidden = false;

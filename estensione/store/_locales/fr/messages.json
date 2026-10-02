@@ -7,5 +7,17 @@
   },
   "titolo": {
     "message": "Lancer ou arrêter le combat sur cette page"
+  },
+  "opzioniTitolo": {
+    "message": "Options de Page Brawl"
+  },
+  "sempreEtichetta": {
+    "message": "Afficher le bouton de mise en marche sur tous les sites"
+  },
+  "sempreSpiega": {
+    "message": "Un petit bouton reste dans le coin inférieur droit de chaque page : un clic et le combat commence, sans passer par l'icône de la barre. Pour l'y placer, le navigateur vous demandera de laisser Page Brawl fonctionner sur tous les sites. Rien n'est lu dans les pages et rien n'est envoyé."
+  },
+  "sempreNegato": {
+    "message": "Autorisation refusée : le bouton reste désactivé."
   }
 }

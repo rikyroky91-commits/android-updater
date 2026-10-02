@@ -179,6 +179,7 @@
     "VOLA!": ["FLY!", "¡A VOLAR!", "VOLE !", "FLIEG!"],
     "NOTIFICA!": ["PING!", "¡AVISO!", "NOTIF !", "PLING!"],
     "CTRL+ALT+CANC!": ["CTRL+ALT+DEL!", "¡CTRL+ALT+SUPR!", "CTRL+ALT+SUPPR !", "STRG+ALT+ENTF!"],
+    "Tasto di accensione su tutti i siti": ["Power button on every site", "Botón de encendido en todos los sitios", "Bouton de mise en marche sur tous les sites", "Einschaltknopf auf allen Websites"],
     "Sblocca Premium": ["Unlock Premium", "Desbloquear Premium", "Débloquer Premium", "Premium freischalten"],
     "Premium arriva presto": ["Premium is coming soon", "Premium llegará pronto", "Premium arrive bientôt", "Premium kommt bald"],
     "Premium di prova (solo in questa versione)": ["Trial Premium (this build only)", "Premium de prueba (solo en esta versión)", "Premium d'essai (cette version uniquement)", "Premium zum Testen (nur in dieser Version)"],

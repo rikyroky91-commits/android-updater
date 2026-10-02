@@ -7,5 +7,17 @@
   },
   "titolo": {
     "message": "Start or stop the brawl on this page"
+  },
+  "opzioniTitolo": {
+    "message": "Page Brawl options"
+  },
+  "sempreEtichetta": {
+    "message": "Show the power button on every site"
+  },
+  "sempreSpiega": {
+    "message": "A small button stays in the bottom right corner of every page: one click starts the brawl, without going through the toolbar icon. To put it there, the browser will ask you to let Page Brawl run on all sites. Nothing is read from the pages and nothing is sent anywhere."
+  },
+  "sempreNegato": {
+    "message": "Permission not granted: the button stays off."
   }
 }

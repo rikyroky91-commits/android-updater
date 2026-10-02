@@ -15,6 +15,13 @@
     "scripting",
     "storage"
   ],
+  "optional_host_permissions": [
+    "<all_urls>"
+  ],
+  "options_ui": {
+    "page": "opzioni.html",
+    "open_in_tab": false
+  },
   "icons": {
     "16": "icone/16.png",
     "48": "icone/48.png",

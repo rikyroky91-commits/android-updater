@@ -25,3 +25,17 @@ async function avvia(tab) {
   }
 }
 chrome.action.onClicked.addListener(avvia);
+// Dal tasto sempre visibile (per chi l'ha acceso nelle opzioni) e dalla tendina.
+chrome.runtime.onMessage.addListener((messaggio, mittente) => {
+  if (!messaggio) return;
+  if (messaggio.tipo === "avvia" && mittente.tab) avvia(mittente.tab);
+  if (messaggio.tipo === "opzioni") chrome.runtime.openOptionsPage();
+});
+// Tolto il permesso su tutti i siti dalle impostazioni del browser: via anche il tasto.
+chrome.permissions.onRemoved.addListener(async () => {
+  try {
+    if (await chrome.permissions.contains({ origins: ["<all_urls>"] })) return;
+    await chrome.scripting.unregisterContentScripts({ ids: ["pb-tasto"] });
+    await chrome.storage.local.set({ "pb-sempre": "off" });
+  } catch (errore) { /* non era registrato */ }
+});

@@ -7,5 +7,17 @@
   },
   "titolo": {
     "message": "Kampf auf dieser Seite starten oder stoppen"
+  },
+  "opzioniTitolo": {
+    "message": "Optionen von Page Brawl"
+  },
+  "sempreEtichetta": {
+    "message": "Einschaltknopf auf allen Websites anzeigen"
+  },
+  "sempreSpiega": {
+    "message": "Ein kleiner Knopf bleibt unten rechts auf jeder Seite: ein Klick und der Kampf beginnt, ohne das Symbol in der Leiste. Dafür fragt der Browser, ob Page Brawl auf allen Websites laufen darf. Aus den Seiten wird nichts gelesen und nichts wird gesendet."
+  },
+  "sempreNegato": {
+    "message": "Berechtigung nicht erteilt: Der Knopf bleibt aus."
   }
 }

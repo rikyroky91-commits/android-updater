@@ -7,5 +7,17 @@
   },
   "titolo": {
     "message": "Accendi o spegni la lotta su questa pagina"
+  },
+  "opzioniTitolo": {
+    "message": "Opzioni di Page Brawl"
+  },
+  "sempreEtichetta": {
+    "message": "Mostra il tasto di accensione su tutti i siti"
+  },
+  "sempreSpiega": {
+    "message": "Un tastino resta nell'angolo in basso a destra di ogni pagina: un clic e la lotta parte, senza passare dall'icona nella barra. Per metterlo lì il browser ti chiede di lasciar funzionare Page Brawl su tutti i siti. Dalle pagine non viene letto niente e non viene inviato niente."
+  },
+  "sempreNegato": {
+    "message": "Permesso non concesso: il tasto resta spento."
   }
 }

@@ -7,5 +7,17 @@
   },
   "titolo": {
     "message": "Enciende o apaga la pelea en esta página"
+  },
+  "opzioniTitolo": {
+    "message": "Opciones de Page Brawl"
+  },
+  "sempreEtichetta": {
+    "message": "Mostrar el botón de encendido en todos los sitios"
+  },
+  "sempreSpiega": {
+    "message": "Un botoncito se queda en la esquina inferior derecha de cada página: un clic y empieza la pelea, sin pasar por el icono de la barra. Para ponerlo ahí, el navegador te pedirá que dejes funcionar Page Brawl en todos los sitios. No se lee nada de las páginas y no se envía nada."
+  },
+  "sempreNegato": {
+    "message": "Permiso no concedido: el botón sigue apagado."
   }
 }

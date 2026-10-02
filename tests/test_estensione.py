@@ -36,6 +36,9 @@ class TestEstensione(unittest.TestCase):
                 self.assertEqual(sorted(m["permissions"]), ["activeTab", "scripting", "storage"])
                 self.assertNotIn("host_permissions", m)
                 self.assertNotIn("content_scripts", m)       # parte solo al clic sull'icona
+                # L'accesso a tutti i siti è solo FACOLTATIVO: lo chiede la pagina delle opzioni a chi vuole il tasto ovunque.
+                self.assertEqual(m["optional_host_permissions"], ["<all_urls>"])
+                self.assertTrue((cartella / m["options_ui"]["page"]).exists())
                 for lato in ("16", "48", "128"):
                     self.assertTrue((cartella / m["icons"][lato]).exists())
                 self.assertTrue((cartella / m["background"]["service_worker"]).exists())
@@ -48,7 +51,7 @@ class TestEstensione(unittest.TestCase):
                 self.assertEqual(m["name"], "__MSG_nome__")
                 for lingua in LINGUE:
                     messaggi = json.loads((cartella / "_locales" / lingua / "messages.json").read_text(encoding="utf-8"))
-                    self.assertEqual(set(messaggi), {"nome", "descrizione", "titolo"})
+                    self.assertEqual(set(messaggi), {"nome", "descrizione", "titolo", "opzioniTitolo", "sempreEtichetta", "sempreSpiega", "sempreNegato"})
                     self.assertLessEqual(len(messaggi["nome"]["message"]), 45)          # limite del Chrome Web Store
                     self.assertLessEqual(len(messaggi["descrizione"]["message"]), 132)  # idem
 
@@ -61,7 +64,7 @@ class TestEstensione(unittest.TestCase):
 
     def test_niente_codice_da_fuori_e_niente_rete(self):
         for nome, cartella in VARIANTI.items():
-            for file in ("prepara.js", "sfondo.js", "ring.js", "lingue.js"):
+            for file in ("prepara.js", "sfondo.js", "ring.js", "lingue.js", "tasto.js", "opzioni.js"):
                 testo = (cartella / file).read_text(encoding="utf-8")
                 for vietato in ("fetch(", "XMLHttpRequest", "eval(", "new Function", "importScripts(", "<script"):
                     self.assertNotIn(vietato, testo, f"{nome}/{file}: {vietato}")
@@ -86,6 +89,26 @@ class TestEstensione(unittest.TestCase):
                 self.assertIn("__lingueSoloDizionario = true", sfondo)      # il dizionario non tocca la pagina
                 self.assertLess(sfondo.index('"lingue.js"'), sfondo.index('"prepara.js"'))
                 self.assertLess(sfondo.index('"prepara.js"'), sfondo.index('"ring.js"'))
+
+    def test_il_tasto_di_accensione_resta_in_vista_e_quello_su_tutti_i_siti_e_una_scelta(self):
+        for nome, cartella in VARIANTI.items():
+            with self.subTest(variante=nome):
+                prepara = (cartella / "prepara.js").read_text(encoding="utf-8")
+                # Spento resta solo il tasto: il resto sparisce con `data-spento` sull'ospite.
+                self.assertIn(":host([data-spento]) .tela", prepara)
+                self.assertIn('ospite.setAttribute("data-spento"', prepara)
+                self.assertNotIn('ospite.style.display = "none"', prepara)
+                # Il tasto su ogni pagina si registra solo dalle opzioni, dopo la richiesta del permesso.
+                opzioni = (cartella / "opzioni.js").read_text(encoding="utf-8")
+                self.assertLess(opzioni.index("chrome.permissions.request(TUTTI)"), opzioni.index("registerContentScripts"))
+                self.assertIn("chrome.permissions.remove(TUTTI)", opzioni)
+                sfondo = (cartella / "sfondo.js").read_text(encoding="utf-8")
+                self.assertNotIn("scripting.registerContentScripts", sfondo) # mai da solo
+                self.assertIn('messaggio.tipo === "avvia" && mittente.tab', sfondo)
+                tasto = (cartella / "tasto.js").read_text(encoding="utf-8")
+                self.assertIn('chrome.runtime.sendMessage({ tipo: "avvia" })', tasto)
+                self.assertIn("window.top !== window", tasto)                # non nei riquadri dentro le pagine
+                self.assertNotIn("<script", (cartella / "opzioni.html").read_text(encoding="utf-8").replace('<script src="opzioni.js"></script>', ""))
 
     def test_gli_effetti_cruenti_partono_spenti(self):
         # Lo store non ammette violenza gratuita: schizzi e arti staccati li accende chi li vuole.

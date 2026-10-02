@@ -43,22 +43,55 @@ MANIFEST = {
     "background": {"service_worker": "sfondo.js"},
     # Il permesso minimo: solo la scheda su cui si clicca l'icona.
     "permissions": ["activeTab", "scripting", "storage"],
+    # Facoltativo, chiesto solo a chi accende «tasto su tutti i siti» nelle opzioni.
+    "optional_host_permissions": ["<all_urls>"],
+    "options_ui": {"page": "opzioni.html", "open_in_tab": False},
     "icons": {"16": "icone/16.png", "48": "icone/48.png", "128": "icone/128.png"},
 }
 
-# Nome, descrizione breve (al massimo 132 caratteri: è il limite dello store)
-# e titolo del tasto, nelle lingue dell'estensione.
+# Nome, descrizione breve (al massimo 132 caratteri: è il limite dello store),
+# titolo del tasto e i testi della pagina delle opzioni, nelle lingue dell'estensione.
 MESSAGGI = {
-    "en": ("A robot and an apple brawl on the page you are viewing. Grab them, throw them, bet on the winner.",
-           "Start or stop the brawl on this page"),
-    "it": ("Un robot e una mela si picchiano sulla pagina che stai guardando. Prendili, lanciali, scommetti su chi vince.",
-           "Accendi o spegni la lotta su questa pagina"),
-    "es": ("Un robot y una manzana se pelean en la página que estás viendo. Agárralos, lánzalos y apuesta por el ganador.",
-           "Enciende o apaga la pelea en esta página"),
-    "fr": ("Un robot et une pomme se battent sur la page que vous regardez. Attrapez-les, lancez-les, pariez sur le vainqueur.",
-           "Lancer ou arrêter le combat sur cette page"),
-    "de": ("Ein Roboter und ein Apfel prügeln sich auf der Seite, die du gerade ansiehst. Pack sie, wirf sie, wette auf den Sieger.",
-           "Kampf auf dieser Seite starten oder stoppen"),
+    "en": {
+        "descrizione": "A robot and an apple brawl on the page you are viewing. Grab them, throw them, bet on the winner.",
+        "titolo": "Start or stop the brawl on this page",
+        "opzioniTitolo": "Page Brawl options",
+        "sempreEtichetta": "Show the power button on every site",
+        "sempreSpiega": "A small button stays in the bottom right corner of every page: one click starts the brawl, without going through the toolbar icon. To put it there, the browser will ask you to let Page Brawl run on all sites. Nothing is read from the pages and nothing is sent anywhere.",
+        "sempreNegato": "Permission not granted: the button stays off.",
+    },
+    "it": {
+        "descrizione": "Un robot e una mela si picchiano sulla pagina che stai guardando. Prendili, lanciali, scommetti su chi vince.",
+        "titolo": "Accendi o spegni la lotta su questa pagina",
+        "opzioniTitolo": "Opzioni di Page Brawl",
+        "sempreEtichetta": "Mostra il tasto di accensione su tutti i siti",
+        "sempreSpiega": "Un tastino resta nell'angolo in basso a destra di ogni pagina: un clic e la lotta parte, senza passare dall'icona nella barra. Per metterlo lì il browser ti chiede di lasciar funzionare Page Brawl su tutti i siti. Dalle pagine non viene letto niente e non viene inviato niente.",
+        "sempreNegato": "Permesso non concesso: il tasto resta spento.",
+    },
+    "es": {
+        "descrizione": "Un robot y una manzana se pelean en la página que estás viendo. Agárralos, lánzalos y apuesta por el ganador.",
+        "titolo": "Enciende o apaga la pelea en esta página",
+        "opzioniTitolo": "Opciones de Page Brawl",
+        "sempreEtichetta": "Mostrar el botón de encendido en todos los sitios",
+        "sempreSpiega": "Un botoncito se queda en la esquina inferior derecha de cada página: un clic y empieza la pelea, sin pasar por el icono de la barra. Para ponerlo ahí, el navegador te pedirá que dejes funcionar Page Brawl en todos los sitios. No se lee nada de las páginas y no se envía nada.",
+        "sempreNegato": "Permiso no concedido: el botón sigue apagado.",
+    },
+    "fr": {
+        "descrizione": "Un robot et une pomme se battent sur la page que vous regardez. Attrapez-les, lancez-les, pariez sur le vainqueur.",
+        "titolo": "Lancer ou arrêter le combat sur cette page",
+        "opzioniTitolo": "Options de Page Brawl",
+        "sempreEtichetta": "Afficher le bouton de mise en marche sur tous les sites",
+        "sempreSpiega": "Un petit bouton reste dans le coin inférieur droit de chaque page : un clic et le combat commence, sans passer par l'icône de la barre. Pour l'y placer, le navigateur vous demandera de laisser Page Brawl fonctionner sur tous les sites. Rien n'est lu dans les pages et rien n'est envoyé.",
+        "sempreNegato": "Autorisation refusée : le bouton reste désactivé.",
+    },
+    "de": {
+        "descrizione": "Ein Roboter und ein Apfel prügeln sich auf der Seite, die du gerade ansiehst. Pack sie, wirf sie, wette auf den Sieger.",
+        "titolo": "Kampf auf dieser Seite starten oder stoppen",
+        "opzioniTitolo": "Optionen von Page Brawl",
+        "sempreEtichetta": "Einschaltknopf auf allen Websites anzeigen",
+        "sempreSpiega": "Ein kleiner Knopf bleibt unten rechts auf jeder Seite: ein Klick und der Kampf beginnt, ohne das Symbol in der Leiste. Dafür fragt der Browser, ob Page Brawl auf allen Websites laufen darf. Aus den Seiten wird nichts gelesen und nichts wird gesendet.",
+        "sempreNegato": "Berechtigung nicht erteilt: Der Knopf bleibt aus.",
+    },
 }
 
 SFONDO = """/* Il service worker dell'estensione: al clic sull'icona accende il ring
@@ -88,6 +121,20 @@ async function avvia(tab) {
   }
 }
 chrome.action.onClicked.addListener(avvia);
+// Dal tasto sempre visibile (per chi l'ha acceso nelle opzioni) e dalla tendina.
+chrome.runtime.onMessage.addListener((messaggio, mittente) => {
+  if (!messaggio) return;
+  if (messaggio.tipo === "avvia" && mittente.tab) avvia(mittente.tab);
+  if (messaggio.tipo === "opzioni") chrome.runtime.openOptionsPage();
+});
+// Tolto il permesso su tutti i siti dalle impostazioni del browser: via anche il tasto.
+chrome.permissions.onRemoved.addListener(async () => {
+  try {
+    if (await chrome.permissions.contains({ origins: ["<all_urls>"] })) return;
+    await chrome.scripting.unregisterContentScripts({ ids: ["pb-tasto"] });
+    await chrome.storage.local.set({ "pb-sempre": "off" });
+  } catch (errore) { /* non era registrato */ }
+});
 """
 
 STILE_BASE = """
@@ -121,8 +168,10 @@ STILE_BASE = """
 }
 .tasto:hover { border-color: var(--verde); }
 .tasto[aria-expanded="true"] { background: var(--verde-tenue); }
-.tasto[data-gioca][aria-pressed="false"] { opacity: .6; }
-.tasto[data-gioca][aria-pressed="false"] .omino-taglio { display: none; }
+.tasto[data-gioca] { color: var(--verde); }
+.tasto[data-gioca][aria-pressed="false"] { color: var(--ink); opacity: .65; }
+/* Spento: resta solo il tasto di accensione. */
+:host([data-spento]) .tela, :host([data-spento]) .ancora, :host([data-spento]) [data-opzioni] { display: none !important; }
 h3 { font-weight: 700; }
 /* Premium: i tasti chiusi portano il lucchetto; in cima alla tendina il riquadro che spiega e sblocca. */
 .ring-tasto.bloccato { opacity: .72; }
@@ -138,19 +187,121 @@ h3 { font-weight: 700; }
 STILE_PAGINA = ("html.ring-presa, html.ring-presa * { cursor: grab !important; } "
                 "html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-select: none !important; }")
 
+ICONA_ACCENSIONE = ('<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">'
+                    '<path d="M12 3v9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>'
+                    '<path d="M7.1 6.3a8 8 0 1 0 9.8 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>')
+
+# Il tasto di accensione è `data-gioca`, quello che il ring già conosce: acceso
+# c'è tutto, spento resta solo lui (vedi `:host([data-spento])`).
 BARRETTA = """
   <div class="barretta">
     <button type="button" class="tasto" data-opzioni hidden aria-expanded="false"
             title="Opzioni del combattimento: scommesse, armi, imprevisti">&#129354;</button>
     <button type="button" class="tasto" data-gioca hidden aria-pressed="true" aria-label="Lotte accese o spente"
-            title="Spegni le lotte">
-      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-        <circle cx="12" cy="5" r="2.6" fill="none" stroke="currentColor" stroke-width="2"/>
-        <path d="M12 8v7M7 11h10M12 15l-4 6M12 15l4 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        <path class="omino-taglio" d="M4 20L20 4" stroke="#d8343f" stroke-width="2.6" stroke-linecap="round"/>
-      </svg>
-    </button>
+            title="Spegni le lotte">__ICONA__</button>
   </div>
+""".replace("__ICONA__", ICONA_ACCENSIONE)
+
+# Il tasto per chi lo vuole su ogni pagina: uno script minuscolo, registrato
+# solo dopo che l'utente l'ha chiesto nelle opzioni e ha dato il permesso.
+TASTO = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
+ *
+ * Il tasto di accensione sempre visibile: in basso a destra, su ogni pagina.
+ * Un clic chiede al service worker di far partire il ring su questa scheda.
+ */
+(function () {
+  "use strict";
+  if (window.top !== window || window.__ringEstensione || document.getElementById("page-brawl") || document.getElementById("page-brawl-tasto")) return;
+  var ospite = document.createElement("div");
+  ospite.id = "page-brawl-tasto";
+  ospite.style.cssText = "all: initial; position: fixed; right: 12px; bottom: 12px; z-index: 2147483646;";
+  var radice = ospite.attachShadow({ mode: "open" });
+  radice.innerHTML = __HTML__;
+  try {
+    var foglio = new CSSStyleSheet();
+    foglio.replaceSync(__STILE__);
+    radice.adoptedStyleSheets = [foglio];
+  } catch (e) { /* senza stile resta un tasto qualunque */ }
+  var tasto = radice.querySelector("button"), titolo = "";
+  try { titolo = chrome.i18n.getMessage("titolo"); } catch (e) { /* niente titolo */ }
+  tasto.title = titolo; tasto.setAttribute("aria-label", titolo);
+  tasto.addEventListener("click", function () {
+    try { chrome.runtime.sendMessage({ tipo: "avvia" }); }
+    catch (e) { ospite.remove(); }             // estensione aggiornata o tolta: il tasto non serve più
+  });
+  document.documentElement.appendChild(ospite);
+})();
+"""
+STILE_TASTO = """
+button {
+  width: 48px; height: 48px; border-radius: 50%; border: 1px solid #d4d0c8; background: #ffffff; color: #201e1d;
+  opacity: .75; cursor: pointer; display: grid; place-items: center; padding: 0; box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+}
+button:hover { opacity: 1; border-color: #1f7a5a; color: #1f7a5a; }
+@media (prefers-color-scheme: dark) { button { background: #1c1b1a; color: #ebe9e6; border-color: #3a3835; } }
+"""
+
+OPZIONI_HTML = """<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Page Brawl</title>
+<link rel="stylesheet" href="opzioni.css">
+</head>
+<body>
+<h1 data-msg="opzioniTitolo"></h1>
+<label><input type="checkbox" id="sempre"> <span data-msg="sempreEtichetta"></span></label>
+<p data-msg="sempreSpiega"></p>
+<p id="esito" role="status"></p>
+<script src="opzioni.js"></script>
+</body>
+</html>
+"""
+OPZIONI_CSS = """body { font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 16px 18px; min-width: 320px; max-width: 520px; color: #201e1d; }
+h1 { font-size: 18px; margin: 0 0 12px; }
+label { display: flex; gap: 8px; align-items: flex-start; font-weight: 600; }
+p { margin: 10px 0 0; color: #4a4744; }
+#esito { color: #b3261e; min-height: 1.4em; }
+@media (prefers-color-scheme: dark) { body { background: #1c1b1a; color: #ebe9e6; } p { color: #bdb9b3; } }
+"""
+OPZIONI_JS = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
+ *
+ * La pagina delle opzioni: una sola scelta, il tasto di accensione su tutti i
+ * siti. Accenderla fa chiedere al browser il permesso (facoltativo) su tutti
+ * i siti e registra lo script del tasto; spegnerla toglie l'uno e l'altro.
+ */
+(function () {
+  "use strict";
+  var TUTTI = { origins: ["<all_urls>"] }, ID = "pb-tasto";
+  var casella = document.getElementById("sempre"), esito = document.getElementById("esito");
+  var m = function (chiave) { return chrome.i18n.getMessage(chiave) || chiave; };
+  document.querySelectorAll("[data-msg]").forEach(function (el) { el.textContent = m(el.getAttribute("data-msg")); });
+  document.title = m("opzioniTitolo");
+  async function registrato() { return (await chrome.scripting.getRegisteredContentScripts({ ids: [ID] })).length > 0; }
+  async function leggi() { casella.checked = (await chrome.permissions.contains(TUTTI)) && (await registrato()); }
+  casella.addEventListener("change", async function () {
+    esito.textContent = "";
+    try {
+      if (casella.checked) {
+        // La richiesta va fatta subito, dentro il clic: è il browser a mostrare la domanda.
+        var concesso = await chrome.permissions.request(TUTTI);
+        if (!concesso) { casella.checked = false; esito.textContent = m("sempreNegato"); return; }
+        if (!(await registrato())) {
+          await chrome.scripting.registerContentScripts([{ id: ID, js: ["tasto.js"], matches: ["<all_urls>"], runAt: "document_idle" }]);
+        }
+        await chrome.storage.local.set({ "pb-sempre": "on" });
+      } else {
+        if (await registrato()) await chrome.scripting.unregisterContentScripts({ ids: [ID] });
+        await chrome.storage.local.set({ "pb-sempre": "off" });
+        try { await chrome.permissions.remove(TUTTI); } catch (e) { /* già tolto */ }
+      }
+    } catch (e) {
+      esito.textContent = String((e && e.message) || e);
+      await leggi();
+    }
+  });
+  leggi();
+})();
 """
 
 PREPARA = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
@@ -215,6 +366,25 @@ PREPARA = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
   }
   document.documentElement.appendChild(ospite);
   window.__ringRadice = radice;
+  // Se c'era il tasto sempre visibile, da qui in poi lo sostituisce la barretta.
+  var solo = document.getElementById("page-brawl-tasto");
+  if (solo) solo.remove();
+
+  // Il tasto di accensione resta sempre in vista: spento, il resto sparisce
+  // (canvas, tendina, tasto delle opzioni); riacceso, torna tutto.
+  var accensione = radice.querySelector("[data-gioca]");
+  function allinea() {
+    if (accensione.getAttribute("aria-pressed") === "true") { ospite.removeAttribute("data-spento"); return; }
+    ospite.setAttribute("data-spento", "");
+    var tendina = radice.querySelector("[data-pannello]"), apri = radice.querySelector("[data-opzioni]");
+    if (tendina) tendina.classList.remove("aperto");
+    if (apri) apri.setAttribute("aria-expanded", "false");
+  }
+  new MutationObserver(allinea).observe(accensione, { attributes: true, attributeFilter: ["aria-pressed"] });
+  var versoOpzioni = radice.querySelector("[data-opzioni-estensione]");
+  if (versoOpzioni) versoOpzioni.addEventListener("click", function () {
+    try { chrome.runtime.sendMessage({ tipo: "opzioni" }); } catch (e) { /* estensione ricaricata */ }
+  });
 
   // Il riquadro Premium: cosa sblocca, il tasto per comprarlo e, nella sola
   // variante di prova, un interruttore per vedere il gioco aperto e chiuso.
@@ -254,12 +424,8 @@ PREPARA = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
   window.__ringEstensione = {
     ospite: ospite,
     premium: impostaPremium,
-    // Un altro clic sull'icona: spegne e nasconde tutto, o riaccende.
-    alterna: function () {
-      var tasto = radice.querySelector("[data-gioca]"), acceso = tasto.getAttribute("aria-pressed") === "true";
-      if (ospite.style.display === "none") { ospite.style.display = ""; if (!acceso) tasto.click(); }
-      else { if (acceso) tasto.click(); ospite.style.display = "none"; }
-    },
+    // Un altro clic sull'icona nella barra fa lo stesso del tasto di accensione.
+    alterna: function () { accensione.click(); },
   };
 })();
 """
@@ -309,6 +475,10 @@ RIQUADRO_PREMIO = """
       <p data-premio-cosa>Premium sblocca i personaggi (super guerrieri, maghi e duellanti) con le loro mosse, le armi e le bombe, il meteo e la gravità.</p>
       <button type="button" class="ring-tasto ring-largo" data-premio-compra>Sblocca Premium</button>__PROVA__
     </section>"""
+VERSO_OPZIONI = """  <section class="ring-sezione">
+      <button type="button" class="ring-tasto ring-largo" data-opzioni-estensione>&#9881; Tasto di accensione su tutti i siti</button>
+    </section>
+  """
 TASTO_PROVA = """
       <button type="button" class="ring-tasto ring-largo" data-premio-prova aria-pressed="false">Premium di prova (solo in questa versione)</button>"""
 
@@ -337,6 +507,9 @@ def file_attesi(variante: str) -> dict:
     if scelte["premium"]:
         riquadro = RIQUADRO_PREMIO.replace("__PROVA__", TASTO_PROVA if opzioni["premium_di_prova"] else "")
         pannello = pannello[:fine_testa] + riquadro + pannello[fine_testa:]
+    # In fondo alla tendina, la strada per le opzioni dell'estensione.
+    fine = pannello.rindex("</div>")
+    pannello = pannello[:fine] + VERSO_OPZIONI + pannello[fine:]
     html = '<canvas class="tela" data-ring aria-hidden="true"></canvas>\n<div class="ancora">\n  ' + pannello + "\n</div>" + BARRETTA
     if "style=" in html:
         raise SystemExit("la tendina ha stili in linea: una CSP severa li bloccherebbe")
@@ -351,11 +524,17 @@ def file_attesi(variante: str) -> dict:
         "prepara.js": prepara,
         "ring.js": (RADICE / "web/static/ring.js").read_text(encoding="utf-8"),
         "lingue.js": (RADICE / "web/static/lingue.js").read_text(encoding="utf-8"),
+        "tasto.js": (TASTO.replace("__HTML__", json.dumps('<button type="button">' + ICONA_ACCENSIONE + "</button>"))
+                          .replace("__STILE__", json.dumps(STILE_TASTO))),
+        "opzioni.html": OPZIONI_HTML, "opzioni.css": OPZIONI_CSS, "opzioni.js": OPZIONI_JS,
     }
-    for lingua, (descrizione, titolo) in MESSAGGI.items():
-        if len(descrizione) > 132:
-            raise SystemExit(f"descrizione {lingua} troppo lunga per lo store: {len(descrizione)} caratteri")
-        messaggi = {"nome": {"message": NOME}, "descrizione": {"message": descrizione}, "titolo": {"message": titolo}}
+    for lingua, testi in MESSAGGI.items():
+        if set(testi) != set(MESSAGGI["en"]):
+            raise SystemExit(f"messaggi {lingua}: chiavi diverse dall'inglese")
+        if len(testi["descrizione"]) > 132:
+            raise SystemExit(f"descrizione {lingua} troppo lunga per lo store: {len(testi['descrizione'])} caratteri")
+        messaggi = {"nome": {"message": NOME}}
+        messaggi.update({chiave: {"message": testo} for chiave, testo in testi.items()})
         attesi[f"_locales/{lingua}/messages.json"] = json.dumps(messaggi, ensure_ascii=False, indent=2) + "\n"
     return attesi
 
