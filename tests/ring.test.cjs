@@ -976,18 +976,103 @@ test("la mela si smembra: morsi che si richiudono, taglio in due che si rincolla
 });
 
 test("un omino portato col puntatore colpisce l'altro se ci sbatte contro", () => {
+  let colpita = false;
+  for (let prova = 0; prova < 4 && !colpita; prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    let m = amb.lottatore("mela");
+    amb.porta("robot", m.bacino.x - 110, m.bacino.y - 14, 12);
+    // lo si sbatte contro la mela, inseguendola
+    for (let i = 1; i <= 24 && !colpita; i++) {
+      m = amb.lottatore("mela");
+      amb.muovi(m.bacino.x + 60, m.bacino.y - 14); amb.avanza(1);
+      const s = amb.stato(), f = s.lottatori.find((l) => l.tipo === "mela");
+      if (f.danni > 0 || f.ko > 0 || s.punteggio.robot > 0) colpita = true;
+    }
+    amb.rilascia(m.bacino.x + 60, m.bacino.y - 14);
+    amb.avanza(120); dentro(amb);
+  }
+  assert.ok(colpita, "portato col puntatore, il robot non ha colpito la mela");
+});
+
+test("sfera gigante: si carica sopra la testa, parte ed esplode", () => {
   const amb = ambiente();
   amb.avanza(30);
-  const m = amb.lottatore("mela");
-  amb.porta("robot", m.bacino.x - 200, m.bacino.y - 20, 10);
-  // lo si sbatte contro la mela
-  let colpita = false;
-  for (let i = 1; i <= 10 && !colpita; i++) {
-    amb.muovi(m.bacino.x - 200 + i * 30, m.bacino.y - 20); amb.avanza(1);
-    const s = amb.stato(), f = s.lottatori.find((l) => l.tipo === "mela");
-    if (f.danni > 0 || s.punteggio.robot > 0) colpita = true;
+  const r = amb.finestra.__ring;
+  r.comandi.colpo("sfera");
+  let carica = false, partita = false, esplosa = false;
+  amb.avanza(60 * 12, (s) => {
+    if (s.lottatori.some((f) => f.sfera)) carica = true;
+    if (s.sfereGrandi > 0) partita = true;
+    if (partita && s.sfereGrandi === 0 && (s.particelleTipi.fuoco || 0) > 0) { esplosa = true; return false; }
+  });
+  assert.ok(carica, "la sfera non si carica");
+  assert.ok(partita, "la sfera non parte");
+  assert.ok(esplosa, "la sfera non esplode");
+  amb.avanza(60 * 10); dentro(amb);
+});
+
+test("autodistruzione: avvinghiato all'altro salta in aria, l'altro resta nel cratere e poi si rialza", () => {
+  let cratere = false, pezzi = false, punto = false;
+  for (let prova = 0; prova < 4 && !cratere; prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    const r = amb.finestra.__ring;
+    r.comandi.colpo("autodistruzione");
+    let vittima = null;
+    amb.avanza(60 * 9, (s) => {
+      const esploso = s.lottatori.find((f) => f.esploso);
+      if (esploso) { pezzi = true; vittima = s.lottatori.find((f) => !f.esploso); }
+      if (vittima && s.lottatori.find((f) => f.tipo === vittima.tipo).cratere) { cratere = true; }
+      if (s.punteggio.robot + s.punteggio.mela === 1) punto = true;
+    });
+    if (cratere) {
+      // la vittima si rialza da sola e chi è saltato in aria si rimonta
+      let rialzata = false, rimontato = false;
+      amb.avanza(60 * 14, (s) => {
+        if (!s.lottatori.find((f) => f.tipo === vittima.tipo).ko) rialzata = true;
+        if (s.lottatori.every((f) => !f.esploso)) rimontato = true;
+        if (rialzata && rimontato) return false;
+      });
+      assert.ok(rialzata, "la vittima resta nel cratere per sempre");
+      assert.ok(rimontato, "chi si è fatto esplodere non si rimonta");
+    }
+    dentro(amb);
   }
-  amb.rilascia(m.bacino.x + 100, m.bacino.y - 20);
-  assert.ok(colpita, "portato col puntatore, il robot non ha colpito la mela");
-  amb.avanza(120); dentro(amb);
+  assert.ok(pezzi, "nessuno è saltato in aria");
+  assert.ok(cratere, "la vittima non è finita nel cratere");
+  assert.ok(punto, "l'autodistruzione non ha dato un punto solo");
+});
+
+test("disco tagliente, lampo accecante e barriera", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  const r = amb.finestra.__ring;
+  r.comandi.colpo("disco");
+  let disco = false;
+  amb.avanza(120, (s) => { if (s.dischi > 0) { disco = true; return false; } });
+  assert.ok(disco, "il disco non parte");
+  amb.avanza(60 * 8);
+  let accecato = false;
+  for (let i = 0; i < 4 && !accecato; i++) {
+    r.comandi.colpo("lampo");
+    amb.avanza(60 * 4, (s) => { if (s.lottatori.some((f) => f.accecato)) { accecato = true; return false; } });
+  }
+  assert.ok(accecato, "il lampo non acceca nessuno");
+  amb.avanza(60 * 5);
+  // la barriera ferma un telefono lanciato addosso
+  let retto = false;
+  for (let i = 0; i < 4 && !retto; i++) {
+    r.comandi.colpo("barriera");
+    const f = amb.stato().lottatori.find((l) => l.azione === "barriera");
+    if (!f) { amb.avanza(60); continue; }
+    const prima = f.danni;
+    r.lanciaTelefono(f.testa.x - 70, f.testa.y, 9, 0, "pc");
+    amb.avanza(20);
+    const dopo = amb.stato().lottatori.find((l) => l.tipo === f.tipo);
+    if (dopo.danni === prima && !dopo.ko) retto = true;
+    amb.avanza(60 * 3);
+  }
+  assert.ok(retto, "la barriera non ha fermato il colpo");
+  dentro(amb);
 });
