@@ -80,6 +80,18 @@
   "guidaS6": {
     "message": "Vous voulez le bouton de mise en marche sur tous les sites, sans passer par l'icône ? Activez-le dans les options."
   },
+  "guidaP6T": {
+    "message": "Prenez les commandes avec le bouton manette"
+  },
+  "guidaP6": {
+    "message": "Un quart de roue s'ouvre dans le coin inférieur droit. Le portrait dans le coin est le combattant que vous commandez : cliquez sur une tranche et il fait ce coup, cliquez sur le portrait pour passer à l'autre."
+  },
+  "guidaS7": {
+    "message": "De temps en temps il se passe quelque chose : un orage, un séisme avec une éruption, des météorites. Quand les zombies arrivent, les deux cessent de se battre et se mettent dos à dos : la horde arrive par vagues, jamais deux fois la même."
+  },
+  "guidaS5gratis": {
+    "message": "Super guerriers, mages, duellistes, armes, météo, météorites, horde de zombies et gravité font partie de Premium. Pour l'instant c'est gratuit : ouvrez le panneau et appuyez sur « Débloquer Premium gratuitement »."
+  },
   "guidaOpzioni": {
     "message": "Ouvrir les options"
   },

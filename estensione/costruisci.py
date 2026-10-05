@@ -8,12 +8,15 @@ browser: il manifest, il service worker che parte al clic sull'icona, e
 `prepara.js`, che crea canvas e tendina dentro uno shadow DOM (così lo stile
 dei siti non li tocca) prima di far partire il ring.
 
-Si costruiscono DUE varianti, uguali in tutto tranne una cosa:
+Si costruiscono DUE varianti:
   - `pacchetto/`  da caricare a mano per provare: nella tendina c'è un
     interruttore «Premium di prova» per vedere il gioco bloccato e sbloccato;
-  - `store/`      da pubblicare: niente interruttore di prova. Premium si
-    compra dall'indirizzo scritto in `premium.json` (`url_acquisto`); finché è
-    vuoto il tasto dice «Premium arriva presto».
+  - `store/`      da pubblicare. Con `sblocco_gratis: true` in `premium.json`
+    (05/10/2026: si esce così, in attesa dei pareri di chi la usa) ha lo
+    stesso interruttore della prova, col nome «Sblocca Premium gratis»: un clic
+    e si apre tutto. Con `sblocco_gratis: false` l'interruttore non c'è e
+    Premium si compra dall'indirizzo `url_acquisto`; finché è vuoto il tasto
+    dice «Premium arriva presto».
 
 Uso:
     python3 estensione/costruisci.py            # rigenera pacchetto/ e store/
@@ -31,7 +34,7 @@ from pathlib import Path
 RADICE = Path(__file__).resolve().parent.parent
 QUI = Path(__file__).resolve().parent
 VARIANTI = {"pacchetto": {"premium_di_prova": True}, "store": {"premium_di_prova": False}}
-VERSIONE = "0.4.0"
+VERSIONE = "0.5.0"
 NOME = "Page Brawl"
 
 MANIFEST = {
@@ -123,6 +126,10 @@ GUIDA = {
         "guidaS4": "Gore effects are off: if you want them, turn them on from the panel.",
         "guidaS5": "Super warriors, wizards, duelists, weapons, weather and gravity are part of Premium: in the panel they carry a padlock.",
         "guidaS6": "Want the power button on every site, without going through the icon? Turn it on in the options.",
+        "guidaP6T": "Take control with the gamepad button",
+        "guidaP6": "A quarter wheel opens in the bottom right corner. The portrait in the corner is the fighter you command: click a slice and they do that move, click the portrait to switch to the other one.",
+        "guidaS7": "Now and then something happens: a storm, an earthquake with an eruption, meteorites. When zombies show up the two stop fighting each other and stand back to back: the horde comes in waves, never the same twice.",
+        "guidaS5gratis": "Super warriors, wizards, duelists, weapons, weather, meteorites, the zombie horde and gravity are part of Premium. For now it is free: open the panel and press “Unlock Premium for free”.",
         "guidaOpzioni": "Open the options",
         "guidaPiede": "You can reopen this page any time from “How it works”, at the bottom of the panel.",
     },
@@ -147,6 +154,10 @@ GUIDA = {
         "guidaS4": "Gli effetti cruenti sono spenti: se li vuoi, si accendono dalla tendina.",
         "guidaS5": "Super guerrieri, maghi, duellanti, armi, meteo e gravità fanno parte di Premium: nella tendina hanno il lucchetto.",
         "guidaS6": "Vuoi il tasto di accensione su ogni sito, senza passare dall'icona? Si accende dalle opzioni.",
+        "guidaP6T": "Prendi il comando col tasto del joypad",
+        "guidaP6": "Nell'angolo in basso a destra si apre un quarto di ruota. Il ritratto nell'angolo è il lottatore che comandi: clicca uno spicchio e fa quella mossa, clicca il ritratto per passare all'altro.",
+        "guidaS7": "Ogni tanto succede qualcosa: un temporale, un terremoto con l'eruzione, i meteoriti. Quando arrivano gli zombie i due smettono di picchiarsi e si mettono spalle a spalla: l'orda arriva a ondate, mai due volte uguali.",
+        "guidaS5gratis": "Super guerrieri, maghi, duellanti, armi, meteo, meteoriti, orda di zombie e gravità fanno parte di Premium. Per ora è gratis: apri la tendina e premi «Sblocca Premium gratis».",
         "guidaOpzioni": "Apri le opzioni",
         "guidaPiede": "Questa pagina si riapre quando vuoi da «Come funziona», in fondo alla tendina.",
     },
@@ -171,6 +182,10 @@ GUIDA = {
         "guidaS4": "Los efectos sangrientos están apagados: si los quieres, se encienden desde el panel.",
         "guidaS5": "Los superguerreros, los magos, los duelistas, las armas, el clima y la gravedad forman parte de Premium: en el panel llevan un candado.",
         "guidaS6": "¿Quieres el botón de encendido en todos los sitios, sin pasar por el icono? Se activa en las opciones.",
+        "guidaP6T": "Toma el mando con el botón del gamepad",
+        "guidaP6": "En la esquina inferior derecha se abre un cuarto de rueda. El retrato de la esquina es el luchador que controlas: haz clic en un sector y hará ese movimiento, haz clic en el retrato para pasar al otro.",
+        "guidaS7": "De vez en cuando pasa algo: una tormenta, un terremoto con erupción, meteoritos. Cuando llegan los zombis los dos dejan de pelearse y se ponen espalda con espalda: la horda llega en oleadas, nunca dos veces igual.",
+        "guidaS5gratis": "Los superguerreros, los magos, los duelistas, las armas, el clima, los meteoritos, la horda de zombis y la gravedad forman parte de Premium. Por ahora es gratis: abre el panel y pulsa «Desbloquear Premium gratis».",
         "guidaOpzioni": "Abrir las opciones",
         "guidaPiede": "Puedes volver a abrir esta página cuando quieras desde «Cómo funciona», al final del panel.",
     },
@@ -195,6 +210,10 @@ GUIDA = {
         "guidaS4": "Les effets sanglants sont désactivés : si vous les voulez, activez-les depuis le panneau.",
         "guidaS5": "Super guerriers, mages, duellistes, armes, météo et gravité font partie de Premium : dans le panneau, ils portent un cadenas.",
         "guidaS6": "Vous voulez le bouton de mise en marche sur tous les sites, sans passer par l'icône ? Activez-le dans les options.",
+        "guidaP6T": "Prenez les commandes avec le bouton manette",
+        "guidaP6": "Un quart de roue s'ouvre dans le coin inférieur droit. Le portrait dans le coin est le combattant que vous commandez : cliquez sur une tranche et il fait ce coup, cliquez sur le portrait pour passer à l'autre.",
+        "guidaS7": "De temps en temps il se passe quelque chose : un orage, un séisme avec une éruption, des météorites. Quand les zombies arrivent, les deux cessent de se battre et se mettent dos à dos : la horde arrive par vagues, jamais deux fois la même.",
+        "guidaS5gratis": "Super guerriers, mages, duellistes, armes, météo, météorites, horde de zombies et gravité font partie de Premium. Pour l'instant c'est gratuit : ouvrez le panneau et appuyez sur « Débloquer Premium gratuitement ».",
         "guidaOpzioni": "Ouvrir les options",
         "guidaPiede": "Vous pouvez rouvrir cette page à tout moment depuis « Comment ça marche », en bas du panneau.",
     },
@@ -219,6 +238,10 @@ GUIDA = {
         "guidaS4": "Blutige Effekte sind aus: Wenn du sie willst, schaltest du sie im Menü ein.",
         "guidaS5": "Superkrieger, Magier, Duellanten, Waffen, Wetter und Schwerkraft gehören zu Premium: Im Menü tragen sie ein Schloss.",
         "guidaS6": "Du willst den Einschaltknopf auf jeder Website, ohne über das Symbol zu gehen? Schalte ihn in den Optionen ein.",
+        "guidaP6T": "Übernimm die Steuerung mit der Gamepad-Taste",
+        "guidaP6": "Unten rechts in der Ecke öffnet sich ein Viertelrad. Das Porträt in der Ecke ist der Kämpfer, den du steuerst: Klicke auf ein Segment und er führt diesen Angriff aus, klicke auf das Porträt, um zum anderen zu wechseln.",
+        "guidaS7": "Ab und zu passiert etwas: ein Gewitter, ein Erdbeben mit Ausbruch, Meteoriten. Wenn Zombies auftauchen, hören die beiden auf zu kämpfen und stellen sich Rücken an Rücken: Die Horde kommt in Wellen, nie zweimal gleich.",
+        "guidaS5gratis": "Superkrieger, Magier, Duellanten, Waffen, Wetter, Meteoriten, die Zombiehorde und Schwerkraft gehören zu Premium. Im Moment ist es gratis: Öffne das Menü und drücke „Premium gratis freischalten“.",
         "guidaOpzioni": "Optionen öffnen",
         "guidaPiede": "Diese Seite öffnest du jederzeit wieder über „So funktioniert es“ unten im Menü.",
     },
@@ -375,11 +398,14 @@ STILE_BASE = """
   color: var(--ink); font: inherit; font-size: 17px; cursor: pointer; display: grid; place-items: center; padding: 0;
 }
 .tasto:hover { border-color: var(--verde); }
-.tasto[aria-expanded="true"] { background: var(--verde-tenue); }
+.tasto[aria-expanded="true"], .tasto[data-radiale][aria-pressed="true"] { background: var(--verde-tenue); }
+/* Col controller aperto nell'angolo, i tasti gli si mettono accanto (la larghezza la scrive il ring). */
+.barretta.con-controller { right: calc(var(--controller, 0px) + 12px); }
 .tasto[data-gioca] { color: var(--verde); }
 .tasto[data-gioca][aria-pressed="false"] { color: var(--ink); opacity: .65; }
 /* Spento: resta solo il tasto di accensione. */
-:host([data-spento]) .tela, :host([data-spento]) .ancora, :host([data-spento]) [data-opzioni] { display: none !important; }
+:host([data-spento]) .tela, :host([data-spento]) .ancora, :host([data-spento]) [data-opzioni], :host([data-spento]) [data-radiale] { display: none !important; }
+:host([data-spento]) .barretta { right: 12px; }
 h3 { font-weight: 700; }
 /* Premium: i tasti chiusi portano il lucchetto; in cima alla tendina il riquadro che spiega e sblocca. */
 .ring-tasto.bloccato { opacity: .72; }
@@ -393,7 +419,8 @@ h3 { font-weight: 700; }
 """
 
 STILE_PAGINA = ("html.ring-presa, html.ring-presa * { cursor: grab !important; } "
-                "html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-select: none !important; }")
+                "html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-select: none !important; } "
+                "html.ring-punta, html.ring-punta * { cursor: pointer !important; }")
 
 ICONA_ACCENSIONE = ('<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">'
                     '<path d="M12 3v9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>'
@@ -403,6 +430,8 @@ ICONA_ACCENSIONE = ('<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden
 # c'è tutto, spento resta solo lui (vedi `:host([data-spento])`).
 BARRETTA = """
   <div class="barretta">
+    <button type="button" class="tasto" data-radiale hidden aria-pressed="false"
+            title="Controller: scegli il personaggio e fagli fare le sue mosse">&#127918;</button>
     <button type="button" class="tasto" data-opzioni hidden aria-expanded="false"
             title="Opzioni del combattimento: scommesse, armi, imprevisti">&#129354;</button>
     <button type="button" class="tasto" data-gioca hidden aria-pressed="true" aria-label="Lotte accese o spente"
@@ -600,8 +629,9 @@ PREPARA = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
     try { chrome.runtime.sendMessage({ tipo: "guida" }); } catch (e) { /* estensione ricaricata */ }
   });
 
-  // Il riquadro Premium: cosa sblocca, il tasto per comprarlo e, nella sola
-  // variante di prova, un interruttore per vedere il gioco aperto e chiuso.
+  // Il riquadro Premium: cosa sblocca, il tasto per comprarlo e l'interruttore
+  // che lo apre e lo chiude senza pagare: nella variante di prova sempre, in
+  // quella da pubblicare finché `sblocco_gratis` è acceso in premium.json.
   function aggiornaRiquadro(cercato) {
     var q = function (sel) { return radice.querySelector(sel); };
     var riquadro = q("[data-premio]");
@@ -609,8 +639,11 @@ PREPARA = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
     q("[data-premio-avviso]").hidden = premiumAttivo || !cercato;
     q("[data-premio-attivo]").hidden = !premiumAttivo;
     q("[data-premio-cosa]").hidden = premiumAttivo;
+    var gratis = q("[data-premio-gratis]");
+    if (gratis) gratis.hidden = premiumAttivo;
     var compra = q("[data-premio-compra]");
-    compra.hidden = premiumAttivo;
+    // Finché si sblocca gratis e non c'è dove comprare, il tasto «arriva presto» non serve.
+    compra.hidden = premiumAttivo || (CONFIG.sbloccoGratis && !CONFIG.urlAcquisto);
     compra.disabled = !CONFIG.urlAcquisto;
     compra.textContent = CONFIG.urlAcquisto ? "Sblocca Premium" : "Premium arriva presto";
     var prova = q("[data-premio-prova]");
@@ -686,7 +719,7 @@ RIQUADRO_PREMIO = """
     <section class="premio" data-premio>
       <p class="premio-avviso" data-premio-avviso hidden>Questa funzione fa parte di Premium.</p>
       <p data-premio-attivo hidden>Premium attivo.</p>
-      <p data-premio-cosa>Premium sblocca i personaggi (super guerrieri, maghi e duellanti) con le loro mosse, le armi e le bombe, il meteo e la gravità.</p>
+      <p data-premio-cosa>Premium sblocca i personaggi (super guerrieri, maghi e duellanti) con le loro mosse, le armi e le bombe, il meteo, i meteoriti, l'orda di zombie e la gravità.</p>__GRATIS__
       <button type="button" class="ring-tasto ring-largo" data-premio-compra>Sblocca Premium</button>__PROVA__
     </section>"""
 VERSO_OPZIONI = """  <section class="ring-sezione">
@@ -696,21 +729,30 @@ VERSO_OPZIONI = """  <section class="ring-sezione">
   """
 TASTO_PROVA = """
       <button type="button" class="ring-tasto ring-largo" data-premio-prova aria-pressed="false">Premium di prova (solo in questa versione)</button>"""
+# Lo stesso interruttore, col nome che ha quando Premium si regala a tutti (`sblocco_gratis`).
+TASTO_GRATIS = """
+      <button type="button" class="ring-tasto ring-largo" data-premio-prova aria-pressed="false">Sblocca Premium gratis</button>"""
+RIGA_GRATIS = """
+      <p data-premio-gratis>Per ora è gratis: un clic qui sotto e si apre tutto.</p>"""
 
 
 def premium() -> dict:
-    """Le due scelte di `premium.json`.
+    """Le tre scelte di `premium.json`.
 
-    `premium_attivo`: se falso non c'è niente di chiuso (utile per uscire con
-    tutto gratis finché non si vende). `url_acquisto`: dove si compra; finché è
-    vuoto il tasto resta «Premium arriva presto».
+    `premium_attivo`: se falso non c'è niente di chiuso, né lucchetti né
+    riquadro. `sblocco_gratis`: Premium resta com'è (lucchetti e riquadro), ma
+    chiunque lo apre con un clic, anche nella variante da pubblicare: è lo
+    stesso interruttore della variante di prova. `url_acquisto`: dove si
+    compra; finché è vuoto il tasto di acquisto resta spento (e con lo sblocco
+    gratis non si vede).
     """
     percorso = QUI / "premium.json"
     dati = json.loads(percorso.read_text(encoding="utf-8")) if percorso.exists() else {}
     url = str(dati.get("url_acquisto") or "").strip()
     if url and not url.startswith("https://"):
         raise SystemExit("premium.json: url_acquisto deve cominciare con https://")
-    return {"premium": bool(dati.get("premium_attivo", True)), "urlAcquisto": url}
+    return {"premium": bool(dati.get("premium_attivo", True)), "urlAcquisto": url,
+            "sbloccoGratis": bool(dati.get("premium_attivo", True)) and bool(dati.get("sblocco_gratis", False))}
 
 
 def file_attesi(variante: str) -> dict:
@@ -719,8 +761,13 @@ def file_attesi(variante: str) -> dict:
     testa = '<div class="ring-pannello-testa">'
     fine_testa = pannello.index("</div>", pannello.index(testa)) + len("</div>")
     scelte = premium()
+    # L'interruttore che apre Premium senza pagare: sempre nella variante di
+    # prova, e anche in quella da pubblicare quando Premium si regala.
+    interruttore = scelte["premium"] and (opzioni["premium_di_prova"] or scelte["sbloccoGratis"])
     if scelte["premium"]:
-        riquadro = RIQUADRO_PREMIO.replace("__PROVA__", TASTO_PROVA if opzioni["premium_di_prova"] else "")
+        tasto = (TASTO_GRATIS if scelte["sbloccoGratis"] else TASTO_PROVA) if interruttore else ""
+        riquadro = (RIQUADRO_PREMIO.replace("__PROVA__", tasto)
+                    .replace("__GRATIS__", RIGA_GRATIS if scelte["sbloccoGratis"] else ""))
         pannello = pannello[:fine_testa] + riquadro + pannello[fine_testa:]
     # Nell'estensione non ci sono telefoni (02/10/2026, su richiesta): via i
     # tasti che li mettono in campo, e la pioggia diventa di oggetti.
@@ -735,7 +782,7 @@ def file_attesi(variante: str) -> dict:
     html = '<canvas class="tela" data-ring aria-hidden="true"></canvas>\n<div class="ancora">\n  ' + pannello + "\n</div>" + BARRETTA
     if "style=" in html:
         raise SystemExit("la tendina ha stili in linea: una CSP severa li bloccherebbe")
-    config = dict(scelte, premiumDiProva=scelte["premium"] and opzioni["premium_di_prova"])
+    config = dict(scelte, premiumDiProva=interruttore)
     prepara = (PREPARA
                .replace("__CONFIG__", json.dumps(config, ensure_ascii=False))
                .replace("__STILE__", json.dumps(STILE_BASE + stile_tendina(), ensure_ascii=False))
@@ -743,7 +790,8 @@ def file_attesi(variante: str) -> dict:
     attesi = {
         "manifest.json": json.dumps(MANIFEST, ensure_ascii=False, indent=2) + "\n",
         "sfondo.js": SFONDO.replace("__STILE_PAGINA__", json.dumps(STILE_PAGINA, ensure_ascii=False)) + SFONDO_GUIDA,
-        "benvenuto.html": pagina_guida(NOME, 5, ["guidaS1", "guidaS2", "guidaS3", "guidaS4"] + (["guidaS5"] if scelte["premium"] else []) + ["guidaS6"]),
+        "benvenuto.html": pagina_guida(NOME, 6, ["guidaS1", "guidaS2", "guidaS7", "guidaS3", "guidaS4"]
+                                       + ([("guidaS5gratis" if scelte["sbloccoGratis"] else "guidaS5")] if scelte["premium"] else []) + ["guidaS6"]),
         "benvenuto.css": GUIDA_CSS, "benvenuto.js": GUIDA_JS,
         "prepara.js": prepara,
         "ring.js": (RADICE / "web/static/ring.js").read_text(encoding="utf-8"),
@@ -1107,10 +1155,12 @@ def main() -> int:
             if not percorso.exists():
                 percorso.write_bytes(icona_di(lato))
         print("scritto " + str(uscita))
-    if not verifica and premium()["premium"] and not premium()["urlAcquisto"]:
+    if not verifica and premium()["sbloccoGratis"]:
+        print("Premium si sblocca gratis anche in store/ (sblocco_gratis: true in premium.json).")
+    elif not verifica and premium()["premium"] and not premium()["urlAcquisto"]:
         print("ATTENZIONE: Premium è chiuso ma manca l'indirizzo di acquisto: in store/ le funzioni Premium "
               "non si possono sbloccare. Prima di pubblicare metti url_acquisto in premium.json, "
-              "oppure premium_attivo: false per uscire con tutto gratis.")
+              "oppure sblocco_gratis: true (si apre con un clic) o premium_attivo: false (niente lucchetti).")
     if "--zip" in sys.argv and not verifica:
         import zipfile
         (QUI / "zip").mkdir(exist_ok=True)

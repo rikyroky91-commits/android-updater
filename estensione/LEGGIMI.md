@@ -20,7 +20,18 @@ Non funzionano, per regola di Chrome, su `chrome://…`, sul Chrome Web Store e 
 
 ## Page Brawl
 
-Un clic sull'icona accende la lotta sulla scheda aperta. In basso a destra compaiono due tasti: il guantone apre le opzioni, quello di accensione spegne tutto e resta da solo in vista, pronto a riaccendere. Un altro clic sull'icona fa lo stesso del tasto di accensione.
+Un clic sull'icona accende la lotta sulla scheda aperta. In basso a destra compaiono tre tasti: il joypad apre il controller, il guantone apre le opzioni, quello di accensione spegne tutto e resta da solo in vista, pronto a riaccendere. Un altro clic sull'icona fa lo stesso del tasto di accensione.
+
+### Il controller ad angolo (05/10/2026)
+
+Il tasto col joypad apre un quarto di ruota attaccato all'angolo in basso a destra della finestra, semitrasparente finché non ci si passa sopra. Non dipende dalla tendina: funziona con la tendina aperta o chiusa, e quando è aperto tendina e tasti gli si mettono accanto.
+
+- **Nell'angolo** c'è il ritratto dal vivo del lottatore che si comanda, con la vita e l'energia lungo l'orlo e una spia verde o rossa. Un clic sul ritratto passa all'altro lottatore. Trascinandolo oltre metà finestra il controller va nell'angolo di sinistra.
+- **Intorno**, due fasce a spicchi: fuori gli attacchi, dentro le mosse di servizio. Un clic e il lottatore la fa. Le mosse cambiano coi personaggi scelti; sotto l'icona c'è l'energia che serve, rossa se non basta, e lo spicchio resta spento finché la mossa non si può fare.
+- Una mossa da vicino chiesta da lontano: prima ci va di corsa, poi colpisce.
+- Durante l'orda i comandi valgono contro gli zombie. Durante uno scontro di energie ogni comando è tifo per il proprio lottatore.
+
+Il resto del tempo il lottatore continua a pensare da sé: il controller dà ordini, non toglie l'iniziativa. È gratis.
 
 ### Il tasto su tutti i siti
 
@@ -30,13 +41,15 @@ Di suo l'estensione entra in una pagina solo quando clicchi l'icona (`activeTab`
 
 | Cartella | A cosa serve | Premium |
 | --- | --- | --- |
-| `pacchetto/` | Provarla caricandola a mano | Chiuso, con un interruttore **Premium di prova** in cima alla tendina per vederla aperta e chiusa |
-| `store/` | Quella da pubblicare | Chiuso, senza interruttore di prova. Il tasto dice «Premium arriva presto» finché manca l'indirizzo di acquisto |
+| `pacchetto/` | Provarla caricandola a mano | Chiuso, con l'interruttore in cima alla tendina per vederla aperta e chiusa |
+| `store/` | Quella da pubblicare | Dipende da `premium.json`. Oggi (`sblocco_gratis: true`) ha lo stesso interruttore della prova, col nome **Sblocca Premium gratis**: un clic e si apre tutto |
+
+Con `sblocco_gratis: true` le due cartelle sono uguali. La scelta è stata presa il 05/10/2026: si esce con Premium apribile da chiunque, in attesa dei pareri di chi la usa.
 
 ### Cosa è gratis e cosa è Premium
 
-- **Gratis:** la lotta fra il robot e la mela, prese e lanci col mouse, fumogeni e barattoli con le creature, la pioggia di oggetti, terremoto, jetpack, furia, barre della vita, scommesse, la partita a dieci col volo fuori dal ring, quello che i lottatori imparano.
-- **Premium:** i personaggi (super guerrieri, maghi, duellanti) con le loro mosse; pistola, spada, bomba, pieghevole e le due esplosioni; pioggia, uragano, rallentatore e le gravità diverse dalla Terra.
+- **Gratis:** la lotta fra il robot e la mela, prese e lanci col mouse, il controller ad angolo, fumogeni e barattoli con le creature, la pioggia di oggetti, il terremoto con l'eruzione, jetpack, furia, barre della vita, scommesse, la partita a dieci col volo fuori dal ring, quello che i lottatori imparano.
+- **Premium:** i personaggi (super guerrieri, maghi, duellanti) con le loro mosse, scontro di energie compreso; pistola, spada, bomba, pieghevole e le due esplosioni; pioggia, uragano, rallentatore, meteoriti, orda di zombie e le gravità diverse dalla Terra.
 
 I tasti Premium portano un lucchetto. Cliccandone uno si apre il riquadro in cima alla tendina.
 
@@ -56,7 +69,7 @@ Chi arriva a dieci K.O. chiude la partita: sul colpo l'azione si ferma un attimo
 
 ### La guida per chi installa
 
-Alla prima installazione si apre `benvenuto.html`: cinque passi e le cose da sapere, nelle cinque lingue (i testi sono nei messaggi dell'estensione, in `costruisci.py`). Si riapre da «Come funziona» in fondo alla tendina e dalla pagina delle opzioni. Page Snow ha la sua, più corta.
+Alla prima installazione si apre `benvenuto.html`: sei passi (l'ultimo è il controller) e le cose da sapere, nelle cinque lingue (i testi sono nei messaggi dell'estensione, in `costruisci.py`). Si riapre da «Come funziona» in fondo alla tendina e dalla pagina delle opzioni. Page Snow ha la sua, più corta.
 
 ### I personaggi
 
@@ -68,14 +81,27 @@ Scelto uno stile, in campo non ci sono più il robot e la mela ma due personaggi
 
 Nomi, facce e vestiti sono inventati qui: non richiamano personaggi di altri. Vale la pena tenerlo così anche nelle schede degli store.
 
+### Gli imprevisti nuovi (05/10/2026)
+
+- **Pioggia e temporale.** Le gocce arrivano fino in fondo e si fermano sui bordi degli elementi della pagina. Dopo qualche secondo di pioggia cade un fulmine: chi tiene una spada o vola alto lo attira.
+- **Terremoto con eruzione.** Le scosse sbilanciano chi è a terra (chi vola no); dal pavimento, lontano dai due, esce un vulcano che lancia lapilli e cola lava. Nell'estensione trema il mondo del ring, non la pagina del sito.
+- **Meteoriti** (Premium). Un mirino a terra annuncia dove cadono; i lottatori si scansano o alzano la barriera. Qualcuno lascia un sasso caldo da raccogliere e tirare.
+- **Orda di zombie** (Premium). I due smettono di picchiarsi e si mettono spalle a spalla; si coprono e si aiutano a rialzarsi. L'orda arriva a **ondate generate ogni volta diverse** (tipi di zombie, tema, lati d'arrivo). A sorpresa sono tre ondate; dal tasto della tendina non finiscono finché i due reggono, e resta il primato delle ondate superate. Un secondo clic sul tasto la chiude.
+- **Scontro di energie** (coi personaggi a energia). Chi vede caricare un colpo d'energia prova a caricare lo stesso: i due colpi si incontrano e parte un tiro alla fune. Vince chi spinge di più; le regole sono scritte nel commento sopra `SFIDA` in `ring.js`. Ogni clic su un lottatore gli dà fiato.
+
+Chi resta senza gambe si trascina sulle mani o vola; con una gamba sola saltella; senza braccia tira calci e testate.
+
 ### Premium: cosa c'è e cosa manca
 
 Le scelte stanno in `premium.json`:
 
-- `premium_attivo`: `true` chiude le funzioni Premium; `false` toglie lucchetti e riquadro, tutto gratis.
-- `url_acquisto`: la pagina dove si compra (deve cominciare con `https://`). Vuoto: il tasto resta spento con «Premium arriva presto».
+- `premium_attivo`: `true` tiene chiuse le funzioni Premium; `false` toglie lucchetti e riquadro, tutto gratis e senza traccia di Premium.
+- `sblocco_gratis`: `true` lascia lucchetti e riquadro, ma mette in cima alla tendina il tasto **Sblocca Premium gratis** anche nella variante da pubblicare. È l'interruttore della variante di prova: un clic apre tutto, un altro richiude. `false` lo toglie dallo store.
+- `url_acquisto`: la pagina dove si compra (deve cominciare con `https://`). Vuoto: il tasto di acquisto resta spento con «Premium arriva presto», e con lo sblocco gratis non si vede.
 
-**Manca la verifica dell'acquisto.** Oggi Premium si accende solo scrivendo `pb-premium = on` nella memoria dell'estensione (lo fa l'interruttore di prova). Il passo successivo è collegare un servizio di licenze, che controlla la chiave e scrive quel valore. Il blocco è nel codice dell'estensione, quindi chi sa usare gli strumenti per sviluppatori può aggirarlo: vale come barriera per l'utente normale, non come protezione.
+Per tornare a vendere: `sblocco_gratis: false`, un `url_acquisto` vero, `python3 estensione/costruisci.py --zip`, versione nuova nello store. Chi aveva già sbloccato resta sbloccato: lo stato sta nella memoria dell'estensione sul suo computer.
+
+**Manca la verifica dell'acquisto.** Oggi Premium si accende solo scrivendo `pb-premium = on` nella memoria dell'estensione (lo fa l'interruttore). Il passo successivo è collegare un servizio di licenze, che controlla la chiave e scrive quel valore. Il blocco è nel codice dell'estensione, quindi chi sa usare gli strumenti per sviluppatori può aggirarlo: vale come barriera per l'utente normale, non come protezione.
 
 ### Lingua ed effetti cruenti
 
@@ -103,10 +129,12 @@ Nelle opzioni c'è una sola scelta: **accendere da solo il tema su tutti i siti*
 
 ## Pubblicare
 
-`python3 estensione/costruisci.py --zip` scrive in `estensione/zip/` tre zip coi file alla radice: `page-brawl-…-prova.zip` (da provare a mano), `page-brawl-…-store.zip` e `page-snow-….zip` (da caricare negli store). Testi, giustificazioni dei permessi e schermate sono in `SCHEDA-STORE.md`, `scheda/` e `scheda-natale/`.
+`python3 estensione/costruisci.py --zip` scrive in `estensione/zip/` tre zip coi file alla radice: `page-brawl-…-prova.zip` (da provare a mano), `page-brawl-…-store.zip` e `page-snow-….zip` (da caricare negli store). La guida passo per passo, i testi, le giustificazioni dei permessi e le schermate sono in `SCHEDA-STORE.md`, `scheda/` e `scheda-natale/`.
 
 ## Limiti noti
 
 - Il pavimento è il fondo della finestra; gli ostacoli del ring sono campi, tasti, immagini e scritte grandi della pagina (i primi 160).
+- Durante il terremoto nell'estensione la pagina del sito resta ferma (sul sito Mobile Update Tracker trema anche la pagina): muovere il contenuto di un sito qualunque sposterebbe i suoi elementi fissi.
+- Il controller è stato provato col mouse e col tocco simulato, non su un telefono vero.
 - La richiesta del permesso su tutti i siti (la finestrella del browser) non è stata provata in un Chrome vero: nelle prove automatiche il permesso era già dato.
 - Le traduzioni in spagnolo, francese e tedesco non sono state riviste da un madrelingua.

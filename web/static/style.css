@@ -1495,6 +1495,27 @@ body.con-ultimora { padding-bottom: 4.5rem; }
 /* La manina sopra un lottatore, e il pugno chiuso mentre lo si tiene. */
 html.ring-presa, html.ring-presa * { cursor: grab !important; }
 html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-select: none !important; }
+/* Sopra il controller radiale (disegnato nel canvas) il puntatore è un dito. */
+html.ring-punta, html.ring-punta * { cursor: pointer !important; }
+/* IL TERREMOTO (05/10/2026): mentre durano le scosse trema anche la pagina.
+   `ring.js` mette `ring-trema` su <html> e la toglie quando il suolo si
+   ferma. Si muove il contenuto, non la striscia in fondo: è il pavimento
+   dei lottatori, e la sua posizione è quella che la fisica misura. */
+@keyframes ring-trema {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  12% { transform: translate(-3px, 1px) rotate(-.12deg); }
+  25% { transform: translate(2px, -2px) rotate(.1deg); }
+  37% { transform: translate(-2px, 2px) rotate(-.06deg); }
+  50% { transform: translate(3px, 1px) rotate(.12deg); }
+  62% { transform: translate(-1px, -2px) rotate(-.1deg); }
+  75% { transform: translate(2px, 2px) rotate(.06deg); }
+  87% { transform: translate(-3px, -1px) rotate(-.08deg); }
+}
+html.ring-trema .contenuto, html.ring-trema .pieduccio, html.ring-trema .testata-interno { animation: ring-trema .38s linear infinite; }
+html.ring-trema .pieduccio { animation-duration: .31s; }
+@media (prefers-reduced-motion: reduce) {
+  html.ring-trema .contenuto, html.ring-trema .pieduccio, html.ring-trema .testata-interno { animation: none; }
+}
 .ultimora-barra {
   pointer-events: auto; position: relative; z-index: 1;
   display: flex; align-items: stretch; height: 44px;
@@ -1579,6 +1600,7 @@ html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-sel
 .ultimora-gioca[aria-pressed="false"] .omino-taglio { display: none; }
 .ultimora-gioca .omino { display: block; margin: auto; }
 .ultimora-opzioni[aria-expanded="true"] { background: var(--verde-tenue); }
+.ultimora-radiale[aria-pressed="true"] { background: var(--verde-tenue); }
 
 /* --- La tendina del ring (01/10/2026) ------------------------------------
    Sale dalla striscia, a destra, sopra il tasto col guantone. È l'unico
@@ -1597,6 +1619,12 @@ html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-sel
 }
 .ring-pannello.aperto { transform: none; opacity: 1; visibility: visible; transition: transform .22s ease, opacity .18s ease; }
 .ring-pannello[hidden] { display: none; }
+/* Col controller aperto nell'angolo, la tendina si fa in là: di lato, o sopra
+   il controller dove di lato non c'è posto. La larghezza la scrive il ring. */
+.ring-pannello.con-controller { right: calc(var(--controller, 0px) + 8px); }
+@media (max-width: 640px) {
+  .ring-pannello.con-controller { right: 8px; bottom: calc(100% + var(--controller, 0px) + 8px); max-height: min(70vh, calc(100vh - var(--controller, 0px) - 120px)); }
+}
 .ring-pannello-testa { display: flex; align-items: center; justify-content: space-between; margin-bottom: .35rem; }
 .ring-chiudi { border: 0; background: none; color: inherit; font-size: 1rem; cursor: pointer; padding: .2rem .4rem; border-radius: 6px; }
 .ring-chiudi:hover { background: var(--verde-tenue); }

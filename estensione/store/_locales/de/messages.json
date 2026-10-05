@@ -80,6 +80,18 @@
   "guidaS6": {
     "message": "Du willst den Einschaltknopf auf jeder Website, ohne über das Symbol zu gehen? Schalte ihn in den Optionen ein."
   },
+  "guidaP6T": {
+    "message": "Übernimm die Steuerung mit der Gamepad-Taste"
+  },
+  "guidaP6": {
+    "message": "Unten rechts in der Ecke öffnet sich ein Viertelrad. Das Porträt in der Ecke ist der Kämpfer, den du steuerst: Klicke auf ein Segment und er führt diesen Angriff aus, klicke auf das Porträt, um zum anderen zu wechseln."
+  },
+  "guidaS7": {
+    "message": "Ab und zu passiert etwas: ein Gewitter, ein Erdbeben mit Ausbruch, Meteoriten. Wenn Zombies auftauchen, hören die beiden auf zu kämpfen und stellen sich Rücken an Rücken: Die Horde kommt in Wellen, nie zweimal gleich."
+  },
+  "guidaS5gratis": {
+    "message": "Superkrieger, Magier, Duellanten, Waffen, Wetter, Meteoriten, die Zombiehorde und Schwerkraft gehören zu Premium. Im Moment ist es gratis: Öffne das Menü und drücke „Premium gratis freischalten“."
+  },
   "guidaOpzioni": {
     "message": "Optionen öffnen"
   },

@@ -80,6 +80,18 @@
   "guidaS6": {
     "message": "Want the power button on every site, without going through the icon? Turn it on in the options."
   },
+  "guidaP6T": {
+    "message": "Take control with the gamepad button"
+  },
+  "guidaP6": {
+    "message": "A quarter wheel opens in the bottom right corner. The portrait in the corner is the fighter you command: click a slice and they do that move, click the portrait to switch to the other one."
+  },
+  "guidaS7": {
+    "message": "Now and then something happens: a storm, an earthquake with an eruption, meteorites. When zombies show up the two stop fighting each other and stand back to back: the horde comes in waves, never the same twice."
+  },
+  "guidaS5gratis": {
+    "message": "Super warriors, wizards, duelists, weapons, weather, meteorites, the zombie horde and gravity are part of Premium. For now it is free: open the panel and press “Unlock Premium for free”."
+  },
   "guidaOpzioni": {
     "message": "Open the options"
   },

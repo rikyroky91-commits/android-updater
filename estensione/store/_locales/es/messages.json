@@ -80,6 +80,18 @@
   "guidaS6": {
     "message": "¿Quieres el botón de encendido en todos los sitios, sin pasar por el icono? Se activa en las opciones."
   },
+  "guidaP6T": {
+    "message": "Toma el mando con el botón del gamepad"
+  },
+  "guidaP6": {
+    "message": "En la esquina inferior derecha se abre un cuarto de rueda. El retrato de la esquina es el luchador que controlas: haz clic en un sector y hará ese movimiento, haz clic en el retrato para pasar al otro."
+  },
+  "guidaS7": {
+    "message": "De vez en cuando pasa algo: una tormenta, un terremoto con erupción, meteoritos. Cuando llegan los zombis los dos dejan de pelearse y se ponen espalda con espalda: la horda llega en oleadas, nunca dos veces igual."
+  },
+  "guidaS5gratis": {
+    "message": "Los superguerreros, los magos, los duelistas, las armas, el clima, los meteoritos, la horda de zombis y la gravedad forman parte de Premium. Por ahora es gratis: abre el panel y pulsa «Desbloquear Premium gratis»."
+  },
   "guidaOpzioni": {
     "message": "Abrir las opciones"
   },

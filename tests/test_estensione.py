@@ -16,7 +16,9 @@ from pathlib import Path
 RADICE = Path(__file__).resolve().parent.parent
 ESTENSIONE = RADICE / "estensione"
 # Due varianti: `pacchetto` si carica a mano e ha l'interruttore «Premium di
-# prova»; `store` è quella da pubblicare e non ce l'ha.
+# prova»; `store` è quella da pubblicare, e l'interruttore ce l'ha solo finché
+# `premium.json` dice `sblocco_gratis: true` (05/10/2026: si esce così, in
+# attesa dei pareri di chi la usa).
 VARIANTI = {nome: ESTENSIONE / nome for nome in ("pacchetto", "store")}
 LINGUE = ("en", "it", "es", "fr", "de")
 
@@ -118,17 +120,61 @@ class TestEstensione(unittest.TestCase):
                 testo = (cartella / "prepara.js").read_text(encoding="utf-8")
                 self.assertIn('memoria["mut-ring-cruento"] = "off"', testo)
 
-    def test_premium_e_predisposto_e_la_prova_gratis_non_arriva_nello_store(self):
+    def test_premium_e_predisposto_e_nello_store_si_sblocca_gratis_solo_se_lo_dice_premium_json(self):
         for nome, cartella in VARIANTI.items():
             with self.subTest(variante=nome):
                 testo = (cartella / "prepara.js").read_text(encoding="utf-8")
                 self.assertIn("window.__ringPremium", testo)
                 self.assertIn("bloccate: { guerrieri: true, armi: true, meteo: true }", testo)
                 self.assertIn("data-premio-compra", testo)
-        # L'interruttore di prova sblocca tutto gratis: nella variante da pubblicare non c'è il tasto.
-        self.assertIn("data-premio-prova aria-pressed", (VARIANTI["pacchetto"] / "prepara.js").read_text(encoding="utf-8"))
-        self.assertNotIn("data-premio-prova aria-pressed", (VARIANTI["store"] / "prepara.js").read_text(encoding="utf-8"))
-        self.assertIn('"premiumDiProva": false', (VARIANTI["store"] / "prepara.js").read_text(encoding="utf-8"))
+        scelte = json.loads((ESTENSIONE / "premium.json").read_text(encoding="utf-8"))
+        gratis = bool(scelte.get("premium_attivo", True)) and bool(scelte.get("sblocco_gratis", False))
+        prova = (VARIANTI["pacchetto"] / "prepara.js").read_text(encoding="utf-8")
+        store = (VARIANTI["store"] / "prepara.js").read_text(encoding="utf-8")
+        # Nella variante di prova l'interruttore c'è sempre.
+        self.assertIn("data-premio-prova aria-pressed", prova)
+        # In quella da pubblicare c'è solo quando Premium si regala: allora è lo stesso della prova.
+        self.assertEqual("data-premio-prova aria-pressed" in store, gratis)
+        self.assertIn('"premiumDiProva": ' + ("true" if gratis else "false"), store)
+        if gratis:
+            self.assertIn("Sblocca Premium gratis", store)
+            self.assertNotIn("solo in questa versione", store)
+
+    def test_lo_sblocco_gratis_e_una_scelta_che_si_spegne_da_premium_json(self):
+        """Le tre uscite possibili della variante da pubblicare, provate sul costruttore."""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("costruisci_estensione", ESTENSIONE / "costruisci.py")
+        costruisci = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(costruisci)
+        casi = {
+            "gratis": ({"premium": True, "urlAcquisto": "", "sbloccoGratis": True}, True, True),
+            "chiuso": ({"premium": True, "urlAcquisto": "https://esempio.invalid/premium", "sbloccoGratis": False}, True, False),
+            "tutto libero": ({"premium": False, "urlAcquisto": "", "sbloccoGratis": False}, False, False),
+        }
+        for nome, (scelte, riquadro, interruttore) in casi.items():
+            with self.subTest(caso=nome):
+                costruisci.premium = lambda scelte=scelte: dict(scelte)
+                store = costruisci.file_attesi("store")["prepara.js"]
+                self.assertEqual("data-premio-compra>Sblocca Premium" in store, riquadro)
+                self.assertEqual("data-premio-prova aria-pressed" in store, interruttore)
+                self.assertEqual('"premium": true' in store, riquadro)
+                # la variante di prova ha sempre l'interruttore, finché Premium esiste
+                self.assertEqual("data-premio-prova aria-pressed" in costruisci.file_attesi("pacchetto")["prepara.js"], riquadro)
+
+    def test_il_controller_ha_il_suo_tasto_e_i_tasti_gli_fanno_posto(self):
+        """05/10/2026: il controller ad angolo si apre dal suo tasto, accanto a quello delle opzioni."""
+        for nome, cartella in VARIANTI.items():
+            with self.subTest(variante=nome):
+                prepara = (cartella / "prepara.js").read_text(encoding="utf-8")
+                self.assertIn("data-radiale hidden", prepara)
+                self.assertLess(prepara.index("data-radiale hidden"), prepara.index("data-opzioni hidden"))
+                self.assertIn(".barretta.con-controller", prepara)
+                self.assertIn(".ring-pannello.con-controller", prepara)
+                self.assertIn(":host([data-spento]) [data-radiale]", prepara)      # spento resta solo il tasto di accensione
+                self.assertIn("html.ring-punta", (cartella / "sfondo.js").read_text(encoding="utf-8"))
+        ring = (RADICE / "web" / "static" / "ring.js").read_text(encoding="utf-8")
+        self.assertIn('mio.querySelector("[data-radiale]")', ring)
+        self.assertIn('data-radiale', (RADICE / "web" / "templates" / "home.html").read_text(encoding="utf-8"))
 
     def test_niente_telefoni_nell_estensione_ma_fumogeni_e_barattoli(self):
         """02/10/2026: nel plug-in non piovono telefoni. Via i tasti che li mettono in campo;

@@ -16,7 +16,7 @@ async function avvia(tab) {
     await chrome.scripting.executeScript({ target: dove, func: (d) => { window.__ringDati = d; window.__lingueSoloDizionario = true; }, args: [dati] });
     // Il cursore a manina sopra i lottatori: inserito dall'estensione, così passa anche
     // sui siti con una Content-Security-Policy che vieta gli stili scritti nella pagina.
-    await chrome.scripting.insertCSS({ target: dove, css: "html.ring-presa, html.ring-presa * { cursor: grab !important; } html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-select: none !important; }" });
+    await chrome.scripting.insertCSS({ target: dove, css: "html.ring-presa, html.ring-presa * { cursor: grab !important; } html.ring-trascina, html.ring-trascina * { cursor: grabbing !important; user-select: none !important; } html.ring-punta, html.ring-punta * { cursor: pointer !important; }" });
     await chrome.scripting.executeScript({ target: dove, files: ["lingue.js", "prepara.js", "ring.js"] });
     return "acceso";
   } catch (errore) {
