@@ -371,15 +371,27 @@ class TestCodiceNellApiENelControlloNotturno(_Sito):
                                           "trovato": True, "codice": "", "scheda": {}})
         self.assertEqual(esito["codici_modello"], ["iPhone17,1"])
 
-    def _controllo(self, risposte):
+    #: Il risultato in pagina di una ricerca riuscita, ridotto all'osso.
+    PAGINA_INTERA = ('<div id="risultato-ricerca"><section class="scheda"></section>'
+                     '<p class="riga-esito firmware-versione">Android 15</p></div>')
+
+    def _modulo(self):
         import importlib.util
 
         percorso = os.path.join(_RADICE, "scripts", "controllo_notturno.py")
         spec = importlib.util.spec_from_file_location("controllo_notturno_prova", percorso)
         modulo = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(modulo)
+        return modulo
+
+    def _controllo(self, risposte, pagina=PAGINA_INTERA):
+        """`pagina`: l'HTML che il sito restituisce, o una funzione che lo
+        produce (per far cadere la richiesta)."""
+        modulo = self._modulo()
         modulo.CASI = [("Galaxy A07", "a07", True)]
         modulo.cerca = lambda base, q: risposte
+        modulo.risultato_in_pagina = (pagina if callable(pagina)
+                                      else lambda base, q: pagina)
         import contextlib
         import io
         with contextlib.redirect_stdout(io.StringIO()) as uscita:
@@ -402,6 +414,95 @@ class TestCodiceNellApiENelControlloNotturno(_Sito):
         un codice sparito, è un campo che non c'è ancora."""
         codice, _ = self._controllo({"nome": "Samsung Galaxy A07", "firmware": True})
         self.assertEqual(codice, 0)
+
+    # --- 05/10/2026: il controllo guarda anche la pagina ---------------
+    _A07 = {"nome": "Samsung Galaxy A07", "firmware": True, "scheda": True,
+            "codici_modello": ["SM-A075F"]}
+
+    def test_il_controllo_notturno_segnala_una_scheda_che_non_arriva_in_pagina(self):
+        """LA SEGNALAZIONE DEL 05/10/2026, vista da qui: il server conosce
+        la scheda (`scheda: true` nell'API) e la pagina non la mostra.
+        Guardando solo l'API il controllo diceva «tutto bene»."""
+        senza_scheda = ('<div id="risultato-ricerca">'
+                        '<p class="riga-esito firmware-versione">Android 15</p></div>')
+        codice, testo = self._controllo(dict(self._A07), pagina=senza_scheda)
+        self.assertEqual(codice, 1)
+        self.assertIn("scheda tecnica nota al server ma assente dalla pagina", testo)
+
+    def test_segnala_un_firmware_che_non_arriva_in_pagina(self):
+        senza_firmware = '<div id="risultato-ricerca"><section class="scheda"></section></div>'
+        codice, testo = self._controllo(dict(self._A07), pagina=senza_firmware)
+        self.assertEqual(codice, 1)
+        self.assertIn("firmware noto al server ma assente dalla pagina", testo)
+
+    def test_segnala_un_risultato_completo_che_aspetta_ancora(self):
+        appeso = self.PAGINA_INTERA.replace(
+            "</div>", '<div data-firmware-per="x"></div></div>')
+        codice, testo = self._controllo(dict(self._A07), pagina=appeso)
+        self.assertEqual(codice, 1)
+        self.assertIn("contiene ancora un'attesa", testo)
+
+    def test_una_scheda_che_il_server_non_ha_non_e_un_guasto(self):
+        """HONOR, realme: per molti modelli la scheda non c'è proprio, e
+        l'API lo dice. In pagina non la si pretende."""
+        senza_scheda = ('<div id="risultato-ricerca">'
+                        '<p class="riga-esito firmware-versione">Android 15</p></div>')
+        codice, _ = self._controllo(dict(self._A07, scheda=False), pagina=senza_scheda)
+        self.assertEqual(codice, 0)
+
+    def test_il_sito_di_prima_risponde_col_solo_riquadro_e_non_e_un_allarme(self):
+        """Fra il merge e il deploy `pagina=1` non esiste ancora: torna il
+        riquadro del firmware, senza contenitore. Non si può giudicare."""
+        solo_riquadro = '<div class="firmware-risultato"><p>Android 15</p></div>'
+        codice, _ = self._controllo(dict(self._A07), pagina=solo_riquadro)
+        self.assertEqual(codice, 0)
+
+    def test_se_la_pagina_non_risponde_lo_dice(self):
+        def cade(base, q):
+            raise OSError("HTTP 500")
+
+        codice, testo = self._controllo(dict(self._A07), pagina=cade)
+        self.assertEqual(codice, 1)
+        self.assertIn("risultato in pagina non raggiungibile (HTTP 500)", testo)
+
+    def test_il_controllo_chiede_la_pagina_come_la_chiede_il_browser(self):
+        """Stessa rotta, stesso parametro: se uno dei due cambia nome il
+        controllo guarderebbe una risposta che il browser non riceve."""
+        modulo = self._modulo()
+        chiesti = []
+
+        class _Risposta:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return b"<div id=\"risultato-ricerca\"></div>"
+
+        def apri(richiesta, timeout=None):
+            chiesti.append((richiesta.full_url, richiesta.get_header("User-agent")))
+            return _Risposta()
+
+        vero = modulo.urllib.request.urlopen
+        modulo.urllib.request.urlopen = apri
+        try:
+            modulo.risultato_in_pagina("https://esempio.invalid/", "Galaxy A07")
+        finally:
+            modulo.urllib.request.urlopen = vero
+        self.assertEqual(chiesti, [(
+            "https://esempio.invalid/ricerca/firmware?q=Galaxy%20A07&pagina=1",
+            "controllo-notturno")])
+        with open(os.path.join(_RADICE, "web", "static", "firmware-in-arrivo.js"),
+                  encoding="utf-8") as f:
+            self.assertIn('parametri.set("pagina", "1")', f.read())
+
+    def test_il_controllo_notturno_non_entra_fra_le_ricerche_recenti(self):
+        from starlette.requests import Request
+        import web.main as main
+
+        def richiesta(agente):
+            return Request({"type": "http", "headers": [(b"user-agent", agente.encode())]})
+
+        self.assertTrue(main._e_un_crawler(richiesta("controllo-notturno")))
+        self.assertFalse(main._e_un_crawler(richiesta(
+            "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0")))
 
 
 class TestFileStaticiFirmati(unittest.TestCase):
