@@ -87,7 +87,10 @@
     "message": "En la esquina inferior derecha se abre un cuarto de rueda. El retrato de la esquina es el luchador que controlas: haz clic en un sector y hará ese movimiento, haz clic en el retrato para pasar al otro."
   },
   "guidaS7": {
-    "message": "De vez en cuando pasa algo: una tormenta, un terremoto con erupción, meteoritos. Cuando llegan los zombis los dos dejan de pelearse y se ponen espalda con espalda: la horda llega en oleadas, nunca dos veces igual."
+    "message": "De vez en cuando pasa algo: una tormenta, un terremoto con erupción, meteoritos. Al cabo de un par de minutos llegan los zombis: los dos dejan de pelearse y se ponen espalda con espalda. La horda llega en oleadas, nunca dos veces igual, y la pareja tiene tres vidas (los corazones de arriba)."
+  },
+  "guidaS8": {
+    "message": "Cuando dos ataques de energía chocan aparecen dos botones en los extremos de la barra: machaca el del lado de tu luchador y el choque se inclina a su favor."
   },
   "guidaS5gratis": {
     "message": "Los superguerreros, los magos, los duelistas, las armas, el clima, los meteoritos, la horda de zombis y la gravedad forman parte de Premium. Por ahora es gratis: abre el panel y pulsa «Desbloquear Premium gratis»."

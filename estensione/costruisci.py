@@ -34,7 +34,7 @@ from pathlib import Path
 RADICE = Path(__file__).resolve().parent.parent
 QUI = Path(__file__).resolve().parent
 VARIANTI = {"pacchetto": {"premium_di_prova": True}, "store": {"premium_di_prova": False}}
-VERSIONE = "0.5.0"
+VERSIONE = "0.5.1"
 NOME = "Page Brawl"
 
 MANIFEST = {
@@ -128,7 +128,8 @@ GUIDA = {
         "guidaS6": "Want the power button on every site, without going through the icon? Turn it on in the options.",
         "guidaP6T": "Take control with the gamepad button",
         "guidaP6": "A quarter wheel opens in the bottom right corner. The portrait in the corner is the fighter you command: click a slice and they do that move, click the portrait to switch to the other one.",
-        "guidaS7": "Now and then something happens: a storm, an earthquake with an eruption, meteorites. When zombies show up the two stop fighting each other and stand back to back: the horde comes in waves, never the same twice.",
+        "guidaS7": "Now and then something happens: a storm, an earthquake with an eruption, meteorites. After a couple of minutes zombies show up: the two stop fighting each other and stand back to back. The horde comes in waves, never the same twice, and the pair has three lives (the hearts at the top).",
+        "guidaS8": "When two energy attacks collide, two buttons pop up at the ends of the bar: hammer the one on your fighter's side and the clash goes their way.",
         "guidaS5gratis": "Super warriors, wizards, duelists, weapons, weather, meteorites, the zombie horde and gravity are part of Premium. For now it is free: open the panel and press “Unlock Premium for free”.",
         "guidaOpzioni": "Open the options",
         "guidaPiede": "You can reopen this page any time from “How it works”, at the bottom of the panel.",
@@ -156,7 +157,8 @@ GUIDA = {
         "guidaS6": "Vuoi il tasto di accensione su ogni sito, senza passare dall'icona? Si accende dalle opzioni.",
         "guidaP6T": "Prendi il comando col tasto del joypad",
         "guidaP6": "Nell'angolo in basso a destra si apre un quarto di ruota. Il ritratto nell'angolo è il lottatore che comandi: clicca uno spicchio e fa quella mossa, clicca il ritratto per passare all'altro.",
-        "guidaS7": "Ogni tanto succede qualcosa: un temporale, un terremoto con l'eruzione, i meteoriti. Quando arrivano gli zombie i due smettono di picchiarsi e si mettono spalle a spalla: l'orda arriva a ondate, mai due volte uguali.",
+        "guidaS7": "Ogni tanto succede qualcosa: un temporale, un terremoto con l'eruzione, i meteoriti. Dopo un paio di minuti arrivano gli zombie: i due smettono di picchiarsi e si mettono spalle a spalla. L'orda arriva a ondate, mai due volte uguali, e i due hanno tre vite (i cuori in alto).",
+        "guidaS8": "Quando due colpi d'energia si scontrano spuntano due tasti ai capi della barra: martella quello dalla parte del tuo lottatore e lo scontro va a lui.",
         "guidaS5gratis": "Super guerrieri, maghi, duellanti, armi, meteo, meteoriti, orda di zombie e gravità fanno parte di Premium. Per ora è gratis: apri la tendina e premi «Sblocca Premium gratis».",
         "guidaOpzioni": "Apri le opzioni",
         "guidaPiede": "Questa pagina si riapre quando vuoi da «Come funziona», in fondo alla tendina.",
@@ -184,7 +186,8 @@ GUIDA = {
         "guidaS6": "¿Quieres el botón de encendido en todos los sitios, sin pasar por el icono? Se activa en las opciones.",
         "guidaP6T": "Toma el mando con el botón del gamepad",
         "guidaP6": "En la esquina inferior derecha se abre un cuarto de rueda. El retrato de la esquina es el luchador que controlas: haz clic en un sector y hará ese movimiento, haz clic en el retrato para pasar al otro.",
-        "guidaS7": "De vez en cuando pasa algo: una tormenta, un terremoto con erupción, meteoritos. Cuando llegan los zombis los dos dejan de pelearse y se ponen espalda con espalda: la horda llega en oleadas, nunca dos veces igual.",
+        "guidaS7": "De vez en cuando pasa algo: una tormenta, un terremoto con erupción, meteoritos. Al cabo de un par de minutos llegan los zombis: los dos dejan de pelearse y se ponen espalda con espalda. La horda llega en oleadas, nunca dos veces igual, y la pareja tiene tres vidas (los corazones de arriba).",
+        "guidaS8": "Cuando dos ataques de energía chocan aparecen dos botones en los extremos de la barra: machaca el del lado de tu luchador y el choque se inclina a su favor.",
         "guidaS5gratis": "Los superguerreros, los magos, los duelistas, las armas, el clima, los meteoritos, la horda de zombis y la gravedad forman parte de Premium. Por ahora es gratis: abre el panel y pulsa «Desbloquear Premium gratis».",
         "guidaOpzioni": "Abrir las opciones",
         "guidaPiede": "Puedes volver a abrir esta página cuando quieras desde «Cómo funciona», al final del panel.",
@@ -212,7 +215,8 @@ GUIDA = {
         "guidaS6": "Vous voulez le bouton de mise en marche sur tous les sites, sans passer par l'icône ? Activez-le dans les options.",
         "guidaP6T": "Prenez les commandes avec le bouton manette",
         "guidaP6": "Un quart de roue s'ouvre dans le coin inférieur droit. Le portrait dans le coin est le combattant que vous commandez : cliquez sur une tranche et il fait ce coup, cliquez sur le portrait pour passer à l'autre.",
-        "guidaS7": "De temps en temps il se passe quelque chose : un orage, un séisme avec une éruption, des météorites. Quand les zombies arrivent, les deux cessent de se battre et se mettent dos à dos : la horde arrive par vagues, jamais deux fois la même.",
+        "guidaS7": "De temps en temps il se passe quelque chose : un orage, un séisme avec une éruption, des météorites. Au bout de deux minutes environ, les zombies arrivent : les deux cessent de se battre et se mettent dos à dos. La horde arrive par vagues, jamais deux fois la même, et le duo a trois vies (les cœurs en haut).",
+        "guidaS8": "Quand deux attaques d'énergie se rencontrent, deux boutons apparaissent aux extrémités de la barre : martelez celui du côté de votre combattant et le choc tourne en sa faveur.",
         "guidaS5gratis": "Super guerriers, mages, duellistes, armes, météo, météorites, horde de zombies et gravité font partie de Premium. Pour l'instant c'est gratuit : ouvrez le panneau et appuyez sur « Débloquer Premium gratuitement ».",
         "guidaOpzioni": "Ouvrir les options",
         "guidaPiede": "Vous pouvez rouvrir cette page à tout moment depuis « Comment ça marche », en bas du panneau.",
@@ -240,7 +244,8 @@ GUIDA = {
         "guidaS6": "Du willst den Einschaltknopf auf jeder Website, ohne über das Symbol zu gehen? Schalte ihn in den Optionen ein.",
         "guidaP6T": "Übernimm die Steuerung mit der Gamepad-Taste",
         "guidaP6": "Unten rechts in der Ecke öffnet sich ein Viertelrad. Das Porträt in der Ecke ist der Kämpfer, den du steuerst: Klicke auf ein Segment und er führt diesen Angriff aus, klicke auf das Porträt, um zum anderen zu wechseln.",
-        "guidaS7": "Ab und zu passiert etwas: ein Gewitter, ein Erdbeben mit Ausbruch, Meteoriten. Wenn Zombies auftauchen, hören die beiden auf zu kämpfen und stellen sich Rücken an Rücken: Die Horde kommt in Wellen, nie zweimal gleich.",
+        "guidaS7": "Ab und zu passiert etwas: ein Gewitter, ein Erdbeben mit Ausbruch, Meteoriten. Nach ein paar Minuten tauchen Zombies auf: Die beiden hören auf zu kämpfen und stellen sich Rücken an Rücken. Die Horde kommt in Wellen, nie zweimal gleich, und das Duo hat drei Leben (die Herzen oben).",
+        "guidaS8": "Wenn zwei Energieangriffe aufeinanderprallen, erscheinen zwei Tasten an den Enden des Balkens: Hämmere auf die Taste deines Kämpfers, dann kippt das Duell zu seinen Gunsten.",
         "guidaS5gratis": "Superkrieger, Magier, Duellanten, Waffen, Wetter, Meteoriten, die Zombiehorde und Schwerkraft gehören zu Premium. Im Moment ist es gratis: Öffne das Menü und drücke „Premium gratis freischalten“.",
         "guidaOpzioni": "Optionen öffnen",
         "guidaPiede": "Diese Seite öffnest du jederzeit wieder über „So funktioniert es“ unten im Menü.",
@@ -790,7 +795,7 @@ def file_attesi(variante: str) -> dict:
     attesi = {
         "manifest.json": json.dumps(MANIFEST, ensure_ascii=False, indent=2) + "\n",
         "sfondo.js": SFONDO.replace("__STILE_PAGINA__", json.dumps(STILE_PAGINA, ensure_ascii=False)) + SFONDO_GUIDA,
-        "benvenuto.html": pagina_guida(NOME, 6, ["guidaS1", "guidaS2", "guidaS7", "guidaS3", "guidaS4"]
+        "benvenuto.html": pagina_guida(NOME, 6, ["guidaS1", "guidaS2", "guidaS7", "guidaS8", "guidaS3", "guidaS4"]
                                        + ([("guidaS5gratis" if scelte["sbloccoGratis"] else "guidaS5")] if scelte["premium"] else []) + ["guidaS6"]),
         "benvenuto.css": GUIDA_CSS, "benvenuto.js": GUIDA_JS,
         "prepara.js": prepara,

@@ -8,9 +8,9 @@ Controllato sulla documentazione di Chrome il 02/10/2026 e ricontrollato il 05/1
 
 **Un punto da verificare nella console: il video.** La pagina `cws-dashboard-listing` elenca fra le cose da fornire anche il link a un video YouTube che mostra l'estensione, e dichiara facoltativo solo il riquadro grande (1400×560). Non ho potuto aprire la console per vedere se il campo blocca davvero l'invio. Se lo blocca, basta mezzo minuto di schermo registrato con la lotta, il controller e l'orda, caricato su YouTube come «non in elenco».
 
-## In breve, per questa uscita (0.5.0, Premium sbloccabile gratis)
+## In breve, per questa uscita (0.5.1, Premium sbloccabile gratis)
 
-1. `python3 estensione/costruisci.py --zip` e si carica `estensione/zip/page-brawl-0.5.0-store.zip`.
+1. `python3 estensione/costruisci.py --zip` e si carica `estensione/zip/page-brawl-0.5.1-store.zip`.
 2. `premium.json` è già a posto: `premium_attivo: true`, `sblocco_gratis: true`, `url_acquisto` vuoto. Chi installa vede i lucchetti e, in cima alla tendina, il tasto **Sblocca Premium gratis**.
 3. Nella scheda dello store si incollano le descrizioni di questa pagina (dicono che Premium per ora è gratis) e, nelle istruzioni per la verifica, il testo del passo 8: spiega al revisore come aprire tutto.
 4. In «Distribuzione» l'estensione resta **gratis** e senza acquisti in-app.
@@ -83,8 +83,8 @@ The power button in the corner turns everything off and on again. The page itsel
 
 Premium is free for now: press "Unlock Premium for free" at the top of the panel. It adds:
 • Three sets of original characters, each with its own moves. Super warriors fly, fire energy waves and transform. Wizards cast freezing, shrinking and lightning spells and ride brooms. Duelists fight with energy blades.
-• Energy clashes: when one fighter charges an energy attack the other answers with the same one, the two beams meet and it becomes a tug of war. Click your fighter to cheer them on.
-• A zombie horde: the two stop fighting each other, stand back to back and hold out against waves that are never the same twice.
+• Energy clashes: when one fighter charges an energy attack the other answers with the same one, the two beams meet and it becomes a tug of war. Two buttons pop up: hammer the one on your fighter's side to win it.
+• A zombie horde that shows up on its own: the two stop fighting each other, stand back to back and hold out, with three lives, against waves that are never the same twice.
 • Weapons and bombs.
 • Weather and gravity: rain and thunderstorms, a hurricane, meteorites, slow motion, Moon, space and upside-down gravity.
 
@@ -113,8 +113,8 @@ Il tasto di accensione nell'angolo spegne e riaccende tutto. La pagina non viene
 
 Premium per ora è gratis: premi «Sblocca Premium gratis» in cima alla tendina. Aggiunge:
 • Tre coppie di personaggi originali, ognuna con le sue mosse. I super guerrieri volano, lanciano onde di energia e si trasformano. I maghi congelano, rimpiccioliscono, scagliano fulmini e volano sulla scopa. I duellanti combattono con lame di energia.
-• Gli scontri di energie: quando uno carica un colpo d'energia l'altro risponde con lo stesso, i due raggi si incontrano e diventa un tiro alla fune. Clicca il tuo lottatore per fare il tifo.
-• L'orda di zombie: i due smettono di picchiarsi, si mettono spalle a spalla e resistono a ondate mai due volte uguali.
+• Gli scontri di energie: quando uno carica un colpo d'energia l'altro risponde con lo stesso, i due raggi si incontrano e diventa un tiro alla fune. Spuntano due tasti: martella quello dalla parte del tuo lottatore per farlo vincere.
+• L'orda di zombie, che arriva da sola: i due smettono di picchiarsi, si mettono spalle a spalla e resistono, con tre vite, a ondate mai due volte uguali.
 • Armi e bombe.
 • Meteo e gravità: pioggia e temporali, uragano, meteoriti, rallentatore, Luna, spazio e gravità sottosopra.
 
@@ -153,8 +153,8 @@ Page Brawl shows an animated cartoon fight on top of the page the user is viewin
 - **Icona 128×128:** `store/icone/128.png`.
 - **Schermate 1280×800** (cartella `scheda/`, su una pagina dimostrativa inventata, senza marchi; effetti cruenti spenti). Lo store ne accetta al massimo cinque. **Le cinque da caricare per questa uscita**, in quest'ordine:
   1. `6-controller.png`: il controller ad angolo coi super guerrieri, una mossa appena comandata.
-  2. `7-orda.png`: il robot e la mela spalle a spalla contro l'orda, con l'ondata in corso in alto.
-  3. `8-scontro.png`: lo scontro di energie, col tiro alla fune sopra i due raggi.
+  2. `7-orda.png`: il robot e la mela spalle a spalla contro l'orda, con l'ondata in corso e le tre vite in alto.
+  3. `8-scontro.png`: lo scontro di energie, col tiro alla fune sopra i due raggi e i due tasti da martellare.
   4. `1-creature.png`: il robot e la mela con le creature dei barattoli (fuoco e acqua).
   5. `9-sblocco.png`: la tendina, col riquadro «Unlock Premium for free» e i lucchetti.
 - Restano in cartella, di riserva: `2-opzioni.png` (la tendina con le scommesse), `3-premium-guerrieri.png`, `4-premium-maghi.png`, `5-premium-duellanti.png`. Sono della versione 0.4: mostrano due tasti nell'angolo invece di tre.

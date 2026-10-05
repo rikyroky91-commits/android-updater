@@ -27,7 +27,7 @@ Un clic sull'icona accende la lotta sulla scheda aperta. In basso a destra compa
 Il tasto col joypad apre un quarto di ruota attaccato all'angolo in basso a destra della finestra, semitrasparente finché non ci si passa sopra. Non dipende dalla tendina: funziona con la tendina aperta o chiusa, e quando è aperto tendina e tasti gli si mettono accanto.
 
 - **Nell'angolo** c'è il ritratto dal vivo del lottatore che si comanda, con la vita e l'energia lungo l'orlo e una spia verde o rossa. Un clic sul ritratto passa all'altro lottatore. Trascinandolo oltre metà finestra il controller va nell'angolo di sinistra.
-- **Intorno**, due fasce a spicchi: fuori gli attacchi, dentro le mosse di servizio. Un clic e il lottatore la fa. Le mosse cambiano coi personaggi scelti; sotto l'icona c'è l'energia che serve, rossa se non basta, e lo spicchio resta spento finché la mossa non si può fare.
+- **Intorno**, due fasce a spicchi: fuori gli attacchi, dentro le mosse di servizio. Un clic e il lottatore la fa. Le mosse cambiano coi personaggi scelti e sono tutte quelle della tendina (per i super guerrieri anche presa a distanza, lampo accecante e autodistruzione; per i maghi la sparizione; per i duellanti l'incrocio di lame). Sotto l'icona c'è l'energia che serve, rossa se non basta, e lo spicchio resta spento finché la mossa non si può fare.
 - Una mossa da vicino chiesta da lontano: prima ci va di corsa, poi colpisce.
 - Durante l'orda i comandi valgono contro gli zombie. Durante uno scontro di energie ogni comando è tifo per il proprio lottatore.
 
@@ -86,8 +86,12 @@ Nomi, facce e vestiti sono inventati qui: non richiamano personaggi di altri. Va
 - **Pioggia e temporale.** Le gocce arrivano fino in fondo e si fermano sui bordi degli elementi della pagina. Dopo qualche secondo di pioggia cade un fulmine: chi tiene una spada o vola alto lo attira.
 - **Terremoto con eruzione.** Le scosse sbilanciano chi è a terra (chi vola no); dal pavimento, lontano dai due, esce un vulcano che lancia lapilli e cola lava. Nell'estensione trema il mondo del ring, non la pagina del sito.
 - **Meteoriti** (Premium). Un mirino a terra annuncia dove cadono; i lottatori si scansano o alzano la barriera. Qualcuno lascia un sasso caldo da raccogliere e tirare.
-- **Orda di zombie** (Premium). I due smettono di picchiarsi e si mettono spalle a spalla; si coprono e si aiutano a rialzarsi. L'orda arriva a **ondate generate ogni volta diverse** (tipi di zombie, tema, lati d'arrivo). A sorpresa sono tre ondate; dal tasto della tendina non finiscono finché i due reggono, e resta il primato delle ondate superate. Un secondo clic sul tasto la chiude.
-- **Scontro di energie** (coi personaggi a energia). Chi vede caricare un colpo d'energia prova a caricare lo stesso: i due colpi si incontrano e parte un tiro alla fune. Vince chi spinge di più; le regole sono scritte nel commento sopra `SFIDA` in `ring.js`. Ogni clic su un lottatore gli dà fiato.
+- **Orda di zombie** (Premium). I due smettono di picchiarsi e si mettono spalle a spalla; si coprono e si aiutano a rialzarsi. L'orda arriva a **ondate generate ogni volta diverse** (tipi di zombie, tema, lati d'arrivo).
+  - **Arriva da sola**, col suo orologio: la prima fra un minuto e mezzo e due e dieci di lotta, poi una ogni quattro-sei minuti (con le sorprese accese). A sorpresa sono tre ondate.
+  - Dal tasto della tendina non finisce finché i due reggono, e resta il primato delle ondate superate. Un secondo clic sul tasto la chiude.
+  - **Tre vite**, i cuori accanto al conto dell'ondata: con tutti e due a terra insieme, le prime due volte si rialzano di scatto e l'urto butta indietro gli zombie; alla terza l'orda ha vinto.
+  - L'orda **segue i due**: se finiscono su un altro piano della pagina, gli zombie affondano e rispuntano lì.
+- **Scontro di energie** (coi personaggi a energia). Chi vede caricare un colpo d'energia prova a caricare lo stesso: i due colpi si incontrano e parte un tiro alla fune. Vince chi spinge di più; le regole sono scritte nel commento sopra `SFIDA` in `ring.js`. Durante lo scontro **spuntano due tasti**, uno per parte, ai capi della barra: ogni clic su un tasto dà al suo lottatore fiato e una spinta in più, e cliccando in fretta lo si fa vincere anche se parte sfavorito.
 
 Chi resta senza gambe si trascina sulle mani o vola; con una gamba sola saltella; senza braccia tira calci e testate.
 

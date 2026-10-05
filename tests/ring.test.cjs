@@ -36,6 +36,10 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
     get(obj, nome) {
       if (nome in obj) return obj[nome];
       if (nome === "createRadialGradient" || nome === "createLinearGradient") return () => ({ addColorStop() {} });
+      // Un canvas vero rifiuta un arco col raggio negativo (o che non è un numero) e l'eccezione
+      // ferma il disegno di tutta la pagina: qui deve succedere lo stesso, sennò non ce ne accorgiamo.
+      if (nome === "arc") return (x, y, r) => { if (!(r >= 0) || !Number.isFinite(x + y + r)) throw new Error("arc(" + x + ", " + y + ", " + r + "): un canvas vero qui si ferma"); };
+      if (nome === "ellipse") return (x, y, rx, ry) => { if (!(rx >= 0) || !(ry >= 0) || !Number.isFinite(x + y + rx + ry)) throw new Error("ellipse(" + [x, y, rx, ry].join(", ") + "): un canvas vero qui si ferma"); };
       return () => {};
     },
     set(obj, nome, valore) { obj[nome] = valore; return true; },
@@ -609,14 +613,16 @@ test("si afferra l'avversario, lo si tiene e lo si scaglia via", () => {
 });
 
 test("lottando, prima o poi uno afferra l'altro da solo", () => {
+  // Dal 05/10/2026 dopo un minuto e mezzo-due arriva l'orda, e durante la tregua non ci si afferra:
+  // di ogni prova resta meno lotta vera, quindi le prove passano da quattro a sei.
   let preso = false;
-  for (let prova = 0; prova < 4 && !preso; prova++) {
+  for (let prova = 0; prova < 6 && !preso; prova++) {
     const amb = ambiente();
     amb.finestra.__ring.tempo(60);
     amb.avanza(60 * 120, (s) => { if (s.lottatori.some((f) => f.tenuto)) { preso = true; return false; } });
     dentro(amb);
   }
-  assert.ok(preso, "nessuna presa in otto minuti di lotta");
+  assert.ok(preso, "nessuna presa in sei prove da due minuti di lotta");
 });
 
 test("chi scende apposta da una piattaforma alta apre il paracadute; chi viene lanciato no", () => {
@@ -2156,7 +2162,9 @@ test("controller ad angolo: sta nell'angolo in basso a destra, comanda il person
 });
 
 test("controller: le mosse sono quelle dei personaggi scelti, quelle a energia si spengono se l'energia non basta", () => {
-  const attese = { guerrieri: 9, maghi: 8, lame: 8 };
+  // Ci sono tutte le mosse della tendina: la presa a distanza, il lampo e l'autodistruzione
+  // dei guerrieri, la sparizione dei maghi, l'incrocio di lame dei duellanti.
+  const attese = { guerrieri: 12, maghi: 9, lame: 9 }, devono = { guerrieri: ["telecinesi", "lampo", "avvinghia"], maghi: ["teletrasporto"], lame: ["duello"] };
   for (const stile of Object.keys(attese)) {
     const amb = ambiente({ memoria: { "mut-ring-stile": stile, "mut-ring-radiale": "on" } });
     amb.avanza(60);
@@ -2165,7 +2173,14 @@ test("controller: le mosse sono quelle dei personaggi scelti, quelle a energia s
     let s = amb.stato();
     assert.strictEqual(s.radiale.aperto, true, "il controller non si ricorda di essere aperto");
     assert.strictEqual(s.radiale.voci.length, attese[stile], stile);
-    assert.strictEqual(s.radiale.spicchi.filter((q) => q.giro === 1).length, 5);
+    for (const id of devono[stile]) assert.ok(s.radiale.voci.indexOf(id) >= 0, stile + ": nel controller manca " + id);
+    assert.strictEqual(s.radiale.spicchi.filter((q) => q.giro === 1).length, Math.ceil(attese[stile] * 0.58));
+    // tutti dentro l'angolo, nessuno sopra un altro
+    for (const q of s.radiale.spicchi) assert.ok(q.x < s.radiale.x && q.y < s.radiale.y && q.x > s.radiale.x - s.radiale.largo && q.y > s.radiale.y - s.radiale.largo, "spicchio fuori dall'angolo");
+    for (let i = 0; i < s.radiale.spicchi.length; i++) for (let j = 0; j < i; j++) {
+      const a = s.radiale.spicchi[i], b = s.radiale.spicchi[j];
+      assert.ok(Math.hypot(a.x - b.x, a.y - b.y) > 24 * s.scala, stile + ": due spicchi troppo vicini per cliccarli");
+    }
     if (stile === "lame") continue;
     const onda = s.radiale.voci.indexOf("onda");
     let provato = false;
@@ -2210,4 +2225,164 @@ test("controller durante l'orda: i comandi valgono contro gli zombie, mai contro
   }
   assert.ok(colpi > 0, "durante l'orda il controller non comanda mai");
   dentro(amb);
+});
+
+test("controller: la presa a distanza c'è e afferra l'altro da lontano; durante la tregua resta spenta", () => {
+  let presi = 0, prove = 0;
+  for (let giro = 0; giro < 10 && presi < 2; giro++) {
+    const amb = ambiente({ memoria: { "mut-ring-stile": "guerrieri" } });
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false);
+    amb.avanza(60);
+    r.sposta("robot", 300); r.sposta("mela", 800); r.energia("robot", 100);
+    amb.avanza(3);
+    const g = amb.stato().radiale, k = g.voci.indexOf("telecinesi");
+    if (!g.accese[k]) continue;
+    r.radiale(true); amb.avanza(30);
+    const q = amb.stato().radiale.spicchi[k];
+    amb.premi(q.x, q.y); amb.rilascia(0, 0);
+    if (amb.lottatore("robot").azione !== "telecinesi") continue;
+    prove++;
+    let preso = false;
+    amb.avanza(150, (s) => { if (s.lottatori.find((f) => f.tipo === "mela").tenuto) { preso = true; return false; } });
+    if (preso) presi++;
+    amb.avanza(300); dentro(amb);
+  }
+  assert.ok(prove >= 2, "la presa a distanza dal controller non parte: " + prove);
+  assert.ok(presi >= 1, "la presa a distanza non afferra mai: " + presi + "/" + prove);
+  // senza energia è spenta; durante l'orda pure (è una mossa sull'altro, che ora è un alleato)
+  const amb = ambiente({ memoria: { "mut-ring-stile": "guerrieri" } });
+  const r = amb.finestra.__ring;
+  r.comandi.sorprese(false); amb.avanza(60);
+  r.energia("robot", 10);
+  let s = amb.stato();
+  assert.strictEqual(s.radiale.accese[s.radiale.voci.indexOf("telecinesi")], false);
+  r.orda(0, 9); amb.avanza(90); r.energia("robot", 100);
+  s = amb.stato();
+  for (const id of ["telecinesi", "avvinghia", "teletrasporto"]) assert.strictEqual(s.radiale.accese[s.radiale.voci.indexOf(id)], false, id + " accesa durante la tregua");
+});
+
+test("l'orda arriva da sola, col suo orologio: non nel primo minuto e mezzo, ma entro pochi minuti sì", () => {
+  // Riccardo, 05/10/2026: «l'ondata di zombie non arriva mai». Era pescata una volta su dieci fra gli imprevisti.
+  let arrivate = 0;
+  for (let giro = 0; giro < 3; giro++) {
+    const amb = ambiente();
+    let quando = -1, n = 0;
+    amb.avanza(60 * 190, (s) => { n++; if (s.orda) { quando = n / 60; return false; } });
+    const s = amb.stato();
+    if (!s.orda) continue;
+    arrivate++;
+    assert.ok(quando >= 88, "l'orda è arrivata troppo presto: " + quando.toFixed(0) + " s");
+    assert.strictEqual(s.orda.ondate, 3, "a sorpresa le ondate sono tre");
+    assert.strictEqual(s.evento, "zombie");
+    // finita, non ne riparte subito un'altra
+    amb.avanza(60 * 150, (st) => (st.orda ? undefined : false));
+    if (amb.stato().orda) continue;                    // tre ondate lunghe: capita
+    amb.avanza(60 * 60, (st) => { assert.ok(!st.orda, "finita un'orda ne è ripartita subito un'altra"); });
+    dentro(amb);
+  }
+  assert.ok(arrivate >= 2, "in tre minuti di lotta l'orda non arriva: " + arrivate + "/3");
+  // con le sorprese spente non arriva
+  const amb = ambiente();
+  amb.finestra.__ring.comandi.sorprese(false);
+  amb.avanza(60 * 200, (s) => { assert.ok(!s.orda, "orda a sorpresa con le sorprese spente"); });
+});
+
+test("orda: con tutti e due a terra ci si rialza di scatto due volte; alla terza l'orda ha vinto", () => {
+  // Prima finiva alla prima caduta in due, spesso già alla seconda ondata: «c'è solo la prima ondata».
+  const amb = ambiente();
+  const r = amb.finestra.__ring;
+  r.comandi.sorprese(false);
+  amb.avanza(60);
+  r.orda(0, 3);
+  amb.avanza(120);
+  assert.strictEqual(amb.stato().orda.vite, 3);
+  for (const attese of [2, 1]) {
+    // giù tutti e due, e ci restano: dopo un secondo e mezzo scatta la riscossa
+    let n = 0;
+    amb.avanza(60 * 6, (s) => {
+      if (!s.orda || s.orda.vite === attese) return false;
+      for (const f of s.lottatori) if (!f.ko) r.ko(f.tipo);
+      n++;
+    });
+    let s = amb.stato();
+    assert.ok(s.orda && s.orda.fase !== "festa", "alla caduta numero " + (3 - attese) + " l'orda è finita");
+    assert.strictEqual(s.orda.vite, attese);
+    assert.ok(n >= 85, "la riscossa è scattata troppo presto: " + n);
+    // si rialzano subito, e gli zombie vicini sono stati buttati indietro
+    let inPiedi = false;
+    amb.avanza(60, (st) => { if (st.lottatori.every((f) => !f.ko)) { inPiedi = true; return false; } });
+    assert.ok(inPiedi, "dopo la riscossa non si rialzano");
+  }
+  amb.avanza(60 * 6, (s) => { if (!s.orda || s.orda.fase === "festa") return false; for (const f of s.lottatori) if (!f.ko) r.ko(f.tipo); });
+  assert.ok(!amb.stato().orda || amb.stato().orda.fase === "festa", "finite le vite l'orda non finisce");
+  amb.avanza(60 * 5);
+  assert.strictEqual(amb.stato().orda, null);
+  dentro(amb);
+});
+
+test("orda: se i due finiscono su un altro piano, gli zombie rispuntano lì", () => {
+  // Buttati giù da un elemento della pagina restavano sotto, e gli zombie sopra, fermi fino allo scadere dell'ondata.
+  let traslochi = 0;
+  for (let giro = 0; giro < 4 && !traslochi; giro++) {
+    const amb = ambiente({ solidi: [[250, 420, 950, 450]] });
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false);
+    amb.avanza(60);
+    // tutti e due a terra, e l'orda comincia lì
+    amb.porta("robot", 520, amb.pavimento - 60, 12); amb.rilascia(520, amb.pavimento - 60);
+    amb.porta("mela", 640, amb.pavimento - 60, 12); amb.rilascia(640, amb.pavimento - 60);
+    amb.avanza(90);
+    r.orda(0, 4 + giro);
+    amb.avanza(150);
+    let s = amb.stato();
+    if (!s.orda || Math.abs(s.orda.base - amb.pavimento) > 2) continue;
+    // li si porta sopra l'elemento
+    amb.porta("robot", 520, 360, 14); amb.rilascia(520, 360);
+    amb.porta("mela", 660, 360, 14); amb.rilascia(660, 360);
+    let su = false;
+    amb.avanza(60 * 5, (st) => { if (st.orda && Math.abs(st.orda.base - 420) < 3) { su = true; return false; } });
+    if (!su) continue;
+    s = amb.stato();
+    assert.ok(s.orda.traslochi >= 1);
+    assert.ok(s.orda.l >= 250 && s.orda.r <= 950, "l'orda non si è stretta sull'elemento");
+    for (const z of s.orda.zombie) if (z.stato !== "giu") assert.ok(z.x >= 250 && z.x <= 950, "uno zombie è rimasto fuori dall'elemento");
+    traslochi++;
+    // e lassù si continua a combattere
+    const prima = s.orda.uccisi;
+    amb.avanza(60 * 25, (st) => (st.orda && st.orda.uccisi > prima + 1 ? false : undefined));
+    assert.ok(amb.stato().orda && amb.stato().orda.uccisi > prima, "dopo il trasloco non si abbatte più nessuno");
+    dentro(amb);
+  }
+  assert.ok(traslochi > 0, "l'orda non ha mai seguito i due sull'altro piano");
+});
+
+test("scontro di energie: spuntano due tasti, e martellando quello di chi parte sfavorito lo si fa vincere", () => {
+  // senza tasti: con 50 contro 100 vince la mela
+  const senza = scontroPulito((r) => { r.energia("robot", 50); r.energia("mela", 100); });
+  assert.strictEqual(senza.vince, "mela");
+  // col tasto del robot cliccato cinque volte al secondo vince lui
+  let tasti = null, bloccati = 0, clic = 0;
+  const amb0 = { premi: null };
+  const e = scontroPulito((r, amb) => { amb0.amb = amb; r.energia("robot", 50); r.energia("mela", 100); tasti = null; bloccati = 0; clic = 0; }, (r, s) => {
+    if (!s.sfida.tasti.length) return;
+    if (!tasti) {
+      tasti = s.sfida.tasti;
+      assert.strictEqual(tasti.length, 2);
+      assert.ok(tasti[0].x < tasti[1].x, "il tasto di sinistra deve stare a sinistra");
+      for (const t of tasti) assert.ok(t.x - t.r >= 0 && t.x + t.r <= s.larghezza && t.y - t.r >= 0 && t.y + t.r <= s.pavimento, "tasto fuori dalla finestra");
+      assert.ok(tasti[1].x - tasti[0].x > tasti[0].r * 2, "i due tasti si sovrappongono");
+    } else {
+      // una volta messi non si spostano: si devono poter cliccare in fretta
+      assert.ok(Math.abs(s.sfida.tasti[0].x - tasti[0].x) < 0.5 && Math.abs(s.sfida.tasti[0].y - tasti[0].y) < 0.5, "il tasto si sposta durante lo scontro");
+    }
+    if (s.sfida.t % 12 === 0) {
+      const sinistra = s.sfida.sinistra === "robot" ? 0 : 1;
+      const ev = amb0.amb.premi(tasti[sinistra].x, tasti[sinistra].y); amb0.amb.rilascia(tasti[sinistra].x, tasti[sinistra].y);
+      clic++; if (ev.bloccato) bloccati++;
+    }
+  });
+  assert.ok(clic >= 5 && bloccati === clic, "i clic sul tasto arrivano alla pagina: " + bloccati + "/" + clic);
+  assert.strictEqual(e.vince, "robot", "martellando il tasto non si vince (" + e.come + ", " + clic + " clic)");
+  assert.ok(e.tifo[e.stato.ultimaSfida ? 0 : 0] + e.tifo[1] === clic, "non tutti i clic sono diventati tifo");
 });
