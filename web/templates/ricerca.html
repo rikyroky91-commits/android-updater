@@ -12,6 +12,12 @@
   in cui si guardano.
 #}
 {% block corpo %}
+{# TUTTO IL RISULTATO STA IN UN CONTENITORE SOLO, e ha un nome: è quello
+   che il secondo tempo della ricerca sostituisce per intero (vedi
+   `frammento_firmware` in web/main.py e `firmware-in-arrivo.js`). Il
+   titolo della scheda del browser viaggia con lui, perché anche quello
+   lo decide il risultato completo, non il primo tempo. #}
+<div id="risultato-ricerca" data-titolo-pagina="{{ risultato.nome or query }} · {{ titolo_sito }}">
 {# L'AI HA GIÀ CERCATO. Non un elenco di link da scegliere: il tasto fa
    partire la ricerca vera sull'interpretazione migliore, e qui si dice
    cosa è stato interpretato — con le alternative a un clic, per quando
@@ -111,7 +117,17 @@
   {% with senza_nome = true %}{% include "_esito_firmware.html" %}{% endwith %}
   {% endif %}
 
-  {% if risultato.chiave_parco %}
+  {# CIÒ CHE SCRIVE UN DATO ASPETTA IL RISULTATO COMPLETO. Mentre il
+     firmware è in arrivo questa pagina è provvisoria: il primo tempo non
+     conosce la marca (nessuna fonte ha ancora risposto) e, per un modello
+     che l'archivio non ha, nemmeno la chiave con cui l'archivio lo
+     chiamerà. Il tasto del parco spediva quei valori: un telefono
+     aggiunto in quei secondi entrava nel parco senza marca e sotto una
+     chiave che nessun aggiornamento avrebbe mai raggiunto. Compare con il
+     secondo tempo, che ridisegna tutto il risultato. Stessa regola, più
+     sotto, per la correzione del nome: salva su un CODICE, e quello del
+     primo tempo può essere di un altro telefono. #}
+  {% if risultato.chiave_parco and not risultato.firmware_in_arrivo %}
   <div class="azione-parco">
     {% if risultato.in_parco %}
     <p class="nota">✓ Già nel <a href="/parco">parco di test</a>.</p>
@@ -174,7 +190,7 @@
      esteso, ma che resta comunque collegata alla stessa scheda tecnica
      di ogni altra forma. Compare solo quando c'è un codice a cui
      agganciare la scelta: senza, non c'è niente da correggere. #}
-  {% if risultato.codice_per_correzione %}
+  {% if risultato.codice_per_correzione and not risultato.firmware_in_arrivo %}
   <details class="correzione-nome">
     <summary>{{ "Nome corretto a mano — cambia" if risultato.corretto_a_mano
                 else "Non è il nome giusto?" }}</summary>
@@ -335,4 +351,5 @@
 {% if risultato.quante_notizie %}
 <p class="nota">Verifica online: {{ risultato.quante_notizie }} notizie trovate.</p>
 {% endif %}
+</div>
 {% endblock %}

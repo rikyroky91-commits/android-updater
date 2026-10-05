@@ -58,7 +58,8 @@ from core.util import (alleggerisci_se_serve, fmt_date, fmt_relative, libera_mem
 from . import account, auth_web, presenters as P
 from . import imei_status, tac_admin
 from .cache import CacheATempo
-from .contesto import RADICE, contesto as _contesto, rendi as _rendi
+from .contesto import (RADICE, contesto as _contesto, rendi as _rendi,
+                       rendi_blocco as _rendi_blocco)
 
 # La memoria corta delle ricerche. Vedi `web/cache.py` per i numeri che
 # l'hanno motivata: una ricerca costa fino a tredici secondi di rete, e
@@ -500,6 +501,31 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
     if risultato.get("firmware_in_arrivo"):
         risultato["domanda_originale"] = domanda
 
+    # RICERCHE RECENTI DI TUTTI: si registra il nome del telefono TROVATO (non
+    # il testo digitato, non un IMEI), e solo per visite di persone: né
+    # crawler né il secondo caricamento della stessa ricerca.
+    if (risultato.get("trovato") and not imei and not saved and not completo
+            and not _e_un_crawler(request)):
+        storage.registra_ricerca_recente(risultato.get("nome") or "")
+    return _rendi(request, "ricerca.html", _contesto_ricerca(
+        request, q, risultato, imei, ai=ai, alt=alt, perche=perche,
+        verifica_ai=verifica_ai, parco=parco, stats=stats))
+
+
+def _contesto_ricerca(request: Request, q: str, risultato: dict, imei: dict | None,
+                      *, ai: str = "", alt: list[str] | tuple = (), perche: str = "",
+                      verifica_ai: str = "", parco: int = 0,
+                      stats: dict | None = None) -> dict:
+    """Il contesto della pagina di un modello cercato, costruito in UN posto.
+
+    Lo usano le due strade che disegnano quel risultato: la pagina intera
+    (`/`) e il secondo tempo, che lo ridisegna al posto di quello
+    provvisorio (`/ricerca/firmware?pagina=1`). Finché lo costruiva solo la
+    prima, tutto ciò che sta qui dentro — lo striscione «hai scritto X, ho
+    cercato Y», il codice sotto il nome, la nota «aggiunto al parco» — era
+    per forza quello del primo tempo.
+    """
+    domanda = (q or "").strip()
     verifica = None
     if verifica_ai == "1" and aiquery.fornitore() and aiquery.fornitore()[0] == "Gemini":
         contesto = " · ".join(x for x in (
@@ -509,14 +535,9 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
         verifica = aiquery.verifica(risultato.get("nome") or domanda, contesto)
 
     risultato = _codici_da_mostrare(risultato, imei)
-    # RICERCHE RECENTI DI TUTTI: si registra il nome del telefono TROVATO (non
-    # il testo digitato, non un IMEI), e solo per visite di persone: né
-    # crawler né il secondo caricamento della stessa ricerca.
-    if (risultato.get("trovato") and not imei and not saved and not completo
-            and not _e_un_crawler(request)):
-        storage.registra_ricerca_recente(risultato.get("nome") or "")
-    return _rendi(request, "ricerca.html", _contesto(
-        request, attiva="cerca", query=q, stats=stats,
+    extra = {} if stats is None else {"stats": stats}
+    return _contesto(
+        request, attiva="cerca", query=q, **extra,
         risultato=risultato, imei=imei, verifica_ai=verifica,
         aggiunto_al_parco=bool(parco),
         # L'INTERPRETAZIONE SI DICHIARA. Se l'AI ha tradotto «quel samsung
@@ -532,7 +553,7 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
         interpretato_da=ai.strip() or risultato.get("ai_da", ""),
         interpretato_perche=perche.strip() or risultato.get("ai_perche", ""),
         alternative=[a for a in alt if a and a != q][:3],
-    ))
+    )
 
 
 _RE_CIFRA = re.compile(r"\d")
@@ -647,17 +668,52 @@ def _codici_da_mostrare(risultato: dict, imei: dict | None = None) -> dict:
 
 
 @app.get("/ricerca/firmware", response_class=HTMLResponse)
-def frammento_firmware(request: Request, q: str = Query(default="")):
-    """Il secondo tempo della ricerca: solo le righe del firmware.
+def frammento_firmware(request: Request, q: str = Query(default=""),
+                       pagina: int = 0, ai: str = "", perche: str = "",
+                       verifica_ai: str = "", parco: int = 0):
+    """Il secondo tempo della ricerca: il risultato COMPLETO.
 
     Restituisce un pezzo di HTML, non una pagina: lo va a prendere la
-    pagina già aperta e lo mette al posto della rotellina. È la STESSA
-    `_esito_ricerca` di sempre — stessa cache, stesse fonti — perché due
-    strade diverse per la stessa domanda finirebbero prima o poi per
-    rispondere due cose diverse sullo stesso telefono.
+    pagina già aperta. È la STESSA `_esito_ricerca` di sempre — stessa
+    cache, stesse fonti — perché due strade diverse per la stessa domanda
+    finirebbero prima o poi per rispondere due cose diverse sullo stesso
+    telefono.
 
     Il risultato completo entra in cache: chi ricarica la pagina la vede
     già intera, senza rotellina e senza rifare la ricerca.
+
+    ## `pagina=1`: tutto il risultato, non solo le righe del firmware
+
+    Fino al 05/10/2026 da qui usciva soltanto il riquadro del firmware, e
+    il browser lo metteva al posto della rotellina. Il resto della pagina
+    restava quello disegnato dal primo tempo — che però non è «la stessa
+    pagina senza il firmware»: è un'altra ricerca, fatta senza rete, e
+    spesso arriva a un'identità diversa o a nessuna. Segnalato dall'utente
+    cercando «a505»: nome e firmware del Galaxy A50 (secondo tempo) sopra
+    una pagina senza scheda tecnica, senza foto e senza processore (primo
+    tempo, che quel codice non l'aveva riconosciuto).
+
+    Non era un caso isolato, e la scheda non era la parte peggiore.
+    Misurato in locale su cinquanta ricerche comuni (codici, nomi, sigle;
+    archivio vuoto in partenza): in 45 la pagina, dopo il secondo tempo,
+    restava diversa dal risultato completo in qualcosa che sta fuori dal
+    riquadro del firmware — in 24 la scheda mancava o mostrava il
+    processore di un'altra variante, e poi «Forse cercavi», lo storico, le
+    notizie, lo striscione dell'AI. E in 47 il tasto «Aggiungi al parco di
+    test» spediva i valori del PRIMO tempo: marca vuota e, per un modello
+    non ancora in archivio, una chiave che l'archivio non avrebbe mai
+    usato («|a505» invece di «samsung|a50») — cioè un telefono nel parco
+    che nessun aggiornamento avrebbe mai fatto segnalare.
+
+    Rattoppare un campo alla volta sarebbe stata la solita rincorsa. Con
+    `pagina=1` questa rotta rende il blocco `corpo` di `ricerca.html` — lo
+    stesso template della pagina intera, non una copia — sul risultato
+    completo, e il browser sostituisce tutto il risultato. Dopo il secondo
+    tempo la pagina è, per costruzione, quella che il server avrebbe
+    disegnato facendo tutto insieme.
+
+    Senza `pagina` la risposta resta il solo riquadro del firmware: è il
+    contratto di prima, e resta per chi lo usa ancora.
     """
     domanda = (q or "").strip()
     if not domanda:
@@ -684,8 +740,20 @@ def frammento_firmware(request: Request, q: str = Query(default="")):
     else:
         imei = None
         risultato = _esito_ricerca(domanda)
-    risultato = _codici_da_mostrare(risultato, imei)
-    return _rendi(request, "_esito_firmware.html", {"risultato": risultato})
+    if not pagina:
+        risultato = _codici_da_mostrare(risultato, imei)
+        return _rendi(request, "_esito_firmware.html", {"risultato": risultato})
+    # LE RICERCHE RECENTI SI REGISTRANO QUI, perché è qui che una ricerca in
+    # due tempi SA di aver trovato un telefono. La pagina le registra solo
+    # se `trovato`, e il primo tempo non lo è mai: senza rete nessuna fonte
+    # risponde. Risultato: in due tempi entrava nell'elenco solo chi
+    # ricaricava la pagina entro la durata della cache.
+    if risultato.get("trovato") and not imei and not _e_un_crawler(request):
+        storage.registra_ricerca_recente(risultato.get("nome") or "")
+    return HTMLResponse(_rendi_blocco(request, "ricerca.html", "corpo", _contesto_ricerca(
+        request, q, risultato, imei, ai=ai,
+        alt=request.query_params.getlist("alt"), perche=perche,
+        verifica_ai=verifica_ai, parco=parco)))
 
 
 @app.get("/confronto", response_class=HTMLResponse)
@@ -3698,6 +3766,22 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
     codice = identita.get("model_code") or ""
     if not codice and sources.looks_like_model_code(query):
         codice = " ".join((query or "").split()).upper()
+        # ...E SE È INCOMPLETO, IL CODICE È QUELLO A CUI SI RIFERISCE.
+        #
+        # Segnalato dall'utente il 05/10/2026 cercando «a505»: la pagina
+        # mostrava il nome e il firmware del Galaxy A50 ma nessuna scheda
+        # tecnica, nessuna foto, nessun processore. Il secondo tempo arriva
+        # a `SM-A505F` provando i completamenti contro la fonte Samsung; il
+        # primo tempo, che la rete non la tocca, restava con «A505» in mano
+        # — un codice che nessun catalogo conosce — e disegnava la pagina di
+        # un telefono sconosciuto. Valeva per ogni codice Samsung scritto
+        # senza la lettera del mercato: «a546», «s928», «SM-G991».
+        #
+        # Quale telefono sia non dipende dalla rete: lo dice il dataset dei
+        # codici, che il primo tempo consulta già. `completa_codice`
+        # risponde solo quando la radice porta a UN telefono; altrimenti il
+        # codice resta quello scritto, e a decidere è il secondo tempo.
+        codice = sources.completa_codice(codice) or codice
     nome = identita.get("device_model") or query
     marca = identita.get("brand", "")
 

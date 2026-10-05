@@ -660,6 +660,16 @@ class TestIlServizioEsternoVieneInterrogatoDavvero(unittest.TestCase):
                       "il frammento non dice al browser di non ricaricare")
         self.assertIn("99887766", frammento.text,
                       "il frammento non dice nemmeno di che TAC si parla")
+        # Vale anche per la richiesta che il browser fa davvero dal
+        # 05/10/2026 (`pagina=1`, il risultato intero al posto del solo
+        # riquadro): quando non c'è un telefono non c'è un risultato da
+        # ridisegnare, e la risposta deve restare QUESTO messaggio. Se
+        # diventasse una pagina di risultato lo script la metterebbe al
+        # posto di tutto, marcatore compreso, e il freno sparirebbe.
+        intero = self.client.get("/ricerca/firmware",
+                                 params={"q": self.IMEI, "pagina": 1})
+        self.assertIn('data-identita="ignota"', intero.text)
+        self.assertNotIn('id="risultato-ricerca"', intero.text)
 
         # E la pagina ricaricata a mano non ripropone l'attesa.
         pagina = self.client.get("/", params={"q": self.IMEI})

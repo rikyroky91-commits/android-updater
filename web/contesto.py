@@ -52,6 +52,21 @@ def rendi(request: Request, pagina: str, contesto: dict):
     return templates.TemplateResponse(request, pagina, contesto)
 
 
+def rendi_blocco(request: Request, pagina: str, blocco: str, contesto: dict) -> str:
+    """UN SOLO BLOCCO di una pagina, reso con lo stesso template della pagina.
+
+    Serve al secondo tempo della ricerca (`/ricerca/firmware?pagina=1`): il
+    browser ha già la testata e la barra di ricerca, gli manca solo il
+    risultato. Renderlo da un template a parte vorrebbe dire tenere due
+    copie dello stesso HTML — e due copie, in questo progetto, hanno sempre
+    finito per dire due cose diverse. Qui il blocco È quello della pagina:
+    stesso file, stesse righe.
+    """
+    modello = templates.get_template(pagina)
+    ambiente = modello.new_context({"request": request, **contesto})
+    return "".join(modello.blocks[blocco](ambiente))
+
+
 def contesto(request: Request, **extra) -> dict:
     """Quello che serve a OGNI pagina: testata, stato fonti, ricerca, chi
     è collegato adesso (per la voce Accedi/Esci della navigazione)."""
