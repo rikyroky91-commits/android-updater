@@ -2915,14 +2915,15 @@ test("trasformazioni: nel ring libero ci si trasforma da soli quando manca un co
     const m0 = amb.lottatore("mela");
     if (m0.danni < m0.soglia - 1 || m0.ko) continue;
     prove++;
-    let vista = null;
+    let vista = null, finito = false;
     amb.avanza(60 * 6, (s) => {
       r.roundFatale(false);
       const m = s.lottatori.find((f) => f.tipo === "mela");
       if (m.trasformazione) { vista = m.trasformazione; return false; }
-      if (s.punteggio.robot) return false;                      // il round è finito prima
+      // Il round può finire prima in tutti i modi: K.O. dato dall'altro, oppure dal ring (che non segna punti).
+      if (s.punteggio.robot || s.punteggio.mela || s.lottatori.some((f) => f.ko > 0)) { finito = true; return false; }
     });
-    if (!vista) { assert.ok(amb.lottatore("mela").mutato || amb.stato().punteggio.robot > 0, "non si è nemmeno provato a rimontare"); continue; }
+    if (!vista) { assert.ok(amb.lottatore("mela").mutato || finito, "non si è nemmeno provato a rimontare"); continue; }
     viste++;
     assert.strictEqual(vista, "albero");
     assert.strictEqual(amb.lottatore("mela").mutato, true, "la rimonta non viene segnata");
