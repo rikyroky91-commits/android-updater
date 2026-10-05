@@ -4464,6 +4464,60 @@ def _nome_ufficiale(codice: str, ripiego: str) -> str:
     return " ".join((ripiego or "").split())
 
 
+def completamenti_del_codice(codice: str, limite: int = 12) -> list[str]:
+    """I codici completi sotto un codice INCOMPLETO, l'internazionale per primo.
+
+    `SM-A505` → `SM-A505F`, `SM-A505U`, `SM-A505U1`, … Sono gli stessi di
+    `modelcodes.codici_per_prefisso`, ma in un ordine DICHIARATO: quello di
+    `_ORDINE_MERCATI_SAMSUNG`, già usato quando dal nome si arriva ai codici.
+    L'ordinamento è stabile, quindi fra due codici dello stesso rango — e
+    per ogni marca che non è Samsung — resta l'ordine alfabetico di prima.
+
+    Il taglio a `limite` viene DOPO l'ordinamento: tagliare prima, in ordine
+    alfabetico, potrebbe lasciare fuori proprio la variante internazionale.
+    """
+    completi = modelcodes.codici_per_prefisso(codice, limite=60)
+    return sorted(completi, key=_rango_mercato_samsung)[:limite]
+
+
+def completa_codice(testo: str) -> str | None:
+    """`a505` → `SM-A505F`: il codice completo dietro un codice senza mercato.
+
+    Chi scrive «a505» ha letto il codice sulla scatola senza l'ultima
+    lettera, che indica solo il mercato: il telefono è uno, il Galaxy A50.
+    `expand_query` lo sa già e prova i completamenti uno per uno contro le
+    fonti firmware — ma quella strada passa dalla rete. Qui si risponde alla
+    sola domanda che dalla rete non dipende: QUALE telefono è.
+
+    Torna None, e non un tentativo, in due casi:
+
+    * il testo non è un codice incompleto — non ha la forma di un codice,
+      oppure il dataset lo conosce già così com'è;
+    * sotto quella radice ci sono telefoni DIVERSI. `SM-W201` è insieme
+      W2014, W2015, W2016…: sceglierne uno sarebbe inventare un modello, ed
+      è la cosa che questo progetto non fa. Misurato sul dataset del
+      05/10/2026: 347 radici Samsung su 357 portano a un telefono solo.
+
+    Il confronto fra i nomi ignora il suffisso di connettività («Galaxy
+    S21» e «Galaxy S21 5G» sotto `SM-G991` sono lo stesso telefono) ma non
+    altro: `stesso_telefono` qui sarebbe troppo largo, perché accetta anche
+    un nome che è l'inizio di un altro.
+    """
+    for codice in _code_candidates(testo):
+        if modelcodes.resolve(codice):
+            return None
+        completi = completamenti_del_codice(codice, limite=60)
+        if not completi:
+            continue
+        famiglie = set()
+        for completo in completi:
+            nome = modelcodes.nome_canonico(completo)
+            if nome:
+                famiglie.add(modelcodes._senza_suffissi(modelcodes._normalize_name(nome)))
+        return completi[0] if len(famiglie) == 1 else None
+    return None
+
+
 def _lookup_samsung(model_name: str) -> list[RawItem]:
     """Controllo versione ufficiale per un Samsung qualsiasi.
 
@@ -5554,7 +5608,13 @@ def expand_query(query: str) -> list[str]:
         # avendo il dato a un carattere di distanza — ed è una delle forme
         # più comuni, perché il codice si legge sulla scatola senza la
         # lettera finale o si ricorda a metà.
-        for completo in modelcodes.codici_per_prefisso(codice):
+        #
+        # NELL'ORDINE DEI MERCATI, NON IN QUELLO DELL'ALFABETO. In ordine
+        # alfabetico sotto `SM-S921` viene prima `SM-S9210` (Cina) di
+        # `SM-S921B` (internazionale): lo stesso difetto già corretto per la
+        # ricerca per nome (vedi `_ORDINE_MERCATI_SAMSUNG`), rimasto aperto
+        # su questa strada. Vedi `completamenti_del_codice`.
+        for completo in completamenti_del_codice(codice):
             candidati.append(completo)
             candidati.extend(modelcodes.resolve_senza_ambiguita(completo))
 
