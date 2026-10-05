@@ -48,8 +48,8 @@ Con `sblocco_gratis: true` le due cartelle sono uguali. La scelta è stata presa
 
 ### Cosa è gratis e cosa è Premium
 
-- **Gratis:** la lotta fra il robot e la mela, prese e lanci col mouse, il controller ad angolo, fumogeni e barattoli con le creature, la pioggia di oggetti, il terremoto con l'eruzione, jetpack, furia, barre della vita, scommesse, la partita a dieci col volo fuori dal ring, il colpo finale, quello che i lottatori imparano.
-- **Premium:** i personaggi (super guerrieri, maghi, duellanti) con le loro mosse, scontro di energie compreso; pistola, spada, bomba, pieghevole e le due esplosioni; pioggia, uragano, rallentatore, meteoriti, buco nero, orda di zombie (con le mosse in coppia) e le gravità diverse dalla Terra.
+- **Gratis:** la lotta fra il robot e la mela, prese e lanci col mouse, il controller ad angolo, fumogeni e barattoli con le creature, la pioggia di oggetti, il terremoto con l'eruzione, jetpack, furia, barre della vita, scommesse, la partita a dieci col volo fuori dal ring, il colpo finale, la trasformazione del robot e della mela, quello che i lottatori imparano.
+- **Premium:** i personaggi (super guerrieri, maghi, duellanti) con le loro mosse, scontro di energie e trasformazioni comprese; pistola, spada, bomba, bazooka, lanciafiamme, pieghevole e le due esplosioni; pioggia, uragano, rallentatore, meteoriti, buco nero, orda di zombie (con le mosse in coppia) e le gravità diverse dalla Terra.
 
 I tasti Premium portano un lucchetto. Cliccandone uno si apre il riquadro in cima alla tendina.
 
@@ -107,8 +107,30 @@ Circa un round su tre si chiude con una scena: quando all'altro manca un colpo s
 - **Onda finale** (super guerrieri): un'onda a bruciapelo lo porta fino al bordo.
 - **Statua** (maghi): lo gela, poi una saetta manda il ghiaccio in pezzi.
 - **Taglio netto** (duellanti): uno scatto attraverso, un attimo fermi, poi l'altro cade.
+- **Sfera finale** (05/10/2026): si carica sopra la testa una sfera enorme, più del doppio della sfera gigante dei super guerrieri, e gliela lascia cadere addosso. Lo scoppio **sfonda la pagina**: la striscia delle notizie si crepa in cinque punti (coi buchi veri), i bordi si rovinano, il pavimento resta bruciato e i telefoni lì intorno si spaccano.
+- **Meteora**: lo manda per aria con un montante e gli tira addosso una meteora; cadendo lascia lo stesso genere di segni.
+- **Mulinello**: un imbuto di vento lo tira su e lo trascina da una parte all'altra della pagina raschiando quello che trova, poi lo pianta a terra.
+- **Crepa**: un pugno nel pavimento, e la crepa corre verso di lui spaccando la striscia man mano che passa.
 
 Quale round tocca lo decide un sacchetto di tre (uno sì, due no) mescolato ogni volta. Se il round buono finisce in un altro modo (K.O. da lontano, in volo), resta buono per quello dopo. Vale un K.O. come gli altri. Non capita sul punto che chiude la partita a dieci, né durante orda, scontro di energie, terremoto o buco nero; se si afferra uno dei due col mouse, salta. Il tasto «Colpo finale» della tendina lo fa partire appena i due sono in piedi e vicini.
+
+### Le trasformazioni (05/10/2026)
+
+Chi si potenzia non cambia solo colore: cambia proprio corpo.
+
+- **Super guerrieri**: diventano scimmioni, col pelo, il muso, le orecchie tonde e la coda. Oro alla prima forma, viola alla seconda.
+- **Robot e mela** (il ring gratis): il robot diventa un **colosso** corazzato con gli spallacci e il nucleo acceso, la mela un **albero** con tronco, chioma e foglie che cadono. Qui la trasformazione è la rimonta di chi sta per cadere: arriva da sola quando manca un colpo al K.O., una volta sola a round, e il tasto «Trasforma i due» la fa partire a mano.
+- **Duellanti**: il **cavaliere** incappucciato, col mantello, la maschera accesa e la lama a due punte, che respinge sempre i colpi che gli arrivano addosso.
+- **Maghi**: per ora restano com'erano (trance e aura). Da fare, se piace il resto.
+
+Chi è trasformato si disegna più grande (la fisica resta quella di prima) e picchia più forte, come già faceva il potenziamento.
+
+### Le armi nuove (05/10/2026)
+
+- **Bazooka**: due colpi. Spara un razzo che vola piano, corregge appena la rotta e scoppia su quello che tocca; chi ce l'ha tiene le distanze. Si innesca appena uscito dal tubo, così sparando verso il basso non scoppia addosso a chi spara.
+- **Lanciafiamme**: tre vampate. Una fiammata lunga un paio di secondi che brucia chi ha davanti e annerisce il pavimento; chi ce l'ha si avvicina invece di scappare.
+
+Tutte e due stanno nel gruppo **armi** (Premium) e piovono col resto delle armi.
 
 ### Premium: cosa c'è e cosa manca
 

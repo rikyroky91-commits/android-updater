@@ -2631,7 +2631,8 @@ test("buco nero: arriva anche da solo, la prima volta poco dopo il primo minuto"
 // Riccardo: «un sistema di fatality con mosse finali e animazioni particolari
 // quando l'avversario ha poca vita, casuale una volta ogni 3 round».
 test("colpo finale: ogni scena fa buio, conta un K.O. solo e lascia tutti nella finestra", () => {
-  for (const [stile, tipo] of [["", "orbita"], ["", "flipper"], ["", "schiacciata"], ["guerrieri", "onda"], ["maghi", "statua"], ["lame", "taglio"]]) {
+  for (const [stile, tipo] of [["", "orbita"], ["", "flipper"], ["", "schiacciata"], ["", "sferona"], ["", "meteora"],
+                               ["guerrieri", "onda"], ["maghi", "statua"], ["lame", "taglio"]]) {
     let fatte = 0;
     for (let k = 0; k < 4 && fatte < 2; k++) {
       const amb = ambiente({ memoria: stile ? { "mut-ring-stile": stile } : {} });
@@ -2683,6 +2684,7 @@ test("colpo finale: ogni scena fa buio, conta un K.O. solo e lascia tutti nella 
       const s2 = amb.stato(), m2 = s2.lottatori.find((f) => f.tipo === "mela"), r2 = s2.lottatori.find((f) => f.tipo === "robot");
       assert.ok(s2.fataleBuio < 0.03, tipo + ": resta buio");
       assert.ok(!m2.fatVola && !m2.schiacciato && !r2.alza, tipo + ": la vittima resta com'era nella scena");
+      if (tipo === "sferona" || tipo === "meteora") assert.ok(s.danniStriscia >= 2 && s.bruciature >= 2, tipo + ": la pagina non si rompe");
       dentro(amb);
       fatte++;
     }
@@ -2854,4 +2856,330 @@ test("colpo finale: il tasto del menu lo fa partire appena i due sono in piedi e
   }
   // (coi maghi in volo sulla scopa può non partire entro i sei secondi: misurato, 26 volte su 30)
   assert.ok(partiti >= 3, "col tasto il colpo finale parte di rado: " + partiti + "/5");
+});
+
+// --- Le trasformazioni (05/10/2026) ----------------------------------------
+// Riccardo: «migliora le trasformazioni. I super guerrieri diventano
+// scimmieschi e gialli o viola, l'androide diventa un robot gigante e la mela
+// un albero potentissimo; i duellanti qualcosa in quel genere lì».
+test("trasformazioni: col tasto ogni coppia prende la sua forma, e dopo un po' torna normale", () => {
+  for (const [stile, attese] of [["", { robot: "colosso", mela: "albero" }], ["guerrieri", { robot: "scimmia", mela: "scimmia" }],
+                                 ["lame", { robot: "cavaliere", mela: "cavaliere" }]]) {
+    let fatte = 0;
+    for (let k = 0; k < 4 && fatte < 1; k++) {
+      const amb = ambiente({ memoria: stile ? { "mut-ring-stile": stile } : {} });
+      const r = amb.finestra.__ring, c = r.comandi;
+      c.sorprese(false); r.roundFatale(false); amb.avanza(60 + k * 30, () => r.roundFatale(false));
+      assert.notStrictEqual(c.colpo("muta"), false, stile + ": il tasto non fa niente");
+      let presa = {};
+      amb.avanza(60 * 4, (s) => {
+        r.roundFatale(false);
+        for (const f of s.lottatori) if (f.trasformazione) presa[f.tipo] = f.trasformazione;
+        return !(Object.keys(presa).length === 2);
+      });
+      if (Object.keys(presa).length < 2) continue;              // uno dei due s'è preso un colpo durante la carica
+      fatte++;
+      assert.deepStrictEqual(presa, attese, stile + ": forme sbagliate");
+      const s = amb.stato();
+      for (const f of s.lottatori) assert.strictEqual(f.forma, 1, stile + ": " + f.tipo + " senza forma");
+      dentro(amb);
+      // la forma dura un po' e poi se ne va da sola
+      let finita = false;
+      // (senza energia: i super guerrieri, se si ricaricano, si ritrasformano subito nella seconda forma)
+      amb.avanza(60 * 30, (st) => {
+        r.roundFatale(false);
+        if (stile) { r.energia("robot", 0); r.energia("mela", 0); }
+        if (st.lottatori.every((f) => !f.trasformazione)) { finita = true; return false; }
+      });
+      assert.ok(finita, stile + ": la forma non finisce mai");
+      dentro(amb);
+    }
+    assert.ok(fatte >= 1, stile + ": la trasformazione non parte mai col tasto");
+  }
+});
+
+test("trasformazioni: nel ring libero ci si trasforma da soli quando manca un colpo, una volta sola a round", () => {
+  let viste = 0, prove = 0;
+  for (let k = 0; k < 10 && viste < 3; k++) {
+    const amb = ambiente();
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); r.roundFatale(false); amb.avanza(50, () => r.roundFatale(false));
+    // si porta la mela a un colpo dal K.O.
+    let colpi = 0;
+    for (let i = 0; i < 40; i++) {
+      const m = amb.lottatore("mela");
+      if (m.danni >= m.soglia - 1) break;
+      colpi += r.colpo("robot", "mela") > 0 ? 1 : 0;
+      amb.avanza(12, () => r.roundFatale(false));
+    }
+    const m0 = amb.lottatore("mela");
+    if (m0.danni < m0.soglia - 1 || m0.ko) continue;
+    prove++;
+    let vista = null;
+    amb.avanza(60 * 6, (s) => {
+      r.roundFatale(false);
+      const m = s.lottatori.find((f) => f.tipo === "mela");
+      if (m.trasformazione) { vista = m.trasformazione; return false; }
+      if (s.punteggio.robot) return false;                      // il round è finito prima
+    });
+    if (!vista) { assert.ok(amb.lottatore("mela").mutato || amb.stato().punteggio.robot > 0, "non si è nemmeno provato a rimontare"); continue; }
+    viste++;
+    assert.strictEqual(vista, "albero");
+    assert.strictEqual(amb.lottatore("mela").mutato, true, "la rimonta non viene segnata");
+    // finita la forma, nello stesso round non si ritrasforma
+    // (un K.O. fa round nuovo e la rimonta torna buona: anche quello dato dal ring, che non segna punti)
+    let caduto = false;
+    amb.avanza(60 * 30, (s) => {
+      r.roundFatale(false);
+      if (s.lottatori.some((f) => f.ko > 0)) caduto = true;
+      return !!s.lottatori.find((f) => f.tipo === "mela").trasformazione && !caduto;
+    });
+    if (!caduto) {
+      const m = amb.lottatore("mela");
+      assert.strictEqual(m.trasformazione, null);
+      assert.strictEqual(m.mutato, true, "nello stesso round la rimonta è tornata disponibile");
+    }
+    dentro(amb);
+  }
+  assert.ok(viste >= 3, "alle corde non ci si trasforma quasi mai: " + viste + "/" + prove);
+  // a ogni K.O. la rimonta torna buona per tutti e due
+  const amb = ambiente();
+  const r = amb.finestra.__ring;
+  r.comandi.sorprese(false); amb.avanza(40);
+  r.comandi.colpo("muta"); amb.avanza(90);
+  assert.ok(amb.stato().lottatori.every((f) => f.mutato), "il tasto non segna la rimonta");
+  r.ko("mela");
+  assert.ok(amb.stato().lottatori.every((f) => !f.mutato), "dopo il K.O. la rimonta non torna buona");
+});
+
+test("trasformazioni: il cavaliere para i colpi che gli arrivano addosso", () => {
+  let parati = 0, tirati = 0;
+  for (let k = 0; k < 6 && parati < 4; k++) {
+    const amb = ambiente({ memoria: { "mut-ring-stile": "lame" } });
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); r.roundFatale(false); amb.avanza(50, () => r.roundFatale(false));
+    r.comandi.colpo("muta");
+    let pronto = false;
+    amb.avanza(60 * 4, (s) => { r.roundFatale(false); if (s.lottatori.find((f) => f.tipo === "robot").trasformazione) { pronto = true; return false; } });
+    if (!pronto) continue;
+    r.sposta("robot", 600); r.sposta("mela", 1000);
+    amb.avanza(2);
+    const f = amb.lottatore("robot");
+    assert.strictEqual(f.trasformazione, "cavaliere");
+    const prima = f.danni;
+    r.proiettile(f.bacino.x + 120 * amb.stato().scala, f.collo.y, -9 * amb.stato().scala, 0, "mela");
+    tirati++;
+    let tornato = false;
+    amb.avanza(40, (s) => { const b = s.lottatori.find((l) => l.tipo === "robot"); if (b.danni > prima) return false; });
+    const dopo = amb.lottatore("robot");
+    if (dopo.danni === prima) { parati++; }
+    dentro(amb);
+  }
+  assert.ok(parati >= 4, "il cavaliere si fa colpire lo stesso: parati " + parati + "/" + tirati);
+});
+
+// --- Armi nuove: bazooka e lanciafiamme (05/10/2026) ------------------------
+test("bazooka: spara un razzo che vola e scoppia, poi finisce i colpi e si butta via", () => {
+  let visti = 0;
+  for (let k = 0; k < 6 && visti < 2; k++) {
+    const amb = ambiente();
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); r.roundFatale(false); amb.avanza(50, () => r.roundFatale(false));
+    assert.strictEqual(r.dai("robot", "bazooka"), "arma");
+    const f0 = amb.lottatore("robot");
+    assert.strictEqual(f0.arma, "bazooka");
+    assert.strictEqual(f0.colpiArma, 2, "il bazooka deve avere due colpi");
+    r.sposta("robot", 260); r.sposta("mela", 1000);
+    let razzi = 0, scoppi = 0, lontano = 0;
+    amb.avanza(60 * 16, (s) => {
+      r.roundFatale(false);
+      razzi = Math.max(razzi, s.razzi);
+      if (s.razzi) lontano++;
+      scoppi = Math.max(scoppi, s.particelleTipi.brace || 0);
+      for (const l of s.lottatori) assert.ok(Number.isFinite(l.cx + l.bacino.x + l.bacino.y), "coordinate non finite");
+    });
+    // Sparato a bruciapelo il razzo scoppia addosso subito: non conta come prova di volo.
+    if (!razzi || lontano < 3) continue;
+    visti++;
+    assert.ok(scoppi > 0, "il razzo non scoppia");
+    assert.ok(amb.stato().sfereGrandi === 0, "il razzo viene contato come sfera d'energia");
+    dentro(amb);
+  }
+  assert.ok(visti >= 2, "col bazooka in mano non parte quasi mai un razzo: " + visti);
+  // è un'arma: senza Premium non arriva
+  const premio = { bloccate: { guerrieri: true, armi: true, meteo: true }, attivo: () => false, chiedi: () => {} };
+  const amb = ambiente({ premio, estensione: true, memoria: { "mut-ring": "on" } });
+  amb.avanza(30);
+  assert.strictEqual(amb.finestra.__ring.comandi.metti("bazooka"), false);
+  assert.strictEqual(amb.finestra.__ring.comandi.metti("lanciafiamme"), false);
+});
+
+test("lanciafiamme: una vampata che brucia chi ha davanti e annerisce il pavimento", () => {
+  let visti = 0;
+  for (let k = 0; k < 6 && visti < 2; k++) {
+    const amb = ambiente();
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); r.roundFatale(false); amb.avanza(50, () => r.roundFatale(false));
+    assert.strictEqual(r.dai("robot", "lanciafiamme"), "arma");
+    assert.strictEqual(amb.lottatore("robot").colpiArma, 3);
+    let fiammate = 0, fuoco = 0, bruciature = 0, danniMela = 0;
+    const d0 = amb.lottatore("mela").danni;
+    amb.avanza(60 * 16, (s) => {
+      r.roundFatale(false);
+      if (s.lottatori.some((l) => l.azione === "fiammata")) fiammate++;
+      fuoco = Math.max(fuoco, s.particelleTipi.fuoco || 0);
+      bruciature = Math.max(bruciature, s.bruciature);
+      danniMela = Math.max(danniMela, s.lottatori.find((l) => l.tipo === "mela").danni - d0);
+      for (const l of s.lottatori) assert.ok(Number.isFinite(l.cx + l.bacino.x + l.bacino.y), "coordinate non finite");
+    });
+    if (!fiammate) continue;
+    visti++;
+    assert.ok(fiammate > 20, "la vampata dura un soffio: " + fiammate + " fotogrammi");
+    assert.ok(fuoco > 5, "il lanciafiamme non fa fiamme");
+    assert.ok(bruciature > 0, "il pavimento non si annerisce");
+    dentro(amb);
+  }
+  assert.ok(visti >= 2, "col lanciafiamme in mano non parte quasi mai una vampata: " + visti);
+});
+
+test("armi nuove: piovono col resto delle armi e stanno nella tendina", () => {
+  const amb = ambiente();
+  const r = amb.finestra.__ring;
+  r.comandi.sorprese(false); amb.avanza(30);
+  for (const forma of ["bazooka", "lanciafiamme"]) {
+    const prima = amb.stato().telefoni.length;
+    assert.notStrictEqual(r.comandi.metti(forma), false);
+    amb.avanza(30);
+    const t = amb.stato().telefoni;
+    assert.ok(t.length > prima && t.some((q) => q.tipo === forma), forma + ": non entra in campo");
+  }
+  dentro(amb);
+  // e i tasti stanno nella pagina
+  const casa = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "web", "templates", "home.html"), "utf8");
+  for (const forma of ["bazooka", "lanciafiamme"]) assert.ok(casa.indexOf('data-metti="' + forma + '"') > 0, forma + ": manca il tasto nella tendina");
+});
+
+// --- Colpi finali nuovi: la sfera gigante e la meteora (05/10/2026) ---------
+test("colpo finale: la sfera gigante e la meteora scoppiano e lasciano il segno sulla pagina", () => {
+  for (const tipo of ["sferona", "meteora"]) {
+    let fatte = 0;
+    for (let k = 0; k < 5 && fatte < 2; k++) {
+      const amb = ambiente();
+      const r = amb.finestra.__ring;
+      r.comandi.sorprese(false); r.roundFatale(false); amb.avanza(50, () => r.roundFatale(false));
+      let partita = false;
+      for (let i = 0; i < 200 && !partita; i++) { amb.avanza(3); r.roundFatale(false); partita = r.fatale("robot", tipo); }
+      if (!partita) continue;
+      const s0 = amb.stato();
+      assert.strictEqual(s0.danniStriscia, 0, "la striscia era già rotta");
+      const punti = s0.punteggio.robot;
+      let fasi = [], n = 0, alto = 1e9, buio = 0;
+      amb.avanza(60 * 12, (s) => {
+        n++;
+        const F = s.fatale;
+        if (!F) return false;
+        if (fasi[fasi.length - 1] !== F.fase) fasi.push(F.fase);
+        buio = Math.max(buio, s.fataleBuio);
+        const m = s.lottatori.find((l) => l.tipo === "mela");
+        alto = Math.min(alto, m.bacino.y);
+        assert.ok(Number.isFinite(m.bacino.x + m.bacino.y), tipo + ": coordinate non finite");
+        assert.ok(m.bacino.x >= 0 && m.bacino.x <= s.larghezza && m.bacino.y <= s.pavimento + 1 && m.bacino.y >= 0, tipo + ": la vittima esce dalla finestra");
+        assert.ok(s.punteggio.robot + s.punteggio.mela - punti <= 1, tipo + ": più di un K.O.");
+      });
+      const s = amb.stato();
+      assert.strictEqual(s.fatale, null, tipo + ": la scena non finisce");
+      assert.strictEqual(fasi.join(">"), "annuncio>mossa>fine", tipo + ": fasi " + fasi.join(">"));
+      assert.ok(buio > 0.3, tipo + ": non si fa buio");
+      assert.strictEqual(s.punteggio.robot, punti + 1, tipo + ": K.O. non contato una volta sola");
+      assert.strictEqual(s.fataliFatti, 1);
+      // il segno sulla pagina: crepe nella striscia delle notizie, bordi rotti, pavimento bruciato
+      assert.ok(s.danniStriscia >= 2, tipo + ": la striscia non si rompe (" + s.danniStriscia + ")");
+      assert.ok(s.danniBordi.length >= 1, tipo + ": i bordi della finestra restano intatti");
+      assert.ok(s.bruciature >= 2, tipo + ": il pavimento non si annerisce");
+      if (tipo === "meteora") assert.ok(alto < s0.pavimento - 150 * s.scala, "meteora: non lo manda abbastanza in alto");
+      amb.avanza(400, () => r.roundFatale(false));
+      dentro(amb);
+      fatte++;
+    }
+    assert.ok(fatte >= 2, tipo + ": la scena non parte quasi mai (" + fatte + ")");
+  }
+});
+
+// --- Colpi finali che sfondano la pagina (05/10/2026) -----------------------
+// Riccardo: «altri tipi di colpi finali, come una sfera gigante ancora più
+// gigante che danneggia anche parte del sito in modo evidente».
+test("colpo finale: mulinello e crepa sfondano la pagina, contano un K.O. solo e non buttano nessuno fuori", () => {
+  for (const tipo of ["vortice", "crepa"]) {
+    let fatte = 0;
+    for (let k = 0; k < 4 && fatte < 2; k++) {
+      const amb = ambiente({ solidi: k % 2 ? [[300, 500, 900, 530]] : [] });
+      const r = amb.finestra.__ring;
+      r.comandi.sorprese(false); r.roundFatale(false); amb.avanza(50, () => r.roundFatale(false));
+      let partita = false;
+      for (let i = 0; i < 200 && !partita; i++) { amb.avanza(3); r.roundFatale(false); partita = r.fatale("robot", tipo); }
+      if (!partita) continue;
+      const s0 = amb.stato(), punti = s0.punteggio.robot + s0.punteggio.mela, crepe0 = s0.danniStriscia;
+      assert.strictEqual(s0.fatale.tipo, tipo);
+      let n = 0, crepe = crepe0, bruciature = 0, lontano = 0, alto = 0;
+      const x0 = s0.lottatori.find((f) => f.tipo === "mela").cx;
+      amb.avanza(60 * 13, (s) => {
+        n++;
+        const F = s.fatale;
+        if (!F) return false;
+        const m = s.lottatori.find((f) => f.tipo === "mela"), rb = s.lottatori.find((f) => f.tipo === "robot");
+        for (const f of [m, rb]) {
+          assert.ok(Number.isFinite(f.cx + f.bacino.x + f.bacino.y), tipo + ": coordinate non finite");
+          assert.ok(f.bacino.x >= 0 && f.bacino.x <= s.larghezza && f.bacino.y <= s.pavimento + 1 && f.bacino.y >= 0,
+                    tipo + ": fuori dalla finestra (" + Math.round(f.bacino.x) + ", " + Math.round(f.bacino.y) + ")");
+        }
+        assert.ok(s.punteggio.robot + s.punteggio.mela - punti <= 1, tipo + ": conta più di un K.O.");
+        crepe = Math.max(crepe, s.danniStriscia); bruciature = Math.max(bruciature, s.bruciature);
+        lontano = Math.max(lontano, Math.abs(m.cx - x0) / s.scala); alto = Math.max(alto, (s.pavimento - m.bacino.y) / s.scala);
+      });
+      const s = amb.stato();
+      assert.strictEqual(s.fatale, null, tipo + ": la scena non finisce");
+      assert.strictEqual(s.punteggio.robot, s0.punteggio.robot + 1, tipo + ": non vale un K.O. per chi la fa");
+      assert.strictEqual(s.fataliFatti, 1);
+      assert.ok(crepe >= crepe0 + 3, tipo + ": la pagina non si crepa abbastanza (" + crepe0 + "→" + crepe + ")");
+      assert.ok(bruciature > 0, tipo + ": niente segni per terra");
+      if (tipo === "vortice") assert.ok(lontano > 120 && alto > 90, "mulinello: non lo porta in giro (lontano " + Math.round(lontano) + ", alto " + Math.round(alto) + ")");
+      amb.avanza(400, () => r.roundFatale(false));
+      dentro(amb);
+      fatte++;
+    }
+    assert.ok(fatte >= 2, tipo + ": la scena non parte quasi mai (" + fatte + ")");
+  }
+});
+
+test("colpo finale: la sfera finale è molto più grande della sfera normale e spacca la striscia in più punti", () => {
+  // quanto è grossa la sfera della mossa normale dei super guerrieri
+  const amb0 = ambiente({ memoria: { "mut-ring-stile": "guerrieri" } });
+  const r0 = amb0.finestra.__ring;
+  r0.comandi.sorprese(false); r0.roundFatale(false); amb0.avanza(40, () => r0.roundFatale(false));
+  let normale = 0;
+  for (let k = 0; k < 6 && !normale; k++) {
+    r0.energia("robot", 100); r0.mossa("robot", "sfera");
+    amb0.avanza(130, (s) => { r0.roundFatale(false); for (const f of s.lottatori) normale = Math.max(normale, f.sferaR || 0); });
+  }
+  let grande = 0, crepe = 0, visto = false;
+  for (let k = 0; k < 4 && !visto; k++) {
+    const amb = ambiente();
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); r.roundFatale(false); amb.avanza(50, () => r.roundFatale(false));
+    let partita = false;
+    for (let i = 0; i < 200 && !partita; i++) { amb.avanza(3); r.roundFatale(false); partita = r.fatale("robot", "sferona"); }
+    if (!partita) continue;
+    visto = true;
+    const crepe0 = amb.stato().danniStriscia;
+    amb.avanza(60 * 13, (s) => {
+      if (!s.fatale) return false;
+      grande = Math.max(grande, s.fatale.r || 0);
+      crepe = Math.max(crepe, s.danniStriscia - crepe0);
+    });
+    dentro(amb);
+  }
+  assert.ok(visto, "la sfera finale non parte");
+  assert.ok(grande > 100, "la sfera finale è piccola: " + Math.round(grande));
+  if (normale) assert.ok(grande > normale * 2.5, "la sfera finale (" + Math.round(grande) + ") non è molto più grande di quella normale (" + Math.round(normale) + ")");
+  assert.ok(crepe >= 4, "la sfera finale non spacca la striscia in più punti: " + crepe);
 });

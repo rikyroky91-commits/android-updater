@@ -8,6 +8,7 @@ Quello che si difende:
   - niente codice caricato da fuori: tutto sta nel pacchetto.
 """
 import json
+import re
 import subprocess
 import sys
 import unittest
@@ -194,6 +195,27 @@ class TestEstensione(unittest.TestCase):
         self.assertIn("buco", premio)                                  # il buco nero sta col meteo a pagamento
         self.assertNotIn("fatale", premio)                             # il colpo finale è di tutti
 
+    def test_trasformazioni_armi_nuove_e_colpi_finali_stanno_nel_plug_in(self):
+        """05/10/2026: forme nuove (col tasto gratis «Trasforma i due»), bazooka e lanciafiamme (armi, a pagamento)."""
+        for nome, cartella in VARIANTI.items():
+            with self.subTest(variante=nome):
+                prepara = (cartella / "prepara.js").read_text(encoding="utf-8")
+                for tasto in ("muta", "fatale"):
+                    self.assertIn(f'data-colpo=\\"{tasto}\\"', prepara)
+                for arma in ("bazooka", "lanciafiamme"):
+                    self.assertIn(f'data-metti=\\"{arma}\\"', prepara)
+                guida = (cartella / "benvenuto.html").read_text(encoding="utf-8")
+                self.assertIn('data-msg="guidaS10"', guida)
+                for lingua in LINGUE:
+                    messaggi = json.loads((cartella / "_locales" / lingua / "messages.json").read_text(encoding="utf-8"))
+                    self.assertTrue(messaggi["guidaS10"]["message"])
+        ring = (RADICE / "web" / "static" / "ring.js").read_text(encoding="utf-8")
+        armi = re.search(r"const ARMI_PREMIO = \{([^}]*)\}", ring).group(1)
+        for arma in ("bazooka", "lanciafiamme"):
+            self.assertIn(arma, armi)                                  # le armi nuove restano a pagamento
+        mosse = re.search(r"const MOSSE_PREMIO = \{(.*?)\};", ring, re.S).group(1)
+        self.assertNotIn("muta:", mosse)                               # cambiare forma nel ring libero è gratis
+
     def test_niente_telefoni_nell_estensione_ma_fumogeni_e_barattoli(self):
         """02/10/2026: nel plug-in non piovono telefoni. Via i tasti che li mettono in campo;
         restano le armi (Premium) e arrivano fumogeni e barattoli. Sul sito i telefoni restano."""
@@ -202,7 +224,8 @@ class TestEstensione(unittest.TestCase):
             with self.subTest(variante=nome):
                 testo = (cartella / "prepara.js").read_text(encoding="utf-8")
                 messi = set(re.findall(r'data-metti=\\"([a-z-]+)\\"', testo))
-                self.assertEqual(messi, {"pistola", "spada", "bomba", "duo", "fumogeno", "barattolo-fuoco", "barattolo-scossa", "barattolo-acqua"})
+                self.assertEqual(messi, {"pistola", "spada", "bomba", "duo", "bazooka", "lanciafiamme",
+                                         "fumogeno", "barattolo-fuoco", "barattolo-scossa", "barattolo-acqua"})
                 self.assertIn("Pioggia di oggetti", testo)
                 self.assertNotIn("Pioggia di telefoni", testo)
         casa = (RADICE / "web" / "templates" / "home.html").read_text(encoding="utf-8")
