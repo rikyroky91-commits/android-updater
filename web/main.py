@@ -2121,7 +2121,12 @@ def _e_un_crawler(request: Request) -> bool:
         return True
     if any(c.lower() in ua for c in _CRAWLER_AI):
         return True
-    return any(x in ua for x in ("bot", "crawler", "spider", "curl", "python-requests", "httpx"))
+    # `controllo-notturno` è il nostro (scripts/controllo_notturno.py): dal
+    # 05/10/2026 chiede anche il risultato in pagina, che registra le
+    # ricerche recenti — e trenta ricerche di una macchina ogni notte non
+    # sono «le ultime ricerche di chi usa il sito».
+    return any(x in ua for x in ("bot", "crawler", "spider", "curl", "python-requests",
+                                 "httpx", "controllo-notturno"))
 
 
 @app.get("/api/ricerche-recenti")
@@ -3781,7 +3786,18 @@ def _cerca_davvero(query: str, senza_rete: bool = False) -> dict:
         # codici, che il primo tempo consulta già. `completa_codice`
         # risponde solo quando la radice porta a UN telefono; altrimenti il
         # codice resta quello scritto, e a decidere è il secondo tempo.
-        codice = sources.completa_codice(codice) or codice
+        #
+        # ...E SOLO SE IL CODICE SCRITTO NON È GIÀ UN CODICE VERO. I tablet
+        # Samsung non hanno la lettera del mercato: `SM-T385` è un codice
+        # completo, e il catalogo delle schede lo conosce così. Il dataset
+        # dei codici può invece conoscere solo `SM-T385C` (la variante
+        # cinese) — e allora «t385» sembrerebbe una radice da completare.
+        # Completarlo toglieva la scheda che un attimo prima c'era
+        # (confronto prima/dopo su 518 ricerche, 05/10/2026: «t385» e
+        # «SM-T295»). Se una scheda risponde al codice com'è scritto, quel
+        # codice non è incompleto.
+        if not any(specs.per_codice(forma) for forma in sources._code_candidates(codice)):
+            codice = sources.completa_codice(codice) or codice
     nome = identita.get("device_model") or query
     marca = identita.get("brand", "")
 

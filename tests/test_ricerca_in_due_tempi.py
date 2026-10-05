@@ -480,6 +480,28 @@ class TestCioCheScriveAspettaIlRisultatoCompleto(_ConLeSchede):
         self.assertIn(f'name="brand" value="{C.SAMSUNG}"', intero)
         self.assertIn(f'name="modello" value="{completo["nome"]}"', intero)
 
+    def test_dopo_averlo_aggiunto_la_conferma_arriva_col_secondo_tempo(self):
+        """Aggiungere al parco riporta a `/?q=…&parco=1` e svuota la cache:
+        la pagina torna in due tempi. La conferma «Aggiunto al parco» sta
+        nello stesso riquadro del tasto, quindi nel primo tempo non c'è —
+        deve portarla il secondo, e per farlo deve ricevere `parco`."""
+        from core import storage
+        from web.main import RICERCHE, _esito_ricerca
+
+        completo = _esito_ricerca(self.DOMANDA)
+        storage.add_to_watchlist(completo["chiave_parco"], completo["brand"],
+                                 completo["nome"])
+        try:
+            RICERCHE.svuota()
+            intero = _testo(self.client.get(
+                "/ricerca/firmware",
+                params={"q": self.DOMANDA, "pagina": 1, "parco": 1}).text)
+            self.assertIn("Già nel parco di test", intero)
+            self.assertIn("Aggiunto al parco di test.", intero)
+        finally:
+            storage.remove_from_watchlist(completo["chiave_parco"])
+            RICERCHE.svuota()
+
     def test_senza_due_tempi_il_tasto_c_e_subito(self):
         """La pagina fatta tutta insieme non è provvisoria: lì niente
         aspetta niente."""
@@ -566,6 +588,53 @@ class TestCodiceSenzaMercatoNelPrimoTempo(_ConLeSchede):
         from web.main import _cerca_davvero
 
         self.assertEqual(_cerca_davvero("a325", senza_rete=True)["codice"], "SM-A325F")
+
+
+class TestUnCodiceVeroNonSiCompleta(unittest.TestCase):
+    """I tablet Samsung non hanno la lettera del mercato.
+
+    `SM-T385` è un codice completo — Galaxy Tab A 8.0 (2017) LTE — e il
+    catalogo delle schede lo conosce così. Il dataset dei codici ne
+    conosce solo la variante cinese, `SM-T385C`: visto da lì «t385» sembra
+    una radice. Trovato confrontando 518 ricerche prima e dopo la modifica
+    del 05/10/2026: completandolo, il primo tempo perdeva la scheda che
+    aveva sempre mostrato. Righe vere dei due cataloghi.
+    """
+
+    def setUp(self):
+        from core import modelcodes, specs
+
+        self._ripiego = specs.RIPIEGO_ESTERNO
+        specs.RIPIEGO_ESTERNO = False
+        specs.carica_da([{
+            "nome": "Samsung Galaxy Tab A 8.0 (2017)", "marca": "Samsung",
+            "codici": ["SM-T380", "SM-T385"], "chipset": "Qualcomm MSM8917 Snapdragon 425",
+        }], "due righe vere")
+        modelcodes.carica_indice({"SM-T385C": ["Galaxy Tab A (2017)"]})
+
+    def tearDown(self):
+        from core import modelcodes, specs
+
+        specs.RIPIEGO_ESTERNO = self._ripiego
+        specs.reset_cache()
+        modelcodes.reset_cache()
+
+    def test_il_dataset_da_solo_lo_completerebbe(self):
+        """La premessa: è per questo che serve chiedere anche alle schede."""
+        from core import sources
+
+        self.assertEqual(sources.completa_codice("t385"), "SM-T385C")
+
+    def test_la_scheda_del_codice_scritto_resta(self):
+        from web.main import _cerca_davvero
+
+        for scritto in ("t385", "SM-T385"):
+            with self.subTest(scritto=scritto):
+                esito = _cerca_davvero(scritto, senza_rete=True)
+                self.assertNotEqual(esito["codice"], "SM-T385C")
+                self.assertTrue(esito["scheda"]["trovata"])
+                self.assertEqual(esito["scheda"]["titolo"],
+                                 "Samsung Galaxy Tab A 8.0 (2017)")
 
 
 class TestCompletaCodice(unittest.TestCase):
