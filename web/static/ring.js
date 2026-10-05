@@ -6334,13 +6334,15 @@
     const q = formaDi(f);
     scrivi(GRIDO_FORMA[q === "scimmia" && f.forma >= 2 ? "scimmia2" : q] || (f.forma >= 2 ? "SOVRACCARICO II!" : "SOVRACCARICO!"), b.x, b.y - 62 * S, true);
     // L'onda d'urto sbalza via l'avversario, senza fargli danno.
-    if (!altro.esploso && !altro.preso && !altro.tenuto) {
+    // (se anche l'altro si sta trasformando non lo tocca: si trasformano insieme, senza spingersi)
+    if (!altro.esploso && !altro.preso && !altro.tenuto && altro.azione !== "trasforma") {
       const d = altro.p.bacino.x - b.x;
       if (Math.hypot(d, altro.p.bacino.y - b.y) < 200 * S) {
         const s = Math.sign(d || f.dir);
-        for (const n in altro.p) { altro.p[n].ox -= s * 8 * S; altro.p[n].oy += verso * 3 * S; }
-        // (se anche l'altro si sta trasformando, l'onda non gli rovina la sua: si trasformano insieme)
-        if (altro.azione !== "trasforma") { altro.azione = null; altro.stordito = Math.max(altro.stordito, 20); }
+        // La spinta non lo butta mai fuori dalla finestra (volando ci finiva, una volta ogni tanto).
+        const spinta = Math.max(0, Math.min(8 * S, s > 0 ? (W - 16 * S - altro.p.bacino.x) / 3 : (altro.p.bacino.x - 16 * S) / 3));
+        for (const n in altro.p) { altro.p[n].ox -= s * spinta; altro.p[n].oy += verso * 3 * S; }
+        altro.azione = null; altro.stordito = Math.max(altro.stordito, 20);
         altro.scatto = 0; altro.onda = null;
         if (altro.tel) lasciaCadere(altro);
       }
