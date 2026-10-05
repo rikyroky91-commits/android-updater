@@ -84,7 +84,7 @@ Join in:
 The power button in the corner turns everything off and on again. The page itself is never changed. A short "How it works" page opens after installation and can be reopened from the panel.
 
 Premium is free for now: press "Unlock Premium for free" at the top of the panel. It adds:
-• Three sets of original characters, each with its own moves and its own transformed body (golden apes, hooded knights). Super warriors fly, fire energy waves and transform. Wizards cast freezing, shrinking and lightning spells and ride brooms. Duelists fight with energy blades.
+• Three sets of original characters, each with its own moves and its own transformed body (blazing crests and torn jackets, hooded knights). Super warriors fly, fire energy waves and transform. Wizards cast freezing, shrinking and lightning spells and ride brooms. Duelists fight with energy blades.
 • Energy clashes: when one fighter charges an energy attack the other answers with the same one, the two beams meet and it becomes a tug of war. Two buttons pop up: hammer the one on your fighter's side to win it.
 • A zombie horde that shows up on its own: the two stop fighting each other, stand back to back and hold out, with three lives, against waves that are never the same twice. They team up too: leapfrog over the partner, side swap, double strike, cannonball.
 • A black hole that swallows whatever is nearby (fighters, items, zombies) and spits it out on the other side of the screen.
@@ -117,7 +117,7 @@ Partecipa anche tu:
 Il tasto di accensione nell'angolo spegne e riaccende tutto. La pagina non viene mai modificata. Dopo l'installazione si apre una breve pagina «Come funziona», che si riapre dalla tendina.
 
 Premium per ora è gratis: premi «Sblocca Premium gratis» in cima alla tendina. Aggiunge:
-• Tre coppie di personaggi originali, ognuna con le sue mosse e la sua trasformazione (scimmioni d'oro, cavalieri incappucciati). I super guerrieri volano, lanciano onde di energia e si trasformano. I maghi congelano, rimpiccioliscono, scagliano fulmini e volano sulla scopa. I duellanti combattono con lame di energia.
+• Tre coppie di personaggi originali, ognuna con le sue mosse e la sua trasformazione (cresta accesa e casacca a brandelli, cavalieri incappucciati). I super guerrieri volano, lanciano onde di energia e si trasformano. I maghi congelano, rimpiccioliscono, scagliano fulmini e volano sulla scopa. I duellanti combattono con lame di energia.
 • Gli scontri di energie: quando uno carica un colpo d'energia l'altro risponde con lo stesso, i due raggi si incontrano e diventa un tiro alla fune. Spuntano due tasti: martella quello dalla parte del tuo lottatore per farlo vincere.
 • L'orda di zombie, che arriva da sola: i due smettono di picchiarsi, si mettono spalle a spalla e resistono, con tre vite, a ondate mai due volte uguali. E si danno una mano: cavallina sopra il compagno, cambio di lato, colpo insieme, palla di cannone.
 • Il buco nero, che risucchia quello che ha intorno (lottatori, oggetti, zombie) e lo risputa dall'altra parte dello schermo.

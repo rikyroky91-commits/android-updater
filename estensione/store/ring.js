@@ -5244,14 +5244,15 @@
   // ·· LE TRASFORMAZIONI (05/10/2026, chieste da Riccardo) ··
   // Chi si potenzia non cambia solo colore: cambia proprio corpo, e ogni
   // coppia di personaggi ha la sua.
-  //   super guerrieri   scimmioni: pelo, muso, coda. Oro alla prima forma, viola alla seconda
+  //   super guerrieri   loro stessi, gonfiati: massa doppia, cresta ritta, casacca strappata
   //   robot e mela      il robot diventa un colosso d'acciaio, la mela un albero
   //   duellanti         il cavaliere incappucciato, con la lama doppia che para tutto
   //   maghi             per ora niente di nuovo: restano la trance e l'aura
-  const PELO = { robot: ["#f0ae25", "#ffd863"], mela: ["#9b4fe0", "#c98cff"] };
+  // I capelli accesi della forma: oro a Zefir, viola a Brasa; più chiari alla seconda.
+  const CRESTA = { robot: ["#f0ae25", "#ffe066"], mela: ["#9b4fe0", "#cf9bff"] };
   function formaDi(f) {
     if (!f || !(f.potenziato > 0) || !f.forma) return null;
-    if (stile === "guerrieri") return "scimmia";
+    if (stile === "guerrieri") return "super";
     if (stile === "lame") return "cavaliere";
     if (!stile) return f.tipo === "robot" ? "colosso" : "albero";
     return null;
@@ -5259,10 +5260,10 @@
   // Quanto si disegna più grandi (la fisica resta quella di prima: cambia solo il disegno).
   function quantoGrosso(f) {
     const q = formaDi(f);
-    return q === "colosso" || q === "albero" ? 1.44 : q === "scimmia" ? 1.34 : 1;
+    return q === "colosso" || q === "albero" ? 1.44 : q === "super" ? 1.2 : 1;
   }
-  const coloreAnime = (f) => (formaDi(f) === "scimmia" ? PELO[f.tipo][Math.min(1, (f.forma || 1) - 1)] : COLORI_ANIME[f.tipo]);
-  const GRIDO_FORMA = { scimmia: "BESTIA D'ORO!", scimmia2: "BESTIA VIOLA!", colosso: "COLOSSO!", albero: "GRANDE ALBERO!", cavaliere: "CAVALIERE!" };
+  const coloreAnime = (f) => (formaDi(f) === "super" ? CRESTA[f.tipo][Math.min(1, (f.forma || 1) - 1)] : COLORI_ANIME[f.tipo]);
+  const GRIDO_FORMA = { colosso: "COLOSSO!", albero: "GRANDE ALBERO!", cavaliere: "CAVALIERE!" };
   const maniDi = (f) => (maghi() ? puntaBacchetta(f) : { x: (f.p.manoA.x + f.p.manoD.x) / 2, y: (f.p.manoA.y + f.p.manoD.y) / 2 });
   function eseguiAnime(f, altro) {
     if (f.azione === "carica") {
@@ -6331,8 +6332,7 @@
     for (const k of [0, 8]) if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "onda", x: b.x, y: b.y - 12 * S, vx: 0, vy: 0, vita: 22 + k, max: 22 + k, colore: k ? "#ffffff" : col });
     scintille(b.x, b.y - 14 * S, 26, col); scintille(b.x, b.y - 14 * S, 12, "#ffffff");
     scossa = Math.max(scossa, 14); fermoColpo = Math.max(fermoColpo, 6);
-    const q = formaDi(f);
-    scrivi(GRIDO_FORMA[q === "scimmia" && f.forma >= 2 ? "scimmia2" : q] || (f.forma >= 2 ? "SOVRACCARICO II!" : "SOVRACCARICO!"), b.x, b.y - 62 * S, true);
+    scrivi(GRIDO_FORMA[formaDi(f)] || (f.forma >= 2 ? "SOVRACCARICO II!" : "SOVRACCARICO!"), b.x, b.y - 62 * S, true);
     // L'onda d'urto sbalza via l'avversario, senza fargli danno.
     // (se anche l'altro si sta trasformando non lo tocca: si trasformano insieme, senza spingersi)
     if (!altro.esploso && !altro.preso && !altro.tenuto && altro.azione !== "trasforma") {
@@ -6814,62 +6814,35 @@
   const nomeProprio = (tipo) => { const n = ASPETTI[stile][tipo].nome; return n.charAt(0) + n.slice(1).toLowerCase(); };
   const scuro = (colore) => mix(colore, "#000000", 0.22);
 
-  // Il pelo degli scimmioni: una striscia folta lungo l'arto, coi ciuffi che spuntano.
-  function artoPeloso(a, b, c, spessore, col) {
-    arto(a, b, c, spessore, col);
-    ctx.strokeStyle = col; ctx.lineWidth = 1.5 * S; ctx.lineCap = "round";
-    ctx.beginPath();
-    for (const [u, v] of [[a, b], [b, c]]) {
-      const dx = v.x - u.x, dy = v.y - u.y, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
-      for (let i = 1; i <= 3; i++) {
-        const t = i / 4, x = u.x + dx * t, y = u.y + dy * t, lato = i % 2 ? 1 : -1, lun = spessore * 0.45 + 2.4 * S;
-        ctx.moveTo(x, y); ctx.lineTo(x + nx * lato * lun + dx / L * 2.4 * S, y + ny * lato * lun + dy / L * 2.4 * S);
-      }
+  const NERO = "#17171c";
+  // La cresta del trasformato: ciuffi grossi, ritti e piegati all'indietro, nel colore della forma.
+  function crestaSuper(f, col, d) {
+    ctx.fillStyle = col; ctx.strokeStyle = NERO; ctx.lineWidth = 1.2 * S; ctx.lineJoin = "round";
+    for (const [giro, lun] of [[-0.34, 17], [-0.08, 22], [0.2, 19], [0.5, 14], [0.8, 10]]) {
+      const a = -Math.PI / 2 - d * giro, base = 7.2 * S, larg = 0.28;
+      const px = Math.cos(a) * (base + lun * S) - d * 5 * S, py = Math.sin(a) * (base + lun * S);
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a - larg) * base, Math.sin(a - larg) * base);
+      ctx.quadraticCurveTo(Math.cos(a) * (base + lun * 0.55 * S) - d * 1.5 * S, Math.sin(a) * (base + lun * 0.6 * S), px, py);
+      ctx.quadraticCurveTo(Math.cos(a + larg) * (base + lun * 0.5 * S), Math.sin(a + larg) * (base + lun * 0.5 * S),
+                           Math.cos(a + larg) * base, Math.sin(a + larg) * base);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
     }
-    ctx.stroke();
-  }
-  // Il braccio dello scimmione: spalla grossa, avambraccio ancora più grosso, manone.
-  function bracciaScimmia(f, spalla, gomito, mano, col, pelle) {
-    artoPeloso(spalla, gomito, mano, 12 * S, col);
-    // L'avambraccio, più pieno del braccio.
-    linea(gomito, mano, 13.6 * S, col);
-    const L = Math.hypot(mano.x - gomito.x, mano.y - gomito.y) || 1;
-    const ux = (mano.x - gomito.x) / L, uy = (mano.y - gomito.y) / L;
-    // Il pugno: grosso, con le nocche.
-    const mx = mano.x + ux * 1.5 * S, my = mano.y + uy * 1.5 * S;
-    ctx.fillStyle = pelle; ctx.strokeStyle = "#17171c"; ctx.lineWidth = 1.2 * S;
-    ctx.beginPath(); ctx.arc(mx, my, 6 * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = scuro(pelle); ctx.lineWidth = 1.3 * S; ctx.lineCap = "round"; ctx.beginPath();
-    for (let i = -1; i <= 1; i++) {
-      const a = Math.atan2(uy, ux) + i * 0.55;
-      ctx.moveTo(mx + Math.cos(a) * 2.4 * S, my + Math.sin(a) * 2.4 * S);
-      ctx.lineTo(mx + Math.cos(a) * 5.4 * S, my + Math.sin(a) * 5.4 * S);
+    // Le due ciocche corte davanti alla fronte.
+    for (const lato of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(lato * 4.6 * S, -5.8 * S);
+      ctx.lineTo(lato * 9 * S, -11.5 * S);
+      ctx.lineTo(lato * 7.8 * S, -4 * S);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
     }
-    ctx.stroke();
   }
-  // La coda, dietro a tutto: parte dal bacino, si incurva e ondeggia.
-  function codaScimmia(f, col) {
-    const b = f.p.bacino, d = f.dir, on = Math.sin(passi * 0.09) * 8 * S;
-    // Spessa alla radice e affusolata: tre tratti uno sopra l'altro.
-    for (const [w, k] of [[7.4, 0], [5.4, 0.3], [3.4, 0.62]]) {
-      ctx.strokeStyle = col; ctx.lineWidth = w * S; ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(b.x - d * 5 * S, b.y + 3 * S);
-      ctx.quadraticCurveTo(b.x - d * (30 - k * 8) * S, b.y + 8 * S + on * 0.4,
-                           b.x - d * (36 - k * 10) * S, b.y - (20 + k * 6) * S + on);
-      ctx.stroke();
-    }
-    const px = b.x - d * 26 * S, py = b.y - 26 * S + on;
-    tondo(px, py, 5 * S, mix(col, "#ffffff", 0.32));
-    ctx.strokeStyle = mix(col, "#ffffff", 0.32); ctx.lineWidth = 1.8 * S; ctx.beginPath();
-    for (let i = 0; i < 5; i++) { const a = -1.9 + i * 0.5; ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(a) * 8 * S, py + Math.sin(a) * 8 * S); }
-    ctx.stroke();
-  }
-  function pugno(gomito, mano, A, colore, lontano) {
+  function pugno(gomito, mano, A, colore, lontano, grande) {
     const L = Math.hypot(mano.x - gomito.x, mano.y - gomito.y) || 1, ux = (mano.x - gomito.x) / L, uy = (mano.y - gomito.y) / L;
     // Il polsino, poi la mano.
-    linea({ x: mano.x - ux * 5 * S, y: mano.y - uy * 5 * S }, { x: mano.x - ux * 2.4 * S, y: mano.y - uy * 2.4 * S }, 4.6 * S, colore);
+    linea({ x: mano.x - ux * 5 * S, y: mano.y - uy * 5 * S }, { x: mano.x - ux * 2.4 * S, y: mano.y - uy * 2.4 * S }, (grande ? 6.4 : 4.6) * S, colore);
     ctx.fillStyle = lontano ? scuro(A.pelle) : A.pelle; ctx.strokeStyle = "#17171c"; ctx.lineWidth = 1 * S;
-    ctx.beginPath(); ctx.arc(mano.x, mano.y, 3.2 * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(mano.x, mano.y, (grande ? 4.6 : 3.2) * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   }
   // La faccia, nel riferimento della testa (su = -y): cambia con quello che succede.
   function facciaUmana(f, A, luce) {
@@ -6978,11 +6951,10 @@
   function disegnaUmano(f) {
     const p = f.p, A = aspetto(f), st = f.staccati || {}, nero = "#17171c", d = f.dir, [ginA, ginD] = ginocchia(f);
     // Trasformato: i bordi del vestito e gli occhi si accendono del suo colore.
-    const forma = formaDi(f), scimmia = forma === "scimmia", cavaliere = forma === "cavaliere";
+    const forma = formaDi(f), sup = forma === "super", cavaliere = forma === "cavaliere";
     const acceso = !!forma;
-    const pelo = coloreAnime(f), peloScuro = scuro(pelo);
+    const crine = coloreAnime(f);
     const bordo = acceso ? coloreAnime(f) : A.bordo;
-    if (scimmia) codaScimmia(f, peloScuro);
     if (f.furia > 0) {
       const g = ctx.createRadialGradient(p.bacino.x, p.bacino.y - 14 * S, 4 * S, p.bacino.x, p.bacino.y - 14 * S, 38 * S);
       g.addColorStop(0, "rgba(255,70,30,.45)"); g.addColorStop(1, "rgba(255,70,30,0)");
@@ -6992,12 +6964,14 @@
     if (A.veste) mantello(f, p, scuro(A.tuta));
     if (cavaliere) mantello(f, p, "#1a1b22");
     // Gamba e braccio lontani.
-    if (!st.gD) (scimmia ? artoPeloso : arto)(p.bacino, ginD, p.piedeD, scimmia ? 11 * S : 5 * S, scimmia ? scuro(peloScuro) : scuro(A.gambe));
+    if (!st.gD) arto(p.bacino, ginD, p.piedeD, (sup ? 6.6 : 5) * S, scuro(A.gambe));
     if (!st.D) {
-      if (scimmia) bracciaScimmia(f, p.collo, p.gomitoD, p.manoD, scuro(peloScuro), scuro(mix(A.pelle, pelo, 0.3)));
-      else { arto(p.collo, p.gomitoD, p.manoD, 4.2 * S, scuro(A.maniche)); pugno(p.gomitoD, p.manoD, A, scuro(bordo), true); }
+      // Trasformato: braccia più grosse, avambraccio pieno, pugno grande.
+      arto(p.collo, p.gomitoD, p.manoD, (sup ? 6 : 4.2) * S, scuro(A.maniche));
+      if (sup) linea(p.gomitoD, p.manoD, 7 * S, scuro(mix(A.pelle, "#ffffff", 0.1)));
+      pugno(p.gomitoD, p.manoD, A, scuro(bordo), true, sup);
     }
-    if (!st.gA) (scimmia ? artoPeloso : arto)(p.bacino, ginA, p.piedeA, scimmia ? 11 * S : 5 * S, scimmia ? peloScuro : A.gambe);
+    if (!st.gA) arto(p.bacino, ginA, p.piedeA, (sup ? 6.6 : 5) * S, A.gambe);
     // Le scarpe.
     for (const piede of [p.piedeD, p.piedeA]) {
       if ((piede === p.piedeD && st.gD) || (piede === p.piedeA && st.gA)) continue;
@@ -7019,65 +6993,53 @@
     const lung = Math.hypot(p.bacino.x - p.collo.x, p.bacino.y - p.collo.y);
     ctx.save();
     ctx.translate((p.collo.x + p.bacino.x) / 2, (p.collo.y + p.bacino.y) / 2); ctx.rotate(ang);
-    if (scimmia) {
-      // Il torace: largo in alto, stretto in vita, con le spalle che sporgono.
-      const alto = -lung / 2 - 7 * S, basso = lung / 2 + 5 * S;
-      ctx.fillStyle = peloScuro; ctx.strokeStyle = nero; ctx.lineWidth = 1.3 * S; ctx.lineJoin = "round";
+    if (sup) {
+      // Trasformato: spalle larghe, vita stretta, pettorali in vista e la casacca strappata.
+      const alto = -lung / 2 - 5 * S, basso = lung / 2 + 5 * S;
+      ctx.lineJoin = "round";
       ctx.beginPath();
-      ctx.moveTo(-15 * S, alto + 4 * S);
-      ctx.quadraticCurveTo(-17 * S, alto - 3 * S, -9 * S, alto - 4 * S);
-      ctx.quadraticCurveTo(0, alto - 6 * S, 9 * S, alto - 4 * S);
-      ctx.quadraticCurveTo(17 * S, alto - 3 * S, 15 * S, alto + 4 * S);
-      ctx.quadraticCurveTo(14 * S, (alto + basso) / 2 - 2 * S, 6.4 * S, basso);
-      ctx.lineTo(-6.4 * S, basso);
-      ctx.quadraticCurveTo(-14 * S, (alto + basso) / 2 - 2 * S, -15 * S, alto + 4 * S);
-      ctx.closePath(); ctx.fill(); ctx.stroke();
-      // Le spalle: masse di pelo coi ciuffi che puntano in fuori e in alto.
-      for (const lato of [-1, 1]) {
-        ctx.fillStyle = peloScuro; ctx.strokeStyle = nero; ctx.lineWidth = 1.2 * S; ctx.lineJoin = "round";
-        ctx.beginPath(); ctx.ellipse(lato * 12.5 * S, alto + 4 * S, 8.4 * S, 7 * S, lato * 0.25, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = pelo;
-        for (let i = 0; i < 3; i++) {
-          const a = -Math.PI / 2 + lato * (0.35 + i * 0.52), cx = lato * 12.5 * S, cy = alto + 4 * S;
-          ctx.beginPath();
-          ctx.moveTo(cx + Math.cos(a - 0.3) * 7 * S, cy + Math.sin(a - 0.3) * 6 * S);
-          ctx.lineTo(cx + Math.cos(a) * 15 * S, cy + Math.sin(a) * 13 * S);
-          ctx.lineTo(cx + Math.cos(a + 0.3) * 7 * S, cy + Math.sin(a + 0.3) * 6 * S);
-          ctx.closePath(); ctx.fill(); ctx.stroke();
-        }
-      }
-      // I ciuffi lungo i fianchi.
-      ctx.strokeStyle = peloScuro; ctx.lineWidth = 2.2 * S; ctx.lineCap = "round"; ctx.beginPath();
-      for (let i = 0; i < 4; i++) {
-        const y = alto + 10 * S + (basso - alto - 10 * S) * i / 3;
-        for (const lato of [-1, 1]) { ctx.moveTo(lato * 11 * S, y); ctx.lineTo(lato * 17 * S, y + (i % 2 ? 3 : -3) * S); }
-      }
+      ctx.moveTo(-6 * S, basso);
+      ctx.quadraticCurveTo(-12.5 * S, (alto + basso) / 2, -12 * S, alto + 4 * S);
+      ctx.quadraticCurveTo(-11.5 * S, alto - 2 * S, -5 * S, alto - 2.5 * S);
+      ctx.quadraticCurveTo(0, alto - 3.5 * S, 5 * S, alto - 2.5 * S);
+      ctx.quadraticCurveTo(11.5 * S, alto - 2 * S, 12 * S, alto + 4 * S);
+      ctx.quadraticCurveTo(12.5 * S, (alto + basso) / 2, 6 * S, basso);
+      ctx.closePath();
+      const g = ctx.createLinearGradient(0, alto, 0, basso);
+      g.addColorStop(0, mix(A.pelle, "#ffffff", 0.2)); g.addColorStop(1, scuro(A.pelle));
+      ctx.fillStyle = g; ctx.fill();
+      ctx.strokeStyle = nero; ctx.lineWidth = 1.3 * S; ctx.stroke();
+      // Pettorali e ventre, segnati appena.
+      ctx.strokeStyle = scuro(A.pelle); ctx.lineWidth = 1.3 * S; ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-8 * S, alto + 11 * S); ctx.quadraticCurveTo(0, alto + 15 * S, 8 * S, alto + 11 * S);
+      ctx.moveTo(0, alto + 4 * S); ctx.lineTo(0, alto + 24 * S);
+      ctx.moveTo(-5.5 * S, alto + 18 * S); ctx.lineTo(-5 * S, alto + 23 * S);
+      ctx.moveTo(5.5 * S, alto + 18 * S); ctx.lineTo(5 * S, alto + 23 * S);
       ctx.stroke();
-      // Il petto scoperto: due pettorali e il ventre.
-      ctx.fillStyle = mix(pelo, "#ffffff", 0.4);
-      for (const lato of [-1, 1]) { ctx.beginPath(); ctx.ellipse(lato * 4.4 * S, alto + 11 * S, 4.6 * S, 3.6 * S, 0, 0, Math.PI * 2); ctx.fill(); }
-      ctx.beginPath(); ctx.ellipse(0, alto + 20 * S, 6.4 * S, 6 * S, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = scuro(mix(pelo, "#ffffff", 0.4)); ctx.lineWidth = 1 * S;
-      ctx.beginPath(); ctx.moveTo(0, alto + 9 * S); ctx.lineTo(0, alto + 25 * S); ctx.stroke();
-      // La casacca strappata: resta solo un gilè sulle spalle e la fascia in vita.
-      ctx.fillStyle = A.tuta; ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
+      // La casacca strappata: due lembi sulle spalle, con lo strappo frastagliato.
+      ctx.fillStyle = A.tuta; ctx.strokeStyle = nero; ctx.lineWidth = 1.2 * S;
       for (const lato of [-1, 1]) {
         ctx.beginPath();
-        ctx.moveTo(lato * 10 * S, alto + 2 * S);
-        ctx.lineTo(lato * 3 * S, alto + 4 * S);
-        ctx.lineTo(lato * 5 * S, alto + 15 * S);
-        ctx.lineTo(lato * 8 * S, alto + 11 * S);
-        ctx.lineTo(lato * 7.5 * S, alto + 19 * S);
-        ctx.lineTo(lato * 11 * S, alto + 12 * S);
+        ctx.moveTo(lato * 12.4 * S, alto + 3 * S);
+        ctx.quadraticCurveTo(lato * 11 * S, alto - 2.4 * S, lato * 4.6 * S, alto - 2 * S);
+        ctx.lineTo(lato * 6 * S, alto + 7 * S);
+        ctx.lineTo(lato * 8.4 * S, alto + 4 * S);
+        ctx.lineTo(lato * 8 * S, alto + 13 * S);
+        ctx.lineTo(lato * 10.6 * S, alto + 7.5 * S);
+        ctx.lineTo(lato * 11.4 * S, alto + 16 * S);
         ctx.closePath(); ctx.fill(); ctx.stroke();
       }
-      ctx.fillStyle = bordo; ctx.fillRect(-9 * S, basso - 7 * S, 18 * S, 3.4 * S);
+      // La fascia in vita, annodata.
+      ctx.fillStyle = bordo; ctx.strokeStyle = nero; ctx.lineWidth = 1 * S;
+      ctx.beginPath(); rettangoloTondo(-8 * S, basso - 9 * S, 16 * S, 5 * S, 1.8 * S); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); rettangoloTondo(-d * 5.6 * S - 1.4 * S, basso - 8 * S, 2.8 * S, 9 * S, 1.2 * S); ctx.fill(); ctx.stroke();
     } else {
       ctx.fillStyle = sfumatura(0, 0, lung, mix(A.tuta, "#ffffff", 0.18), A.tuta); ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
       rettangoloTondo(-7.6 * S, -lung / 2 - 3 * S, 15.2 * S, lung + 7 * S, 5 * S); ctx.fill(); ctx.stroke();
     }
     ctx.strokeStyle = bordo; ctx.lineCap = "round"; ctx.lineWidth = 1.6 * S; ctx.beginPath();
-    if (scimmia) { /* il gilè strappato se l'è già disegnato */ }
+    if (sup) { /* la casacca strappata se l'è già disegnata */ }
     else if (stile === "guerrieri") {
       // La casacca incrociata e la fascia in vita, annodata.
       ctx.moveTo(-5 * S, -lung / 2 - 2 * S); ctx.lineTo(d * 3 * S, lung / 2 - 6 * S);
@@ -7100,52 +7062,13 @@
     // La testa.
     const angT = Math.atan2(p.testa.y - p.collo.y, p.testa.x - p.collo.x) + Math.PI / 2;
     ctx.save(); ctx.translate(p.testa.x, p.testa.y); ctx.rotate(angT);
-    if (!scimmia) capoUmano(f, A, bordo, true);                   // sotto la criniera i capelli non si vedono
-    if (scimmia) {
-      // La criniera: punte lunghe che si aprono all'insù, dodici, nel colore della forma.
-      ctx.fillStyle = pelo; ctx.strokeStyle = peloScuro; ctx.lineWidth = 1 * S; ctx.lineJoin = "round";
-      for (let i = 0; i < 14; i++) {
-        const a = -Math.PI * 0.95 + (i / 13) * Math.PI * 1.9;         // dall'alto, giro quasi completo
-        const su = Math.max(0, -Math.sin(a));                          // più lunghe in alto
-        const lun = (9 + 13 * su + (i % 2 ? 4 : 0)) * S, larg = 0.34;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(a - larg) * 7.4 * S, Math.sin(a - larg) * 7.4 * S);
-        ctx.quadraticCurveTo(Math.cos(a - larg * 0.3) * (7.4 * S + lun * 0.6), Math.sin(a - larg * 0.3) * (7.4 * S + lun * 0.6),
-                             Math.cos(a) * (7.4 * S + lun), Math.sin(a) * (7.4 * S + lun));
-        ctx.quadraticCurveTo(Math.cos(a + larg * 0.3) * (7.4 * S + lun * 0.6), Math.sin(a + larg * 0.3) * (7.4 * S + lun * 0.6),
-                             Math.cos(a + larg) * 7.4 * S, Math.sin(a + larg) * 7.4 * S);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
-      }
-      // Il collare di pelo intorno al collo e le orecchie, piccole.
-      ctx.fillStyle = peloScuro; ctx.strokeStyle = nero;
-      ctx.beginPath(); ctx.ellipse(0, 1 * S, 8.6 * S, 7.6 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      for (const lato of [-1, 1]) {
-        tondo(lato * 7.6 * S, 0.2 * S, 2.6 * S, peloScuro);
-        tondo(lato * 7.6 * S, 0.2 * S, 1.3 * S, mix(A.pelle, pelo, 0.45));
-      }
-    }
+    if (!sup) capoUmano(f, A, bordo, true);                        // trasformato, i capelli sono la cresta
+    else crestaSuper(f, crine, d);
     ctx.fillStyle = A.pelle; ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
-    ctx.beginPath(); ctx.arc(0, 0, scimmia ? 7 * S : 8 * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    if (scimmia) {
-      // Il muso: corto e largo, con le narici e le zanne che spuntano.
-      ctx.fillStyle = mix(A.pelle, "#ffffff", 0.42); ctx.strokeStyle = nero; ctx.lineWidth = 1 * S;
-      ctx.beginPath(); ctx.ellipse(d * 1.6 * S, 3.4 * S, 5.4 * S, 3.8 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      for (const lato of [-1, 1]) tondo(d * 1.6 * S + lato * 1.6 * S, 2 * S, 0.65 * S, nero);
-      ctx.fillStyle = "#fffaf0"; ctx.strokeStyle = nero; ctx.lineWidth = 0.7 * S;
-      for (const lato of [-1, 1]) {
-        ctx.beginPath();
-        ctx.moveTo(d * 1.6 * S + lato * 3.4 * S, 4.4 * S);
-        ctx.lineTo(d * 1.6 * S + lato * 2.1 * S, 4.4 * S);
-        ctx.lineTo(d * 1.6 * S + lato * 2.9 * S, 7.4 * S);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
-      }
-      // L'arcata sopraccigliare, pesante.
-      ctx.strokeStyle = peloScuro; ctx.lineWidth = 3.4 * S; ctx.lineCap = "round";
-      ctx.beginPath(); ctx.arc(0, 0.4 * S, 6 * S, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
-    }
+    ctx.beginPath(); ctx.arc(0, 0, 8 * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     facciaUmana(f, A, acceso ? coloreAnime(f) : null);
     disegnaSegni(f, "testa");
-    if (!scimmia) capoUmano(f, A, bordo, false);
+    if (!sup) capoUmano(f, A, bordo, false);
     if (cavaliere) {
       // Il cappuccio cala sulla testa e lascia in ombra la faccia; resta accesa la fessura della maschera.
       ctx.fillStyle = "#1a1b22"; ctx.strokeStyle = "#0d0e12"; ctx.lineWidth = 1.3 * S; ctx.lineJoin = "round";
@@ -7166,8 +7089,9 @@
     ctx.restore();
     // Il braccio vicino.
     if (!st.A) {
-      if (scimmia) bracciaScimmia(f, p.collo, p.gomitoA, p.manoA, pelo, mix(A.pelle, pelo, 0.3));
-      else { arto(p.collo, p.gomitoA, p.manoA, 4.2 * S, A.maniche); pugno(p.gomitoA, p.manoA, A, bordo, false); }
+      arto(p.collo, p.gomitoA, p.manoA, (sup ? 6 : 4.2) * S, A.maniche);
+      if (sup) linea(p.gomitoA, p.manoA, 7 * S, mix(A.pelle, "#ffffff", 0.1));
+      pugno(p.gomitoA, p.manoA, A, bordo, false, sup);
     }
     if (f.palla && !st.A) tondo(p.manoA.x, p.manoA.y - 3 * S, 3 * S, "#ffffff");
   }

@@ -2863,7 +2863,7 @@ test("colpo finale: il tasto del menu lo fa partire appena i due sono in piedi e
 // scimmieschi e gialli o viola, l'androide diventa un robot gigante e la mela
 // un albero potentissimo; i duellanti qualcosa in quel genere lì».
 test("trasformazioni: col tasto ogni coppia prende la sua forma, e dopo un po' torna normale", () => {
-  for (const [stile, attese] of [["", { robot: "colosso", mela: "albero" }], ["guerrieri", { robot: "scimmia", mela: "scimmia" }],
+  for (const [stile, attese] of [["", { robot: "colosso", mela: "albero" }], ["guerrieri", { robot: "super", mela: "super" }],
                                  ["lame", { robot: "cavaliere", mela: "cavaliere" }]]) {
     let fatte = 0;
     for (let k = 0; k < 4 && fatte < 1; k++) {

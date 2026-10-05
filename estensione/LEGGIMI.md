@@ -118,7 +118,7 @@ Quale round tocca lo decide un sacchetto di tre (uno sì, due no) mescolato ogni
 
 Chi si potenzia non cambia solo colore: cambia proprio corpo.
 
-- **Super guerrieri**: diventano scimmioni, col pelo, il muso, le orecchie tonde e la coda. Oro alla prima forma, viola alla seconda.
+- **Super guerrieri**: restano loro, ma gonfiati: cresta di capelli ritta e piegata all'indietro (oro a Zefir, viola a Brasa, più chiara alla seconda forma), petto scoperto coi muscoli segnati, casacca ridotta a brandelli sulle spalle, fascia in vita, braccia e pugni più grossi.
 - **Robot e mela** (il ring gratis): il robot diventa un **colosso** corazzato con gli spallacci e il nucleo acceso, la mela un **albero** con tronco, chioma e foglie che cadono. Qui la trasformazione è la rimonta di chi sta per cadere: arriva da sola quando manca un colpo al K.O., una volta sola a round, e il tasto «Trasforma i due» la fa partire a mano.
 - **Duellanti**: il **cavaliere** incappucciato, col mantello, la maschera accesa e la lama a due punte, che respinge sempre i colpi che gli arrivano addosso.
 - **Maghi**: per ora restano com'erano (trance e aura). Da fare, se piace il resto.

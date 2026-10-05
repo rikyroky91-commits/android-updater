@@ -147,8 +147,6 @@
     "Lama lanciata": ["Thrown blade", "Hoja lanzada", "Lame lancée", "Klingenwurf"],
     "Incrocio di lame": ["Blade lock", "Cruce de hojas", "Lames croisées", "Klingenkreuzen"],
     "SOVRACCARICO!": ["OVERDRIVE!", "¡SOBRECARGA!", "SURCHARGE !", "ÜBERLADUNG!"],
-    "BESTIA D'ORO!": ["GOLDEN BEAST!", "¡BESTIA DORADA!", "BÊTE D'OR !", "GOLDENE BESTIE!"],
-    "BESTIA VIOLA!": ["PURPLE BEAST!", "¡BESTIA MORADA!", "BÊTE VIOLETTE !", "VIOLETTE BESTIE!"],
     "COLOSSO!": ["COLOSSUS!", "¡COLOSO!", "COLOSSE !", "KOLOSS!"],
     "GRANDE ALBERO!": ["GREAT TREE!", "¡GRAN ÁRBOL!", "GRAND ARBRE !", "GROSSER BAUM!"],
     "CAVALIERE!": ["KNIGHT!", "¡CABALLERO!", "CHEVALIER !", "RITTER!"],
