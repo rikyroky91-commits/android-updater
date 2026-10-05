@@ -87,13 +87,16 @@
     "message": "En la esquina inferior derecha se abre un cuarto de rueda. El retrato de la esquina es el luchador que controlas: haz clic en un sector y hará ese movimiento, haz clic en el retrato para pasar al otro."
   },
   "guidaS7": {
-    "message": "De vez en cuando pasa algo: una tormenta, un terremoto con erupción, meteoritos. Al cabo de un par de minutos llegan los zombis: los dos dejan de pelearse y se ponen espalda con espalda. La horda llega en oleadas, nunca dos veces igual, y la pareja tiene tres vidas (los corazones de arriba)."
+    "message": "De vez en cuando pasa algo: una tormenta, un terremoto con erupción, meteoritos, un agujero negro que se traga lo que tiene cerca y lo escupe al otro lado de la pantalla. Al cabo de un par de minutos llegan los zombis: los dos dejan de pelearse, se ponen espalda con espalda y se ayudan (salto sobre el compañero, cambio de lado, golpe conjunto, bala de cañón). La horda llega en oleadas, nunca dos veces igual, y la pareja tiene tres vidas (los corazones de arriba)."
+  },
+  "guidaS9": {
+    "message": "Más o menos una ronda de cada tres acaba con un golpe final: la escena se oscurece y el que gana manda al otro a la órbita, lo hace rebotar entre los bordes de la ventana o lo aplasta como una tortita. Cada pareja de personajes tiene el suyo. También puedes pedirlo desde el panel."
   },
   "guidaS8": {
     "message": "Cuando dos ataques de energía chocan aparecen dos botones en los extremos de la barra: machaca el del lado de tu luchador y el choque se inclina a su favor."
   },
   "guidaS5gratis": {
-    "message": "Los superguerreros, los magos, los duelistas, las armas, el clima, los meteoritos, la horda de zombis y la gravedad forman parte de Premium. Por ahora es gratis: abre el panel y pulsa «Desbloquear Premium gratis»."
+    "message": "Los superguerreros, los magos, los duelistas, las armas, el clima, los meteoritos, el agujero negro, la horda de zombis y la gravedad forman parte de Premium. Por ahora es gratis: abre el panel y pulsa «Desbloquear Premium gratis»."
   },
   "guidaOpzioni": {
     "message": "Abrir las opciones"

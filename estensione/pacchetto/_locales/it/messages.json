@@ -87,13 +87,16 @@
     "message": "Nell'angolo in basso a destra si apre un quarto di ruota. Il ritratto nell'angolo è il lottatore che comandi: clicca uno spicchio e fa quella mossa, clicca il ritratto per passare all'altro."
   },
   "guidaS7": {
-    "message": "Ogni tanto succede qualcosa: un temporale, un terremoto con l'eruzione, i meteoriti. Dopo un paio di minuti arrivano gli zombie: i due smettono di picchiarsi e si mettono spalle a spalla. L'orda arriva a ondate, mai due volte uguali, e i due hanno tre vite (i cuori in alto)."
+    "message": "Ogni tanto succede qualcosa: un temporale, un terremoto con l'eruzione, i meteoriti, un buco nero che risucchia quello che ha intorno e lo risputa dall'altra parte dello schermo. Dopo un paio di minuti arrivano gli zombie: i due smettono di picchiarsi, si mettono spalle a spalla e si danno una mano (cavallina sopra il compagno, cambio di lato, colpo insieme, palla di cannone). L'orda arriva a ondate, mai due volte uguali, e i due hanno tre vite (i cuori in alto)."
+  },
+  "guidaS9": {
+    "message": "Circa un round su tre si chiude con un colpo finale: la scena si fa buia e chi vince manda l'altro in orbita, lo fa rimbalzare fra i bordi della finestra o lo schiaccia come una frittella. Ogni coppia di personaggi ha il suo. Lo puoi anche chiamare dalla tendina."
   },
   "guidaS8": {
     "message": "Quando due colpi d'energia si scontrano spuntano due tasti ai capi della barra: martella quello dalla parte del tuo lottatore e lo scontro va a lui."
   },
   "guidaS5gratis": {
-    "message": "Super guerrieri, maghi, duellanti, armi, meteo, meteoriti, orda di zombie e gravità fanno parte di Premium. Per ora è gratis: apri la tendina e premi «Sblocca Premium gratis»."
+    "message": "Super guerrieri, maghi, duellanti, armi, meteo, meteoriti, buco nero, orda di zombie e gravità fanno parte di Premium. Per ora è gratis: apri la tendina e premi «Sblocca Premium gratis»."
   },
   "guidaOpzioni": {
     "message": "Apri le opzioni"

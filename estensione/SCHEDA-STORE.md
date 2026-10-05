@@ -8,9 +8,9 @@ Controllato sulla documentazione di Chrome il 02/10/2026 e ricontrollato il 05/1
 
 **Un punto da verificare nella console: il video.** La pagina `cws-dashboard-listing` elenca fra le cose da fornire anche il link a un video YouTube che mostra l'estensione, e dichiara facoltativo solo il riquadro grande (1400×560). Non ho potuto aprire la console per vedere se il campo blocca davvero l'invio. Se lo blocca, basta mezzo minuto di schermo registrato con la lotta, il controller e l'orda, caricato su YouTube come «non in elenco».
 
-## In breve, per questa uscita (0.5.1, Premium sbloccabile gratis)
+## In breve, per questa uscita (0.6.0, Premium sbloccabile gratis)
 
-1. `python3 estensione/costruisci.py --zip` e si carica `estensione/zip/page-brawl-0.5.1-store.zip`.
+1. `python3 estensione/costruisci.py --zip` e si carica `estensione/zip/page-brawl-0.6.0-store.zip`.
 2. `premium.json` è già a posto: `premium_attivo: true`, `sblocco_gratis: true`, `url_acquisto` vuoto. Chi installa vede i lucchetti e, in cima alla tendina, il tasto **Sblocca Premium gratis**.
 3. Nella scheda dello store si incollano le descrizioni di questa pagina (dicono che Premium per ora è gratis) e, nelle istruzioni per la verifica, il testo del passo 8: spiega al revisore come aprire tutto.
 4. In «Distribuzione» l'estensione resta **gratis** e senza acquisti in-app.
@@ -22,7 +22,7 @@ Controllato sulla documentazione di Chrome il 02/10/2026 e ricontrollato il 05/1
 2. **Profilo dell'editore.** In «Account» metti il nome dell'editore e verifica l'email di contatto. Un editore nuovo può avere al massimo **due estensioni pubblicate**: Page Brawl e Page Snow ci stanno giuste.
 3. **Decidi Premium prima di caricare** (vedi «Prima di premere Invia» qui sotto). Tre uscite possibili in `premium.json`: `sblocco_gratis: true` (quella di oggi: lucchetti, e un tasto che apre tutto gratis), `premium_attivo: false` (niente lucchetti, niente Premium), oppure `sblocco_gratis: false` con un `url_acquisto` vero (si vende). Poi `python3 estensione/costruisci.py --zip`.
 4. **Carica.** «Nuovo elemento» → scegli `estensione/zip/page-brawl-<versione>-store.zip` → «Carica». Lo zip ha `manifest.json` in cima, come vuole lo store.
-5. **Scheda dello store.** Descrizione lunga (qui sotto, in inglese; con «Aggiungi lingua» anche l'italiano), categoria, lingua. Immagini: icona 128×128, almeno una schermata 1280×800 e al massimo cinque (in `scheda/` ce ne sono otto: l'elenco in fondo dice quali cinque caricare), riquadro promozionale 440×280 (`scheda/promo-440x280.png`).
+5. **Scheda dello store.** Descrizione lunga (qui sotto, in inglese; con «Aggiungi lingua» anche l'italiano), categoria, lingua. Immagini: icona 128×128, almeno una schermata 1280×800 e al massimo cinque (in `scheda/` ce ne sono undici: l'elenco in fondo dice quali cinque caricare), riquadro promozionale 440×280 (`scheda/promo-440x280.png`).
 6. **Privacy.** Scopo unico, una giustificazione per ogni permesso, «No, non uso codice remoto», nessun dato raccolto, le tre dichiarazioni finali. I testi sono qui sotto, da incollare.
 7. **Distribuzione.** Gratis, pubblica, tutti i paesi. (Se un giorno vendi Premium fuori dallo store, l'estensione resta «gratis» qui: il pagamento non passa da Google.)
 8. **Istruzioni per la verifica.** Non servono credenziali. Testo da incollare:
@@ -46,7 +46,7 @@ Zip: `page-brawl-<versione>-store.zip`.
 
 ## Prima di premere «Invia»
 
-1. **Premium.** Scelta del 05/10/2026: si esce con `sblocco_gratis: true`. Chi installa vede i tasti col lucchetto (i tre stili di personaggi con le loro mosse, le armi, il meteo, i meteoriti, l'orda) e, in cima alla tendina, il tasto **Sblocca Premium gratis** che li apre tutti. Da controllare prima di inviare: `python3 estensione/costruisci.py` deve stampare «Premium si sblocca gratis anche in store/». Se invece avvisa che manca l'indirizzo di acquisto, `premium.json` non è quello giusto e i lucchetti resterebbero chiusi senza rimedio.
+1. **Premium.** Scelta del 05/10/2026: si esce con `sblocco_gratis: true`. Chi installa vede i tasti col lucchetto (i tre stili di personaggi con le loro mosse, le armi, il meteo, i meteoriti, il buco nero, l'orda) e, in cima alla tendina, il tasto **Sblocca Premium gratis** che li apre tutti. Da controllare prima di inviare: `python3 estensione/costruisci.py` deve stampare «Premium si sblocca gratis anche in store/». Se invece avvisa che manca l'indirizzo di acquisto, `premium.json` non è quello giusto e i lucchetti resterebbero chiusi senza rimedio.
 2. **Nome.** «Page Brawl» è provvisorio: va cercato nello store e tra i marchi registrati prima di usarlo.
 3. **Marchi.** I personaggi a pagamento sono inventati (nomi, facce, vestiti) e scheda e schermate non nominano prodotti o personaggi di altri: tenerlo così. Restano il robot e la mela della lotta gratis, che a qualcuno ricordano due marchi: se si vuole togliere ogni dubbio, anche loro si possono sostituire con due personaggi inventati. Un parere legale prima di vendere resta da chiedere.
 4. **Effetti cruenti.** Lo store vieta la violenza gratuita. Partono spenti e le schermate non li mostrano, ma l'interruttore c'è: non so dire come lo giudica un revisore. La scelta più prudente è toglierlo dalla variante `store`.
@@ -77,6 +77,7 @@ Join in:
 • Trigger an earthquake with a volcanic eruption, hand out jetpacks, or start an item shower.
 • Turn on health bars and bet tokens on the winner.
 • First to ten wins: the tenth K.O. sends the loser flying out of the ring, then the match starts over.
+• Finishing moves: about one round in three ends with a short scene. The lights go down and the winner launches the other into orbit, bounces them off the edges of the window or flattens them like a pancake.
 • The fighters learn: the more they fight, the more varied their moves get.
 
 The power button in the corner turns everything off and on again. The page itself is never changed. A short "How it works" page opens after installation and can be reopened from the panel.
@@ -84,7 +85,8 @@ The power button in the corner turns everything off and on again. The page itsel
 Premium is free for now: press "Unlock Premium for free" at the top of the panel. It adds:
 • Three sets of original characters, each with its own moves. Super warriors fly, fire energy waves and transform. Wizards cast freezing, shrinking and lightning spells and ride brooms. Duelists fight with energy blades.
 • Energy clashes: when one fighter charges an energy attack the other answers with the same one, the two beams meet and it becomes a tug of war. Two buttons pop up: hammer the one on your fighter's side to win it.
-• A zombie horde that shows up on its own: the two stop fighting each other, stand back to back and hold out, with three lives, against waves that are never the same twice.
+• A zombie horde that shows up on its own: the two stop fighting each other, stand back to back and hold out, with three lives, against waves that are never the same twice. They team up too: leapfrog over the partner, side swap, double strike, cannonball.
+• A black hole that swallows whatever is nearby (fighters, items, zombies) and spits it out on the other side of the screen.
 • Weapons and bombs.
 • Weather and gravity: rain and thunderstorms, a hurricane, meteorites, slow motion, Moon, space and upside-down gravity.
 
@@ -107,6 +109,7 @@ Partecipa anche tu:
 • Scatena un terremoto con l'eruzione, distribuisci i jetpack o fai piovere oggetti.
 • Accendi le barre della vita e scommetti i gettoni su chi vince.
 • Si gioca a dieci: il decimo K.O. manda lo sconfitto fuori dal ring, poi si ricomincia.
+• Colpi finali: circa un round su tre si chiude con una breve scena. Si abbassano le luci e chi vince manda l'altro in orbita, lo fa rimbalzare fra i bordi della finestra o lo schiaccia come una frittella.
 • I lottatori imparano: più combattono, più le mosse diventano varie.
 
 Il tasto di accensione nell'angolo spegne e riaccende tutto. La pagina non viene mai modificata. Dopo l'installazione si apre una breve pagina «Come funziona», che si riapre dalla tendina.
@@ -114,7 +117,8 @@ Il tasto di accensione nell'angolo spegne e riaccende tutto. La pagina non viene
 Premium per ora è gratis: premi «Sblocca Premium gratis» in cima alla tendina. Aggiunge:
 • Tre coppie di personaggi originali, ognuna con le sue mosse. I super guerrieri volano, lanciano onde di energia e si trasformano. I maghi congelano, rimpiccioliscono, scagliano fulmini e volano sulla scopa. I duellanti combattono con lame di energia.
 • Gli scontri di energie: quando uno carica un colpo d'energia l'altro risponde con lo stesso, i due raggi si incontrano e diventa un tiro alla fune. Spuntano due tasti: martella quello dalla parte del tuo lottatore per farlo vincere.
-• L'orda di zombie, che arriva da sola: i due smettono di picchiarsi, si mettono spalle a spalla e resistono, con tre vite, a ondate mai due volte uguali.
+• L'orda di zombie, che arriva da sola: i due smettono di picchiarsi, si mettono spalle a spalla e resistono, con tre vite, a ondate mai due volte uguali. E si danno una mano: cavallina sopra il compagno, cambio di lato, colpo insieme, palla di cannone.
+• Il buco nero, che risucchia quello che ha intorno (lottatori, oggetti, zombie) e lo risputa dall'altra parte dello schermo.
 • Armi e bombe.
 • Meteo e gravità: pioggia e temporali, uragano, meteoriti, rallentatore, Luna, spazio e gravità sottosopra.
 
@@ -157,6 +161,7 @@ Page Brawl shows an animated cartoon fight on top of the page the user is viewin
   3. `8-scontro.png`: lo scontro di energie, col tiro alla fune sopra i due raggi e i due tasti da martellare.
   4. `1-creature.png`: il robot e la mela con le creature dei barattoli (fuoco e acqua).
   5. `9-sblocco.png`: la tendina, col riquadro «Unlock Premium for free» e i lucchetti.
+- Nuove con la 0.6.0, pronte se si vuole cambiarne una: `10-buco-nero.png` (il robot risucchiato dal buco nero, con l'anello dell'uscita dall'altra parte) e `11-colpo-finale.png` (la scena «in orbita», buia, con la scritta FINISHING MOVE!). Il colpo finale è gratis: `11` può prendere il posto di `1-creature.png` se si vuole mostrare la novità a chi non sblocca niente.
 - Restano in cartella, di riserva: `2-opzioni.png` (la tendina con le scommesse), `3-premium-guerrieri.png`, `4-premium-maghi.png`, `5-premium-duellanti.png`. Sono della versione 0.4: mostrano due tasti nell'angolo invece di tre.
 - **Riquadro promozionale 440×280:** `scheda/promo-440x280.png` (la documentazione lo dà per richiesto).
 - **Riquadro grande 1400×560:** facoltativo, non c'è.

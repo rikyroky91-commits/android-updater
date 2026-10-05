@@ -87,13 +87,16 @@
     "message": "Unten rechts in der Ecke öffnet sich ein Viertelrad. Das Porträt in der Ecke ist der Kämpfer, den du steuerst: Klicke auf ein Segment und er führt diesen Angriff aus, klicke auf das Porträt, um zum anderen zu wechseln."
   },
   "guidaS7": {
-    "message": "Ab und zu passiert etwas: ein Gewitter, ein Erdbeben mit Ausbruch, Meteoriten. Nach ein paar Minuten tauchen Zombies auf: Die beiden hören auf zu kämpfen und stellen sich Rücken an Rücken. Die Horde kommt in Wellen, nie zweimal gleich, und das Duo hat drei Leben (die Herzen oben)."
+    "message": "Ab und zu passiert etwas: ein Gewitter, ein Erdbeben mit Ausbruch, Meteoriten, ein Schwarzes Loch, das alles in der Nähe einsaugt und auf der anderen Seite des Bildschirms wieder ausspuckt. Nach ein paar Minuten tauchen Zombies auf: Die beiden hören auf zu kämpfen, stellen sich Rücken an Rücken und helfen einander (Bocksprung über den Partner, Seitenwechsel, Doppelschlag, Kanonenkugel). Die Horde kommt in Wellen, nie zweimal gleich, und das Duo hat drei Leben (die Herzen oben)."
+  },
+  "guidaS9": {
+    "message": "Etwa jede dritte Runde endet mit einem Finalschlag: Die Szene wird dunkel und der Sieger schießt den anderen in die Umlaufbahn, lässt ihn zwischen den Fensterrändern abprallen oder drückt ihn platt wie einen Pfannkuchen. Jedes Figurenpaar hat seinen eigenen. Du kannst ihn auch aus dem Menü auslösen."
   },
   "guidaS8": {
     "message": "Wenn zwei Energieangriffe aufeinanderprallen, erscheinen zwei Tasten an den Enden des Balkens: Hämmere auf die Taste deines Kämpfers, dann kippt das Duell zu seinen Gunsten."
   },
   "guidaS5gratis": {
-    "message": "Superkrieger, Magier, Duellanten, Waffen, Wetter, Meteoriten, die Zombiehorde und Schwerkraft gehören zu Premium. Im Moment ist es gratis: Öffne das Menü und drücke „Premium gratis freischalten“."
+    "message": "Superkrieger, Magier, Duellanten, Waffen, Wetter, Meteoriten, das Schwarze Loch, die Zombiehorde und Schwerkraft gehören zu Premium. Im Moment ist es gratis: Öffne das Menü und drücke „Premium gratis freischalten“."
   },
   "guidaOpzioni": {
     "message": "Optionen öffnen"

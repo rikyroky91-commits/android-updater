@@ -87,13 +87,16 @@
     "message": "A quarter wheel opens in the bottom right corner. The portrait in the corner is the fighter you command: click a slice and they do that move, click the portrait to switch to the other one."
   },
   "guidaS7": {
-    "message": "Now and then something happens: a storm, an earthquake with an eruption, meteorites. After a couple of minutes zombies show up: the two stop fighting each other and stand back to back. The horde comes in waves, never the same twice, and the pair has three lives (the hearts at the top)."
+    "message": "Now and then something happens: a storm, an earthquake with an eruption, meteorites, a black hole that swallows whatever is nearby and spits it out on the other side of the screen. After a couple of minutes zombies show up: the two stop fighting each other, stand back to back and team up (leapfrog over the partner, side swap, double strike, cannonball). The horde comes in waves, never the same twice, and the pair has three lives (the hearts at the top)."
+  },
+  "guidaS9": {
+    "message": "About one round in three ends with a finishing move: the scene goes dark and the winner sends the other into orbit, bounces them between the edges of the window or flattens them like a pancake. Each character set has its own. You can also call one from the panel."
   },
   "guidaS8": {
     "message": "When two energy attacks collide, two buttons pop up at the ends of the bar: hammer the one on your fighter's side and the clash goes their way."
   },
   "guidaS5gratis": {
-    "message": "Super warriors, wizards, duelists, weapons, weather, meteorites, the zombie horde and gravity are part of Premium. For now it is free: open the panel and press “Unlock Premium for free”."
+    "message": "Super warriors, wizards, duelists, weapons, weather, meteorites, the black hole, the zombie horde and gravity are part of Premium. For now it is free: open the panel and press “Unlock Premium for free”."
   },
   "guidaOpzioni": {
     "message": "Open the options"

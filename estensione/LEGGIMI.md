@@ -48,8 +48,8 @@ Con `sblocco_gratis: true` le due cartelle sono uguali. La scelta è stata presa
 
 ### Cosa è gratis e cosa è Premium
 
-- **Gratis:** la lotta fra il robot e la mela, prese e lanci col mouse, il controller ad angolo, fumogeni e barattoli con le creature, la pioggia di oggetti, il terremoto con l'eruzione, jetpack, furia, barre della vita, scommesse, la partita a dieci col volo fuori dal ring, quello che i lottatori imparano.
-- **Premium:** i personaggi (super guerrieri, maghi, duellanti) con le loro mosse, scontro di energie compreso; pistola, spada, bomba, pieghevole e le due esplosioni; pioggia, uragano, rallentatore, meteoriti, orda di zombie e le gravità diverse dalla Terra.
+- **Gratis:** la lotta fra il robot e la mela, prese e lanci col mouse, il controller ad angolo, fumogeni e barattoli con le creature, la pioggia di oggetti, il terremoto con l'eruzione, jetpack, furia, barre della vita, scommesse, la partita a dieci col volo fuori dal ring, il colpo finale, quello che i lottatori imparano.
+- **Premium:** i personaggi (super guerrieri, maghi, duellanti) con le loro mosse, scontro di energie compreso; pistola, spada, bomba, pieghevole e le due esplosioni; pioggia, uragano, rallentatore, meteoriti, buco nero, orda di zombie (con le mosse in coppia) e le gravità diverse dalla Terra.
 
 I tasti Premium portano un lucchetto. Cliccandone uno si apre il riquadro in cima alla tendina.
 
@@ -91,9 +91,24 @@ Nomi, facce e vestiti sono inventati qui: non richiamano personaggi di altri. Va
   - Dal tasto della tendina non finisce finché i due reggono, e resta il primato delle ondate superate. Un secondo clic sul tasto la chiude.
   - **Tre vite**, i cuori accanto al conto dell'ondata: con tutti e due a terra insieme, le prime due volte si rialzano di scatto e l'urto butta indietro gli zombie; alla terza l'orda ha vinto.
   - L'orda **segue i due**: se finiscono su un altro piano della pagina, gli zombie affondano e rispuntano lì.
+  - **Mosse in coppia** (05/10/2026). Non stanno solo spalle a spalla: ogni tanto, quando sono vicini e in piedi, ne fanno una. *Cavallina*: uno si abbassa, l'altro gli salta sopra e atterra di schianto in mezzo agli zombie dall'altra parte. *Cambio di lato*: si scambiano di posto girandosi intorno, e chi era in difficoltà prende il lato tranquillo. *Colpo insieme*: tutti e due dalla stessa parte, per buttare giù il più grosso. *Palla di cannone*: uno lancia l'altro raso terra contro la fila, e chi è lanciato torna indietro. Più a lungo va avanti l'orda senza una mossa in coppia, più ne hanno voglia. Durante la mossa i morsi non contano. Dal controller, durante la tregua, le quattro mosse prendono il posto di quelle che si fanno sull'altro.
+- **Buco nero** (Premium, 05/10/2026). Si apre vicino ai due e per nove secondi tira a sé quello che ha intorno: lottatori, oggetti, zombie, colpi d'energia. Chi ci finisce dentro esce dalla parte opposta dello schermo, a specchio, un po' stordito ma senza danni e senza cambiare il punteggio. A sorpresa arriva la prima volta dopo il primo minuto abbondante di lotta, poi ogni tanto. Dal tasto della tendina si apre e, ricliccando, si chiude.
 - **Scontro di energie** (coi personaggi a energia). Chi vede caricare un colpo d'energia prova a caricare lo stesso: i due colpi si incontrano e parte un tiro alla fune. Vince chi spinge di più; le regole sono scritte nel commento sopra `SFIDA` in `ring.js`. Durante lo scontro **spuntano due tasti**, uno per parte, ai capi della barra: ogni clic su un tasto dà al suo lottatore fiato e una spinta in più, e cliccando in fretta lo si fa vincere anche se parte sfavorito.
 
 Chi resta senza gambe si trascina sulle mani o vola; con una gamba sola saltella; senza braccia tira calci e testate.
+
+### Il colpo finale (05/10/2026, gratis)
+
+Circa un round su tre si chiude con una scena: quando all'altro manca un colpo solo e i due sono in piedi, vicini, sullo stesso piano, il colpo che lo chiuderebbe diventa una mossa finale. La scena si fa buia, compare «COLPO FINALE!» e parte una di queste:
+
+- **In orbita**: un montante e l'altro esce dall'alto della finestra; dopo un attimo ricade.
+- **Flipper**: un calcio, e rimbalza tre volte fra i bordi della finestra.
+- **Schiacciata**: chi vince salta molto in alto e gli atterra sopra; l'altro resta piatto come una frittella per un paio di secondi.
+- **Onda finale** (super guerrieri): un'onda a bruciapelo lo porta fino al bordo.
+- **Statua** (maghi): lo gela, poi una saetta manda il ghiaccio in pezzi.
+- **Taglio netto** (duellanti): uno scatto attraverso, un attimo fermi, poi l'altro cade.
+
+Quale round tocca lo decide un sacchetto di tre (uno sì, due no) mescolato ogni volta. Se il round buono finisce in un altro modo (K.O. da lontano, in volo), resta buono per quello dopo. Vale un K.O. come gli altri. Non capita sul punto che chiude la partita a dieci, né durante orda, scontro di energie, terremoto o buco nero; se si afferra uno dei due col mouse, salta. Il tasto «Colpo finale» della tendina lo fa partire appena i due sono in piedi e vicini.
 
 ### Premium: cosa c'è e cosa manca
 

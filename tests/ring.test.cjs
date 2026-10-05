@@ -141,7 +141,8 @@ function dentro(amb) {
     for (const punto of [f.testa, f.bacino]) {
       assert.ok(Number.isFinite(punto.x) && Number.isFinite(punto.y), "coordinate non finite");
       assert.ok(punto.y <= s.pavimento + 0.01, "sotto il pavimento");
-      assert.ok(punto.y >= 0 && punto.x >= 0 && punto.x <= s.larghezza, "fuori dalla finestra");
+      // Un'eccezione sola, voluta: nel colpo finale «in orbita» chi lo prende esce dall'alto per un secondo.
+      assert.ok((punto.y >= 0 || f.fatVola) && punto.x >= 0 && punto.x <= s.larghezza, "fuori dalla finestra");
     }
   }
 }
@@ -861,7 +862,8 @@ test("gravità sottosopra: si cade verso il tetto e lì si sta in piedi a testa 
   dentro(amb);
   amb.finestra.__ring.comandi.gravita("1");
   assert.strictEqual(amb.stato().verso, 1);
-  amb.avanza(60 * 8);
+  // (senza colpo finale in questi secondi: «in orbita» e «schiacciata» mandano in alto apposta)
+  amb.avanza(60 * 8, () => { amb.finestra.__ring.roundFatale(false); });
   for (const f of amb.stato().lottatori) assert.ok(f.bacino.y > 600, f.tipo + " non è tornato giù");
   dentro(amb);
 });
@@ -1442,7 +1444,9 @@ test("in piedi su una pagina piena: le gambe non restano incrociate, le ginocchi
     let fot = 0, incrociate = 0, ginocchia = 0, piegato = 0, fila = {}, filaMax = 0;
     amb.avanza(60 * 45, (s) => {
       for (const f of s.lottatori) {
-        // «In piedi»: non a terra, non in mano a qualcuno, non in volo, non stordito.
+        // «In piedi»: non a terra, non in mano a qualcuno, non in volo, non stordito, non nella scena di un colpo finale
+        // (lì le pose sono recitate) né dentro il buco nero.
+        if (f.inScena || f.fuoriCampo || f.schiacciato > 0) { fila[f.tipo] = 0; continue; }
         if (f.esploso || f.ko > 0 || f.preso || f.tenuto || f.vola || f.scalando || f.stordito > 0 || f.rialzo > 0 || f.inVolo || f.gelato || f.fuori || f.azione === "balla") { fila[f.tipo] = 0; continue; }
         fot++;
         const p = f.punti, gv = f.ginocchiaViste;
@@ -1973,7 +1977,7 @@ test("orda di zombie: tregua, spalle a spalla, ci si copre; finita l'orda si ric
     // durante la tregua un colpo dell'uno non fa niente all'altro
     assert.strictEqual(r.colpo("robot", "mela"), 0, "durante la tregua i due si fanno ancora male");
     assert.strictEqual(r.colpo("mela", "robot"), 0);
-    let lotta = 0, spalle = 0, insieme = 0, uccisi = 0, festa = false, aTerra = 0;
+    let lotta = 0, spalle = 0, insieme = 0, uccisi = 0, festa = false, aTerra = 0, inCoppia = 0;
     amb.avanza(60 * 90, (s) => {
       if (!s.orda) return false;
       if (s.orda.fase === "festa") { festa = true; return; }
@@ -1982,15 +1986,20 @@ test("orda di zombie: tregua, spalle a spalla, ci si copre; finita l'orda si ric
       insieme = Math.max(insieme, s.orda.zombie.filter((z) => z.stato !== "giu").length);
       const [x, y] = s.lottatori, sin = x.cx <= y.cx ? x : y, des = sin === x ? y : x;
       if (x.ko || y.ko) aTerra++;
+      else if (x.coppia || y.coppia) inCoppia++;                 // una mossa in coppia: stanno collaborando lo stesso
       else if (Math.abs(x.cx - y.cx) < 56 * s.scala && sin.dir === -1 && des.dir === 1) spalle++;
       for (const z of s.orda.zombie) assert.ok(Number.isFinite(z.x) && z.x >= 0 && z.x <= s.larghezza, "zombie fuori dalla finestra");
     });
     const s = amb.stato();
     assert.strictEqual(s.orda, null, "l'orda non finisce mai");
     assert.ok(festa, "finita l'orda non si festeggia");
-    assert.ok(insieme >= 3, "arrivano troppo pochi zombie insieme: " + insieme);
+    // I guerrieri li abbattono a raffiche appena spuntano: in piedi nello stesso momento ne restano meno.
+    assert.ok(insieme >= (stile ? 2 : 3), "arrivano troppo pochi zombie insieme: " + insieme);
     assert.ok(uccisi >= 8, "ne abbattono troppo pochi: " + uccisi);
-    assert.ok(spalle > (lotta - aTerra) * 0.3, "non stanno quasi mai spalle a spalla: " + spalle + "/" + (lotta - aTerra));
+    // Con le mosse in coppia (05/10/2026) la formazione si rompe e si rifà di continuo: misurato su 40 orde,
+    // spalle a spalla o in una mossa in coppia per il 66% del tempo in mediana, mai sotto il 35%.
+    assert.ok(spalle + inCoppia > (lotta - aTerra) * 0.25, "non stanno quasi mai spalle a spalla: " + spalle + "+" + inCoppia + "/" + (lotta - aTerra));
+    assert.ok(spalle > (lotta - aTerra) * 0.12, "spalle a spalla non ci stanno più: " + spalle + "/" + (lotta - aTerra));
     assert.strictEqual(JSON.stringify(s.punteggio), punti, "i morsi degli zombie hanno cambiato il punteggio della partita");
     dentro(amb);
     // finita la tregua i colpi tornano a contare
@@ -2218,8 +2227,8 @@ test("controller durante l'orda: i comandi valgono contro gli zombie, mai contro
     amb.avanza(25);
     const s = amb.stato();
     if (!s.orda || s.orda.fase !== "lotta") break;
-    const presa = s.radiale.voci.indexOf("presa");
-    assert.strictEqual(s.radiale.accese[presa], false, "durante la tregua la presa (che è sull'alleato) deve essere spenta");
+    assert.strictEqual(s.radiale.voci.indexOf("presa"), -1, "durante la tregua la presa (che è sull'alleato) non va offerta");
+    assert.ok(s.radiale.voci.indexOf("cavallina") >= 0, "durante la tregua il controller deve offrire le mosse in coppia");
     if (r.ordina("robot", "pugno")) colpi++;
     assert.strictEqual(r.colpo("robot", "mela"), 0, "comandato a mano, il robot fa male all'alleato");
   }
@@ -2250,7 +2259,7 @@ test("controller: la presa a distanza c'è e afferra l'altro da lontano; durante
   }
   assert.ok(prove >= 2, "la presa a distanza dal controller non parte: " + prove);
   assert.ok(presi >= 1, "la presa a distanza non afferra mai: " + presi + "/" + prove);
-  // senza energia è spenta; durante l'orda pure (è una mossa sull'altro, che ora è un alleato)
+  // senza energia è spenta; durante l'orda sparisce (è una mossa sull'altro, che ora è un alleato) e al suo posto ci sono le mosse in coppia
   const amb = ambiente({ memoria: { "mut-ring-stile": "guerrieri" } });
   const r = amb.finestra.__ring;
   r.comandi.sorprese(false); amb.avanza(60);
@@ -2259,7 +2268,9 @@ test("controller: la presa a distanza c'è e afferra l'altro da lontano; durante
   assert.strictEqual(s.radiale.accese[s.radiale.voci.indexOf("telecinesi")], false);
   r.orda(0, 9); amb.avanza(90); r.energia("robot", 100);
   s = amb.stato();
-  for (const id of ["telecinesi", "avvinghia", "teletrasporto"]) assert.strictEqual(s.radiale.accese[s.radiale.voci.indexOf(id)], false, id + " accesa durante la tregua");
+  for (const id of ["telecinesi", "avvinghia", "teletrasporto"]) assert.strictEqual(s.radiale.voci.indexOf(id), -1, id + " offerta durante la tregua");
+  for (const id of ["cavallina", "trottola", "insieme", "bolide"]) assert.ok(s.radiale.voci.indexOf(id) >= 0, id + " manca dal controller durante la tregua");
+  assert.strictEqual(s.radiale.voci.length, s.radiale.accese.length);
 });
 
 test("l'orda arriva da sola, col suo orologio: non nel primo minuto e mezzo, ma entro pochi minuti sì", () => {
@@ -2385,4 +2396,462 @@ test("scontro di energie: spuntano due tasti, e martellando quello di chi parte 
   assert.ok(clic >= 5 && bloccati === clic, "i clic sul tasto arrivano alla pagina: " + bloccati + "/" + clic);
   assert.strictEqual(e.vince, "robot", "martellando il tasto non si vince (" + e.come + ", " + clic + " clic)");
   assert.ok(e.tifo[e.stato.ultimaSfida ? 0 : 0] + e.tifo[1] === clic, "non tutti i clic sono diventati tifo");
+});
+
+// --- Mosse in coppia durante l'orda (05/10/2026) ---------------------------
+// Riccardo: «nella modalità zombie non devono stare solo spalla a spalla,
+// devono avere collaborazioni dinamiche». I due in formazione, con gli zombie
+// addosso, e la mossa data a comando.
+function inFormazione(seme, stile) {
+  const amb = ambiente({ memoria: stile ? { "mut-ring-stile": stile } : {} });
+  const r = amb.finestra.__ring;
+  r.comandi.sorprese(false); amb.avanza(60);
+  r.sposta("robot", 560); r.sposta("mela", 640);
+  r.orda(0, seme); amb.avanza(60); r.coppiaAttesa(1e6);       // da soli non ne fanno: le comanda la prova
+  for (let i = 0; i < 400; i++) {
+    amb.avanza(1);
+    const s = amb.stato();
+    if (!s.orda || s.orda.fase !== "lotta") continue;
+    if (Math.abs(s.lottatori[0].cx - s.lottatori[1].cx) < 60 * s.scala && s.lottatori.every((f) => !f.ko && !f.inVolo && !f.coppia)) {
+      const cx = (s.lottatori[0].cx + s.lottatori[1].cx) / 2;
+      for (const [tipo, dx] of [["lento", 110], ["lento", 130], ["svelto", 150], ["lento", 185], ["lento", -40], ["lento", 44]]) r.zombie(tipo, cx + dx);
+      return amb;
+    }
+  }
+  return null;
+}
+const saluteOrda = (s) => s.orda.zombie.reduce((t, z) => t + (z.stato !== "giu" ? z.hp : 0), 0) - s.orda.uccisi * 100;
+
+test("orda, mosse in coppia: cavallina, cambio di lato, colpo insieme e palla di cannone fanno quello che dicono", () => {
+  const fatte = { cavallina: 0, trottola: 0, insieme: 0, bolide: 0 };
+  for (const tipo of Object.keys(fatte)) {
+    for (let k = 0; k < 4 && fatte[tipo] < 2; k++) {
+      const amb = inFormazione(3 + k);
+      if (!amb) continue;
+      const r = amb.finestra.__ring;
+      if (!r.coppia(tipo, "robot")) continue;
+      const s0 = amb.stato(), punti = JSON.stringify(s0.punteggio), salute0 = saluteOrda(s0);
+      const robot0 = s0.lottatori.find((f) => f.tipo === "robot"), mela0 = s0.lottatori.find((f) => f.tipo === "mela");
+      assert.ok(s0.lottatori.some((f) => f.coppia), tipo + ": partita, ma nessuno la sta facendo");
+      let alto = 0, lontano = 0, durata = 0, morsi = 0;
+      const danni0 = robot0.danni + mela0.danni;
+      amb.avanza(120, (s) => {
+        const f = s.lottatori.find((l) => l.tipo === "robot");
+        if (!s.orda || !s.lottatori.some((l) => l.coppia)) return false;
+        durata++;
+        alto = Math.max(alto, f.alto / s.scala); lontano = Math.max(lontano, Math.abs(f.cx - robot0.cx) / s.scala);
+        morsi = Math.max(morsi, s.lottatori[0].danni + s.lottatori[1].danni - danni0);
+        for (const l of s.lottatori) assert.ok(Number.isFinite(l.cx + l.bacino.x + l.bacino.y), tipo + ": coordinate non finite");
+      });
+      const s1 = amb.stato(), robot1 = s1.lottatori.find((f) => f.tipo === "robot"), mela1 = s1.lottatori.find((f) => f.tipo === "mela");
+      assert.ok(durata >= 20 && durata < 110, tipo + ": dura " + durata + " fotogrammi");
+      assert.strictEqual(morsi, 0, tipo + ": durante la mossa in coppia gli zombie mordono lo stesso");
+      assert.strictEqual(JSON.stringify(s1.punteggio), punti, tipo + ": ha cambiato il punteggio della partita");
+      assert.ok(s1.orda && s1.orda.coppie[tipo] === 1, tipo + ": non viene contata");
+      const scambiati = (robot0.cx < mela0.cx) !== (robot1.cx < mela1.cx);
+      if (tipo === "cavallina") {
+        assert.ok(alto > 30, "cavallina: non salta sopra il compagno (alto " + alto.toFixed(0) + ")");
+        assert.ok(scambiati && lontano > 60, "cavallina: non atterra dall'altra parte del compagno");
+        assert.ok(saluteOrda(s1) < salute0, "cavallina: atterrando non colpisce nessuno");
+        assert.notStrictEqual(s1.orda.latiDi.robot, s0.orda.latiDi.robot, "cavallina: i lati da tenere non si scambiano");
+      } else if (tipo === "trottola") {
+        assert.ok(scambiati, "cambio di lato: i due non si scambiano di posto");
+        assert.notStrictEqual(s1.orda.latiDi.robot, s0.orda.latiDi.robot, "cambio di lato: i lati da tenere non si scambiano");
+        assert.strictEqual(s1.orda.latiDi.robot, -s1.orda.latiDi.mela);
+      } else if (tipo === "insieme") {
+        assert.ok(!scambiati, "colpo insieme: i due si sono scambiati di posto");
+        assert.ok(saluteOrda(s1) < salute0, "colpo insieme: non fa male a nessuno zombie");
+      } else {
+        assert.ok(lontano > 120, "palla di cannone: chi viene lanciato non va lontano (" + lontano.toFixed(0) + ")");
+        assert.ok(saluteOrda(s1) < salute0, "palla di cannone: non travolge nessuno zombie");
+      }
+      amb.avanza(240); dentro(amb);
+      fatte[tipo]++;
+    }
+    assert.ok(fatte[tipo] >= 2, tipo + ": a comando non parte quasi mai (" + fatte[tipo] + ")");
+  }
+});
+
+test("orda, mosse in coppia: i due le fanno da soli, e durante la tregua il controller le comanda", () => {
+  // da soli
+  let fatte = 0, tipi = {};
+  for (let k = 0; k < 4 && fatte < 3; k++) {
+    const amb = ambiente();
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); amb.avanza(60); r.orda(0, 20 + k);
+    amb.avanza(60 * 50, (s) => { if (!s.orda) return false; });
+    const s = amb.stato();
+    if (s.orda) for (const t in s.orda.coppie) { fatte += s.orda.coppie[t]; tipi[t] = 1; }
+    dentro(amb);
+  }
+  assert.ok(fatte >= 3, "da soli non fanno quasi mai una mossa in coppia: " + fatte);
+  assert.ok(Object.keys(tipi).length >= 2, "da soli fanno sempre la stessa: " + Object.keys(tipi));
+  // dal controller: lo spicchio «Cavallina» c'è, si accende quando si può e il clic la fa partire
+  let partite = 0;
+  for (let k = 0; k < 5 && !partite; k++) {
+    const amb = inFormazione(11 + k);
+    if (!amb) continue;
+    const r = amb.finestra.__ring;
+    r.radiale(true); amb.avanza(30);
+    let g = amb.stato().radiale;
+    const i = g.voci.indexOf("cavallina");
+    assert.ok(i >= 0, "nel controller, durante la tregua, manca la cavallina");
+    // lo spicchio si accende quando i due sono pronti (in piedi, vicini, non storditi da un morso)
+    for (let n = 0; n < 240 && !g.accese[i]; n++) { amb.avanza(1); g = amb.stato().radiale; }
+    if (!g.accese[i]) continue;
+    amb.premi(g.spicchi[i].x, g.spicchi[i].y); amb.rilascia(0, 0);
+    amb.avanza(8);
+    if (amb.stato().lottatori.some((f) => f.coppia === "cavallina" || f.coppia === "sgabello")) partite++;
+  }
+  assert.ok(partite > 0, "dal controller la cavallina non parte");
+  // fuori dalla tregua le mosse in coppia non ci sono
+  const amb = ambiente();
+  amb.avanza(60);
+  assert.strictEqual(amb.stato().radiale.voci.indexOf("cavallina"), -1);
+  assert.strictEqual(amb.finestra.__ring.coppia("cavallina", "robot"), false, "la mossa in coppia parte anche senza orda");
+});
+
+// --- Buco nero (05/10/2026) -------------------------------------------------
+// Riccardo: «buco nero che risucchia tutto quello che c'è in zona e lo spawna
+// dall'altra parte dello schermo».
+test("buco nero: risucchia un lottatore e lo fa uscire dall'altra parte dello schermo, senza toccare il punteggio", () => {
+  let passati = 0;
+  for (let k = 0; k < 4; k++) {
+    const amb = ambiente();
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); amb.avanza(60);
+    r.sposta("robot", 300); r.sposta("mela", 1040); amb.avanza(5);
+    const f0 = amb.lottatore("robot");
+    // una volta all'altezza del busto, una volta più in alto: chi è a terra lì sotto viene preso lo stesso
+    r.buco(f0.cx + 30, f0.bacino.y - (k % 2 ? 60 * amb.stato().scala : 10));
+    const s0 = amb.stato();
+    assert.ok(s0.buco && s0.buco.fase === "apre", "il buco nero non si apre");
+    assert.ok(s0.buco.uscita.x > s0.larghezza / 2 && Math.abs(s0.buco.uscita.x - s0.buco.x) > 300, "l'uscita non è dall'altra parte dello schermo");
+    let dentroPer = 0, entrato = null, uscito = null, n = 0, chiuso = -1;
+    amb.avanza(60 * 14, (s) => {
+      n++;
+      const f = s.lottatori.find((l) => l.tipo === "robot");
+      assert.ok(Number.isFinite(f.cx + f.bacino.x + f.bacino.y), "coordinate non finite");
+      if (f.fuoriCampo) { dentroPer++; if (!entrato) entrato = { punti: JSON.stringify(s.punteggio), ko: f.ko }; }
+      else if (entrato && !uscito) uscito = { x: f.bacino.x, y: f.bacino.y, punti: JSON.stringify(s.punteggio) };
+      if (!s.buco) { chiuso = n; return false; }
+    });
+    const s = amb.stato();
+    assert.ok(chiuso > 0 && chiuso < 60 * 13, "il buco nero non si chiude");
+    assert.ok(s.lottatori.every((f) => !f.fuoriCampo), "qualcuno è rimasto dentro il buco nero");
+    if (entrato) {
+      passati++;
+      assert.ok(dentroPer >= 10 && dentroPer < 120, "dentro il buco per " + dentroPer + " fotogrammi");
+      assert.ok(uscito, "entrato e mai uscito");
+      assert.ok(uscito.x > s.larghezza / 2 + 100, "esce dalla stessa parte: x " + Math.round(uscito.x));
+      assert.ok(uscito.y > 0 && uscito.y < s.pavimento, "esce fuori dalla finestra");
+      assert.strictEqual(uscito.punti, entrato.punti, "passare nel buco nero ha cambiato il punteggio");
+    }
+    amb.avanza(200); dentro(amb);
+  }
+  assert.ok(passati >= 3, "il lottatore accanto al buco non viene quasi mai risucchiato: " + passati + "/4");
+});
+
+test("buco nero: passano anche oggetti e zombie; a comando si apre e si richiude, e nessuno resta dentro", () => {
+  // un oggetto per aria accanto al buco
+  let oggetti = 0;
+  for (let k = 0; k < 3 && !oggetti; k++) {
+    const amb = ambiente();
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); amb.avanza(60);
+    r.sposta("robot", 150); r.sposta("mela", 250);
+    const i = r.lanciaTelefono(600, 400, 0, 0, "classico");
+    r.buco(620, 400);
+    let p = 0;
+    amb.avanza(60 * 13, (s) => { if (!s.buco) return false; p = s.buco.passati; });
+    const t = amb.stato().telefoni[i];
+    if (p >= 1 && t && Math.abs(t.x - 620) > 250) oggetti++;
+    dentro(amb);
+  }
+  assert.ok(oggetti > 0, "l'oggetto accanto al buco non passa dall'altra parte");
+  // gli zombie
+  let zombie = 0;
+  for (let k = 0; k < 3 && !zombie; k++) {
+    const amb = ambiente();
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); amb.avanza(60);
+    r.sposta("robot", 300); r.sposta("mela", 380);
+    r.orda(0, 7 + k); amb.avanza(90);
+    const s0 = amb.stato();
+    for (const dx of [0, 14, 30]) r.zombie("lento", 900 + dx);
+    r.buco(910, s0.pavimento - 40);
+    let p = 0, sinistra = false;
+    amb.avanza(60 * 13, (s) => {
+      if (!s.buco) return false;
+      p = s.buco.passati;
+      if (s.orda) for (const z of s.orda.zombie) { assert.ok(Number.isFinite(z.x) && z.x >= 0 && z.x <= s.larghezza, "zombie fuori dalla finestra"); }
+    });
+    if (p >= 1) zombie++;
+    dentro(amb);
+  }
+  assert.ok(zombie > 0, "gli zombie accanto al buco non vengono risucchiati");
+  // a comando: si apre vicino ai due, e ricliccando si chiude subito lasciando uscire chi c'era
+  for (let k = 0; k < 6; k++) {
+    const amb = ambiente(k % 2 ? { memoria: { "mut-ring-stile": "guerrieri" } } : {});
+    const r = amb.finestra.__ring, c = r.comandi;
+    c.sorprese(false); amb.avanza(60 * (1 + k));
+    c.colpo("buco");
+    const s0 = amb.stato();
+    assert.ok(s0.buco, "a comando il buco nero non si apre");
+    assert.ok(s0.lottatori.some((f) => Math.abs(f.cx - s0.buco.x) < 200 * s0.scala), "a comando si apre lontano da tutti e due");
+    let dentroQualcuno = false;
+    amb.avanza(60 + k * 40, (s) => { if (s.lottatori.some((f) => f.fuoriCampo)) { dentroQualcuno = true; return false; } });
+    c.colpo("buco");
+    let s = amb.stato();
+    assert.strictEqual(s.buco, null, "ricliccando il buco nero non si chiude");
+    assert.ok(s.lottatori.every((f) => !f.fuoriCampo), "chiuso il buco, qualcuno è rimasto dentro" + (dentroQualcuno ? " (c'era)" : ""));
+    amb.avanza(240, (st) => { for (const f of st.lottatori) assert.ok(Number.isFinite(f.cx + f.bacino.x + f.bacino.y), "coordinate non finite"); });
+    dentro(amb);
+  }
+});
+
+test("buco nero: arriva anche da solo, la prima volta poco dopo il primo minuto", () => {
+  // Come per l'orda: un imprevisto nuovo che non si vede mai non serve a niente.
+  let visti = 0;
+  for (let giro = 0; giro < 3 && visti < 2; giro++) {
+    const amb = ambiente();
+    let n = 0, quando = -1;
+    amb.avanza(60 * 260, (s) => { n++; if (s.buco) { quando = n / 60; return false; } });
+    if (quando < 0) continue;
+    visti++;
+    assert.ok(quando >= 70, "il buco nero arriva troppo presto: " + quando.toFixed(0) + " s");
+    amb.avanza(60 * 12);
+    assert.strictEqual(amb.stato().buco, null, "arrivato a sorpresa, non si chiude più");
+    dentro(amb);
+  }
+  assert.ok(visti >= 2, "in quattro minuti il buco nero non arriva quasi mai: " + visti);
+});
+
+// --- Colpo finale (05/10/2026) ----------------------------------------------
+// Riccardo: «un sistema di fatality con mosse finali e animazioni particolari
+// quando l'avversario ha poca vita, casuale una volta ogni 3 round».
+test("colpo finale: ogni scena fa buio, conta un K.O. solo e lascia tutti nella finestra", () => {
+  for (const [stile, tipo] of [["", "orbita"], ["", "flipper"], ["", "schiacciata"], ["guerrieri", "onda"], ["maghi", "statua"], ["lame", "taglio"]]) {
+    let fatte = 0;
+    for (let k = 0; k < 4 && fatte < 2; k++) {
+      const amb = ambiente({ memoria: stile ? { "mut-ring-stile": stile } : {} });
+      const r = amb.finestra.__ring;
+      r.comandi.sorprese(false); r.roundFatale(false); amb.avanza(50);
+      let partita = false;
+      for (let i = 0; i < 200 && !partita; i++) { amb.avanza(3); r.roundFatale(false); partita = r.fatale("robot", tipo); }   // solo quello chiesto dalla prova
+      if (!partita) continue;
+      const s0 = amb.stato(), punti = s0.punteggio.robot + s0.punteggio.mela, robotPunti = s0.punteggio.robot;
+      assert.strictEqual(s0.fataliFatti, 0);
+      assert.ok(s0.fatale && s0.fatale.tipo === tipo && s0.fatale.fase === "annuncio" && s0.fatale.da === "robot" && s0.fatale.a === "mela", tipo + ": la scena non parte");
+      const dx0 = Math.sign(s0.lottatori.find((f) => f.tipo === "mela").cx - s0.lottatori.find((f) => f.tipo === "robot").cx);
+      const fasi = [];
+      let n = 0, buio = 0, minY = 1e9, minX = 1e9, maxX = -1e9, salto = 0, piatto = 0, gelo = false, oltre = false, colpiInScena = 0;
+      amb.avanza(60 * 12, (s) => {
+        n++;
+        const F = s.fatale;
+        if (!F) return false;
+        if (fasi[fasi.length - 1] !== F.fase) fasi.push(F.fase);
+        const m = s.lottatori.find((f) => f.tipo === "mela"), rb = s.lottatori.find((f) => f.tipo === "robot");
+        assert.ok(Number.isFinite(m.bacino.x + m.bacino.y + rb.bacino.x + rb.bacino.y + m.cx + rb.cx), tipo + ": coordinate non finite");
+        assert.ok(m.bacino.x >= 0 && m.bacino.x <= s.larghezza && m.bacino.y <= s.pavimento + 1, tipo + ": la vittima esce dalla finestra (" + Math.round(m.bacino.x) + ", " + Math.round(m.bacino.y) + ")");
+        if (tipo !== "orbita") assert.ok(m.bacino.y >= 0, tipo + ": la vittima esce dall'alto");
+        assert.ok(rb.bacino.y >= 0 && rb.bacino.y <= s.pavimento + 1, tipo + ": chi colpisce esce dalla finestra");
+        assert.ok(s.punteggio.robot + s.punteggio.mela - punti <= 1, tipo + ": la scena conta più di un K.O.");
+        buio = Math.max(buio, s.fataleBuio); minY = Math.min(minY, m.bacino.y); minX = Math.min(minX, m.bacino.x); maxX = Math.max(maxX, m.bacino.x);
+        salto = Math.max(salto, rb.alza / s.scala); piatto = Math.max(piatto, m.schiacciato); gelo = gelo || m.gelato;
+        if (Math.sign(m.cx - rb.cx) === -dx0) oltre = true;
+        // durante la scena i colpi normali non contano
+        if (n % 20 === 5 && !F.contato) colpiInScena += r.colpo("robot", "mela") + r.colpo("mela", "robot");
+      });
+      const s = amb.stato();
+      assert.strictEqual(s.fatale, null, tipo + ": la scena non finisce");
+      assert.strictEqual(fasi.join(">"), "annuncio>mossa>fine", tipo + ": fasi " + fasi.join(">"));
+      assert.ok(n > 100 && n < 420, tipo + ": dura " + n + " fotogrammi");
+      assert.ok(buio > 0.3, tipo + ": la scena non si oscura");
+      assert.strictEqual(colpiInScena, 0, tipo + ": durante la scena i colpi normali contano");
+      assert.strictEqual(s.punteggio.robot, robotPunti + 1, tipo + ": non vale un K.O. per chi la fa");
+      assert.strictEqual(s.punteggio.robot + s.punteggio.mela, punti + 1, tipo + ": K.O. contati " + (s.punteggio.robot + s.punteggio.mela - punti));
+      assert.strictEqual(s.fataliFatti, 1);
+      if (tipo === "orbita") assert.ok(minY < 0, "in orbita: non esce dall'alto");
+      if (tipo === "flipper") assert.ok(maxX - minX > s.larghezza * 0.7, "flipper: non rimbalza da un bordo all'altro (" + Math.round(minX) + ".." + Math.round(maxX) + ")");
+      if (tipo === "schiacciata") assert.ok(salto > 30 && piatto > 0, "schiacciata: salto " + salto.toFixed(0) + ", schiacciato " + piatto);
+      if (tipo === "onda") assert.ok(minX < 90 * s.scala || maxX > s.larghezza - 90 * s.scala, "onda finale: non lo porta fino al bordo");
+      if (tipo === "statua") assert.ok(gelo, "statua: non lo gela");
+      if (tipo === "taglio") assert.ok(oltre, "taglio netto: chi colpisce non passa dall'altra parte");
+      // poi tutto torna com'era: luce, vittima in piedi e intera, nessuno fuori (e niente altro colpo finale nel frattempo)
+      amb.avanza(500, () => { r.roundFatale(false); });
+      const s2 = amb.stato(), m2 = s2.lottatori.find((f) => f.tipo === "mela"), r2 = s2.lottatori.find((f) => f.tipo === "robot");
+      assert.ok(s2.fataleBuio < 0.03, tipo + ": resta buio");
+      assert.ok(!m2.fatVola && !m2.schiacciato && !r2.alza, tipo + ": la vittima resta com'era nella scena");
+      dentro(amb);
+      fatte++;
+    }
+    assert.ok(fatte >= 2, tipo + ": la scena non parte quasi mai (" + fatte + ")");
+  }
+});
+
+test("colpo finale: tocca a un round su tre, a caso; quello non usato resta buono", () => {
+  const amb = ambiente();
+  const r = amb.finestra.__ring;
+  r.comandi.sorprese(false); amb.avanza(30);
+  r.roundFatale(false);
+  const buoni = [];
+  for (let i = 0; i < 60; i++) {
+    r.ko(i % 2 ? "robot" : "mela");
+    if (amb.stato().fataleRound) { buoni.push(i); r.roundFatale(false); }      // come se fosse stato usato
+  }
+  assert.ok(buoni.length >= 19 && buoni.length <= 21, "su 60 round, quelli buoni sono " + buoni.length);
+  const passi = {};
+  for (let i = 1; i < buoni.length; i++) { const d = buoni[i] - buoni[i - 1]; passi[d] = 1; assert.ok(d >= 1 && d <= 5, "fra due round buoni ne passano " + d); }
+  assert.ok(Object.keys(passi).length >= 2, "il round buono cade sempre allo stesso posto: non è a caso");
+  // quello non usato resta buono, e uno uscito nel frattempo resta a credito: alla lunga è sempre uno su tre
+  const amb2 = ambiente();
+  const r2 = amb2.finestra.__ring;
+  r2.comandi.sorprese(false); amb2.avanza(30);
+  r2.roundFatale(true);
+  let usati = 0;
+  for (let i = 0; i < 60; i++) {
+    r2.ko(i % 2 ? "robot" : "mela");
+    assert.ok(i >= 12 || amb2.stato().fataleRound, "il round buono non usato è andato perso");
+    if (i >= 12 && amb2.stato().fataleRound) { usati++; r2.roundFatale(false); }
+  }
+  assert.ok(usati >= 17 && usati <= 20, "dopo dodici round a vuoto, su 48 se ne usano " + usati);
+});
+
+test("colpo finale: nel round buono il colpo che chiuderebbe diventa la mossa finale; negli altri round mai", () => {
+  let conFinale = 0, prove = 0;
+  for (let k = 0; k < 8 && conFinale < 3; k++) {
+    const amb = ambiente(k % 2 ? { memoria: { "mut-ring-stile": "lame" } } : {});
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); amb.avanza(40);
+    r.roundFatale(true);
+    prove++;
+    let visto = false;
+    amb.avanza(60 * 40, (s) => {
+      if (s.fatale) visto = true;
+      if (s.punteggio.robot + s.punteggio.mela > 0) return false;
+    });
+    amb.avanza(60 * 8, (s) => { if (!s.fatale) return false; });
+    const s = amb.stato();
+    if (visto && s.fataliFatti === 1) { conFinale++; assert.strictEqual(s.punteggio.robot + s.punteggio.mela, 1); }
+    dentro(amb);
+  }
+  assert.ok(conFinale >= 3, "nel round buono il primo K.O. è quasi sempre un K.O. normale: " + conFinale + "/" + prove);
+  // negli altri round: mai
+  const amb = ambiente();
+  const r = amb.finestra.__ring;
+  r.comandi.sorprese(false); amb.avanza(40);
+  r.roundFatale(false);
+  let ko = 0;
+  amb.avanza(60 * 70, (s) => { r.roundFatale(false); assert.strictEqual(s.fatale, null, "colpo finale in un round che non è quello buono"); ko = Math.max(ko, s.punteggio.robot + s.punteggio.mela); });
+  assert.ok(ko >= 1, "in settanta secondi nessun K.O.");
+  assert.strictEqual(amb.stato().fataliFatti, 0);
+});
+
+test("colpo finale: non sul punto che chiude la partita, non durante orda o buco nero; se si afferra uno dei due salta", () => {
+  // sul punto partita
+  let provato = false;
+  for (let k = 0; k < 5 && !provato; k++) {
+    const amb = ambiente();
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); amb.avanza(40);
+    for (let i = 0; i < 9; i++) { r.ko("mela"); r.roundFatale(false); }
+    assert.strictEqual(amb.stato().punteggio.robot, 9);
+    for (let i = 0; i < 400 && !provato; i++) {
+      amb.avanza(3); r.roundFatale(false);
+      const s = amb.stato();
+      if (s.punteggio.robot !== 9 || s.punteggio.mela >= 9) break;
+      assert.strictEqual(r.fatale("robot"), false, "colpo finale sul punto che chiude la partita");
+      if (r.fatale("mela")) provato = true;                    // l'altro, che non è sul punto partita, può
+    }
+  }
+  assert.ok(provato, "non si è mai arrivati a provare il punto partita");
+  // durante l'orda e col buco nero aperto
+  {
+    const amb = ambiente();
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); amb.avanza(40);
+    r.orda(0, 3);
+    amb.avanza(240, () => { assert.strictEqual(r.fatale("robot"), false, "colpo finale durante l'orda"); assert.strictEqual(r.fatale("mela"), false); });
+  }
+  {
+    const amb = ambiente();
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); amb.avanza(40);
+    r.buco(900, 200);
+    amb.avanza(240, (s) => { if (!s.buco) return false; assert.strictEqual(r.fatale("robot"), false, "colpo finale col buco nero aperto"); });
+  }
+  // un buco nero aperto addosso a scena iniziata non la disturba: chi è in scena non viene risucchiato
+  let conBuco = 0;
+  for (let k = 0; k < 5 && conBuco < 2; k++) {
+    const amb = ambiente();
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); r.roundFatale(false); amb.avanza(50);
+    let partita = false;
+    for (let i = 0; i < 200 && !partita; i++) { amb.avanza(3); r.roundFatale(false); partita = r.fatale("robot", k % 2 ? "orbita" : "schiacciata"); }
+    if (!partita) continue;
+    const punti = amb.stato().punteggio.robot;
+    amb.avanza(8);
+    const m = amb.lottatore("mela");
+    r.buco(m.bacino.x + 10, m.bacino.y - 20);
+    amb.avanza(60 * 10, (s) => {
+      if (!s.fatale) return false;
+      assert.ok(s.lottatori.every((f) => !f.fuoriCampo), "risucchiato durante il colpo finale");
+      for (const f of s.lottatori) assert.ok(f.bacino.y <= s.pavimento + 1 && (f.bacino.y >= 0 || f.fatVola), "fuori dalla finestra durante il colpo finale col buco aperto");
+    });
+    const s = amb.stato();
+    assert.strictEqual(s.fatale, null);
+    assert.strictEqual(s.punteggio.robot, punti + 1, "col buco nero aperto la scena non arriva in fondo");
+    assert.strictEqual(s.fataliFatti, 1);
+    conBuco++;
+  }
+  assert.ok(conBuco >= 2, "colpo finale col buco nero: mai provato");
+  // afferrato a metà dell'annuncio: la scena salta, niente K.O., e il round resta buono
+  let saltate = 0;
+  for (let k = 0; k < 6 && saltate < 2; k++) {
+    const amb = ambiente();
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); r.roundFatale(false); amb.avanza(50);
+    let partita = false;
+    for (let i = 0; i < 200 && !partita; i++) { amb.avanza(3); r.roundFatale(false); partita = r.fatale("robot", "schiacciata"); }
+    if (!partita) continue;
+    const punti = JSON.stringify(amb.stato().punteggio);
+    amb.avanza(6);
+    const m = amb.lottatore("mela");
+    amb.premi(m.bacino.x, m.bacino.y - 8);
+    amb.muovi(m.bacino.x + 6, m.bacino.y - 14);
+    amb.avanza(4);
+    const s = amb.stato();
+    if (!s.lottatori.find((f) => f.tipo === "mela").preso) { amb.rilascia(0, 0); continue; }
+    assert.strictEqual(s.fatale, null, "afferrata la vittima, la scena va avanti");
+    assert.strictEqual(JSON.stringify(s.punteggio), punti, "scena saltata, ma il K.O. è contato");
+    assert.strictEqual(s.fataliFatti, 0);
+    assert.strictEqual(s.fataleRound, true, "scena saltata: il round buono è andato perso");
+    amb.rilascia(m.bacino.x + 6, m.bacino.y - 14);
+    amb.avanza(200); dentro(amb);
+    saltate++;
+  }
+  assert.ok(saltate >= 2, "non si riesce ad afferrare la vittima durante l'annuncio: " + saltate);
+});
+
+test("colpo finale: il tasto del menu lo fa partire appena i due sono in piedi e vicini, ed è gratis", () => {
+  const premio = { bloccate: { guerrieri: true, armi: true, meteo: true }, attivo: () => false, chiedi: () => {} };
+  let partiti = 0;
+  for (let k = 0; k < 5; k++) {
+    const amb = ambiente(k === 0 ? { premio, estensione: true, memoria: { "mut-ring": "on" } } : k % 2 ? { memoria: { "mut-ring-stile": "maghi" } } : {});
+    const r = amb.finestra.__ring, c = r.comandi;
+    c.sorprese(false); amb.avanza(60 * (1 + k), () => { r.roundFatale(false); });
+    assert.notStrictEqual(c.colpo("fatale"), false, "il colpo finale non è libero");
+    if (k === 0) assert.strictEqual(c.colpo("buco"), false, "senza Premium il buco nero si apre lo stesso");
+    let visto = -1, n = 0;
+    amb.avanza(60 * 7, (s) => { n++; if (s.fatale) { visto = n; return false; } });
+    if (visto < 0) { assert.ok(amb.stato().fataleRound, "il tasto non ha lasciato traccia: passati sei secondi il round in corso deve diventare quello buono"); continue; }
+    partiti++;
+    amb.avanza(60 * 9, (s) => { r.roundFatale(false); if (!s.fatale) return false; });
+    assert.strictEqual(amb.stato().fatale, null);
+    assert.strictEqual(amb.stato().fataliFatti, 1);
+    dentro(amb);
+  }
+  // (coi maghi in volo sulla scopa può non partire entro i sei secondi: misurato, 26 volte su 30)
+  assert.ok(partiti >= 3, "col tasto il colpo finale parte di rado: " + partiti + "/5");
 });

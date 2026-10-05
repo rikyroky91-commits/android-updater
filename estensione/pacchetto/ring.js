@@ -56,7 +56,7 @@
   }
   const ARMI_PREMIO = { pistola: 1, spada: 1, bomba: 1, duo: 1 };
   // Gli imprevisti che nell'estensione stanno col meteo (a pagamento); il terremoto resta libero.
-  const EVENTI_PREMIO = { meteoriti: 1, zombie: 1 };
+  const EVENTI_PREMIO = { meteoriti: 1, zombie: 1, buco: 1 };
   const MOSSE_PREMIO = { onda: 1, carica: 1, teletrasporto: 1, sfera: 1, disco: 1, lampo: 1, barriera: 1, autodistruzione: 1, telecinesi: 1,
                          trasforma: 1, dardi: 1, gelo: 1, rimpicciolisci: 1, fulmine: 1, levita: 1, scudo: 1, raggio: 1, sparizione: 1,
                          "scatto-lama": 1, "lancio-lama": 1, duello: 1, scontro: 1 };
@@ -469,7 +469,8 @@
     gocce = []; spruzzi = []; bagnato = 0; pioveDa = 0; pioggiaFino = 0; prossimoLampo = 300;
     if (sisma) fineSisma();
     lapilli = []; colate = []; meteore = []; sciame = null; bruciature = [];
-    moltG = 1; ritmo = 1; daSpawnare = 0; fermoColpo = 0; scossa = 0;
+    moltG = 1; ritmo = 1; daSpawnare = 0; fermoColpo = 0; scossa = 0; buco = null;
+    fatale = null; fataleBuio = 0; fataleSacco = []; fataleRound = false; fataleDebito = 0; fataleVoluto = 0; prossimoRoundFatale();
     tempo = 0; proiettili = []; pezzi = []; arti = []; macchie = []; cumulo = 0; danniBordi = [];
     prossimoEvento = CALMA + Math.round(caso(120, 600));
     prossimaOrda = Math.round(caso(ORDA.prima[0], ORDA.prima[1]) * 60);
@@ -580,6 +581,71 @@
       case "salto":
         q.piedeA = [10, 9]; q.piedeD = [10, -7]; q.ginocchioA = [20, 9]; q.ginocchioD = [20, -2];
         break;
+      // --- Le mosse in coppia contro l'orda (vedi «LE MOSSE IN COPPIA») ---
+      case "sgabello": {
+        // Piegato in avanti, mani sulle ginocchia: l'alleato gli salta sopra.
+        const k = Math.min(1, f.t / 7, Math.max(0, (f.durata - f.t) / 7));
+        q.bacino = [28 - 5 * k, -3 * k]; q.collo = [50 - 19 * k, 1 + 11 * k]; q.testa = [62 - 27 * k, 2 + 19 * k];
+        q.manoA = [50 - 33 * k, 13 - 3 * k]; q.gomitoA = [42 - 16 * k, 8 + 5 * k]; q.manoD = [49 - 32 * k, 8 - 9 * k]; q.gomitoD = [41 - 16 * k, 3 + 1 * k];
+        q.ginocchioA = [14 - 1 * k, 6 + 4 * k]; q.ginocchioD = [14 - 1 * k, -3 + 1 * k];
+        break;
+      }
+      case "cavallina": {
+        const c = f.coppia;
+        if (c && c.h > 2 * S) {
+          // In aria a gambe larghe, le mani che spingono sulla schiena dell'altro e poi si aprono.
+          const u = c.u;
+          q.piedeA = [9, 17]; q.piedeD = [9, -15]; q.ginocchioA = [21, 13]; q.ginocchioD = [21, -9];
+          q.manoA = [34 + 34 * u, 15 + 8 * u]; q.gomitoA = [42 + 14 * u, 11 + 4 * u]; q.manoD = [33 + 34 * u, 5 - 14 * u]; q.gomitoD = [41 + 14 * u, 2 - 8 * u];
+          q.collo[1] += 6 - 4 * u; q.testa[1] += 9 - 6 * u;
+        } else if (c && !c.fatto) {
+          // La rincorsa.
+          const ph = f.passo;
+          q.piedeA = [Math.max(0, 6 * Math.cos(ph)), 9 + 8 * Math.sin(ph)]; q.piedeD = [Math.max(0, -6 * Math.cos(ph)), -8 - 8 * Math.sin(ph)];
+          q.collo[1] += 5; q.testa[1] += 7; q.manoA = [44, 20]; q.manoD = [42, 12];
+        } else {
+          // Atterrato: giù sulle ginocchia, un pugno a terra.
+          q.bacino[0] -= 9; q.collo = [36, 6]; q.testa = [46, 10]; q.manoA = [8, 16]; q.gomitoA = [24, 13]; q.manoD = [40, -12]; q.gomitoD = [36, -4];
+          q.ginocchioA = [12, 12]; q.ginocchioD = [8, -6]; q.piedeA = [0, 10]; q.piedeD = [0, -12];
+        }
+        break;
+      }
+      case "trottola": {
+        // La giravolta schiena contro schiena: braccia larghe, chi passa sopra raccoglie le gambe.
+        const c = f.coppia, su = c && c.salta;
+        q.manoA = [54, 24]; q.gomitoA = [51, 13]; q.manoD = [54, -20]; q.gomitoD = [50, -9];
+        if (su) { q.piedeA = [8, 8]; q.piedeD = [8, -6]; q.ginocchioA = [19, 9]; q.ginocchioD = [19, -3]; }
+        else { const giu = 9 * e; q.bacino[0] -= giu * 0.6; q.collo[0] -= giu; q.testa[0] -= giu; q.manoA[0] -= giu; q.manoD[0] -= giu; q.gomitoA[0] -= giu; q.gomitoD[0] -= giu; }
+        break;
+      }
+      case "insieme": {
+        // Si carica (le mani al petto, giù sulle gambe) e poi la spinta a due mani in fuori.
+        const carico = Math.min(1, f.t / 12), spinge = f.t < 13 ? 0 : Math.min(1, (f.t - 13) / 4) * Math.max(0, 1 - Math.max(0, f.t - 24) / 12);
+        q.bacino[0] -= 5 * carico * (1 - spinge); q.collo = [50 - 4 * carico + 2 * spinge, 1 - 4 * carico + 9 * spinge]; q.testa = [62 - 4 * carico + 2 * spinge, 2 - 5 * carico + 11 * spinge];
+        q.manoA = [45 + 4 * spinge, 6 * (1 - spinge) + 30 * spinge]; q.gomitoA = [42 + 5 * spinge, 9 + 9 * spinge];
+        q.manoD = [43 + 2 * spinge, 2 * (1 - spinge) + 27 * spinge]; q.gomitoD = [40 + 3 * spinge, 4 + 10 * spinge];
+        q.ginocchioA = [14 - 2 * carico, 8 + 2 * spinge]; q.piedeA = [0, 10 + 5 * spinge];
+        break;
+      }
+      case "fionda": {
+        // Il lancio da bocce: il braccio indietro e poi avanti, basso.
+        const k = f.t < 10 ? f.t / 10 : 1, va = f.t < 10 ? 0 : Math.min(1, (f.t - 10) / 6);
+        q.bacino[0] -= 6 * k; q.collo = [50 - 10 * k, 1 + 6 * k + 8 * va]; q.testa = [62 - 12 * k, 2 + 9 * k + 10 * va];
+        q.manoA = [26 - 6 * va, -14 * (1 - va) + 30 * va]; q.gomitoA = [34 - 4 * va, -5 * (1 - va) + 16 * va];
+        q.manoD = [40, -10]; q.gomitoD = [40, -3]; q.ginocchioA = [12, 10]; q.piedeA = [0, 13];
+        break;
+      }
+      case "bolide": {
+        const c = f.coppia;
+        if (c && !c.fatto) {
+          // Raccolto a palla, che rotola: i pezzi del corpo girano intorno al centro.
+          const giro = c.gira || 0, co = Math.cos(giro), si = Math.sin(giro);
+          const palla = { bacino: [-2, -4], collo: [5, 3], testa: [1, 10], gomitoA: [0, 8], manoA: [-4, 9], gomitoD: [3, 7], manoD: [-2, 6],
+                          ginocchioA: [5, 8], piedeA: [-6, 5], ginocchioD: [3, 6], piedeD: [-7, 2] };
+          for (const n in palla) q[n] = [13 + palla[n][0] * co - palla[n][1] * si, palla[n][0] * si + palla[n][1] * co];
+        }
+        break;
+      }
       case "spara": {
         // Braccio teso verso l'avversario; al colpo, il rinculo.
         const rinculo = f.t >= 10 && f.t < 18 ? (18 - f.t) / 8 : 0;
@@ -848,6 +914,15 @@
     const ng = gambe(f);
     if (ng < 2 && !(f.jet > 0) && !f.paracadute) posaMutilata(f, q, ng, e, carica);
     else if (ng === 2 && COLPI[f.azione]) { const m = bersaglio(f); if (m) colpoMirato(f, q, m, e); }
+    // Le mosse in coppia che staccano da terra: tutto il corpo sale insieme.
+    if (f.coppia && f.coppia.h) for (const nome in q) q[nome][0] += f.coppia.h / S;
+    if (f.alza) for (const nome in q) q[nome][0] += f.alza / S;
+    // Chi sta per prendere il colpo finale barcolla, le braccia giù.
+    if (fatale && f === fatale.a && !f.azione && !fatale.contato) {
+      const d = Math.sin(passi * 0.22) * 4;
+      q.testa[1] += d * 1.2; q.collo[1] += d * 0.7; q.bacino[0] -= 3;
+      q.manoA = [33, 9 + d]; q.gomitoA = [41, 7 + d * 0.5]; q.manoD = [32, -3 + d]; q.gomitoD = [40, 1 + d * 0.5];
+    }
     // In coordinate della finestra.
     const fuori = {};
     for (const nome in q) {
@@ -1047,7 +1122,8 @@
                    carica: 70, onda: 80, raffica: 40, rush: 44,
                    sfera: 150, disco: 56, lampo: 40, barriera: 110, avvinghia: 96, telecinesi: 124,
                    trasforma: 96, gelo: 44, rimpicciolisci: 40, fulmine: 50, levita: 100,
-                   affondo: 24, rovescio: 26, scattoLama: 44, lancioLama: 40, pressa: 50, testata: 22 };
+                   affondo: 24, rovescio: 26, scattoLama: 44, lancioLama: 40, pressa: 50, testata: 22,
+                   cavallina: 46, sgabello: 46, trottola: 34, insieme: 38, bolide: 50, fionda: 34 };
 
   function inizia(f, azione, meta) {
     azione = mossaPossibile(f, azione);
@@ -1193,12 +1269,24 @@
   }
 
   function pensa(f, altro) {
+    if (f.riparo > 0) f.riparo--;
+    // Una mossa in coppia interrotta (un colpo, il ghiaccio, la fine dell'orda) non resta a metà.
+    if (f.coppia && (f.ko || f.stordito || f.preso || f.tenuto || f.esploso || f.gelato > 0 || f.accecato > 0 || !orda || !MOSSE_COPPIA[f.azione])) {
+      f.coppia = null;
+      if (MOSSE_COPPIA[f.azione]) { f.azione = null; f.pensa = 6; }
+    }
+    // In scena per il colpo finale: i gesti li decide la scena, qui scorre solo il tempo della mossa.
+    if (fatale && (f === fatale.da || f === fatale.a)) {
+      if (f.azione && f.azione !== "avanza" && ++f.t >= f.durata) f.azione = null;
+      return;
+    }
     if (f.ko || f.stordito || f.preso || f.tenuto || f.esploso || f.scalata || f.inVolo || f.gelato > 0) return;
     if (f.accecato > 0) { f.accecato--; f.azione = null; f.scatto = 0; if (!(f.jet > 0) && f.accecato % 30 === 0) f.cx += caso(-6, 6) * S; return; }
     if (f.fuga && scappa(f)) return;
     if (f.jet > 0) { pensaVolo(f, altro); return; }
     if (f.azione) {
       f.t++;
+      if (f.coppia) eseguiCoppia(f);
       if (f.azione === "spara" && f.t === 10 && f.arma) spara(f, altro);
       if (f.azione === "estrai" && f.t === 14 && !f.tel) estraiDuo(f);
       if (anime) eseguiAnime(f, altro);
@@ -1237,6 +1325,8 @@
     }
     if (--f.pensa > 0) return;
     f.dopo = null;
+    // All'altro manca un colpo solo, e questo è il round buono: lo si chiude con la mossa finale.
+    if (fataleRound && puoFinire(f, altro)) { avviaFatale(f, altro); return; }
     if (f.ordine && eseguiOrdine(f, altro)) return;
     if (orda) { pensaAlleato(f, altro); return; }
     if (gambe(f) === 0) { pensaSenzaGambe(f, altro); return; }
@@ -1442,6 +1532,10 @@
                           sasso: ["TONK!", "STOCK!", "SDENG!"] };
 
   function colpisci(f, altro, forza, x, y, suono) {
+    if (fatale && altro && altro.tipo) return;                   // durante il colpo finale conta solo la scena
+    if (altro && altro.fuoriCampo) return;                       // chi è dentro il buco nero non si può colpire
+    // Il colpo che chiuderebbe il round, nel round buono: al suo posto parte la mossa finale.
+    if (fataleRound && f && f.tipo && f.p && altro && altro.tipo && altro.danni + 1 >= altro.soglia && puoFinire(f, altro)) { avviaFatale(f, altro); return; }
     // Una parata di fronte ferma quasi tutto, ma il colpo si sente.
     if (altro.esploso) return;
     // TREGUA (l'orda di zombie): i colpi dell'uno non fanno niente all'altro.
@@ -1511,6 +1605,7 @@
   }
 
   function segnaKO(f, altro) {
+    if (fatale && !fatale.io) return;                            // durante il colpo finale il K.O. lo dà la scena
     altro.koVero = true;
     risolviScommessa(f.tipo && f !== altro ? f.tipo : (altro.tipo === "robot" ? "mela" : "robot"));
     altro.ko = Math.round(caso(110, 170)); altro.danni = 0; altro.soglia = Math.round(caso(3, 6));
@@ -1520,7 +1615,10 @@
     // Ogni round un carattere nuovo: più aggressivo o più cauto.
     for (const l of lottatori) nuovoCarattere(l);
     salvaCervello(true);
-    scrivi("K.O.!  " + punteggio.robot + "–" + punteggio.mela, altro.p.bacino.x, altro.base - 72 * S, true);
+    // (nel colpo finale il conto va più in alto: sotto ci sono già il titolo della scena e il rumore del colpo)
+    scrivi("K.O.!  " + punteggio.robot + "–" + punteggio.mela, fatale ? (fatale.da.p.bacino.x + altro.p.bacino.x) / 2 : altro.p.bacino.x,
+           Math.max(testataBasso + 30 * S, altro.base - (fatale ? 158 : 72) * S), true);
+    prossimoRoundFatale();
     controllaFinale(f.tipo, altro, f);
   }
 
@@ -2128,6 +2226,7 @@
 
   function aggiornaTelefoni() {
     for (const t of telefoni) {
+      if (t.inBuco) { t.ox = t.x; t.oy = t.y; continue; }       // dentro il buco nero: fermo (anche la miccia) finché non riesce
       if (t.protetto > 0) t.protetto--;
       if (t.cool > 0) t.cool--;
       if (t.entra > 0) t.entra--;
@@ -4045,7 +4144,7 @@
     seme = seme || Math.floor(Math.random() * 1e9) + 1;
     orda = { t: 0, fase: "pausa", pausa: 36, festa: 0, su: !!o, base: o ? o.t : pavimento, l: o ? o.l : 0, r: o ? o.r : W, zombie: [],
              ondata: 0, ondate: ondate || 0, superate: 0, ricetta: null, tOndata: 0, seme, rng: generatore(seme), prossimo: 0, nati: 0, uccisi: 0, uccisiOndata: 0,
-             sopraffatti: 0, vite: ORDA.vite, altrove: 0, lati: { [sx.tipo]: -1, [dx.tipo]: 1 }, cx: (a.cx + b.cx) / 2, vinta: false };
+             sopraffatti: 0, vite: ORDA.vite, altrove: 0, coppiaAttesa: 110, coppie: {}, lati: { [sx.tipo]: -1, [dx.tipo]: 1 }, cx: (a.cx + b.cx) / 2, vinta: false };
     if (sfida) { sfida = null; sfidaPausa = 40; }
     for (const f of [a, b]) {
       if (f.tiene) molla(f);
@@ -4127,7 +4226,7 @@
     q.nati++;
     polvere(x, q.base - 1, 4);
   }
-  const vivoZ = (z) => z.stato === "va" || z.stato === "colpo" || (z.stato === "esce" && z.s > 22);
+  const vivoZ = (z) => !z.inBuco && (z.stato === "va" || z.stato === "colpo" || (z.stato === "esce" && z.s > 22));
   // Lo zombie vivo più vicino a un punto, entro un raggio; `lato` (facoltativo) chiede quelli da una parte sola.
   function zombieVicino(x, raggio, lato) {
     let scelto = null, d0 = raggio;
@@ -4200,6 +4299,7 @@
   // Il morso: non è un colpo della partita. Stordisce, spinge, e al terzo butta a terra.
   // La manata del grosso butta a terra subito.
   function morso(z, f) {
+    if (f.coppia || f.riparo > 0) return;              // a metà di una mossa in coppia (e un attimo dopo) non lo prendono
     const x = (z.x + f.p.collo.x) / 2, y = f.p.collo.y + 4 * S, grosso = z.tipo === "grosso";
     if (f.azione === "para" && f.dir === -z.dir) {
       scintille(x, y, 5, "#bfe9ff"); scrivi("PARATO!", x, y - 8 * S, false);
@@ -4237,6 +4337,8 @@
     const q = orda;
     if (!q) return;
     q.t++;
+    if (q.coppiaAttesa > 0) q.coppiaAttesa--;
+    if (q.fase === "lotta") q.senzaCoppia = (q.senzaCoppia || 0) + 1;
     const [a, b] = lottatori;
     if (q.fase === "pausa") { if (--q.pausa <= 0) nuovaOndata(); }
     else if (q.fase === "lotta") {
@@ -4280,6 +4382,7 @@
       if (Math.abs(m - q.cx) > 50 * S) q.cx += (m - q.cx) * 0.04;
     }
     for (const z of q.zombie) {
+      if (z.inBuco) continue;                                    // dentro il buco nero: fermo finché non riesce
       const Z = ZOMBI[z.tipo];
       z.t++; z.s++;
       if (z.lampo > 0) z.lampo--;
@@ -4347,6 +4450,8 @@
       if (verso > 0 && !f.tel) { decolla(f, false); return; }
       f.pensa = 20; return;
     }
+    // 0. Una mossa in due, se è il momento (vedi «LE MOSSE IN COPPIA»).
+    if (q.fase === "lotta" && !(q.coppiaAttesa > 0) && pensaCoppia(f, altro, lato)) return;
     // 1. Uno zombie a portata di braccio: lo si colpisce, da qualunque parte arrivi.
     const z = zombieVicino(f.cx, 40 * S);
     if (z) {
@@ -4398,6 +4503,194 @@
     } else altro.aiutato = false;
     f.pensa = 8;
   }
+  // --- LE MOSSE IN COPPIA (05/10/2026, su richiesta) ------------------------
+  // Durante l'orda i due non stanno solo spalle a spalla: ogni tanto fanno una
+  // mossa in due. La decide chi dei due sta pensando (`pensaCoppia`), se
+  // l'altro è lì accanto e libero; fra una e l'altra passano due-quattro
+  // secondi. Si chiedono anche dal controller, che durante la tregua le mette
+  // al posto delle mosse fatte sull'altro.
+  //  - CAVALLINA. Dal mio lato non arriva nessuno, dal suo sì (o c'è un
+  //    grosso). L'alleato si piega, io prendo la rincorsa, gli salto sopra e
+  //    atterro più in là, in mezzo a loro: lo schianto vale due colpi per chi
+  //    è lì sotto. Da lì il lato di là è mio, e lui guarda dall'altra parte.
+  //  - CAMBIO DI LATO. L'alleato sta per andare giù e il mio lato è
+  //    tranquillo: una giravolta schiena contro schiena, ci scambiamo di
+  //    posto, e a metà giro chi è troppo vicino prende una manata.
+  //  - COLPO INSIEME. Accerchiati, due o più per parte: un attimo per caricare
+  //    e poi una spinta a due mani in fuori, nello stesso istante. Indietro
+  //    tutti quelli entro qualche passo (coi personaggi a energia arriva più
+  //    lontano e fa più male, e costa 20 di energia a testa).
+  //  - PALLA DI CANNONE. Una fila dal mio lato: l'alleato mi lancia rasoterra,
+  //    rotolo in mezzo a loro e li butto giù come birilli.
+  // Finché la mossa dura i morsi non arrivano.
+  const COPPIA = { attesa: [130, 250], vicini: 64 };
+  const MOSSE_COPPIA = { cavallina: 1, sgabello: 1, trottola: 1, insieme: 1, bolide: 1, fionda: 1 };
+  const VOCI_COPPIA = [["cavallina", "\u{1F938}", "Cavallina"], ["trottola", "\u{1F504}", "Cambio di lato"], ["insieme", "\u{1F91C}", "Colpo insieme"], ["bolide", "\u{1F3B3}", "Palla di cannone"]];
+  const E_DI_COPPIA = { cavallina: 1, trottola: 1, insieme: 1, bolide: 1 };
+  const prontoCoppia = (f) => !!(f.p && !f.ko && !f.esploso && !f.fuori && !f.preso && !f.tenuto && !(f.gelato > 0) && !(f.accecato > 0) && !(f.stordito > 0) &&
+                                !(f.jet > 0) && !f.inVolo && !f.scalata && !f.coppia && gambe(f) === 2 && braccia(f) === 2);
+  function coppiaPossibile(f, altro) {
+    const q = orda;
+    return !!(q && q.fase === "lotta" && verso > 0 && f && altro && prontoCoppia(f) && prontoCoppia(altro) &&
+              Math.abs(f.base - q.base) < 8 * S && Math.abs(altro.base - q.base) < 8 * S && Math.abs(altro.cx - f.cx) < COPPIA.vicini * S);
+  }
+  // Quanti zombie in piedi da una parte di un punto, entro un certo raggio.
+  const contaZ = (x, lato, raggio) => orda.zombie.reduce((n, z) => n + (vivoZ(z) && (z.x - x) * lato > 0 && Math.abs(z.x - x) < raggio ? 1 : 0), 0);
+  // Dove atterrare con la cavallina: in mezzo ai primi che arrivano dal lato dell'alleato (o sul grosso).
+  function metaCavallina(f, altro) {
+    const va = altro.cx >= f.cx ? 1 : -1;
+    const di = orda.zombie.filter((z) => vivoZ(z) && (z.x - altro.cx) * va > 20 * S && Math.abs(z.x - altro.cx) < 200 * S).sort((a, b) => Math.abs(a.x - altro.cx) - Math.abs(b.x - altro.cx));
+    if (!di.length) return undefined;
+    // Non proprio in mezzo: un passo prima, così lo schianto li prende e chi atterra non resta in bocca al grosso.
+    const grosso = di.find((z) => z.tipo === "grosso");
+    if (grosso) return grosso.x - va * 34 * S;
+    const primi = di.slice(0, 3);
+    return primi.reduce((t, z) => t + z.x, 0) / primi.length - va * 12 * S;
+  }
+  function coppia(tipo, f, altro, dove) {
+    if (!coppiaPossibile(f, altro)) return false;
+    const q = orda, lato = f.cx <= altro.cx ? -1 : 1;            // da che parte sto io, rispetto a lui
+    const mx = (f.cx + altro.cx) / 2, my = Math.min(f.p.testa.y, altro.p.testa.y) - 24 * S;
+    const comincia = (l, azione, dati) => {
+      if (l.tel) lasciaCadere(l);
+      l.zMira = null; l.ordine = null; l.onda = null; l.scatto = 0; l.fuga = null;
+      inizia(l, azione);
+      l.coppia = Object.assign({ tipo, con: l === f ? altro : f, h: 0, u: 0, fatto: false }, dati);
+    };
+    if (tipo === "cavallina") {
+      const va = -lato;                                          // verso dove si salta: oltre l'alleato
+      let x1 = dove !== undefined ? dove : altro.cx + va * 72 * S;
+      x1 = va > 0 ? Math.max(altro.cx + 38 * S, Math.min(altro.cx + 190 * S, x1)) : Math.min(altro.cx - 38 * S, Math.max(altro.cx - 190 * S, x1));
+      x1 = Math.max(q.l + 14 * S, Math.min(q.r - 14 * S, x1));
+      if ((x1 - altro.cx) * va < 30 * S) return false;           // non c'è posto dove atterrare
+      f.dir = va; altro.dir = va;
+      const lungo = Math.abs(x1 - f.cx);
+      comincia(f, "cavallina", { ruolo: "salta", x0: f.cx, xp: altro.cx, x1, va,
+                              alto: Math.max(20 * S, Math.min((42 + 0.1 * lungo / S) * S, q.base - testataBasso - 96 * S)) });   // mai oltre il bordo in alto
+      comincia(altro, "sgabello", { ruolo: "regge" });
+      f.durata = altro.durata = Math.round(36 + lungo / (9 * S));
+      scrivi("OPLÀ!", mx, my, false);
+    } else if (tipo === "trottola") {
+      f.dir = lato; altro.dir = -lato;
+      comincia(f, "trottola", { x0: f.cx, x1: altro.cx, lato, salta: true });
+      comincia(altro, "trottola", { x0: altro.cx, x1: f.cx, lato: -lato, salta: false, fatto: true });
+      scrivi("CAMBIO!", mx, my, false);
+    } else if (tipo === "insieme") {
+      f.dir = lato; altro.dir = -lato;
+      comincia(f, "insieme", { lato });
+      comincia(altro, "insieme", { lato: -lato });
+      scrivi("ORA!", mx, my, false);
+    } else if (tipo === "bolide") {
+      const x1 = Math.max(q.l + 14 * S, Math.min(q.r - 14 * S, f.cx + lato * 215 * S));
+      if (Math.abs(x1 - f.cx) < 70 * S) return false;            // troppo poca strada per rotolare
+      f.dir = lato; altro.dir = lato;
+      comincia(f, "bolide", { ruolo: "rotola", x0: f.cx, x1, lato, presi: [], gira: 0 });
+      comincia(altro, "fionda", { ruolo: "lancia" });
+      scrivi("VAI!", mx, my, false);
+    } else return false;
+    q.coppiaAttesa = Math.round(caso(COPPIA.attesa[0], COPPIA.attesa[1]));
+    q.coppie[tipo] = (q.coppie[tipo] || 0) + 1; q.senzaCoppia = 0;
+    return true;
+  }
+  // Atterrando (o girando) in mezzo a loro: un colpo a tutti quelli entro il raggio.
+  function schianto(f, x, raggio, forza) {
+    const q = orda;
+    let presi = 0;
+    for (const z of q.zombie) {
+      if (!vivoZ(z) || Math.abs(z.x - x) > raggio) continue;
+      const via = z.x >= x ? 1 : -1;
+      colpisciZombie(z, forza, via, z.x, corpoZ(z)[1], f);
+      z.vx = via * 7.5 * S * (z.tipo === "grosso" ? 0.35 : 1); z.botta = Math.max(z.botta, z.tipo === "grosso" ? 50 : 30);
+      presi++;
+    }
+    polvere(x - 9 * S, q.base - 1, 5); polvere(x + 9 * S, q.base - 1, 5);
+    if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "onda", x, y: q.base - 8 * S, vx: 0, vy: 0, vita: 14, max: 14, colore: "#ffffff" });
+    scossa = Math.max(scossa, 7); fermoColpo = Math.max(fermoColpo, 3);
+    return presi;
+  }
+  // La spinta a due mani del colpo insieme: via tutti quelli dal proprio lato.
+  function spazzata(f, lato) {
+    const forte = anime && f.ki >= 20, raggio = (forte ? 140 : 86) * S, colore = anime ? COLORI_ANIME[f.tipo] : "#ffffff", y = f.p.collo.y;
+    if (forte) f.ki -= 20;
+    for (const z of orda.zombie) {
+      if (!vivoZ(z) || (z.x - f.cx) * lato < -8 * S || Math.abs(z.x - f.cx) > raggio) continue;
+      colpisciZombie(z, forte ? 4.6 : 3, lato, z.x, corpoZ(z)[1], f);
+      z.vx = lato * (forte ? 10 : 8) * S * (z.tipo === "grosso" ? 0.35 : 1); z.botta = Math.max(z.botta, 30);
+    }
+    for (let i = 0; i < 3 && particelle.length < MAX_PARTICELLE; i++) {
+      particelle.push({ tipo: "onda", x: f.cx + lato * (20 + 26 * i) * S, y, vx: lato * 3 * S, vy: 0, vita: 10 + 4 * i, max: 10 + 4 * i, colore });
+    }
+    scintille(f.p.manoA.x, f.p.manoA.y, 10, colore);
+    scossa = Math.max(scossa, 6);
+  }
+  const scambiaLati = (f, altro, lato) => { orda.lati[f.tipo] = lato; orda.lati[altro.tipo] = -lato; };
+  // Un fotogramma di mossa in coppia: dove sta, quanto è alto, e il momento del colpo.
+  function eseguiCoppia(f) {
+    const c = f.coppia, q = orda;
+    if (!q || !MOSSE_COPPIA[f.azione]) { f.coppia = null; return; }
+    const k = Math.min(1, f.t / f.durata), morbido = (u) => u * u * (3 - 2 * u);
+    f.fantasma = true;                                           // passa davanti agli elementi della pagina, come chi vola
+    if (c.tipo === "cavallina" && c.ruolo === "salta") {
+      const stacco = 0.24, atterra = 0.86, xs = c.xp - c.va * 21 * S;
+      if (k < stacco) { f.cx = c.x0 + (xs - c.x0) * morbido(k / stacco); c.h = 0; f.passo += 0.5; }
+      else if (k < atterra) { c.u = (k - stacco) / (atterra - stacco); f.cx = xs + (c.x1 - xs) * c.u; c.h = c.alto * Math.sin(Math.PI * c.u); }
+      else {
+        f.cx = c.x1; c.h = 0;
+        if (!c.fatto) { c.fatto = true; c.presi = schianto(f, c.x1, 56 * S, 4.6); scambiaLati(f, c.con, c.va); f.riparo = 34; }
+      }
+    } else if (c.tipo === "trottola") {
+      f.cx = c.x0 + (c.x1 - c.x0) * morbido(k);
+      c.h = c.salta ? 22 * S * Math.sin(Math.PI * k) : 0;
+      if (k >= 0.5 && !c.girato) { c.girato = true; f.dir = -c.lato; }
+      if (c.salta && k >= 0.5 && !c.fatto) {
+        c.fatto = true;
+        c.presi = schianto(f, (c.x0 + c.x1) / 2, 62 * S, 3);
+        scambiaLati(f, c.con, -c.lato);
+      }
+    } else if (c.tipo === "insieme") {
+      if (f.t >= 14 && !c.fatto) { c.fatto = true; spazzata(f, c.lato); }
+    } else if (c.tipo === "bolide" && c.ruolo === "rotola") {
+      const parte = 0.2, arriva = 0.8;
+      if (k < parte) f.cx = c.x0;
+      else if (k < arriva) {
+        const u = (k - parte) / (arriva - parte);
+        f.cx = c.x0 + (c.x1 - c.x0) * (1 - (1 - u) * (1 - u));   // parte forte e rallenta
+        c.gira += 0.42;
+        for (const z of q.zombie) {
+          if (!vivoZ(z) || Math.abs(z.x - f.cx) > 16 * S || c.presi.indexOf(z) >= 0) continue;
+          c.presi.push(z);
+          colpisciZombie(z, 3, c.lato, z.x, corpoZ(z)[1], f);
+          z.vx = c.lato * 5.5 * S * (z.tipo === "grosso" ? 0.35 : 1); z.botta = Math.max(z.botta, 44);
+        }
+        if (f.t % 3 === 0) polvere(f.cx - c.lato * 8 * S, q.base - 1, 1);
+      } else {
+        f.cx = c.x1;
+        if (!c.fatto) { c.fatto = true; f.riparo = 30; if (c.presi.length >= 3) scrivi("STRIKE!", f.cx, q.base - 62 * S, false); }
+      }
+    }
+  }
+  // Chi sta pensando guarda se è il momento di una mossa in due. Più tempo
+  // passa dall'ultima, meno ci vuole per farne un'altra (`voglia`): così se
+  // ne vede una ogni dieci secondi circa anche coi personaggi che gli zombie
+  // li fermano da lontano.
+  function pensaCoppia(f, altro, lato) {
+    if (!coppiaPossibile(f, altro) || Math.random() > 0.75) return false;
+    const voglia = Math.min(2, Math.floor((orda.senzaCoppia || 0) / 300));
+    const mieiVicini = contaZ(f.cx, lato, 66 * S), suoiVicini = contaZ(altro.cx, -lato, 66 * S);
+    const miei = contaZ(f.cx, lato, 125 * S), suoi = contaZ(altro.cx, -lato, 135 * S);
+    // Accerchiati: tutti e due insieme. (Chi ha l'energia per farlo arrivare lontano non aspetta che siano addosso.)
+    const largo = anime && f.ki >= 20 && altro.ki >= 20, daMe = largo ? contaZ(f.cx, lato, 135 * S) : mieiVicini, daLui = largo ? contaZ(altro.cx, -lato, 135 * S) : suoiVicini;
+    if (daMe >= 1 && daLui >= 1 && daMe + daLui >= 4 - voglia) return coppia("insieme", f, altro);
+    // L'alleato sta per andare giù (due morsi su tre, o molta meno vita) e io sono tranquillo: cambio di lato.
+    if (suoiVicini >= 1 && mieiVicini === 0 && ((altro.morsiZ || 0) % 3 === 2 || vitaVera(altro) < vitaVera(f) - 0.3)) return coppia("trottola", f, altro);
+    // Dal mio lato nessuno, dal suo tre o più (o un grosso): gli salto sopra e atterro in mezzo a loro.
+    const grossoDaLui = orda.zombie.some((z) => vivoZ(z) && z.tipo === "grosso" && (z.x - altro.cx) * -lato > 20 * S && Math.abs(z.x - altro.cx) < 180 * S);
+    if (miei === 0 && (suoi >= 3 - voglia || grossoDaLui)) return coppia("cavallina", f, altro, metaCavallina(f, altro));
+    // Una fila dal mio lato, ancora lontana, e l'alleato libero: mi faccio lanciare.
+    if (contaZ(f.cx, lato, 220 * S) >= 4 - voglia && mieiVicini <= 1 && suoiVicini === 0) return coppia("bolide", f, altro);
+    return false;
+  }
+
   // Dove tira chi spara o lancia: all'avversario, o durante la tregua allo zombie che ha scelto.
   function puntoMira(f, altro) {
     if (orda && orda.fase === "lotta") {
@@ -4533,7 +4826,7 @@
   function disegnaOrda() {
     const q = orda;
     if (!q) return;
-    for (const z of q.zombie) disegnaZombie(z);
+    for (const z of q.zombie) if (!z.inBuco) disegnaZombie(z);
     if (q.fase === "festa" || !q.ricetta) return;
     const n = q.ricetta.totale, abbattuti = q.fase === "pausa" ? n : q.uccisiOndata, passo = Math.min(10.5 * S, (W - 150 * S) / n), r = Math.min(3.6 * S, passo * 0.36);
     const y = verso < 0 ? pavimento - 54 * S : Math.max(22 * S, testataBasso + 22 * S) + (barreVita ? 36 * S : 0), x0 = W / 2 - (n - 1) * passo / 2 + 30 * S;
@@ -4589,7 +4882,14 @@
   const radiale = { aperto: false, apre: 0, chi: "robot", lato: "dx", sopra: -2, giu: null, lampo: null, detto: null, dito: false, posto: -1 };
   try { radiale.aperto = deposito.getItem("mut-ring-radiale") === "on"; if (deposito.getItem("mut-ring-radiale-lato") === "sx") radiale.lato = "sx"; } catch (errore) { /* resta chiuso */ }
   if (radiale.aperto) radiale.apre = 1;
-  const vociRadiale = () => VOCI_RADIALE[stile] || VOCI_RADIALE[""];
+  // Durante la tregua le mosse che si fanno sull'altro lasciano il posto a quelle che si fanno CON l'altro.
+  let vociTregua = null, vociTreguaDi = null;
+  const vociRadiale = () => {
+    const base = VOCI_RADIALE[stile] || VOCI_RADIALE[""];
+    if (!orda || orda.fase === "festa") return base;
+    if (vociTreguaDi !== base) { vociTreguaDi = base; vociTregua = base.filter((v) => !SULL_ALTRO[v[0]]).concat(VOCI_COPPIA); }
+    return vociTregua;
+  };
   const comandato = () => lottatori.find((l) => l.tipo === radiale.chi) || lottatori[0] || null;
   // Può fare questa mossa adesso? (per spegnere lo spicchio, e per rifiutare il comando)
   function puoFare(f, voce) {
@@ -4598,6 +4898,7 @@
     if (f.ko > 0 || f.preso || f.tenuto || f.gelato > 0 || f.accecato > 0 || f.scalata || f.inVolo) return false;
     const id = voce[0];
     if (voce[3] && f.ki < voce[3]) return false;
+    if (E_DI_COPPIA[id]) return coppiaPossibile(f, lottatori.find((l) => l !== f));
     if (orda && SULL_ALTRO[id]) return false;                                    // sull'alleato no
     if (id === "duello") return !duello && lamaPronta(f);
     if (id === "trasforma" && f.potenziato > 0 && f.forma >= 2) return false;
@@ -4615,6 +4916,7 @@
     const z = orda && orda.fase === "lotta" ? zombieVicino(f.cx, 1e9) : null, tx = z ? z.x : altro.p.bacino.x;
     f.dir = tx >= f.p.bacino.x ? 1 : -1; f.zMira = z; f.fuga = null; f.ordine = null; f.stordito = 0;
     if (id === "jet") { if (f.jet > 0) f.jet = Math.min(f.jet, 20); else decolla(f, false); return true; }
+    if (E_DI_COPPIA[id]) return coppia(id, f, altro, id === "cavallina" ? metaCavallina(f, altro) : undefined);
     if (id === "teletrasporto") return teletrasporta(f, altro);
     if (id === "duello") {
       // L'incrocio di lame si fa in due: per qualche secondo, appena sono vicini, le lame si incrociano.
@@ -6566,6 +6868,18 @@
   // Tutto quello che si disegna di un lottatore, nell'ordine giusto. Chi è
   // stato rimpicciolito viene disegnato in scala, coi piedi fermi dove sono.
   function disegnaLottatore(f) {
+    // Schiacciato dal colpo finale: piatto come una frittella, e poi torna su di scatto.
+    const piatto = f.schiacciato > 0;
+    if (piatto) {
+      let giu = -1e9;
+      for (const n in f.p) giu = Math.max(giu, f.p[n].y);
+      const q = f.schiacciato > 12 ? 0.22 : 0.22 + 0.78 * (1 - f.schiacciato / 12), px = f.p.bacino.x;
+      ctx.save(); ctx.translate(px, giu); ctx.scale(1 + (1 - q) * 0.5, q); ctx.translate(-px, -giu);
+    }
+    disegnaLottatoreIntero(f);
+    if (piatto) ctx.restore();
+  }
+  function disegnaLottatoreIntero(f) {
     const k = f.scala, stretto = k < 0.98;
     if (stretto) {
       const px = f.p.bacino.x, py = verso > 0 ? Math.max(f.p.piedeA.y, f.p.piedeD.y) : Math.min(f.p.piedeA.y, f.p.piedeD.y);
@@ -6635,17 +6949,547 @@
     ctx.restore();
   }
 
+  // --- IL COLPO FINALE (05/10/2026, su richiesta) ----------------------------
+  // Una volta ogni tre round, a caso, il round non finisce con un colpo
+  // qualunque ma con una mossa finale: quando all'avversario manca un colpo
+  // solo, chi sta per vincere lo chiude con una scena tutta sua. Il resto si
+  // ferma a guardare: intorno si fa buio, i colpi normali non contano, gli
+  // imprevisti aspettano.
+  //   in orbita     un montante lo spedisce oltre il bordo in alto; una stella, e ricade
+  //   flipper       un calcio, e rimbalza tre volte fra i bordi della finestra
+  //   schiacciata   gli salta sopra da molto in alto: resta piatto come una frittella
+  //   onda finale   (super guerrieri) un'onda a bruciapelo lo porta fino al bordo
+  //   statua        (maghi) lo gela, poi una saetta e il ghiaccio va in pezzi
+  //   taglio netto  (duellanti) uno scatto attraverso, un attimo fermi, poi cade
+  // Quale round tocca lo decide un sacchetto di tre (uno sì, due no) mescolato:
+  // se il round scelto finisce prima che la mossa si possa fare, vale per il
+  // round dopo. Niente colpo finale sul punto che chiude la partita a dieci
+  // (quello ha già la sua uscita di scena), né durante orda, scontro di
+  // energie, terremoto o buco nero. Vale un K.O. come gli altri.
+  const FATALE = { ogni: 3, buio: 0.44, dove: { orbita: 27, flipper: 30, schiacciata: 62, onda: 92, statua: 110, taglio: 74 } };
+  let fatale = null, fataleSacco = [], fataleRound = false, fataliFatti = 0, fataleBuio = 0, fataleDebito = 0, fataleVoluto = 0;
+  function prossimoRoundFatale() {
+    if (!fataleSacco.length) {
+      fataleSacco = [true];
+      for (let i = 1; i < FATALE.ogni; i++) fataleSacco.push(false);
+      for (let i = fataleSacco.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const v = fataleSacco[i]; fataleSacco[i] = fataleSacco[j]; fataleSacco[j] = v; }
+    }
+    const tocca = fataleSacco.pop();
+    // Il round buono non usato (K.O. da lontano, in volo…) resta buono; e se nel frattempo ne esce
+    // un altro dal sacchetto, quello resta «a credito»: così alla lunga è davvero uno su tre.
+    if (fataleRound) { if (tocca) fataleDebito = Math.min(2, fataleDebito + 1); return; }
+    if (tocca) fataleRound = true;
+    else if (fataleDebito > 0) { fataleDebito--; fataleRound = true; }
+  }
+  // A comando (il tasto del menu): parte appena i due sono in piedi e vicini; se entro sei secondi
+  // non capita, il round in corso diventa quello buono.
+  function vogliaFatale() {
+    if (!fataleVoluto || fatale) { fataleVoluto = 0; return; }
+    const ordine = fataleVoluto % 2 ? [lottatori[0], lottatori[1]] : [lottatori[1], lottatori[0]];
+    for (const [f, altro] of [ordine, [ordine[1], ordine[0]]]) {
+      if (f && altro && puoFinire(f, altro, true)) { fataleVoluto = 0; altro.danni = Math.max(altro.danni, altro.soglia - 1); avviaFatale(f, altro); return; }
+    }
+    if (--fataleVoluto <= 0) { fataleVoluto = 0; fataleRound = true; }
+  }
+  const inPiediPerFinale = (l) => !!(l.p && !l.ko && !l.esploso && !l.preso && !l.tenuto && !l.fuori && !l.fuoriCampo && !(l.jet > 0) && !l.inVolo && !l.scalata && !(l.gelato > 0));
+  function puoFinire(f, altro, comunque) {
+    return !!((fataleRound || comunque) && !fatale && !orda && !sfida && !buco && !sisma && !finale && verso > 0 &&
+              (comunque || altro.danni >= altro.soglia - 1) && punteggio[f.tipo] < TRAGUARDO - 1 &&
+              inPiediPerFinale(f) && inPiediPerFinale(altro) && gambe(f) === 2 && braccia(f) === 2 && !(f.accecato > 0) && !(f.stordito > 0) &&
+              Math.abs(f.base - altro.base) < 10 * S && Math.abs(altro.cx - f.cx) < 320 * S);
+  }
+  function avviaFatale(da, a, tipo) {
+    const scelte = [[2, "orbita"], [2, "flipper"], [2, "schiacciata"]];
+    if (stile === "guerrieri") scelte.push([4, "onda"]);
+    if (stile === "maghi") scelte.push([4, "statua"]);
+    if (lame() && lamaPronta(da)) scelte.push([4, "taglio"]);
+    if (!tipo || !FATALE.dove[tipo]) tipo = scegli(scelte);
+    fataleRound = false;
+    for (const l of [da, a]) {
+      if (l.tel) lasciaCadere(l);
+      if (l.tiene) molla(l);
+      l.azione = null; l.onda = null; l.sfera = null; l.scatto = 0; l.ordine = null; l.fuga = null; l.combo = 0; l.dopo = null; l.prendiTel = null;
+    }
+    da.dir = a.cx >= da.cx ? 1 : -1; a.dir = -da.dir;
+    fatale = { da, a, tipo, t: 0, fase: "annuncio", m: 0, dir: da.dir, contato: false, d: {} };
+    scrivi("COLPO FINALE!", (da.p.testa.x + a.p.testa.x) / 2, Math.min(da.p.testa.y, a.p.testa.y) - 44 * S, true);
+    fermoColpo = Math.max(fermoColpo, 6);
+  }
+  // Tutto il corpo spostato (o girato intorno al bacino) di peso: chi è in scena non lo muove la fisica.
+  function muoviTutto(f, dx, dy) { for (const n in f.p) { const q = f.p[n]; q.x += dx; q.y += dy; q.ox = q.x; q.oy = q.y; } f.cx += dx; }
+  function ruotaTutto(f, ang) {
+    const c = f.p.bacino, co = Math.cos(ang), si = Math.sin(ang);
+    for (const n in f.p) {
+      const q = f.p[n];
+      if (q === c) continue;
+      const x = q.x - c.x, y = q.y - c.y;
+      q.x = c.x + x * co - y * si; q.y = c.y + x * si + y * co; q.ox = q.x; q.oy = q.y;
+    }
+  }
+  // Il K.O. della mossa finale: uno solo, nel momento che decide la scena.
+  function contaFatale() {
+    const F = fatale;
+    if (F.contato) return;
+    F.contato = true; F.io = true;
+    segnaKO(F.da, F.a);
+    F.io = false;
+    fataliFatti++;
+  }
+  function lasciaAndare(f, vx, vy) {
+    f.fatVola = false; f.inVolo = true; f.fantasma = true;
+    for (const n in f.p) { f.p[n].ox = f.p[n].x - vx; f.p[n].oy = f.p[n].y - vy; }
+  }
+  function fineFatale(annullato) {
+    const F = fatale;
+    if (!F) return;
+    fatale = null;
+    F.da.alza = 0;
+    if (F.a.fatVola) lasciaAndare(F.a, 0, 0);
+    if (annullato && !F.contato) fataleRound = true;            // non si è fatta: resta buona per dopo
+    for (const l of [F.da, F.a]) if (!l.ko && !l.esploso) { l.azione = null; l.pensa = 12; }
+  }
+  function aggiornaFatale() {
+    fataleBuio += ((fatale ? FATALE.buio : 0) - fataleBuio) * 0.12;
+    if (fataleVoluto && !fatale) vogliaFatale();
+    const F = fatale;
+    if (!F) return;
+    const da = F.da, a = F.a, D = F.d, dir = F.dir;
+    F.t++;
+    // Qualcosa da fuori ha rotto la scena (il puntatore, un'esplosione prima del colpo): si lascia perdere.
+    if (da.preso || a.preso || da.esploso || a.esploso || da.fuoriCampo || a.fuoriCampo || orda || (!F.contato && (da.ko > 0 || a.ko > 0)) || F.t > 520) { fineFatale(true); return; }
+    if (a.fatVola) a.ko = Math.max(a.ko, 70);
+    if (F.fase === "annuncio") {
+      // Chi chiude va a mettersi alla distanza giusta; l'altro barcolla.
+      const meta = Math.max(24 * S, Math.min(W - 24 * S, a.cx - dir * FATALE.dove[F.tipo] * S)), manca = meta - da.cx;
+      if (Math.abs(manca) > 5 * S && F.t < 100) {
+        if (da.azione !== "avanza") { da.azione = "avanza"; da.t = 0; da.durata = 999; }
+        da.meta = meta; da.corsa = 4; da.voltato = Math.sign(manca) !== dir; if (da.voltato) da.dir = dir;
+      } else if (F.t >= 34) {
+        if (Math.abs(manca) > 5 * S) { zip(da.p.bacino.x, da.p.bacino.y, COLORI_ANIME[da.tipo]); muoviTutto(da, manca, 0); }
+        da.azione = null; da.dir = dir; da.voltato = false; F.fase = "mossa"; F.m = 0;
+      } else if (da.azione === "avanza") da.azione = null;
+      return;
+    }
+    if (F.fase === "fine") { if (++F.m > 34) fineFatale(false); return; }
+    const m = F.m++;
+    const colpo = (testo) => {
+      const c = a.p.collo;
+      contaFatale();
+      fermoColpo = Math.max(fermoColpo, 9); scossa = Math.max(scossa, 12);
+      scintille(c.x, c.y, 16, "#ffffff");
+      if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "lampo", x: c.x, y: c.y, vx: 0, vy: 0, vita: 8, max: 8, r: 150 * S });
+      if (testo) scrivi(testo, c.x, c.y - 26 * S, false);
+    };
+    if (F.tipo === "orbita") {
+      if (m === 0) inizia(da, "montante");
+      if (m === 11) { colpo("SBAM!"); a.fatVola = true; a.fantasma = true; D.vy = -24 * S; D.x = a.p.bacino.x; D.base = a.base; }
+      if (a.fatVola && !D.su) {
+        muoviTutto(a, 0, D.vy); ruotaTutto(a, 0.22 * dir); D.vy -= 0.6 * S;
+        if (particelle.length < MAX_PARTICELLE && m % 2 === 0) particelle.push({ tipo: "fumo", x: a.p.bacino.x, y: a.p.bacino.y, vx: 0, vy: 2 * S, vita: 18, max: 18, r: 5 * S, colore: "#ffffff" });
+        if (a.p.bacino.y < -120 * S) { D.su = true; D.attesa = 54; D.stella = 34; }
+      } else if (D.su && !D.giu) {
+        if (D.stella > 0) D.stella--;
+        if (--D.attesa <= 0) { D.giu = true; muoviTutto(a, D.x - a.p.bacino.x, -90 * S - a.p.bacino.y); }
+      } else if (D.giu && a.fatVola) {
+        muoviTutto(a, 0, 30 * S); ruotaTutto(a, -0.3 * dir);
+        // Ricade dov'era partito (il piano se lo ricorda la scena: da lassù il suo «sotto» sarebbe la testata).
+        if (a.p.bacino.y >= D.base - 16 * S) {
+          muoviTutto(a, 0, D.base - 14 * S - a.p.bacino.y);
+          a.base = D.base; D.atterrato = true;
+          lasciaAndare(a, 0, 0);
+          scossa = Math.max(scossa, 14); fermoColpo = Math.max(fermoColpo, 5);
+          polvere(a.p.bacino.x - 12 * S, D.base - 1, 6); polvere(a.p.bacino.x + 12 * S, D.base - 1, 6);
+          schegge(a.p.bacino.x, D.base - 4 * S, 8, "#b9b3a8");
+          scrivi("CRASH!", a.p.bacino.x, D.base - 46 * S, false);
+          F.fase = "fine"; F.m = 0;
+        }
+      }
+    } else if (F.tipo === "flipper") {
+      if (m === 0) inizia(da, "calcio");
+      if (m === 13) { colpo("BAM!"); a.fatVola = true; a.fantasma = true; D.vx = dir * 17 * S; D.vy = -3.2 * S; D.rimbalzi = 0; D.dopo = 0; }
+      if (a.fatVola) {
+        muoviTutto(a, D.vx, D.vy); ruotaTutto(a, 0.42 * Math.sign(D.vx));
+        D.vy += 0.16 * S;
+        // (i margini tengono dentro la finestra anche la testa, che gira intorno al bacino)
+        const b = a.p.bacino, alto = testataBasso + 50 * S, basso = a.base - 46 * S;
+        if (b.y > basso && D.vy > 0) D.vy = -Math.abs(D.vy) * 0.7;
+        if (b.y < alto && D.vy < 0) D.vy = Math.abs(D.vy) * 0.7;
+        if ((b.x > W - 42 * S && D.vx > 0) || (b.x < 42 * S && D.vx < 0)) {
+          D.vx = -D.vx * 0.93; D.rimbalzi++;
+          scossa = Math.max(scossa, 9); fermoColpo = Math.max(fermoColpo, 3);
+          scintille(b.x, b.y, 12, "#ffe27a"); scrivi("BONK!", Math.max(40, Math.min(W - 40, b.x)), b.y - 22 * S, false);
+        }
+        if (D.rimbalzi >= 3 && ++D.dopo > 16) { lasciaAndare(a, D.vx * 0.5, D.vy); F.fase = "fine"; F.m = 0; }
+      }
+    } else if (F.tipo === "schiacciata") {
+      const su = 16, fermo = 32, giu = 38, morbido = (u) => u * u * (3 - 2 * u);
+      // Quanto sale: molto, ma senza uscire dalla finestra se si combatte su un elemento in alto.
+      if (m === 0) { inizia(da, "salto"); da.durata = 60; D.x0 = da.cx; D.alto = Math.max(36 * S, Math.min(124 * S, a.base - testataBasso - 84 * S)); }
+      da.fantasma = true;
+      if (m <= su) { const u = morbido(m / su); da.alza = D.alto * u; muoviTutto(da, D.x0 + (a.cx - D.x0) * u - da.cx, 0); }
+      else if (m <= fermo) da.alza = D.alto + Math.sin((m - su) * 0.5) * 3 * S;
+      else if (m <= giu) da.alza = D.alto * (1 - (m - fermo) / (giu - fermo));
+      if (m === giu) {
+        da.alza = 0;
+        colpo("SPIAT!");
+        a.schiacciato = 150; a.fantasma = false;
+        polvere(a.cx - 16 * S, a.base - 1, 6); polvere(a.cx + 16 * S, a.base - 1, 6);
+        scossa = Math.max(scossa, 16);
+      }
+      if (m > giu && m <= giu + 12) muoviTutto(da, dir * 3.2 * S, 0);         // scende di lato
+      if (m === giu + 14) { da.azione = null; F.fase = "fine"; F.m = 0; }
+    } else if (F.tipo === "onda") {
+      const parte = 28, dura = 62;
+      if (m === 0) { inizia(da, "onda"); da.durata = 999; }
+      const mani = maniDi(da);
+      if (m < parte && m % 2 === 0) scintille(mani.x + caso(-10, 10) * S, mani.y + caso(-10, 10) * S, 2, COLORI_ANIME[da.tipo]);
+      if (m === parte) { colpo("ZAAAP!"); a.fatVola = true; a.fantasma = true; D.raggio = 1; }
+      if (m >= parte && m < parte + dura) {
+        D.x0 = mani.x; D.y = mani.y; D.raggio = Math.min(1, (m - parte) / 4) * Math.min(1, (parte + dura - m) / 10);
+        const b = a.p.bacino, bordo = dir > 0 ? W - 44 * S : 44 * S;
+        if ((bordo - b.x) * dir > 2 * S) { muoviTutto(a, dir * Math.min(15 * S, Math.abs(bordo - b.x)), Math.min(0, a.base - 44 * S - b.y) * 0.3); ruotaTutto(a, 0.1 * dir); }
+        else { if (!D.muro) { D.muro = true; scossa = Math.max(scossa, 12); scrivi("BONK!", Math.max(40, Math.min(W - 40, b.x)), b.y - 24 * S, false); } muoviTutto(a, caso(-1, 1) * S, caso(-1, 1) * S); }
+        scossa = Math.max(scossa, 3);
+        if (m % 2 === 0) scintille(a.p.collo.x, a.p.collo.y, 3, COLORI_ANIME[da.tipo]);
+      }
+      if (m === parte + dura) { D.raggio = 0; da.azione = null; lasciaAndare(a, -dir * 2 * S, 0); F.fase = "fine"; F.m = 0; }
+    } else if (F.tipo === "statua") {
+      if (m === 0) inizia(da, "gelo");
+      if (m === 14) { a.azione = null; congela(a, da, a.p.collo.x, a.p.collo.y); if (!(a.gelato > 0)) { fineFatale(true); return; } a.gelato = 400; }
+      if (m === 46) inizia(da, "fulmine");
+      if (m === 58) { D.saetta = 9; D.sx = a.p.collo.x; D.sy = a.p.collo.y; }
+      if (D.saetta > 0) D.saetta--;
+      if (m === 60) {
+        rompiGhiaccio(a, true);
+        colpo("");
+        schegge(a.p.collo.x, a.p.collo.y, 18, "#dff4ff");
+        for (const n in a.p) { a.p[n].ox = a.p[n].x + dir * -3 * S; a.p[n].oy = a.p[n].y + 3 * S; }
+        a.inVolo = true;
+      }
+      if (m === 78) { F.fase = "fine"; F.m = 0; }
+    } else if (F.tipo === "taglio") {
+      const parte = 8, arriva = 15, zac = 50;
+      if (m === 0) { inizia(da, "affondo"); da.durata = 999; D.x0 = da.cx; D.x1 = Math.max(24 * S, Math.min(W - 24 * S, a.cx + dir * 72 * S)); D.y = a.p.collo.y + 8 * S; }
+      da.fantasma = true;
+      if (m >= parte && m <= arriva) { const u = (m - parte) / (arriva - parte); muoviTutto(da, D.x0 + (D.x1 - D.x0) * u - da.cx, 0); D.scia = 1; }
+      if (m > arriva && D.scia > 0) D.scia = Math.max(0, D.scia - 0.06);
+      if (m === arriva + 1) { da.azione = null; scintille(a.p.collo.x, D.y, 6, "#ffffff"); }
+      if (m === zac) {
+        D.taglio = 10;
+        colpo("ZAC!");
+        for (const n in a.p) { a.p[n].ox = a.p[n].x + dir * 2 * S; a.p[n].oy = a.p[n].y + 2 * S; }
+      }
+      if (D.taglio > 0) D.taglio--;
+      if (m === zac + 20) { F.fase = "fine"; F.m = 0; }
+    }
+    // Chi è portato in giro dalla scena non finisce sotto il piano né oltre i bordi di lato
+    // (in alto sì: «in orbita» esce apposta dalla finestra, per un secondo).
+    if (a.fatVola || D.atterrato) {
+      D.atterrato = false;
+      const piano = Math.min(pavimento, D.base !== undefined ? D.base : a.base) - 1;
+      for (const n in a.p) {
+        const q = a.p[n];
+        if (q.y > piano) { q.y = piano; q.oy = piano; }
+        if (q.x < 2) { q.x = 2; q.ox = 2; } else if (q.x > W - 2) { q.x = W - 2; q.ox = W - 2; }
+      }
+    }
+  }
+  // Il buio intorno ai due, sotto i lottatori.
+  function disegnaBuioFatale() {
+    if (fataleBuio < 0.01) return;
+    const F = fatale;
+    const cx = F ? (F.da.p.bacino.x + F.a.p.bacino.x) / 2 : W / 2, cy = F ? Math.min(pavimento, Math.max(0, (F.da.p.bacino.y + F.a.p.bacino.y) / 2)) : pavimento - 60 * S;
+    const g = ctx.createRadialGradient(cx, cy, 70 * S, cx, cy, Math.max(W, H) * 0.75);
+    g.addColorStop(0, "rgba(10,8,22,0)"); g.addColorStop(0.5, "rgba(10,8,22," + (fataleBuio * 0.8).toFixed(3) + ")"); g.addColorStop(1, "rgba(10,8,22," + fataleBuio.toFixed(3) + ")");
+    ctx.save(); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore();
+  }
+  // Quello che la scena aggiunge sopra i lottatori: le stelline di chi barcolla, la stella in cielo, l'onda, la saetta, il taglio.
+  function disegnaFatale() {
+    const F = fatale;
+    if (!F) return;
+    const da = F.da, a = F.a, D = F.d, col = COLORI_ANIME[da.tipo];
+    ctx.save();
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    if (F.fase === "annuncio" || (F.fase === "mossa" && !F.contato && F.tipo !== "statua")) {
+      // Le stelline che girano sopra la testa di chi sta per prenderle.
+      const t = a.p.testa;
+      for (let i = 0; i < 3; i++) {
+        const ang = passi * 0.14 + i * 2.1, x = t.x + Math.cos(ang) * 11 * S, y = t.y - 15 * S + Math.sin(ang) * 3 * S;
+        ctx.fillStyle = "#ffd84a"; ctx.strokeStyle = "#141414"; ctx.lineWidth = 0.8 * S;
+        ctx.beginPath();
+        for (let k = 0; k < 8; k++) { const r = (k % 2 ? 1.4 : 3.4) * S, aa = k * Math.PI / 4; if (k) ctx.lineTo(x + Math.cos(aa) * r, y + Math.sin(aa) * r); else ctx.moveTo(x + r, y); }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+    }
+    if (F.tipo === "orbita" && D.stella > 0) {
+      // Dove è sparito, una stella che brilla e si spegne.
+      const x = Math.max(20, Math.min(W - 20, D.x)), y = Math.max(16, testataBasso + 16 * S), k = Math.sin(Math.PI * (1 - D.stella / 34)), r = Math.max(0.5, 15 * S * k);
+      ctx.globalAlpha = Math.min(1, k * 1.5); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2.4 * S;
+      ctx.beginPath(); ctx.moveTo(x - r, y); ctx.lineTo(x + r, y); ctx.moveTo(x, y - r); ctx.lineTo(x, y + r); ctx.stroke();
+      ctx.lineWidth = 1.2 * S; ctx.beginPath(); ctx.moveTo(x - r * 0.5, y - r * 0.5); ctx.lineTo(x + r * 0.5, y + r * 0.5); ctx.moveTo(x - r * 0.5, y + r * 0.5); ctx.lineTo(x + r * 0.5, y - r * 0.5); ctx.stroke();
+      ctx.fillStyle = "#ffe27a"; ctx.beginPath(); ctx.arc(x, y, Math.max(0.5, r * 0.22), 0, Math.PI * 2); ctx.fill();
+    }
+    if (F.tipo === "onda" && D.raggio > 0) {
+      // L'onda finale: dalle mani fino a lui, larga, col cuore bianco.
+      const x1 = a.p.collo.x, y = D.y, spesso = (20 + Math.sin(passi * 0.9) * 3) * S * D.raggio;
+      for (const [colore, k, alfa] of [[col, 1.5, 0.35], [col, 1, 0.9], ["#ffffff", 0.45, 1]]) {
+        ctx.globalAlpha = alfa * D.raggio; ctx.strokeStyle = colore; ctx.lineWidth = Math.max(0.5, spesso * k);
+        ctx.beginPath(); ctx.moveTo(D.x0, y); ctx.lineTo(x1, a.p.collo.y); ctx.stroke();
+      }
+      ctx.globalAlpha = 0.8 * D.raggio; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(x1, a.p.collo.y, Math.max(0.5, spesso * 0.95), 0, Math.PI * 2); ctx.fill();
+    }
+    if (F.tipo === "statua" && D.saetta > 0) {
+      // La saetta che manda in pezzi la statua.
+      ctx.globalAlpha = Math.min(1, D.saetta / 5); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3.2 * S; ctx.shadowColor = "#9fd8ff"; ctx.shadowBlur = 12 * S;
+      ctx.beginPath(); ctx.moveTo(D.sx + 14 * S, 0);
+      const passiGiu = 7;
+      for (let i = 1; i <= passiGiu; i++) ctx.lineTo(D.sx + (i === passiGiu ? 0 : Math.sin(i * 2.3 + passi) * 16 * S), D.sy * i / passiGiu);
+      ctx.stroke(); ctx.shadowBlur = 0;
+    }
+    if (F.tipo === "taglio") {
+      if (D.scia > 0) {
+        // La scia dello scatto, da dov'era a dov'è.
+        ctx.globalAlpha = D.scia; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3 * S;
+        ctx.beginPath(); ctx.moveTo(D.x0, D.y); ctx.lineTo(da.cx, D.y); ctx.stroke();
+        ctx.globalAlpha = D.scia * 0.5; ctx.strokeStyle = col; ctx.lineWidth = 8 * S; ctx.stroke();
+      }
+      if (D.taglio > 0) {
+        // Il taglio arriva dopo: una riga bianca di traverso, e cade.
+        const c = a.p.collo, k = D.taglio / 10;
+        ctx.globalAlpha = k; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = (2 + 5 * k) * S;
+        ctx.beginPath(); ctx.moveTo(c.x - 26 * S, c.y + 20 * S); ctx.lineTo(c.x + 26 * S, c.y - 12 * S); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  // --- IL BUCO NERO (05/10/2026, su richiesta) -------------------------------
+  // Si apre in un punto a caso, a mezz'aria, e per una decina di secondi tira
+  // dentro tutto quello che gli passa vicino: i lottatori, gli oggetti, gli
+  // zombie, i colpi d'energia. Chi ci finisce dentro sparisce e ne esce
+  // DALL'ALTRA PARTE DELLO SCHERMO, a specchio (chi entra a destra esce a
+  // sinistra), un po' intontito. Poi il buco si richiude.
+  //  - La presa cresce man mano che ci si avvicina e dentro il raggio della
+  //    bocca risucchia; chi è a terra o tenuto non viene tirato.
+  //  - Quello che gli finisce addosso resta fermo un attimo, girando (è la
+  //    «spirale»), e poi riesce dall'altra parte: niente teletrasporti
+  //    istantanei che non si capiscono.
+  //  - Durante l'orda vale anche per gli zombie: entrano da una parte e
+  //    rispuntano dall'altra, che li rimette in gioco invece di toglierli.
+  //  - È gratis? No: sta col meteo, come i meteoriti e l'orda.
+  const BUCO = { apre: 36, dura: 540, chiude: 46, raggio: 150, bocca: 26, presa: 0.9, giro: 14, uscita: 34, vortice: 18, cattura: 0.55 };
+  let buco = null;
+  function avviaBuco(x, y) {
+    if (buco) { buco.t = Math.min(buco.t, BUCO.apre); return; }
+    const sopra = Math.max(testataBasso + 70 * S, pavimento - 300 * S);
+    // Senza un punto preciso si apre dove c'è qualcosa da risucchiare: vicino a uno dei due
+    // (o in mezzo, se sono vicini), all'altezza del busto o poco sopra.
+    if (x === undefined || y === undefined) {
+      const vivi = lottatori.filter((f) => f.p && !f.esploso && !f.fuori && !f.fuoriCampo);
+      if (vivi.length) {
+        const f = vivi[Math.floor(Math.random() * vivi.length)], g = vivi.find((l) => l !== f);
+        const cx = g && Math.abs(g.cx - f.cx) < 200 * S ? (f.cx + g.cx) / 2 : f.cx;
+        if (x === undefined) x = cx + caso(-80, 80) * S;
+        // (i due possono stare su un elemento della pagina, in alto: il buco si apre lì, non verso il fondo)
+        if (y === undefined) y = Math.max(testataBasso + 46 * S, Math.min(pavimento - 60 * S, f.p.bacino.y - caso(10, 70) * S));
+      } else {
+        if (x === undefined) x = caso(0.22, 0.78) * W;
+        if (y === undefined) y = caso(sopra, pavimento - 90 * S);
+      }
+    }
+    buco = { x, y, t: 0, fase: "apre", r: 0, giro: 0, dentro: [], passati: 0, seme: Math.random() * 6.28 };
+    bucoVisti++;
+    buco.x = Math.max(90 * S, Math.min(W - 90 * S, buco.x));
+    scossa = Math.max(scossa, 6);
+  }
+  function fineBuco() {
+    if (!buco) return;
+    // Quello che era ancora dentro esce subito, dove si sarebbe aperto.
+    for (const d of buco.dentro.slice()) sputaBuco(d, true);
+    buco = null;
+  }
+  const raggioBuco = () => (buco.fase === "apre" ? buco.t / BUCO.apre : buco.fase === "chiude" ? Math.max(0, 1 - buco.t / BUCO.chiude) : 1) * BUCO.bocca * S;
+  // Dall'altra parte dello schermo, a specchio. Col buco in mezzo allo schermo
+  // l'uscita cadrebbe dentro la sua presa, e si rientrerebbe subito: in quel
+  // caso si esce al bordo più lontano.
+  function doveEsce(x, y) {
+    let u = W - x;
+    if (Math.abs(u - x) < BUCO.raggio * 1.25 * S) u = x < W / 2 ? W - 40 * S : 40 * S;
+    return { x: Math.max(26 * S, Math.min(W - 26 * S, u)), y: Math.max(testataBasso + 30 * S, Math.min(pavimento - 40 * S, y)) };
+  }
+  function inghiotti(cosa, tipo) {
+    buco.dentro.push({ cosa, tipo, t: 0, uscita: doveEsce(buco.x, buco.y) });
+    buco.passati++;
+    scintille(buco.x, buco.y, 8, "#c9a6ff");
+    if (tipo === "lottatore") {
+      const f = cosa;
+      f.fuoriCampo = true; f.azione = null; f.coppia = null; f.onda = null; f.sfera = null; f.scatto = 0; f.jet = 0; f.paracadute = 0; f.fuga = null;
+      f.ordine = null; f.scalata = null; f.supporto = null;
+      if (f.tel) lasciaCadere(f);
+      if (f.arma) lasciaArma(f);
+      if (f.tiene) molla(f);
+      // Da qui resta fermo dov'è, fuori dal gioco: il vortice che se lo porta dentro è solo disegnato (vedi `disegna`).
+      for (const n in f.p) { f.p[n].ox = f.p[n].x; f.p[n].oy = f.p[n].y; }
+      f.vortice = BUCO.vortice;
+      scrivi("SLURP!", buco.x, buco.y - (BUCO.bocca + 14) * S, false);
+    } else if (tipo === "zombie") cosa.inBuco = true;
+    else if (tipo === "oggetto") { cosa.inBuco = true; cosa.stato = "volo"; cosa.da = null; cosa.x = cosa.ox = buco.x; cosa.y = cosa.oy = buco.y; }
+  }
+  function sputaBuco(d, subito) {
+    const i = buco.dentro.indexOf(d);
+    if (i >= 0) buco.dentro.splice(i, 1);
+    const u = d.uscita;
+    if (d.tipo === "lottatore") {
+      const f = d.cosa;
+      f.fuoriCampo = false; f.vortice = 0;
+      let dx = u.x - f.p.bacino.x, dy = u.y - f.p.bacino.y;
+      // Tutto intero dentro la finestra, comunque fosse girato quando è entrato.
+      let x0 = 1e9, x1 = -1e9, y1 = -1e9;
+      for (const n in f.p) { const q = f.p[n]; x0 = Math.min(x0, q.x + dx); x1 = Math.max(x1, q.x + dx); y1 = Math.max(y1, q.y + dy); }
+      if (y1 > pavimento - 2) dy -= y1 - (pavimento - 2);
+      if (x0 < 4) dx += 4 - x0; else if (x1 > W - 4) dx -= x1 - (W - 4);
+      for (const n in f.p) { const q = f.p[n]; q.x += dx; q.y += dy; q.ox = q.x - caso(-1, 1) * S; q.oy = q.y - caso(1, 2) * S; }
+      u.x = f.p.bacino.x; u.y = f.p.bacino.y;
+      f.cx = u.x; f.base = pavimento; f.supporto = null; f.inVolo = true; f.fantasma = true;
+      f.ko = Math.max(f.ko, subito ? 20 : 34); f.stordito = Math.max(f.stordito, 20); f.pensa = 10; f.riBuco = 70;
+      scrivi("PTUI!", u.x, u.y - 24 * S, false);
+    } else if (d.tipo === "zombie") {
+      const z = d.cosa;
+      z.inBuco = false;
+      if (orda) {
+        z.x = Math.max(orda.l + 8 * S, Math.min(orda.r - 8 * S, u.x));
+        z.lato = z.x < orda.cx ? -1 : 1; z.dir = -z.lato; z.vx = 0; z.botta = 20; z.stato = "esce"; z.s = 0;
+        polvere(z.x, orda.base - 1, 4);
+      }
+    } else {
+      const t = d.cosa;
+      t.inBuco = false;
+      t.x = u.x; t.y = u.y; t.ox = t.x + caso(-1, 1) * S; t.oy = t.y - caso(1, 3) * S; t.stato = "volo"; t.da = null; t.cool = 70;
+    }
+    zip(u.x, u.y, "#c9a6ff");
+    scintille(u.x, u.y, 10, "#c9a6ff");
+  }
+  function aggiornaBuco() {
+    if (!buco) return;
+    const b = buco;
+    b.t++; b.giro += 0.2;
+    if (b.fase === "apre" && b.t >= BUCO.apre) { b.fase = "aperto"; b.t = 0; }
+    else if (b.fase === "aperto" && b.t >= BUCO.dura) { b.fase = "chiude"; b.t = 0; }
+    else if (b.fase === "chiude" && b.t >= BUCO.chiude) { fineBuco(); return; }
+    b.r = raggioBuco();
+    // Chi è dentro gira per un attimo e poi esce dall'altra parte.
+    for (const d of b.dentro.slice()) {
+      if (++d.t >= BUCO.uscita) { sputaBuco(d, false); continue; }
+      if (d.tipo === "lottatore" && d.cosa.vortice > 0) d.cosa.vortice--;
+    }
+    if (b.fase === "chiude") return;
+    const forte = b.fase === "aperto" ? 1 : b.t / BUCO.apre, R = BUCO.raggio * S;
+    // I lottatori: tirati verso la bocca, e dentro il raggio vengono inghiottiti.
+    for (const f of lottatori) {
+      if (!f.p || f.esploso || f.preso || f.tenuto || f.fuoriCampo || f.fuori) continue;
+      if (f.riBuco > 0) continue;                               // appena sputato fuori: un attimo di tregua
+      if (fatale && (f === fatale.da || f === fatale.a)) continue;   // nel colpo finale conta solo la scena
+      const q = f.p.bacino, dx = b.x - q.x, dy = b.y - q.y, d = Math.hypot(dx, dy) || 1;
+      if (d > R) continue;
+      // Chi arriva a metà del raggio è preso: da lì il vortice se lo porta dentro, anche da terra.
+      if (d < Math.max(b.r + 10 * S, R * BUCO.cattura * forte)) { inghiotti(f, "lottatore"); continue; }
+      if (f.ko > 0 && !f.inVolo) continue;                      // chi è a terra non lo tira
+      const tira = BUCO.presa * forte * (1 - d / R) * S;
+      for (const n in f.p) { f.p[n].x += dx / d * tira; f.p[n].y += dy / d * tira; }
+      f.cx += dx / d * tira;
+      if (passi % 10 === 0) scintille(q.x, q.y, 1, "#c9a6ff");
+    }
+    // Gli oggetti: quelli liberi o in volo.
+    for (const t of telefoni) {
+      if (t.inBuco || t.stato === "portato" || t.stato === "impugnato" || t.stato === "preso") continue;
+      const dx = b.x - t.x, dy = b.y - t.y, d = Math.hypot(dx, dy) || 1;
+      if (d > R) continue;
+      if (d < b.r + 8 * S) { inghiotti(t, "oggetto"); continue; }
+      const tira = BUCO.presa * 1.5 * forte * (1 - d / R) * S;
+      if (t.cool > 0) continue;                                 // appena uscito: non lo riprende subito
+      t.stato = "volo"; t.x += dx / d * tira; t.y += dy / d * tira; t.ox = t.x - dx / d * tira * 0.4; t.oy = t.y - dy / d * tira * 0.4;
+    }
+    // Gli zombie, durante l'orda: entrano da una parte e rispuntano dall'altra.
+    if (orda) {
+      for (const z of orda.zombie) {
+        if (z.inBuco || !vivoZ(z)) continue;
+        const c = corpoZ(z), dx = b.x - z.x, dy = b.y - c[1], d = Math.hypot(dx, dy) || 1;
+        if (d > R) continue;
+        if (d < Math.max(b.r + 12 * S, R * BUCO.cattura * forte)) { inghiotti(z, "zombie"); polvere(z.x, orda.base - 20 * S, 4); continue; }
+        z.x += dx / d * BUCO.presa * 1.2 * forte * (1 - d / R) * S;
+      }
+    }
+    // I colpi d'energia: ci finiscono dentro e spariscono.
+    for (const q of proiettili) {
+      if (q.vita <= 0) continue;
+      if (Math.hypot(b.x - q.x, b.y - q.y) < b.r + 6 * S) { q.vita = 0; scintille(q.x, q.y, 6, "#c9a6ff"); }
+    }
+    // Polvere che gira intorno.
+    if (passi % 2 === 0 && particelle.length < MAX_PARTICELLE - 30) {
+      const a = caso(0, Math.PI * 2), r = caso(R * 0.45, R);
+      particelle.push({ tipo: "mote", x: b.x + Math.cos(a) * r, y: b.y + Math.sin(a) * r, vx: 0, vy: 0, vita: 40, max: 40,
+                        verso: { sfera: b }, colore: Math.random() < 0.4 ? "#c9a6ff" : "#ffffff" });
+    }
+  }
+  function disegnaBuco() {
+    if (!buco) return;
+    const b = buco, R = BUCO.raggio * S, k = b.r / (BUCO.bocca * S);
+    ctx.save();
+    // L'alone che risucchia: un cerchio che si stringe, con dentro la luce stirata.
+    const g = ctx.createRadialGradient(b.x, b.y, b.r * 0.6, b.x, b.y, R);
+    g.addColorStop(0, "rgba(90,40,160,.55)"); g.addColorStop(0.45, "rgba(60,25,110,.22)"); g.addColorStop(1, "rgba(40,16,80,0)");
+    ctx.globalAlpha = k; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, Math.PI * 2); ctx.fill();
+    // Le spirali.
+    ctx.strokeStyle = "#c9a6ff"; ctx.lineCap = "round";
+    for (let i = 0; i < 3; i++) {
+      const a0 = b.seme + b.giro + i * Math.PI * 2 / 3;
+      ctx.globalAlpha = 0.5 * k; ctx.lineWidth = 2 * S;
+      ctx.beginPath();
+      for (let u = 0; u <= 1.001; u += 0.08) {
+        const rr = b.r + (R * 0.78 - b.r) * u, aa = a0 - u * 3.4;
+        const px = b.x + Math.cos(aa) * rr, py = b.y + Math.sin(aa) * rr * 0.92;
+        if (u === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    // La bocca: nera, con l'orlo di luce.
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#07060c"; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#e3d2ff"; ctx.lineWidth = 2.4 * S * k; ctx.stroke();
+    ctx.globalAlpha = 0.5 * k; ctx.strokeStyle = "#c9a6ff"; ctx.lineWidth = 6 * S * k;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 4 * S, 0, Math.PI * 2); ctx.stroke();
+    // Chi è dentro: un puntino che gira e si stringe verso il centro.
+    ctx.globalAlpha = 1;
+    for (const d of b.dentro) {
+      const u = d.t / BUCO.uscita, rr = b.r * (1 - u) * 0.8, aa = b.giro * 3 + d.t * 0.3;
+      const col = d.tipo === "lottatore" ? COLORI_ANIME[d.cosa.tipo] : d.tipo === "zombie" ? "#9dbf8c" : "#dcd6cc";
+      tondo(b.x + Math.cos(aa) * rr, b.y + Math.sin(aa) * rr, Math.max(0.6, 3.4 * S * (1 - u)), col);
+    }
+    // E dall'altra parte, dove si viene sputati fuori, un lampo che avvisa.
+    if (b.dentro.length) {
+      const u = doveEsce(b.x, b.y), pulsa = 0.4 + 0.3 * Math.sin(passi * 0.4);
+      ctx.globalAlpha = pulsa; ctx.strokeStyle = "#c9a6ff"; ctx.lineWidth = 2 * S;
+      ctx.beginPath(); ctx.arc(u.x, u.y, (14 + 6 * Math.sin(passi * 0.3)) * S, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   // --- Eventi a sorpresa -----------------------------------------------
   // Gli eventi NON si annunciano con scritte sulla pagina (01/10/2026, su
   // richiesta: toglievano pulizia al sito): si vedono da quello che succede.
 
-  const EVENTI_DA = { meteoriti: 100 * 60 };
+  const EVENTI_DA = { meteoriti: 100 * 60, buco: 70 * 60 };
+  let bucoVisti = 0;
   function avviaEvento() {
     const meteo = libero("meteo");
     // I meteoriti non arrivano prima di cento secondi di lotta. L'orda non
     // sta in questo elenco: ha il suo orologio (vedi `aggiornaEventi`).
-    const quale = scegli([[3, "luna"], [3, "furia"], [3, "pioggia"], [2, "rallenta"], [2.5, "terremoto"], [3, "jet"], [uragano || !meteo ? 0 : 1, "uragano"],
-                          [meteo && tempo >= EVENTI_DA.meteoriti ? 2.5 : 0, "meteoriti"], [meteo && !acquazzone ? 2 : 0, "temporale"]]);
+    // Il buco nero, la prima volta, non si tira a sorte: dopo settanta secondi è il primo imprevisto
+    // che capita (un imprevisto nuovo che non si vede mai non serve a niente). Poi va nel mucchio.
+    const quale = meteo && !buco && !bucoVisti && tempo >= EVENTI_DA.buco ? "buco" :
+                  scegli([[3, "luna"], [3, "furia"], [3, "pioggia"], [2, "rallenta"], [2.5, "terremoto"], [3, "jet"], [uragano || !meteo ? 0 : 1, "uragano"],
+                          [meteo && tempo >= EVENTI_DA.meteoriti ? 2.5 : 0, "meteoriti"], [meteo && !acquazzone ? 2 : 0, "temporale"],
+                          [meteo && !buco && tempo >= EVENTI_DA.buco ? 3 : 0, "buco"]]);
     if (quale === "uragano") { uragano = { x: Math.random() < 0.5 ? 100 * S : W - 100 * S, vx: 1.1 * S, t: 0 }; evento = { nome: quale, durata: 600 }; return; }
     if (quale === "luna") { moltG = 0.45; evento = { nome: quale, durata: 620 };  }
     else if (quale === "pioggia") { daSpawnare = 7;  }
@@ -6653,6 +7497,7 @@
     else if (quale === "jet") { for (const f of lottatori) if (!f.ko && !f.preso) decolla(f, true); }
     else if (quale === "terremoto") { avviaSisma(); evento = { nome: quale, durata: SISMA.fine }; }
     else if (quale === "meteoriti") { avviaMeteore(); evento = { nome: quale, durata: 520 }; }
+    else if (quale === "buco") { avviaBuco(); evento = { nome: quale, durata: BUCO.apre + BUCO.dura + BUCO.chiude + 10 }; }
     else if (quale === "zombie") { avviaOrda(ORDA.sorpresa); evento = { nome: quale, durata: 60 * 240 }; }
     else if (quale === "temporale") { pioggiaFino = tempo + 1100; evento = { nome: quale, durata: 1100 }; }
     else {
@@ -6663,12 +7508,14 @@
 
   function fineEvento() {
     if (evento && evento.nome === "uragano" && !uraganoFisso) uragano = null;
+    if (evento && evento.nome === "buco") fineBuco();
     moltG = gravitaScelta; ritmo = rallentaFisso ? 0.45 : 1; evento = null;
   }
   let uraganoFisso = false, rallentaFisso = false;
 
   function aggiornaEventi() {
     if (fermo) return;
+    if (fatale) { prossimoEvento = Math.max(prossimoEvento, 90); prossimaOrda = Math.max(prossimaOrda, 90); }      // durante il colpo finale gli imprevisti aspettano
     if (--prossimoEvento <= 0) { if (sorprese && !evento) avviaEvento(); prossimoEvento = Math.round(caso(1500, 2700)); }
     // L'orda di zombie, col suo orologio. Se in quel momento c'è altro in corso, aspetta che finisca.
     if (--prossimaOrda <= 0) {
@@ -6880,11 +7727,13 @@
 
     for (const [f, altro] of [[a, b], [b, a]]) {
       f.rivale = altro;
-      if (f.esploso) continue;
+      if (f.esploso || f.fuoriCampo) continue;
       if (f.tel && (f.ko > 0 || f.stordito || f.preso || f.dolore || f.tenuto)) lasciaCadere(f);
       if (f.arma && (f.ko > 0 || f.preso || f.tenuto)) lasciaArma(f);
       if (f.tiene && (f.ko > 0 || f.preso || f.tenuto)) molla(f);
       if (f.polv > 0) f.polv--;
+      if (f.riBuco > 0) f.riBuco--;
+      if (f.schiacciato > 0 && --f.schiacciato === 12) { scrivi("POP!", f.p.bacino.x, f.p.bacino.y - 30 * S, false); for (const n in f.p) f.p[n].oy = f.p[n].y + 3 * S; }
       if (f.scendeApposta > 0) f.scendeApposta--;
       // Chi era sollevato a distanza cade se chi lo teneva smette (o viene colpito).
       if (f.tenuto && f.tenuto.tele !== undefined && ((f.tenuto.da.azione !== "telecinesi" && f.tenuto.da.azione !== "levita") || f.preso)) { f.tenuto = null; f.ko = Math.max(f.ko, 40); f.inVolo = true; }
@@ -6920,7 +7769,10 @@
       if (!(f.jet > 0)) { f.volo = false; f.scatto = 0; }
       if (anime) aggiornaInseguimento(f, altro);
       if (f.caos > 0) f.forza = Math.min(f.forza, 0.35);
-      if (!f.scalata) {
+      // Nel colpo finale il piano resta quello della scena: chi salta altissimo per la schiacciata
+      // non deve «posarsi» su un elemento della pagina che si trova a passare lì sotto.
+      const inScena = fatale && fatale.fase !== "fine" && (f === fatale.da || f === fatale.a);
+      if (!f.scalata && !inScena) {
         const [y, chi] = appoggio(f);
         f.base = y; f.supporto = chi;
       }
@@ -7001,7 +7853,7 @@
       }
     }
     // Non passarsi attraverso, se sono allo stesso livello.
-    if (!a.ko && !b.ko && !a.preso && !b.preso && !a.tenuto && !b.tenuto && Math.abs(a.base - b.base) < 10 * S) {
+    if (!a.ko && !b.ko && !a.preso && !b.preso && !a.tenuto && !b.tenuto && !a.coppia && !b.coppia && !fatale && Math.abs(a.base - b.base) < 10 * S) {
       const d = b.cx - a.cx, minimo = 26 * S;
       if (Math.abs(d) < minimo) {
         const s = d >= 0 ? 1 : -1, sposta = (minimo - Math.abs(d)) / 2;
@@ -7011,13 +7863,15 @@
 
     for (const f of lottatori) {
       if (f.esploso) { aggiornaEsplosione(f); continue; }
+      if (f.fuoriCampo) continue;                                // dentro il buco nero: fermo finché non riesce
+      if (f.fatVola) continue;                                   // portato in giro dal colpo finale
       if (f.fuori) { volaFuori(f); continue; }
       // Il punto tenuto fermo: dal puntatore o dalle mani dell'avversario.
       const fisso = f.preso || (f.tenuto ? "collo" : null);
       // Muscoli.
       if (f.forza > 0) {
         const piede = verso > 0 ? Math.max(f.p.piedeA.y, f.p.piedeD.y) : Math.min(f.p.piedeA.y, f.p.piedeD.y);
-        const inAria = !f.scalata && (f.base - piede) * verso > 30 * S;
+        const inAria = !f.scalata && !f.coppia && !f.alza && (f.base - piede) * verso > 30 * S;
         let q;
         if (f.scalata) q = posaScalata(f);
         else if (f.cratere && !f.cratere.attesa && f.ko > 0) q = posaCratere(f);
@@ -7027,7 +7881,7 @@
           const vera = f.base; f.base = f.p.bacino.y + verso * (striscia(f) ? 6 : 30) * S; q = posa(f); f.base = vera;
         } else q = posa(f);
         const scatto = f.azione && COLPI[f.azione] ? 0.55 : 0.3;
-        const intensita = f.scalata || (f.cratere && !f.cratere.attesa && f.ko > 0) ? 1.3 : (inAria ? 0.35 : 1);
+        const intensita = f.scalata || (f.cratere && !f.cratere.attesa && f.ko > 0) ? 1.3 : f.coppia || f.alza ? 1.7 : (inAria ? 0.35 : 1);
         for (const nome in q) {
           const pt = f.p[nome], [tx, ty] = q[nome];
           const k = TIRO[nome] * f.forza * intensita *
@@ -7131,7 +7985,7 @@
     colpoDaMano(a, b); colpoDaMano(b, a);
     aggiornaLame(); aggiornaFulmini();
     aggiornaTelefoni(); aggiornaCreature(); aggiornaNubi(); aggiornaFinale(); aggiornaProiettili(); aggiornaParticelle(); aggiornaEventi(); aggiornaDanni();
-    aggiornaArti(); aggiornaMeteo(); aggiornaSisma(); aggiornaMeteore(); aggiornaOrda(); aggiornaOnde(); aggiornaVite();
+    aggiornaArti(); aggiornaMeteo(); aggiornaSisma(); aggiornaMeteore(); aggiornaBuco(); aggiornaFatale(); aggiornaOrda(); aggiornaOnde(); aggiornaVite();
     if (anime) controllaScontro();
     for (const sc of scie) sc.vita--;
     if (scie.length && scie[0].vita <= 0) scie = scie.filter((sc) => sc.vita > 0);
@@ -8149,8 +9003,9 @@
     }
     if (uragano) disegnaUragano();
     disegnaFinale(false);
+    disegnaBuioFatale();
     disegnaVulcano(); disegnaColate(); disegnaMirini();
-    for (const t of telefoni) if (t.stato !== "impugnato") disegnaTelefono(t);
+    for (const t of telefoni) if (t.stato !== "impugnato" && !t.inBuco) disegnaTelefono(t);
     for (const pz of pezzi) disegnaPezzo(pz);
     for (const f of lottatori) disegnaCratere(f.cratere);
     disegnaScie();
@@ -8158,13 +9013,21 @@
     const ordine = lottatori.slice().sort((x, y) => (y.ko ? 1 : 0) - (x.ko ? 1 : 0));
     for (const f of ordine) {
       if (f.esploso) continue;
-      disegnaLottatore(f);
+      if (!f.fuoriCampo) disegnaLottatore(f);
+      else if (f.vortice > 0 && buco) {
+        // Nel vortice: si vede ancora, girando intorno alla bocca e sempre più piccolo, finché ci sparisce dentro.
+        // (È solo disegno: i suoi punti restano fermi dov'era quando è stato preso.)
+        const u = 1 - f.vortice / BUCO.vortice, k = Math.pow(1 - u, 1.3);
+        ctx.save(); ctx.translate(buco.x, buco.y); ctx.rotate(u * 5.4); ctx.scale(k, k); ctx.translate(-buco.x, -buco.y);
+        disegnaLottatore(f);
+        ctx.restore();
+      }
     }
     for (const c of creature) disegnaCreatura(c);
     for (const t of telefoni) if (t.stato === "impugnato") disegnaTelefono(t);
     for (const a of arti) disegnaArto(a);
     for (const b of proiettili) disegnaProiettile(b);
-    disegnaLapilli(); disegnaMeteore();
+    disegnaLapilli(); disegnaMeteore(); disegnaBuco(); disegnaFatale();
     for (const z of fulmini) disegnaFulmine(z);
     // Le stelline di chi è stordito o al tappeto.
     for (const f of lottatori) {
@@ -8383,6 +9246,13 @@
       if (gruppo && !concesso(gruppo)) return false;
       assicuraAcceso();
       if (nome === "terremoto") avviaSisma();
+      else if (nome === "buco") { if (buco) fineBuco(); else avviaBuco(); }
+      else if (nome === "fatale") {
+        // A comando: uno dei due, a caso, chiude l'altro appena sono in piedi tutti e due, vicini, sullo stesso piano.
+        if (fatale) return;                                       // ce n'è già uno in scena
+        fataleVoluto = 360 + (Math.random() < 0.5 ? 1 : 0);
+        vogliaFatale();
+      }
       else if (nome === "meteoriti") avviaMeteore();
       else if (nome === "zombie") { if (orda) { if (orda.fase !== "festa") fineOrda(false); } else avviaOrda(0); }
       else if (nome === "jet") { for (const f of lottatori) if (!f.ko && !f.preso && !f.tenuto && !f.esploso) decolla(f, Math.random() < 0.4); }
@@ -8634,6 +9504,14 @@
     sposta: (tipo, x) => { const f = lottatori.find((l) => l.tipo === tipo); if (!f || !f.p) return; const dx = x - f.cx; for (const n in f.p) { f.p[n].x += dx; f.p[n].ox = f.p[n].x; } f.cx = x; f.azione = null; f.ordine = null; },
     // Il controller radiale: aperto o chiuso, e un comando dato a mano.
     radiale: (apri) => { apriRadiale(apri); }, ordina: (tipo, id) => { const f = lottatori.find((l) => l.tipo === tipo); return !!(f && ordina(f, id)); },
+    // Solo per i test: il colpo finale a comando (chi lo dà e quale), e il round buono.
+    fatale: (chi, tipo) => { const f = lottatori.find((l) => l.tipo === chi), a = lottatori.find((l) => l.tipo !== chi); if (!f || !a || !puoFinire(f, a, true)) return false; a.danni = Math.max(a.danni, a.soglia - 1); avviaFatale(f, a, tipo); return true; },
+    roundFatale: (si) => { fataleRound = !!si; },
+    // Solo per i test: il buco nero dove si vuole.
+    buco: (x, y) => { avviaBuco(x, y); },
+    // Solo per i test: una mossa in coppia a comando (la comincia `chi`), e l'attesa fra una e l'altra.
+    coppia: (tipo, chi, dove) => { const f = lottatori.find((l) => l.tipo === chi), a = lottatori.find((l) => l.tipo !== chi); return !!(f && a && coppia(tipo, f, a, dove)); },
+    coppiaAttesa: (n) => { if (orda) orda.coppiaAttesa = n; },
     // Solo per i test: la ricetta di un'ondata da un seme, e un'orda col seme scelto.
     ricettaOndata: (n, seme) => { const rng = generatore(seme); let r = null; for (let i = 1; i <= n; i++) r = ricettaOndata(i, rng); return { tema: r.tema, arrivo: r.arrivo, insieme: r.insieme, coda: r.coda.map((v) => v.tipo + (v.lato < 0 ? "<" : ">") + v.attesa) }; },
     orda: (ondate, seme) => { avviaOrda(ondate, seme); },
@@ -8690,12 +9568,16 @@
     danniBordi: danniBordi.map((d) => d.lato), verso, barreVita, anime, stile, fulmini: fulmini.length, duello,
     tempo, pezzi: pezzi.length, proiettili: proiettili.length,
     sfereGrandi: proiettili.filter((b) => b.grande).length, dischi: proiettili.filter((b) => b.disco).length, gettoni, scommessa: scommessa ? Object.assign({}, scommessa) : null,
+    fatale: fatale ? { tipo: fatale.tipo, fase: fatale.fase, t: fatale.t, da: fatale.da.tipo, a: fatale.a.tipo, contato: fatale.contato } : null,
+    fataleRound, fataliFatti, fataleBuio, fataleVoluto, fataleDebito,
+    buco: buco ? { x: buco.x, y: buco.y, r: buco.r, fase: buco.fase, dentro: buco.dentro.map((d) => d.tipo), passati: buco.passati, uscita: doveEsce(buco.x, buco.y) } : null,
     arti: arti.length, macchie: macchie.length, acquazzone, natale, uragano: !!uragano, cruento, ritmo,
     pioggia: gocce.length, pioggiaInFondo: gocce.reduce((n, g) => n + (g.y > pavimento * 0.7 ? 1 : 0), 0), piovendo, bagnato, sisma: sisma ? { t: sisma.t, x: sisma.x, alto: sisma.alto, forza: sisma.k } : null,
     lapilli: lapilli.length, colate: colate.length, meteore: meteore.map((m) => ({ x: m.x, y: m.y, bx: m.bx, by: m.by, grossa: m.grossa })),
     sciame: sciame ? sciame.resta : 0, bruciature: bruciature.length, trema: radiceTrema(),
     orda: orda ? { fase: orda.fase, t: orda.t, base: orda.base, cx: orda.cx, nati: orda.nati, uccisi: orda.uccisi, lati: Object.assign({}, orda.lati),
                    ondata: orda.ondata, ondate: orda.ondate, superate: orda.superate, seme: orda.seme, vite: orda.vite, traslochi: orda.traslochi || 0, l: orda.l, r: orda.r,
+                   coppie: Object.assign({}, orda.coppie), coppiaAttesa: orda.coppiaAttesa, latiDi: Object.assign({}, orda.lati),
                    ricetta: orda.ricetta ? { tema: orda.ricetta.tema, arrivo: orda.ricetta.arrivo, totale: orda.ricetta.totale, insieme: orda.ricetta.insieme, restano: orda.ricetta.coda.length } : null,
                    zombie: orda.zombie.map((z) => ({ x: z.x, stato: z.stato, hp: z.hp, lato: z.lato, tipo: z.tipo })) } : null, primatoOrda,
     radiale: (() => { const g = lottatori.length ? geometriaRadiale() : { x: 0, y: 0, centro: 0, spicchi: [], largo: 0 };
@@ -8718,6 +9600,7 @@
     forma: f.potenziato > 0 ? f.forma : 0, gelato: f.gelato > 0, piccolo: f.piccolo > 0, scala: f.scala,
     lama: lamaPronta(f), lamaLanciata: !!(f.lama && f.lama.lanciata), soglia: f.soglia,
     morsi: f.morsi ? f.morsi.length : 0, tagliata: !!f.taglio, volo: !!(f.volo && f.jet > 0),
+    coppia: f.coppia ? f.coppia.tipo : null, alto: f.coppia ? f.coppia.h : 0, fuoriCampo: !!f.fuoriCampo, inScena: !!(fatale && (f === fatale.da || f === fatale.a)), fatVola: !!f.fatVola, schiacciato: f.schiacciato || 0, alza: f.alza || 0,
     gambe: gambe(f), braccia: braccia(f), striscia: striscia(f), piano: f.piano, cx: f.cx, trema: f.trema > 0, risposta: !!f.risposta, ordine: f.ordine ? f.ordine.azione : null,
     accecato: f.accecato > 0, cratere: !!(f.cratere && !f.cratere.attesa), sfera: !!f.sfera,
     sollevato: !!(f.tenuto && f.tenuto.tele !== undefined),

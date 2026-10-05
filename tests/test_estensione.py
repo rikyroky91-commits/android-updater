@@ -176,6 +176,24 @@ class TestEstensione(unittest.TestCase):
         self.assertIn('mio.querySelector("[data-radiale]")', ring)
         self.assertIn('data-radiale', (RADICE / "web" / "templates" / "home.html").read_text(encoding="utf-8"))
 
+    def test_buco_nero_e_colpo_finale_hanno_il_loro_tasto_e_stanno_nella_guida(self):
+        """05/10/2026: buco nero (Premium, col meteo) e colpo finale (gratis) arrivano anche nel plug-in."""
+        import re
+        for nome, cartella in VARIANTI.items():
+            with self.subTest(variante=nome):
+                prepara = (cartella / "prepara.js").read_text(encoding="utf-8")
+                for tasto in ("buco", "fatale", "zombie"):
+                    self.assertIn(f'data-colpo=\\"{tasto}\\"', prepara)
+                guida = (cartella / "benvenuto.html").read_text(encoding="utf-8")
+                self.assertIn('data-msg="guidaS9"', guida)
+                for lingua in LINGUE:
+                    messaggi = json.loads((cartella / "_locales" / lingua / "messages.json").read_text(encoding="utf-8"))
+                    self.assertTrue(messaggi["guidaS9"]["message"])
+        ring = (RADICE / "web" / "static" / "ring.js").read_text(encoding="utf-8")
+        premio = re.search(r"const EVENTI_PREMIO = \{([^}]*)\}", ring).group(1)
+        self.assertIn("buco", premio)                                  # il buco nero sta col meteo a pagamento
+        self.assertNotIn("fatale", premio)                             # il colpo finale è di tutti
+
     def test_niente_telefoni_nell_estensione_ma_fumogeni_e_barattoli(self):
         """02/10/2026: nel plug-in non piovono telefoni. Via i tasti che li mettono in campo;
         restano le armi (Premium) e arrivano fumogeni e barattoli. Sul sito i telefoni restano."""
