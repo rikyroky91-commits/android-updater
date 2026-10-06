@@ -6815,28 +6815,32 @@
   const scuro = (colore) => mix(colore, "#000000", 0.22);
 
   const NERO = "#17171c";
-  // I capelli del trasformato che scendono fino alla schiena: ciocche lunghe e appuntite,
-  // una sopra l'altra, che ondeggiano piano.
-  function ciocca(x0, y0, x1, y1, w) {
-    const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1, nx = -dy / L * w, ny = dx / L * w;
+  // I capelli del trasformato: ciocche che scendono dietro la testa e si aprono
+  // verso l'esterno, con la punta che va in fuori. Arrivano a metà schiena, non oltre.
+  function ciocca(x0, y0, x1, y1, w, curva) {
+    const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1;
+    const nx = -dy / L, ny = dx / L;                              // normale alla ciocca
+    const mx = x0 + dx * 0.55 + nx * curva, my = y0 + dy * 0.55 + ny * curva;
     ctx.beginPath();
-    ctx.moveTo(x0 + nx, y0 + ny);
-    ctx.quadraticCurveTo(x0 + dx * 0.6 + nx * 0.9, y0 + dy * 0.6 + ny * 0.9, x1, y1);
-    ctx.quadraticCurveTo(x0 + dx * 0.6 - nx * 0.9, y0 + dy * 0.6 - ny * 0.9, x0 - nx, y0 - ny);
+    ctx.moveTo(x0 + nx * w, y0 + ny * w);
+    ctx.quadraticCurveTo(mx + nx * w * 0.8, my + ny * w * 0.8, x1, y1);
+    ctx.quadraticCurveTo(mx - nx * w * 0.8, my - ny * w * 0.8, x0 - nx * w, y0 - ny * w);
     ctx.closePath(); ctx.fill(); ctx.stroke();
   }
   function chiomaSuper(f, col, scura) {
     const p = f.p, d = f.dir, t = p.testa, b = p.bacino;
     const giu = Math.hypot(b.x - t.x, b.y - t.y) || 1;
-    const on = Math.sin(passi * 0.06) * 3 * S;
+    const on = Math.sin(passi * 0.06) * 2.4 * S;
+    const chiaro = mix(col, "#ffffff", 0.3);
     ctx.save(); ctx.lineJoin = "round"; ctx.strokeStyle = NERO; ctx.lineWidth = 1.2 * S;
-    // Cinque ciocche: le più lunghe dietro e scure, le corte davanti e chiare.
-    const ciocche = [[-13, 1.42, 11, 0], [-6, 1.58, 10, 0], [-17, 1.16, 8.5, 1], [-1, 1.26, 8, 1], [-10, 0.9, 7, 2], [-20, 0.8, 6, 2]];
-    for (const [off, lungo, largo, tono] of ciocche) {
-      ctx.fillStyle = tono === 0 ? scura : tono === 1 ? col : mix(col, "#ffffff", 0.3);
-      const x0 = t.x - d * 4 * S, y0 = t.y - 3 * S;
-      const x1 = t.x + d * off * S + on * lungo, y1 = t.y + giu * lungo + 6 * S;
-      ciocca(x0, y0, x1, y1, largo * S);
+    // [x della punta (in unità, negativo = dietro), y della punta (in frazioni di schiena), larghezza, curva, tono]
+    const ciocche = [[-30, 0.10, 6.5, 7, 1], [-27, 0.42, 7.5, 9, 0], [-20, 0.78, 8, 10, 0],
+                     [-12, 0.98, 7.5, 7, 1], [-24, 0.62, 6, 6, 2], [-6, 0.72, 6, 4, 2]];
+    for (const [fuori, lungo, largo, curva, tono] of ciocche) {
+      ctx.fillStyle = tono === 0 ? scura : tono === 1 ? col : chiaro;
+      ciocca(t.x - d * 3 * S, t.y - 4 * S,
+             t.x + d * fuori * S + on, t.y + giu * lungo,
+             largo * S, -d * curva * S);
     }
     ctx.restore();
   }
