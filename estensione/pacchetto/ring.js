@@ -6815,6 +6815,31 @@
   const scuro = (colore) => mix(colore, "#000000", 0.22);
 
   const NERO = "#17171c";
+  // I capelli del trasformato che scendono fino alla schiena: ciocche lunghe e appuntite,
+  // una sopra l'altra, che ondeggiano piano.
+  function ciocca(x0, y0, x1, y1, w) {
+    const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1, nx = -dy / L * w, ny = dx / L * w;
+    ctx.beginPath();
+    ctx.moveTo(x0 + nx, y0 + ny);
+    ctx.quadraticCurveTo(x0 + dx * 0.6 + nx * 0.9, y0 + dy * 0.6 + ny * 0.9, x1, y1);
+    ctx.quadraticCurveTo(x0 + dx * 0.6 - nx * 0.9, y0 + dy * 0.6 - ny * 0.9, x0 - nx, y0 - ny);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  function chiomaSuper(f, col, scura) {
+    const p = f.p, d = f.dir, t = p.testa, b = p.bacino;
+    const giu = Math.hypot(b.x - t.x, b.y - t.y) || 1;
+    const on = Math.sin(passi * 0.06) * 3 * S;
+    ctx.save(); ctx.lineJoin = "round"; ctx.strokeStyle = NERO; ctx.lineWidth = 1.2 * S;
+    // Cinque ciocche: le più lunghe dietro e scure, le corte davanti e chiare.
+    const ciocche = [[-13, 1.42, 11, 0], [-6, 1.58, 10, 0], [-17, 1.16, 8.5, 1], [-1, 1.26, 8, 1], [-10, 0.9, 7, 2], [-20, 0.8, 6, 2]];
+    for (const [off, lungo, largo, tono] of ciocche) {
+      ctx.fillStyle = tono === 0 ? scura : tono === 1 ? col : mix(col, "#ffffff", 0.3);
+      const x0 = t.x - d * 4 * S, y0 = t.y - 3 * S;
+      const x1 = t.x + d * off * S + on * lungo, y1 = t.y + giu * lungo + 6 * S;
+      ciocca(x0, y0, x1, y1, largo * S);
+    }
+    ctx.restore();
+  }
   // La cresta del trasformato: ciuffi grossi, ritti e piegati all'indietro, nel colore della forma.
   function crestaSuper(f, col, d) {
     ctx.fillStyle = col; ctx.strokeStyle = NERO; ctx.lineWidth = 1.2 * S; ctx.lineJoin = "round";
@@ -6963,6 +6988,7 @@
     if (!anime) zaino(f, 9.5 * S);                 // i duellanti il jetpack ce l'hanno ancora
     if (A.veste) mantello(f, p, scuro(A.tuta));
     if (cavaliere) mantello(f, p, "#1a1b22");
+    if (sup) chiomaSuper(f, crine, scuro(crine));
     // Gamba e braccio lontani.
     if (!st.gD) arto(p.bacino, ginD, p.piedeD, (sup ? 6.6 : 5) * S, scuro(A.gambe));
     if (!st.D) {
