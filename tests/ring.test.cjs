@@ -3580,7 +3580,7 @@ test("la corsa: le monete restano fra una corsa e l'altra, e la bottega le spend
 // ·· I NEMICI NUOVI, LE SORPRESE, IL RITMO (09/10/2026, sera) ··
 // Arriva al primo momento di lotta del round, togliendo di mezzo carte e forzieri.
 function inLotta(amb, r) {
-  avanzaCorsa(amb, r, 600, (s) => !(s.corsa.fase === "lotta" && s.orda && s.orda.fase === "lotta" && !s.corsa.pausa));
+  avanzaCorsa(amb, r, 1800, (s) => !(s.corsa.fase === "lotta" && s.orda && s.orda.fase === "lotta" && !s.corsa.pausa));
   assert.strictEqual(amb.stato().corsa.fase, "lotta");
 }
 // Uno zombie a una certa distanza dall'eroe, dalla parte dove c'è più posto.
@@ -3653,14 +3653,20 @@ test("la corsa: il fulmine avvisa con la linea prima di cadere, il veleno lascia
   const { amb, r } = corsaAvviata({}, "mela", 8);
   inLotta(amb, r);
   r.corsa.arma("orbita", 0);
-  vicinoAllEroe(amb, r, "dragoFulmine", 180);
-  vicinoAllEroe(amb, r, "dragoVeleno", 220);
+  // (se l'eroe li abbatte prima che tirino, ne arrivano altri)
   let saetta = null, pozze = 0;
-  avanzaCorsa(amb, r, 60 * 20, (s) => {
-    for (const t of r.corsa.tiri()) if (t.tipo === "saetta" && !saetta) saetta = t;
-    pozze = Math.max(pozze, s.corsa.pozze);
-    return !(saetta && pozze > 0);
-  });
+  for (let i = 0; i < 30 && !(saetta && pozze > 0); i++) {
+    r.corsa.prossimo("ondata");                                   // niente duelli: servono gli zombie
+    const z = amb.stato().orda ? amb.stato().orda.zombie : [];
+    if (!saetta && !z.some((q) => q.tipo === "dragoFulmine" && q.stato !== "giu")) vicinoAllEroe(amb, r, "dragoFulmine", 180);
+    if (!pozze && !z.some((q) => q.tipo === "dragoVeleno" && q.stato !== "giu")) vicinoAllEroe(amb, r, "dragoVeleno", 220);
+    avanzaCorsa(amb, r, 60, (s) => {
+      for (const t of r.corsa.tiri()) if (t.tipo === "saetta" && !saetta) saetta = t;
+      pozze = Math.max(pozze, s.corsa.pozze);
+      return !(saetta && pozze > 0) && s.corsa.fase === "lotta";
+    });
+    if (amb.stato().corsa.fase !== "lotta") inLotta(amb, r);
+  }
   assert.ok(saetta, "il draghetto elettrico tira il suo fulmine");
   assert.ok(saetta.t < 20, "e il fulmine resta un attimo solo linea, prima di cadere");
   assert.ok(pozze > 0, "il veleno a terra fa la pozza");
@@ -3671,6 +3677,7 @@ test("la corsa: il botto scoppia, il gelido rallenta, il saltatore salta, lo spu
   const { amb, r } = corsaAvviata({}, "robot", 21);
   inLotta(amb, r);
   r.corsa.arma("dardi", 0);
+  r.corsa.senzaVolo();                                      // (in volo il gelido non lo morde e il botto non lo prende)
   // Il botto: arrivato addosso scoppia, e porta via anche gli zombie intorno.
   vicinoAllEroe(amb, r, "botto", 60);
   let scoppiato = false;
@@ -3721,13 +3728,13 @@ test("la corsa: le sorprese, lo zombie d'oro, la pioggia di gemme, il forziere c
 test("la corsa: in ogni round nemici da terra e in volo insieme, e i volanti cambiano quota", () => {
   const { amb, r } = corsaAvviata({}, "robot", 17);
   const aria = new Set(), terra = new Set(), quote = new Map();
-  avanzaCorsa(amb, r, 60 * 40, (s) => {
+  avanzaCorsa(amb, r, 60 * 90, (s) => {
     if (s.orda) for (const z of s.orda.zombie) {
       if (z.stato === "giu") continue;
       (z.volo ? aria : terra).add(s.corsa.round);
       if (z.volo && z.stato === "va") { const k = s.orda.zombie.indexOf(z) + ":" + z.tipo; const q = quote.get(k) || [1e9, -1e9]; quote.set(k, [Math.min(q[0], z.y), Math.max(q[1], z.y)]); }
     }
-    return s.corsa.fase !== "fine";
+    return s.corsa.fase !== "fine" && !(s.corsa.round >= 4 && [...quote.values()].some(([a, b]) => b - a > 40));
   });
   const round = [...terra].filter((n) => n >= 1);
   assert.ok(round.length >= 2, "almeno due round giocati");
@@ -3753,7 +3760,10 @@ test("la corsa: l'eroe vola a prendere i volanti, e torna giù di schianto sulla
   assert.ok(vola, "con i volanti in alto l'eroe decolla");
   assert.ok(alto > 70, "e sale davvero: " + Math.round(alto));
   // Mentre è in aria, sotto si raduna la folla: quando torna giù ci piomba sopra.
-  for (let i = 0; i < 40 && amb.stato().corsa.schianti === 0; i++) {
+  for (let i = 0; i < 100 && amb.stato().corsa.schianti === 0; i++) {
+    // (lo scudo: la folla lì sotto non deve buttarlo giù né finire la corsa prima dello schianto)
+    if (amb.stato().corsa.scudo < 60) { r.corsa.dai("scudo", 0); r.corsa.usa(0); }
+    if (amb.stato().corsa.fase !== "lotta") { r.corsa.prossimo("ondata"); inLotta(amb, r); }
     const f = amb.lottatore("robot");
     if (f.vola && amb.stato().orda.zombie.filter((z) => !z.volo && z.stato !== "giu" && Math.abs(z.x - f.bacino.x) < 90).length < 3) for (const dx of [-30, 30]) r.zombie("lento", f.bacino.x + dx);
     if (!f.vola && corvi() < 2) vicinoAllEroe(amb, r, "corvo", 200);

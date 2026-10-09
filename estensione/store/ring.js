@@ -13235,6 +13235,7 @@
       monete: (n) => { if (corsa) corsa.monete = n; }, energia: (n) => { if (corsa) corsa.energia = n; }, dai: (id, i) => { if (corsa) corsa.slot[i || 0] = id; },
       tocca: (x, y) => { const t = tastoCorsa(x, y); if (t) t.fa(); return !!t; }, tasti: () => tastiUI.map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.h })),
       sorpresa: (nome) => sorpresa(nome), minuti: (m) => { if (corsa && corsa.chi) corsa.tLotta = Math.round(m * 3600); },
+      senzaVolo: () => { if (corsa) corsa.cdVolo = 1e9; },
       tiri: () => (corsa && corsa.tiri ? corsa.tiri.map((t) => ({ tipo: t.tipo, x: t.x, y: t.y, t: t.t })) : []),
     },
     // Solo per i test: apri la mira, spostala a un'altezza, spara.
