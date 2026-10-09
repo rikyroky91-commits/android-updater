@@ -3184,3 +3184,72 @@ test("colpo finale: la sfera finale è molto più grande della sfera normale e s
   if (normale) assert.ok(grande > normale * 2.5, "la sfera finale (" + Math.round(grande) + ") non è molto più grande di quella normale (" + Math.round(normale) + ")");
   assert.ok(crepe >= 4, "la sfera finale non spacca la striscia in più punti: " + crepe);
 });
+
+test("la mira: la linea parte dal personaggio e ruota su e giù in diagonale", () => {
+  const amb = ambiente({});
+  const r = amb.finestra.__ring;
+  r.comandi.sorprese(false);
+  amb.avanza(90);
+  assert.ok(r.mira("robot"), "la mira deve aprirsi");
+  const s0 = amb.stato();
+  assert.ok(s0.mira, "lo stato deve dire che si sta mirando");
+  assert.ok(s0.ritmo < 1, "mentre si mira il tempo rallenta");
+  const angoli = [], fuori = [];
+  amb.avanza(120, (s) => {
+    if (!s.mira) return;
+    angoli.push(s.mira.a);
+    const rb = s.lottatori.find((f) => f.tipo === "robot");
+    if (Math.hypot(s.mira.ox - rb.bacino.x, s.mira.oy - rb.bacino.y) > 80) fuori.push("origine lontana dal robot");
+    if (s.mira.fx < -1 || s.mira.fx > s.larghezza + 1 || s.mira.fy < s.testataBasso - 1 || s.mira.fy > s.pavimento + 1) fuori.push("fine fuori finestra");
+  });
+  assert.ok(angoli.length > 20, "la linea deve restare in scena un po'");
+  assert.ok(Math.min(...angoli) < -0.5 && Math.max(...angoli) > 0.3, "la linea deve puntare sia in alto sia in basso");
+  assert.deepStrictEqual(fuori, [], "la linea parte dalle mani e finisce dentro la finestra");
+  dentro(amb);
+});
+
+test("la mira: verso l'avversario prende, in cielo manca, e poi il tempo torna normale", () => {
+  const amb = ambiente({});
+  const r = amb.finestra.__ring;
+  r.comandi.sorprese(false);
+  amb.avanza(90);
+  r.mira("robot");
+  const mela = amb.stato().lottatori.find((f) => f.tipo === "mela");
+  r.miraA(mela.bacino.x, mela.bacino.y);
+  const preso = r.spara();
+  assert.strictEqual(preso.presi, 1, "puntata sull'avversario la linea lo prende");
+  assert.ok(amb.stato().lampoMira && amb.stato().lampoMira.preso, "e resta il lampo del colpo andato a segno");
+  amb.avanza(90);
+  assert.strictEqual(amb.stato().mira, null, "sparato il colpo la mira si chiude");
+  assert.strictEqual(amb.stato().ritmo, 1, "e il tempo torna normale");
+  r.mira("robot");
+  const s = amb.stato(), m2 = s.lottatori.find((f) => f.tipo === "mela");
+  r.miraA(m2.bacino.x, s.testataBasso);                            // dritta in alto: passa sopra la testa
+  const st = amb.stato();
+  if (Math.abs(st.mira.ox - m2.bacino.x) > 160) assert.strictEqual(r.spara().presi, 0, "in cielo non prende nessuno");
+  else r.spara();
+  amb.avanza(200);
+  dentro(amb);
+});
+
+test("la mira: chi non spara, spara da solo; gli zombie si falciano lungo la linea", () => {
+  const amb = ambiente({});
+  const r = amb.finestra.__ring;
+  r.comandi.sorprese(false);
+  amb.avanza(60);
+  r.comandi.colpo("zombie");
+  amb.avanza(400);
+  const prima = amb.stato().orda.uccisi;
+  r.mira("robot");
+  const s = amb.stato(), z = s.orda.zombie.find((q) => q.stato !== "morto") || s.orda.zombie[0];
+  r.miraA(z.x, s.pavimento - 30);
+  const esito = r.spara();
+  assert.ok(esito.zombie > 0, "la linea deve falciare gli zombie che attraversa");
+  amb.avanza(150);
+  assert.ok(amb.stato().orda.uccisi > prima, "e quei morti devono contare");
+  r.mira("robot");
+  amb.avanza(400);
+  assert.strictEqual(amb.stato().mira, null, "la mira non resta aperta per sempre");
+  assert.strictEqual(amb.stato().ritmo, 1, "e il tempo torna normale anche così");
+  dentro(amb);
+});
