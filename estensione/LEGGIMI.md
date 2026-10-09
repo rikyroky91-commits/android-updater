@@ -134,11 +134,11 @@ Tutte e due stanno nel gruppo **armi** (Premium) e piovono col resto delle armi.
 
 ### La corsa infinita (09/10/2026, gratis)
 
-Dal pannello, «Corsa infinita» trasforma il ring in un gioco a round: si sceglie un personaggio e si lotta da soli, un round dopo l'altro (ondata di zombie, duello contro l'altro personaggio, sopravvivenza a tempo, ondata con un capo), con tre vite che non si ricaricano, un premio fra tre carte dopo ogni round e un negozio con tre posti per gli oggetti, pagati con monete che valgono solo per quella corsa. Il colpo finale si carica lottando e parte con la mira: dalle mani parte una linea che ruota su e giù, e il secondo tocco spara lungo la linea. Finite le vite si resta in piedi, feriti e lenti, col colpo finale carico: se va a segno il round è vinto e una vita torna.
+Dal pannello, «Corsa infinita» trasforma il ring in un gioco che cresce senza sosta: si sceglie un personaggio e si lotta da soli, un round dopo l'altro senza menu in mezzo (ondata, duello, sopravvivenza a tempo, ondata col capo), ognuno più grande del precedente. I nemici lasciano gemme; a ogni livello il gioco si ferma un attimo e offre tre carte: armi che colpiscono da sole (telefoni in orbita, onda d'urto, fulmine, aura di fuoco, dardi, lama rotante) con cinque livelli e un'evoluzione, o potenziamenti. I capi e l'avversario del duello lasciano forzieri. A terra cadono monete e oggetti per i tre posti. Le monete restano nel browser fra una corsa e l'altra e comprano potenziamenti permanenti nella bottega. Tre vite che non tornano; finite quelle, un'ultima possibilità col colpo finale da mirare.
 
-Nell'estensione la corsa è gratis, come il colpo finale, ma i personaggi a pagamento restano a pagamento: nella scelta le tre famiglie hanno il lucchetto finché Premium è chiuso. Gli imprevisti della corsa (meteoriti, buco nero, terremoto…) capitano anche senza Premium, perché non si scelgono: fanno parte del round.
+Nell'estensione la corsa è gratis, come il colpo finale, ma i personaggi a pagamento restano a pagamento: nella scelta le tre famiglie hanno il lucchetto finché Premium è chiuso. Gli imprevisti della corsa capitano anche senza Premium, perché non si scelgono: fanno parte del round.
 
-La classifica globale sta solo sul sito: l'estensione non manda niente a nessuno, tiene il record nel browser e il tasto «Classifica» lì non c'è.
+La classifica globale sta solo sul sito: l'estensione non manda niente a nessuno, tiene record e monete nel browser e il tasto «Classifica» lì non c'è.
 
 ### L'audio (09/10/2026, gratis)
 

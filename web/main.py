@@ -2217,8 +2217,9 @@ async def api_corsa_punteggio(request: Request):
     personaggio, stile = str(dati.get("personaggio") or ""), str(dati.get("stile") or "")
     if personaggio not in _CORSA_PERSONAGGI or stile not in _CORSA_STILI:
         return errore("Non è andata", 400)
-    # Fuori misura: un round dà al massimo qualche centinaio di punti, e dura almeno una decina di secondi.
-    if not (1 <= round_ <= 999 and 0 <= punti <= 1500 * round_ + 2000 and 0 <= uccisi <= 100000 and durata >= 8 * round_):
+    # Fuori misura. Dal 09/10/2026 la corsa cresce a ogni round (più zombie, più punti l'uno): il tetto
+    # cresce col quadrato del round, e un round dura comunque almeno una decina di secondi.
+    if not (1 <= round_ <= 999 and 0 <= punti <= min(10_000_000, 400 * round_ * round_ + 5000) and 0 <= uccisi <= 200000 and durata >= 8 * round_):
         return errore("Punteggio non valido")
     if _troppi_invii(_indirizzo(request), _time.time()):
         return errore("Troppe corse di fila: riprova fra qualche minuto", 429)
