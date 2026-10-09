@@ -3622,7 +3622,8 @@ test("l'audio: la lotta suona, la mira canta, la corsa ha i suoi suoni, e nessun
   const prima = Finto.conto.note + Finto.conto.rumori;
   amb.avanza(60 * 30);
   assert.ok(Finto.conto.note + Finto.conto.rumori > prima + 20, "picchiandosi, si sente");
-  r.mira("robot");
+  // (la mira non parte se in quel momento il robot è a terra: si riprova finché si rialza)
+  for (let i = 0; i < 80 && !r.mira("robot"); i++) amb.avanza(5);
   amb.avanza(60);
   assert.ok(amb.stato().audio.anelli.includes("mira"), "mentre si mira suona una nota continua");
   r.spara();
