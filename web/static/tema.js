@@ -54,7 +54,8 @@
       var sistema = window.matchMedia("(prefers-color-scheme: dark)");
       var segui = function (e) {
         var scelta = salvata();
-        if (scelta !== "scuro" && scelta !== "chiaro") applica(e.matches ? "scuro" : "chiaro");
+        // (ad Halloween, senza una scelta salvata, si resta sul tema scuro)
+        if (scelta !== "scuro" && scelta !== "chiaro" && !radice.classList.contains("halloween")) applica(e.matches ? "scuro" : "chiaro");
       };
       if (sistema.addEventListener) sistema.addEventListener("change", segui);
       else if (sistema.addListener) sistema.addListener(segui);

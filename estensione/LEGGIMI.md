@@ -144,6 +144,10 @@ La classifica globale sta solo sul sito: l'estensione non manda niente a nessuno
 
 Spento finché non lo si accende (tasto «Audio» nella tendina, o l'altoparlante nel cruscotto della corsa). Niente file: ogni suono è sintetizzato al momento con Web Audio, quindi l'estensione non scarica niente. Il contesto audio nasce solo al primo gesto, come vogliono i browser.
 
+### La tastiera (09/10/2026, gratis)
+
+Con il ring acceso si gioca anche da tastiera, sul lottatore del controller: Q W E R T Y U I O P (poi J K) fanno le mosse del controller nell'ordine dei suoi spicchi; A e D camminano, S para, F vola o atterra, G cambia personaggio, H apre il controller; Z il colpo finale (nella mira: spara), X C V i tre oggetti della corsa. Nella corsa A e D scelgono il robot o la mela, Q W E le carte. Si leggono i tasti fisici, quindi su una tastiera francese o tedesca sono gli stessi posti. Mai mentre si scrive in un campo, mai con Ctrl, Alt o Cmd, e a ring spento i tasti restano della pagina. Nella tendina, sezione «Tastiera», si spegne e si rimappa (un clic sul tasto, poi quello nuovo; Esc annulla).
+
 ### Premium: cosa c'è e cosa manca
 
 Le scelte stanno in `premium.json`:

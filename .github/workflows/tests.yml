@@ -44,7 +44,7 @@ jobs:
         run: |
           set -o pipefail
           node --version
-          prova() { node --test --test-reporter=tap tests/confronto-installato.test.cjs tests/ring.test.cjs tests/lingue.test.cjs 2>&1 | tee esito-node.txt; }
+          prova() { node --test --test-reporter=tap tests/confronto-installato.test.cjs tests/ring.test.cjs tests/lingue.test.cjs tests/halloween.test.cjs 2>&1 | tee esito-node.txt; }
           caduti() { grep -E "^ *(not ok|error:)" esito-node.txt | head -30 | while IFS= read -r riga; do echo "::$1::$riga"; done; }
           if prova; then exit 0; fi
           caduti warning || true

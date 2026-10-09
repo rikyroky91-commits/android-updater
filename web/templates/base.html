@@ -21,7 +21,14 @@
      quella del sistema operativo. `localStorage` può non esserci (finestra
      privata, dati bloccati): allora si usa il sistema e basta. #}
   <script>(function(){var t=null;try{t=localStorage.getItem("mut-tema");}catch(e){}
-    if(t!=="scuro"&&t!=="chiaro"){t=(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)?"scuro":"chiaro";}
+    /* HALLOWEEN (09/10/2026): acceso da solo dal 1° ottobre al 2 novembre, vedi `halloween.js`
+       (stessa regola: spento in stagione resta spento, ?halloween=1/0 lo forza). In stagione,
+       senza una scelta salvata, si parte col tema scuro. */
+    var d=new Date(),m=d.getMonth(),hw=m===9||(m===10&&d.getDate()<=2),ph=null;try{ph=localStorage.getItem("mut-halloween");}catch(e){}
+    if(ph==="off-"+d.getFullYear()&&hw)hw=false;else if(ph==="on-"+d.getFullYear())hw=true;
+    var fz=/[?&]halloween=(1|0)\b/.exec(location.search);if(fz)hw=fz[1]==="1";
+    if(hw)document.documentElement.classList.add("halloween");
+    if(t!=="scuro"&&t!=="chiaro"){t=hw||(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)?"scuro":"chiaro";}
     document.documentElement.setAttribute("data-tema",t);
     try{if(localStorage.getItem("mut-natale")==="on")document.documentElement.classList.add("natale");}catch(e){}
     /* Lingua diversa dall'italiano: la pagina resta nascosta finché `lingue.js`
@@ -88,6 +95,13 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"
              stroke-linecap="round" aria-hidden="true"><path d="M12 2.5l4 5.5h-2.2l3.7 5h-2.3l3.8 5H5l3.8-5H6.5l3.7-5H8z"/><path d="M12 18v3.5"/></svg>
       </button>
+      {# HALLOWEEN (09/10/2026): zucche, lucine, zombie e mani che camminano; si accende da solo
+         in stagione, il tasto con la zucca lo spegne. Lo pilota `static/halloween.js`. #}
+      <button type="button" class="tema-tasto halloween-tasto" data-halloween-tasto aria-pressed="false"
+              aria-label="Tema di Halloween" title="Accendi il tema di Halloween">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"
+             stroke-linecap="round" aria-hidden="true"><path d="M12 6.5c-1.8-1.4-6.5-1.3-7.8 3.2-1 3.6.6 8.8 4.3 9.3 1.4.2 2.4-.4 3.5-.4s2.1.6 3.5.4c3.7-.5 5.3-5.7 4.3-9.3C18.5 5.2 13.8 5.1 12 6.5z"/><path d="M12 6.5c0-1.6.6-2.8 2-3.6"/><path d="M8.6 11l1.2-1.4 1.2 1.4M13 11l1.2-1.4 1.2 1.4M8.8 14.4c1.9 1.5 4.5 1.5 6.4 0"/></svg>
+      </button>
       {# LA LINGUA (02/10/2026): un velo di traduzione nel browser, vedi
          `static/lingue.js`. I nomi delle lingue non si traducono. #}
       <div class="lingua">
@@ -136,6 +150,7 @@
 
   <script src="{{ statico('tema.js') }}" defer></script>
   <script src="{{ statico('natale.js') }}" defer></script>
+  <script src="{{ statico('halloween.js') }}" defer></script>
   <script src="{{ statico('lingue.js') }}" defer></script>
   <script src="{{ statico('rete.js') }}" defer></script>
   <script src="{{ statico('ricerca.js') }}" defer></script>

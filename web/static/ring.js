@@ -1437,6 +1437,8 @@
       return;
     }
     if (f.caos > 0 || f.scatto > 0 || f.recupero > 0 || --f.pensa > 0) return;
+    // Nella corsa l'eroe vola a prendere i volanti (`pensaVoloCorsa`).
+    if (orda && corsa && eDellaCorsa(f)) { pensaVoloCorsa(f); return; }
     // Arriva l'orda: si scende a terra, accanto all'alleato.
     if (orda) { f.jet = Math.min(f.jet, 24); f.meta = Math.max(orda.l + 20 * S, Math.min(orda.r - 20 * S, orda.cx + (orda.lati[f.tipo] || 1) * 15 * S)); f.pensa = 12; return; }
     if (f.volo) { pensaGuerriero(f, altro); return; }
@@ -4500,6 +4502,9 @@
     dragoFuoco: { costo: 2.5, hp: 2, vel: [1.6, 2], scala: 1, dal: 99, carica: 34, portata: 0, volo: "fuoco" },
     dragoFulmine: { costo: 2.5, hp: 2, vel: [1.8, 2.2], scala: 1, dal: 99, carica: 30, portata: 0, volo: "fulmine" },
     dragoVeleno: { costo: 2.5, hp: 3, vel: [1.4, 1.7], scala: 1.05, dal: 99, carica: 34, portata: 0, volo: "veleno" },
+    // Il corvaccio (09/10/2026, notte): il volante di tutti i giorni, c'è dal primo round. Non tira:
+    // arriva a stormi e scende in picchiata a beccare, da quote sempre diverse.
+    corvo: { costo: 1, hp: 1, vel: [2.2, 2.8], scala: 0.8, dal: 99, carica: 0, portata: 0, volo: "becco", picchia: true },
   };
   const pesante = (z) => z.tipo === "grosso" || z.tipo === "capo";
   const TEMI_ONDATA = {
@@ -4657,8 +4662,8 @@
       z.volo = Z.volo; z.x = lato < 0 ? q.l + 12 * S : q.r - 12 * S; z.dir = -lato;
       // (sotto il cruscotto; se fra il cruscotto e il terreno c'è poco spazio, come sui telefoni, vola più basso)
       // La quota è sopra il terreno dell'orda: se l'orda trasloca su un altro piano, il draghetto la segue.
-      z.quota = caso(120, 175) * S; z.alto = quotaDrago(z, q); z.y = z.alto - 40 * S;
-      z.distanza = caso(120, 210) * S; z.cd = Math.round(caso(50, 110)); z.ali = caso(0, 6); z.tiri = 0;
+      z.quota = nuovaQuota(z); z.alto = quotaDrago(z, q); z.y = z.alto - 40 * S; z.cambia = Math.round(caso(200, 360));
+      z.distanza = (Z.picchia ? caso(80, 160) : caso(120, 210)) * S; z.cd = Math.round(caso(50, 110)); z.ali = caso(0, 6); z.tiri = 0;
       return;
     }
     polvere(x, q.base - 1, 4);
@@ -4780,6 +4785,8 @@
   }
   // Il draghetto: arriva in volo dal bordo, si mette a qualche passo dall'eroe, a mezz'aria, carica
   // e tira; ogni tre volte scende in picchiata, gli passa accanto e risale dall'altra parte.
+  // Ogni volante cambia quota ogni quattro-sei secondi: chi rasoterra, chi in alto, e il cielo si riempie.
+  const nuovaQuota = (z) => (ZOMBI[z.tipo].picchia ? caso(70, 220) : caso(95, 215)) * S;
   const quotaDrago = (z, q) => Math.min(q.base - 76 * S, Math.max(testataBasso + 100 * S, q.base - z.quota));
   function muoviDrago(z, q, Z) {
     z.alto = quotaDrago(z, q);
@@ -4809,9 +4816,9 @@
       z.dir = T.x1 >= T.x0 ? 1 : -1;
       if (!T.preso && Math.abs(z.x - hx) < 26 * S && Math.abs(z.y - (hy - 10 * S)) < 34 * S) {
         T.preso = true;
-        if (colpitoEroe(f, MORSO_CORSA[z.tipo] || 8, (z.x + hx) / 2, z.y, z.dir, 3)) scrivi("CHOMP!", z.x, z.y - 18 * S, false);
+        if (colpitoEroe(f, MORSO_CORSA[z.tipo] || 8, (z.x + hx) / 2, z.y, z.dir, Z.picchia ? 1.5 : 3)) scrivi(Z.picchia ? "TOC!" : "CHOMP!", z.x, z.y - 18 * S, false);
       }
-      if (u >= 1) { z.stato = "va"; z.s = 0; z.cd = Math.round(caso(60, 100)); }
+      if (u >= 1) { z.stato = "va"; z.s = 0; z.cd = Math.round(Z.picchia ? caso(70, 130) : caso(60, 100)); }
       return;
     }
     z.dir = hx >= z.x ? 1 : -1;
@@ -4821,7 +4828,9 @@
     dove = Math.max(q.l + 30 * S, Math.min(q.r - 30 * S, dove));
     const dx = dove - z.x;
     z.x += Math.sign(dx) * Math.min(Math.abs(dx), z.vel * S * (z.stato === "colpo" ? 0.3 : 1));
-    z.y += (z.alto + Math.sin(z.t * 0.05 + z.fase) * 9 * S - z.y) * 0.08;
+    z.y += (z.alto + Math.sin(z.t * 0.05 + z.fase) * 9 * S - z.y) * (z.cambiata > 0 ? 0.035 : 0.08);
+    if (z.cambiata > 0) z.cambiata--;
+    if (--z.cambia <= 0) { z.quota = nuovaQuota(z); z.cambia = Math.round(caso(240, 360)); z.cambiata = 60; z.distanza = (ZOMBI[z.tipo].picchia ? caso(80, 160) : caso(120, 210)) * S; }
     // Due draghetti non volano uno sull'altro: si scostano.
     for (const w of q.zombie) if (w !== z && w.volo && w.stato !== "giu" && Math.abs(w.x - z.x) < 44 * S && Math.abs(w.y - z.y) < 34 * S) z.x += (z.x >= w.x ? 1 : -1) * 1.2 * S;
     if (z.stato === "colpo") {
@@ -4831,9 +4840,9 @@
     }
     if (corsa && corsa.fase === "lotta" && --z.cd <= 0 && Math.abs(dx) < 90 * S) {
       z.tiri++;
-      if (z.tiri % 3 === 0) {
+      if (z.tiri % 3 === 0 || Z.picchia) {
         const x1 = Math.max(q.l + 20 * S, Math.min(q.r - 20 * S, 2 * hx - z.x));
-        z.stato = "tuffo"; z.s = 0; z.tuffo = { t: 0, dur: 64, x0: z.x, y0: z.y, x1, yb: hy - 10 * S, preso: false };
+        z.stato = "tuffo"; z.s = 0; z.tuffo = { t: 0, dur: Z.picchia ? 46 : 64, x0: z.x, y0: z.y, x1, yb: hy - 10 * S, preso: false };
         suona("soffio", z.x, 0.5);
       } else { z.stato = "colpo"; z.s = 0; }
     }
@@ -5001,6 +5010,11 @@
       const R = q.ricetta, vivi = q.zombie.reduce((n, z) => n + (z.stato !== "giu" ? 1 : 0), 0);
       q.dallUltimo = (q.dallUltimo || 0) + 1;
       if (R.coda.length && vivi < R.insieme && --q.prossimo <= 0) {
+        // Troppi in volo insieme: passa avanti il primo da terra della coda.
+        if (R.maxVolo && ZOMBI[R.coda[0].tipo].volo && q.zombie.filter((z) => z.volo && z.stato !== "giu").length >= R.maxVolo) {
+          const j = R.coda.findIndex((w) => !ZOMBI[w.tipo].volo);
+          if (j > 0) { const t = R.coda[0].tipo; R.coda[0].tipo = R.coda[j].tipo; R.coda[j].tipo = t; }
+        }
         const v = R.coda.shift();
         nuovoZombie(v.tipo, v.lato);
         q.prossimo = R.coda.length ? R.coda[0].attesa : 0; q.dallUltimo = 0;
@@ -5395,7 +5409,7 @@
     ctx.restore();
   }
   function disegnaZombie(z) {
-    if (z.volo) { disegnaDrago(z); segnoNuovo(z); return; }
+    if (z.volo) { if (z.volo === "becco") disegnaCorvo(z); else disegnaDrago(z); segnoNuovo(z); return; }
     const q = orda, T = TONI_ZOMBIE[z.tono], d = z.dir, nero = "#17171c", Z = ZOMBI[z.tipo], sc = Z.scala;
     const gonfio = z.tipo === "gonfio", grosso = pesante(z), rabbioso = z.tipo === "rabbioso", svelto = z.tipo === "svelto" || rabbioso;
     const corazzato = z.tipo === "corazzato", capo = z.tipo === "capo";
@@ -5588,6 +5602,48 @@
     ctx.beginPath(); ctx.moveTo(z.x - 8 * S, y - 10 * S); ctx.lineTo(z.x + 8 * S, y - 10 * S); ctx.lineTo(z.x, y); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
   }
+  // Il corvaccio: un corvo spennacchiato, ali a frange, una cucitura sulla testa pelata, l'occhio verde.
+  function disegnaCorvo(z) {
+    const d = z.dir, sc = ZOMBI[z.tipo].scala, nero = "#17171c";
+    const piume = z.lampo > 0 ? "#ffffff" : z.gelo > 0 ? "#cfeeff" : "#3b3346";
+    ctx.save();
+    if (z.stato === "giu") ctx.globalAlpha = Math.max(0, 1 - Math.max(0, z.s - 26) / 24);
+    ctx.translate(z.x, z.y);
+    let ang = 0;
+    if (z.stato === "giu") ang = Math.min(1, z.s / 18) * 1.6;
+    else if (z.stato === "tuffo" && z.tuffo) ang = Math.cos(Math.PI * Math.min(1, z.tuffo.t / z.tuffo.dur)) * 0.7;
+    ctx.scale(d * sc, sc); ctx.rotate(ang);
+    ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
+    const b = z.stato === "giu" ? -0.4 : z.stato === "tuffo" ? -0.6 : Math.sin(z.ali * 1.3);
+    const ala = (colore) => {
+      ctx.fillStyle = colore; ctx.beginPath(); ctx.moveTo(4 * S, -3 * S);
+      // il bordo a frange: penne spezzate
+      const punte = [[-4, -22], [-8, -18], [-11, -20], [-14, -14], [-16, -15], [-15, -7]];
+      for (const [u, v] of punte) ctx.lineTo(u * S, (-3 + (v + 3) * b) * S);
+      ctx.lineTo(-9 * S, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    };
+    ala("#2a2433");
+    // La coda a ventaglio.
+    ctx.fillStyle = piume; ctx.beginPath(); ctx.moveTo(-8 * S, -1 * S); ctx.lineTo(-19 * S, -5 * S); ctx.lineTo(-18 * S, 0); ctx.lineTo(-20 * S, 4 * S); ctx.lineTo(-8 * S, 3 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Il corpo e la testa.
+    ctx.beginPath(); ctx.ellipse(0, 0, 10 * S, 6.5 * S, -0.1, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#8a7f96"; ctx.beginPath(); ctx.arc(10 * S, -5 * S, 5.2 * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "#5a4f66"; ctx.lineWidth = 0.9 * S; ctx.beginPath();
+    ctx.moveTo(7 * S, -9 * S); ctx.lineTo(11 * S, -8.5 * S);
+    for (const u of [8, 9.5]) { ctx.moveTo(u * S, -10 * S); ctx.lineTo(u * S, -7.6 * S); }
+    ctx.stroke();
+    // Il becco, aperto in picchiata.
+    const apre = z.stato === "tuffo" ? 2.2 : 0.6;
+    ctx.fillStyle = "#c9b26a"; ctx.strokeStyle = nero; ctx.lineWidth = 1 * S;
+    ctx.beginPath(); ctx.moveTo(14 * S, -7 * S); ctx.lineTo(22 * S, (-5 - apre * 0.4) * S); ctx.lineTo(14 * S, -4.5 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(14 * S, -4.5 * S); ctx.lineTo(20 * S, (-3.6 + apre) * S); ctx.lineTo(13.5 * S, -2.8 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
+    tondo(11.5 * S, -6 * S, 1.9 * S, "#9cff6b"); tondo(12 * S, -6 * S, 0.8 * S, nero);
+    // Le zampe.
+    ctx.strokeStyle = "#c9b26a"; ctx.lineWidth = 1.2 * S; ctx.beginPath(); ctx.moveTo(-1 * S, 6 * S); ctx.lineTo(-2 * S, 10 * S); ctx.moveTo(2 * S, 6 * S); ctx.lineTo(1.5 * S, 10 * S); ctx.stroke();
+    ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
+    ala(piume);
+    ctx.restore();
+  }
   // Il draghetto: corpo da lucertola, ali da pipistrello, due cornetti, e la punta della coda che
   // dice che cosa tira (una fiammella, una saetta, una goccia).
   function disegnaDrago(z) {
@@ -5717,6 +5773,8 @@
   // Le mosse che si fanno sull'altro lottatore e basta: durante la tregua restano spente.
   const SULL_ALTRO = { levita: 1, presa: 1, teletrasporto: 1, telecinesi: 1, avvinghia: 1, duello: 1 };
   const radiale = { aperto: false, apre: 0, chi: "robot", lato: "dx", sopra: -2, giu: null, lampo: null, detto: null, dito: false, posto: -1 };
+  // (la tastiera si prepara più in basso, dopo la tendina: finché non è pronta la tendina non la disegna)
+  const statoTastiera = { pronta: false };
   try { radiale.aperto = deposito.getItem("mut-ring-radiale") === "on"; if (deposito.getItem("mut-ring-radiale-lato") === "sx") radiale.lato = "sx"; } catch (errore) { /* resta chiuso */ }
   if (radiale.aperto) radiale.apre = 1;
   // Durante la tregua le mosse che si fanno sull'altro lasciano il posto a quelle che si fanno CON l'altro.
@@ -5852,6 +5910,7 @@
     try { deposito.setItem("mut-ring-radiale", radiale.aperto ? "on" : "off"); } catch (errore) { /* pazienza */ }
     if (tastoRadiale) tastoRadiale.setAttribute("aria-pressed", radiale.aperto ? "true" : "false");
     if (!radiale.aperto) radiceHtml("remove", "ring-punta");
+    else if (statoTastiera.pronta) lasciaIlCampo();
     fattiInLa();
   }
   // Un pezzo di corona fra due raggi e due angoli (misurati dal bordo di sotto).
@@ -5898,6 +5957,14 @@
         ctx.fillStyle = sopra || lampo ? "#10121a" : f.ki >= voce[3] ? "#dfe6ff" : "#ff7a6e";
         ctx.globalAlpha = vivo * entra * (ok ? 0.95 : 0.7);
         ctx.fillText(String(voce[3]), q.x, q.y + 13 * U);
+      }
+      // Il tasto che la fa partire, piccolo, verso l'orlo esterno dello spicchio.
+      const chiave = tastoDi("mossa" + (q.i + 1));
+      if (chiave) {
+        const kx = q.x + q.dx * (q.r1 - q.r0) * 0.36, ky = q.y + q.dy * (q.r1 - q.r0) * 0.36;
+        ctx.globalAlpha = vivo * entra * (ok ? 0.9 : 0.4);
+        ctx.font = "800 " + Math.round(8 * U) + "px Archivo, sans-serif"; ctx.fillStyle = "#ffd84a";
+        ctx.fillText(chiave, kx, ky);
       }
     }
     // L'orlo: una riga del colore del personaggio e le tacche, da strumento di bordo.
@@ -9308,8 +9375,9 @@
         f.jet--;
         if (f.volo && f.scatto > 0) aggiornaScatto(f);
         else {
-          const v = f.volo ? 4.5 : 2.2;
-          f.cx += Math.max(-v * S, Math.min(v * S, (f.meta - f.cx) * (f.volo ? 0.12 : 0.08)));
+          // (l'eroe della corsa, a caccia di volanti, col jetpack va più svelto)
+          const v = f.volo ? 4.5 : f.caccia ? 3.6 : 2.2;
+          f.cx += Math.max(-v * S, Math.min(v * S, (f.meta - f.cx) * (f.volo ? 0.12 : f.caccia ? 0.11 : 0.08)));
         }
         f.passo += 0.12;
       } else if (f.azione === "avanza" && piovendo && !f.supporto && gambe(f) === 2 && Math.random() < 0.0025) {
@@ -11067,6 +11135,7 @@
     }
     const nota = pannello.querySelector("[data-mosse-nota]");
     if (nota) nota.hidden = !!stile;
+    if (statoTastiera.pronta) disegnaListaTasti();                  // le mosse sui tasti cambiano coi personaggi
   }
   function apriPannello(apri) {
     if (!pannello || !tastoOpzioni) return;
@@ -11130,6 +11199,179 @@
     segnaBloccati();
     if (premio && premio.ascolta) premio.ascolta(segnaBloccati);
   }
+  // --- LA TASTIERA (09/10/2026, su richiesta) ---------------------------------
+  // Riccardo: «seleziona un mapping automatico da tastiera in modo da utilizzare la tastiera per
+  // attivare le mosse e tutto il resto. Nelle impostazioni permetti di rimappare i tasti, ma usa i
+  // tasti qwerty, asdf e zxc come standard». Si comanda il lottatore del controller (`comandato`),
+  // anche a controller chiuso:
+  //   Q W E R T Y U I O P, poi J K  → le mosse del controller, nell'ordine dei suoi spicchi
+  //   A ← · S parata · D → · F vola/atterra · G cambia personaggio · H apre il controller
+  //   Z colpo finale (nella mira: spara) · X C V i tre oggetti della corsa
+  // Nei menu della corsa: A e D scelgono il robot (a sinistra) o la mela (a destra); Q W E le tre
+  // carte del livello; Z (o Q) chiude il forziere. Si leggono i tasti fisici (`e.code`): su una
+  // tastiera francese o tedesca sono gli stessi posti. Mai mentre si scrive in un campo, mai con
+  // Ctrl, Alt o Cmd, e a ring spento la tastiera resta della pagina. Si rimappa dalla tendina
+  // (sezione «Tastiera»); i tasti stanno in `mut-ring-tasti`, l'interruttore in `mut-ring-tastiera`.
+  const AZIONI_TASTI = [
+    ["mossa1", "KeyQ"], ["mossa2", "KeyW"], ["mossa3", "KeyE"], ["mossa4", "KeyR"], ["mossa5", "KeyT"], ["mossa6", "KeyY"],
+    ["mossa7", "KeyU"], ["mossa8", "KeyI"], ["mossa9", "KeyO"], ["mossa10", "KeyP"], ["mossa11", "KeyJ"], ["mossa12", "KeyK"],
+    ["sinistra", "KeyA"], ["para", "KeyS"], ["destra", "KeyD"], ["vola", "KeyF"], ["cambia", "KeyG"], ["controller", "KeyH"],
+    ["finale", "KeyZ"], ["oggetto1", "KeyX"], ["oggetto2", "KeyC"], ["oggetto3", "KeyV"],
+  ];
+  const NOMI_AZIONI = { sinistra: "Cammina a sinistra", destra: "Cammina a destra", para: "Parata", vola: "Vola / atterra", cambia: "Cambia personaggio",
+                        controller: "Apri il controller", finale: "Colpo finale / mira" };
+  const mappaTasti = {};
+  let tastiera = true, rimappa = null;
+  for (const [id, code] of AZIONI_TASTI) mappaTasti[id] = code;
+  try {
+    const t = JSON.parse(deposito.getItem("mut-ring-tasti") || "null");
+    if (t && typeof t === "object") for (const id in mappaTasti) if (typeof t[id] === "string" && /^[A-Za-z0-9]{2,20}$/.test(t[id])) mappaTasti[id] = t[id];
+    if (deposito.getItem("mut-ring-tastiera") === "off") tastiera = false;
+  } catch (errore) { /* i tasti di sempre */ }
+  function salvaTasti() {
+    try { deposito.setItem("mut-ring-tasti", JSON.stringify(mappaTasti)); deposito.setItem("mut-ring-tastiera", tastiera ? "on" : "off"); } catch (errore) { /* pazienza */ }
+  }
+  const azioneDi = (code) => { for (const id in mappaTasti) if (mappaTasti[id] === code) return id; return null; };
+  function nomeTasto(code) {
+    if (!code) return "–";
+    if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+    if (/^Digit\d$/.test(code)) return code.slice(5);
+    if (/^Numpad\d$/.test(code)) return "Num " + code.slice(6);
+    const N = { Space: dici("Spazio"), Enter: dici("Invio"), ArrowLeft: "←", ArrowRight: "→", ArrowUp: "↑", ArrowDown: "↓", ShiftLeft: "Shift", ShiftRight: "Shift ⇧",
+                Tab: "Tab", Backspace: "⌫", Semicolon: ";", Comma: ",", Period: ".", Slash: "/", BracketLeft: "[", BracketRight: "]", Minus: "-", Equal: "=",
+                Quote: "'", Backquote: "`", Backslash: "\\", IntlBackslash: "<", ControlLeft: "Ctrl", AltLeft: "Alt" };
+    return N[code] || code;
+  }
+  const tastoDi = (id) => (tastiera ? nomeTasto(mappaTasti[id]) : "");
+  // Chi scrive in un campo non comanda il ring. Ma la home mette il cursore nel campo di ricerca appena
+  // si apre: con la corsa aperta o il controller aperto, un campo VUOTO non conta (e si lascia andare),
+  // tranne quello del nome per la classifica.
+  function scrivendo(el) {
+    if (!el || !el.tagName) return false;
+    const t = String(el.tagName).toUpperCase();
+    if (!(t === "INPUT" || t === "TEXTAREA" || t === "SELECT" || el.isContentEditable)) return false;
+    if (el.closest && el.closest(".corsa-nome")) return true;
+    if ((corsa || radiale.aperto) && t === "INPUT" && !el.value) { if (el.blur) el.blur(); return false; }
+    return true;
+  }
+  function lasciaIlCampo() {
+    const el = document.activeElement;
+    if (el && el.tagName && /^(INPUT|TEXTAREA)$/i.test(el.tagName) && !el.value && el.blur && !(el.closest && el.closest(".corsa-nome"))) el.blur();
+  }
+  function puoMuovere(f) {
+    return !!(f && f.p && !f.esploso && !f.fuori && !f.fuoriCampo && !(f.ko > 0) && !f.preso && !f.tenuto && !(f.gelato > 0) && !f.scalata && !f.inVolo);
+  }
+  function muoviConTasti(f, lato) {
+    if (!puoMuovere(f)) return false;
+    const x = Math.max(16 * S, Math.min(W - 16 * S, f.cx + lato * 80 * S));
+    f.dir = lato; f.fuga = null; f.ordine = null; f.voltato = false;
+    if (f.jet > 0) { f.meta = x; f.pensa = Math.max(f.pensa, 24); return true; }
+    if (f.azione && f.azione !== "avanza") return false;
+    inizia(f, "avanza", x); f.corsa = 24;
+    return true;
+  }
+  // Che cosa fa un'azione adesso (true: fatta, e il tasto non va alla pagina).
+  function eseguiTasto(id) {
+    const c = corsa;
+    if (c && c.fase === "scelta") {
+      if (c.bottega) return false;
+      if (id === "sinistra") return scegliEroe("robot");
+      if (id === "destra") return scegliEroe("mela");
+      return false;
+    }
+    if (c && c.scelta) { const i = ["mossa1", "mossa2", "mossa3"].indexOf(id); return i >= 0 ? prendiCarta(i) : true; }
+    if (c && c.forziere) return id === "finale" || id === "mossa1" ? chiudiForziere() : true;
+    if (mira) { if (id === "finale" || /^mossa/.test(id)) { sparaMira(); return true; } return false; }
+    if (c && c.chi) {
+      if (id === "finale") return tastoFinale();
+      const o = /^oggetto(\d)$/.exec(id);
+      if (o) return usaOggetto(Number(o[1]) - 1);
+      if (c.fase !== "lotta") return false;
+    }
+    if (id === "controller") { const apri = !radiale.aperto; if (apri) assicuraAcceso(); apriRadiale(apri); return true; }
+    if (id === "cambia") {
+      if (c && c.chi) return false;
+      const altro = lottatori.find((l) => l.tipo !== radiale.chi);
+      if (altro) radiale.chi = altro.tipo;
+      return !!altro;
+    }
+    const f = comandato();
+    if (!f) return false;
+    if (id === "finale") return comandi.colpo("mira") !== false;
+    if (id === "sinistra" || id === "destra") return muoviConTasti(f, id === "sinistra" ? -1 : 1);
+    if (id === "para") { if (!puoMuovere(f) || (f.azione && f.azione !== "avanza")) return false; f.ordine = null; inizia(f, "para"); return true; }
+    if (id === "vola") {
+      if (!puoMuovere(f) || verso < 0) return false;
+      if (f.jet > 0) { f.jet = Math.min(f.jet, 20); f.caccia = false; } else decolla(f, false);
+      return true;
+    }
+    const m = /^mossa(\d+)$/.exec(id);
+    if (m) {
+      const voce = vociRadiale()[Number(m[1]) - 1];
+      if (!voce) return false;
+      const ok = ordina(f, voce[0]);
+      if (ok) radiale.detto = { i: Number(m[1]) - 1, fino: tempo + 18 };           // lo spicchio si accende, come al tocco
+      return ok;
+    }
+    return false;
+  }
+  function premiTasto(e) {
+    if (!e || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (rimappa) {
+      // Si sta scegliendo un tasto nuovo: Esc annulla, il resto si prende (se era di un'altra azione, si scambiano).
+      e.preventDefault(); e.stopPropagation();
+      const id = rimappa; rimappa = null;
+      if (e.code && e.code !== "Escape") {
+        const prima = azioneDi(e.code);
+        if (prima && prima !== id) mappaTasti[prima] = mappaTasti[id];
+        mappaTasti[id] = e.code;
+        salvaTasti();
+      }
+      disegnaListaTasti();
+      return;
+    }
+    if (!tastiera || scrivendo(e.target) || !e.code) return;
+    const id = azioneDi(e.code);
+    if (!id) return;
+    if (fermo && !corsa) return;                                  // ring spento: i tasti sono della pagina
+    if (e.repeat && id !== "sinistra" && id !== "destra") { e.preventDefault(); return; }
+    if (eseguiTasto(id)) { e.preventDefault(); e.stopPropagation(); riparti(); }
+  }
+  if (window.addEventListener) window.addEventListener("keydown", premiTasto, true);
+  // La sezione «Tastiera» della tendina: una riga per azione, col suo tasto. Si clicca il tasto e si
+  // preme quello nuovo. Le mosse dicono il nome della mossa dei personaggi in campo.
+  function disegnaListaTasti() {
+    if (!pannello || !pannello.querySelector) return;
+    const lista = pannello.querySelector("[data-tasti-lista]"), inter = pannello.querySelector("[data-tastiera]");
+    if (inter && inter.setAttribute) inter.setAttribute("aria-pressed", tastiera ? "true" : "false");
+    if (!lista || !document.createElement) return;
+    lista.hidden = !tastiera;
+    while (lista.firstChild) lista.removeChild(lista.firstChild);
+    const voci = VOCI_RADIALE[stile] || VOCI_RADIALE[""];
+    for (const [id] of AZIONI_TASTI) {
+      const m = /^mossa(\d+)$/.exec(id), o = /^oggetto(\d)$/.exec(id);
+      if (m && !voci[Number(m[1]) - 1]) continue;                     // questi personaggi non hanno tante mosse
+      const nome = m ? voci[Number(m[1]) - 1][1] + " " + dici(voci[Number(m[1]) - 1][2]) : o ? dici("Oggetto") + " " + o[1] + " (" + dici("Corsa infinita") + ")" : dici(NOMI_AZIONI[id]);
+      const riga = document.createElement("div");
+      riga.className = "ring-tasti-riga";
+      const etichetta = document.createElement("span");
+      etichetta.textContent = nome;
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "ring-chiave"; b.setAttribute("data-azione", id);
+      b.textContent = rimappa === id ? dici("Premi un tasto…") : nomeTasto(mappaTasti[id]);
+      if (rimappa === id) b.setAttribute("aria-pressed", "true");
+      b.addEventListener("click", () => { rimappa = rimappa === id ? null : id; disegnaListaTasti(); });
+      riga.appendChild(etichetta); riga.appendChild(b);
+      lista.appendChild(riga);
+    }
+  }
+  if (pannello && pannello.querySelector) {
+    const inter = pannello.querySelector("[data-tastiera]"), via = pannello.querySelector("[data-tasti-ripristina]");
+    if (inter) inter.addEventListener("click", () => { tastiera = !tastiera; rimappa = null; salvaTasti(); disegnaListaTasti(); });
+    if (via) via.addEventListener("click", () => { for (const [id, code] of AZIONI_TASTI) mappaTasti[id] = code; rimappa = null; salvaTasti(); disegnaListaTasti(); });
+  }
+  statoTastiera.pronta = true;
+  disegnaListaTasti();
   // I tasti delle funzioni a pagamento portano il lucchetto finché Premium non
   // è attivo; se Premium viene tolto, quello che era acceso si spegne.
   function segnaBloccati() {
@@ -11235,11 +11477,11 @@
   // Il danno di un morso, prima della pelle dura e della crescita a ogni round.
   // (per i draghetti è la picchiata; per il botto, lo scoppio)
   const MORSO_CORSA = { lento: 6, svelto: 5, striscia: 5, gonfio: 6, grosso: 15, corazzato: 8, rabbioso: 6, capo: 20,
-                        botto: 13, gelido: 6, saltatore: 7, sputatore: 5, doro: 0, dragoFuoco: 8, dragoFulmine: 8, dragoVeleno: 8 };
+                        botto: 13, gelido: 6, saltatore: 7, sputatore: 5, doro: 0, dragoFuoco: 8, dragoFulmine: 8, dragoVeleno: 8, corvo: 4 };
   const PUNTI_ZOMBIE = { lento: 10, svelto: 10, striscia: 10, gonfio: 12, grosso: 30, corazzato: 20, rabbioso: 20, capo: 300,
-                         botto: 14, gelido: 14, saltatore: 14, sputatore: 16, doro: 100, dragoFuoco: 25, dragoFulmine: 25, dragoVeleno: 25 };
+                         botto: 14, gelido: 14, saltatore: 14, sputatore: 16, doro: 100, dragoFuoco: 25, dragoFulmine: 25, dragoVeleno: 25, corvo: 8 };
   const GEMMA_ZOMBIE = { lento: 1, svelto: 1, striscia: 1, gonfio: 2, grosso: 4, corazzato: 3, rabbioso: 2, capo: 25,
-                         botto: 2, gelido: 2, saltatore: 2, sputatore: 2, doro: 6, dragoFuoco: 3, dragoFulmine: 3, dragoVeleno: 3 };
+                         botto: 2, gelido: 2, saltatore: 2, sputatore: 2, doro: 6, dragoFuoco: 3, dragoFulmine: 3, dragoVeleno: 3, corvo: 1 };
   // Chi entra nella corsa, nell'ordine: uno nuovo a ogni round con l'orda (all'inizio ci sono solo il
   // lento e lo svelto). Finiti i nuovi, ogni round ha due o tre protagonisti a sorte, mai quelli di prima.
   const NOVITA_CORSA = ["striscia", "botto", "dragoFuoco", "gonfio", "saltatore", "dragoFulmine", "corazzato", "gelido", "grosso", "dragoVeleno", "sputatore", "rabbioso"];
@@ -11260,8 +11502,9 @@
   const pressione = () => (corsa && corsa.tLotta ? corsa.tLotta / 3600 : 0);
   // Dal quarto minuto in poi la crescita diventa esponenziale: con tutte le armi evolute si arrivava
   // al tredicesimo minuto senza giocare, e una corsa così non finisce più (misurato).
-  const vitaZombie = () => { const k = pressione(); return (1 + 0.3 * k + 0.35 * k * k) * Math.pow(1.6, Math.max(0, k - 4)); };
-  const crescita = () => { const k = pressione(); return (1 + 0.15 * k + 0.17 * k * k) * Math.pow(1.4, Math.max(0, k - 4)); };
+  // (col volo dell'eroe, 09/10 notte, una corsa su dodici arrivava ancora al nono minuto: coda più ripida)
+  const vitaZombie = () => { const k = pressione(); return (1 + 0.3 * k + 0.35 * k * k) * Math.pow(1.9, Math.max(0, k - 4)); };
+  const crescita = () => { const k = pressione(); return (1 + 0.15 * k + 0.17 * k * k) * Math.pow(1.6, Math.max(0, k - 4)); };
   const pelleCorsa = () => (1 - 0.1 * livello("pelle")) * (1 - 0.05 * (bottega.pelle || 0));
   const areaCorsa = () => 1 + 0.12 * livello("area");
   const ricaricaCorsa = () => (1 - 0.08 * livello("ricarica")) * (1 - 0.04 * (bottega.ricarica || 0));
@@ -11305,6 +11548,7 @@
     sorprese = false; acquazzone = false; uraganoFisso = false; rallentaFisso = false; uragano = null; verso = 1; gravitaScelta = 1;
     comandi.ricomincia();                                         // un ring pulito (prima di accendere la corsa: dopo è bloccato)
     corsa = { fase: "scelta", t: 0, chi: null, prima };
+    if (statoTastiera.pronta) lasciaIlCampo();                      // i tasti sono del gioco, non del campo di ricerca
     prossimoEvento = 1e9; prossimaOrda = 1e9; fataleRound = false; fataleDebito = 0; fataleVoluto = 0;
     aggiornaInterruttori();
     riparti();
@@ -11321,7 +11565,7 @@
       liv: 1, xp: 0, daScegliere: 0, scelta: null, forziere: null, pausa: false, armi: {}, armiT: {},
       gemme: [], aTerra: [], forzieri: [], onde: [], saette: [], dardi: [], lame: [], numeri: [],
       invuln: 0, scudo: 0, imprevisti: [], prossimoImprevisto: 0, nemicoGiu: false, iniziata: Date.now(), danniRound: 0, inviato: false, nome: "",
-      tLotta: 0, tiri: [], pozze: [], sbloccati: ["lento", "svelto"], novita: 0, nuovo: null, protagonisti: [], gelato: 0, frenesia: 0,
+      tLotta: 0, tiri: [], pozze: [], sbloccati: ["lento", "svelto", "corvo"], novita: 0, cdVolo: 300, nuovo: null, protagonisti: [], gelato: 0, frenesia: 0,
       prossimaSorpresa: 600, ultimaSorpresa: null, sorprese: 0,
     });
     try { corsa.nome = deposito.getItem("mut-ring-nome") || ""; } catch (errore) { /* niente nome */ }
@@ -11459,16 +11703,21 @@
     c.protagonisti = pro;
     const pesi = {};
     for (const t of c.sbloccati) pesi[t] = pro.indexOf(t) >= 0 ? 6 : 0.8;
-    if (pro.every((t) => ZOMBI[t].volo)) pesi.lento = Math.max(pesi.lento || 0, 3);      // qualcuno a terra ci vuole
+    // Sempre insieme, quelli da terra e quelli in volo: un terzo circa del round arriva dal cielo.
+    const terra = c.sbloccati.filter((t) => !ZOMBI[t].volo), aria = c.sbloccati.filter((t) => ZOMBI[t].volo);
+    const quotaAria = aria.length ? (n === 1 ? 0.2 : 0.32) : 0;
+    const pesca = (lista) => {
+      let tot = 0; for (const t of lista) tot += pesi[t];
+      let x = rng() * tot;
+      for (const t of lista) if ((x -= pesi[t]) <= 0) return t;
+      return lista[lista.length - 1];
+    };
     const totale = Math.min(120, Math.round((12 + 3.2 * n) * (molt || 1)));
-    const maxVolo = Math.min(10, 2 + Math.floor(n / 2)), maxGrossi = 1 + Math.floor(n / 4);
-    let volo = 0, grossi = 0;
+    const maxGrossi = 1 + Math.floor(n / 4);
+    let grossi = 0;
     const tipi = [];
     while (tipi.length < totale) {
-      let tot = 0; for (const t in pesi) tot += pesi[t];
-      let x = rng() * tot, tipo = "lento";
-      for (const t in pesi) { tipo = t; if ((x -= pesi[t]) <= 0) break; }
-      if (ZOMBI[tipo].volo) { if (volo >= maxVolo) tipo = "lento"; else volo++; }
+      let tipo = rng() < quotaAria ? pesca(aria) : pesca(terra);
       if (tipo === "grosso") { if (grossi >= maxGrossi) tipo = "lento"; else grossi++; }
       tipi.push(tipo);
     }
@@ -11490,7 +11739,7 @@
       return { tipo, lato, attesa: Math.max(4, attesa) };
     });
     coda[0].attesa = 10;
-    return { n, tema: pro.join("+"), arrivo, coda, totale: coda.length, insieme: Math.min(CORSA.maxZombie, 10 + 2 * n + Math.floor(4 * k)) };
+    return { n, tema: pro.join("+"), arrivo, coda, totale: coda.length, insieme: Math.min(CORSA.maxZombie, 10 + 2 * n + Math.floor(4 * k)), maxVolo: Math.min(8, 3 + Math.floor(n / 3)) };
   }
   // Il duello: l'altro personaggio entra dal lato opposto, potenziato a seconda del round.
   function entraNemico() {
@@ -12046,6 +12295,17 @@
     if (c.scudo > 0) c.scudo--;
     if (c.gelato > 0) c.gelato--;
     if (c.frenesia > 0) c.frenesia--;
+    if (c.cdVolo > 0 && c.fase === "lotta") c.cdVolo--;
+    {
+      // Lo schianto dal volo: appena i piedi toccano terra.
+      const f = eroe();
+      if (f && f.p && f.schianto && orda && !(f.jet > 0)) {
+        const piede = Math.max(f.p.piedeA.y, f.p.piedeD.y);
+        if (f.ko > 0 || f.esploso) f.schianto = false;
+        else if (piede > orda.base - 8 * S) schiantoCorsa(f);
+      }
+      if (f && f.caccia && !(f.jet > 0)) f.caccia = false;
+    }
     if (c.fase === "fine") { if (sulSito && classifica.voci && passi - classifica.letta > 600) caricaClassifica(); return; }
     if (!c.chi) return;
     // La valvola: con fotogrammi oltre i 45 ms di media, al massimo 20 zombie insieme (finché non si torna sotto i 30).
@@ -12101,11 +12361,96 @@
     if (Math.random() < 0.3) inizia(f, "esulta");
     return true;
   }
+  // ·· In volo: l'eroe va a prendere i volanti ··
+  // Riccardo (09/10 notte): «fai usare più la verticalità del volo dei personaggi». L'eroe decolla
+  // (jetpack, volo dei guerrieri, scopa dei maghi) quando in alto c'è qualcuno da prendere e a terra
+  // nessuno lo sta mordendo; lassù insegue il volante più vicino e lo picchia a mezz'aria. Il volo
+  // dura pochi secondi; quando finisce, o non c'è più nessuno in alto, torna giù: se sotto si è
+  // radunata la folla (da terra non lo raggiungono, e gli si mettono sotto), ci piomba sopra di schianto.
+  const inAlto = (z) => z.volo && vivoZ(z) && !dragoBasso(z);
+  function volanteVicino(f, raggio) {
+    let scelto = null, d0 = raggio;
+    for (const z of orda.zombie) {
+      if (!z.volo || !vivoZ(z)) continue;
+      const d = Math.hypot(z.x - f.p.bacino.x, z.y - f.p.bacino.y);
+      if (d < d0) { d0 = d; scelto = z; }
+    }
+    return scelto;
+  }
+  function puoDecollareCorsa(f) {
+    const c = corsa;
+    if (!c || c.cdVolo > 0 || verso < 0 || f.jet > 0 || f.ko > 0 || f.tel || mira || !f.p || c.fase !== "lotta") return false;
+    if (!orda.zombie.some(inAlto)) return false;
+    // Se ha uno zombie addosso, prima se lo toglie (tranne una volta ogni tanto: si scappa in alto).
+    if (zombieVicino(f.cx, 34 * S) && Math.random() < 0.8) return false;
+    return true;
+  }
+  function decollaCorsa(f) {
+    decolla(f, false);
+    if (!(f.jet > 0)) return;
+    // (voli brevi: lassù gli zombie da terra non arrivano, e con voli lunghi i maghi arrivavano all'ottavo minuto)
+    f.jet = Math.min(f.jet, Math.round(caso(170, 250))); f.caccia = true; f.schianto = false;
+    corsa.cdVolo = Math.round(caso(280, 420));
+    f.pensa = 2;
+  }
+  function pensaVoloCorsa(f) {
+    const q = orda;
+    const z = q.fase === "lotta" && f.jet > 30 ? volanteVicino(f, 520 * S) : null;
+    if (!z) { atterraCorsa(f); return; }
+    const b = f.p.bacino, lato = b.x <= z.x ? -1 : 1;
+    f.dir = -lato;
+    f.meta = Math.max(q.l + 20 * S, Math.min(q.r - 20 * S, z.x + lato * 24 * S));
+    // Il bacino un po' sotto il volante: i pugni partono all'altezza delle spalle.
+    f.volaY = Math.max(testataBasso + 60 * S, Math.min(q.base - 50 * S, z.y + 16 * S));
+    const dx = Math.abs(z.x - b.x), dy = Math.abs(z.y - (b.y - 16 * S));
+    if (dx < 42 * S && dy < 28 * S) {
+      f.zMira = z;
+      inizia(f, scegli([[3, "pugno"], [3, "calcio"], [2, "montante"], [2, "diretto"]]));
+      return;
+    }
+    f.pensa = 3;
+  }
+  function atterraCorsa(f) {
+    const q = orda, c = corsa;
+    f.jet = Math.min(f.jet, 18); f.meta = f.cx; f.pensa = 10; f.caccia = false; f.zMira = null;
+    // Sotto c'è folla: giù in picchiata, e lo schianto all'arrivo (vedi `aggiornaCorsa`).
+    const sotto = q.zombie.filter((z) => vivoZ(z) && !z.volo && Math.abs(z.x - f.p.bacino.x) < 100 * S).length;
+    if (sotto >= 2 && f.p.bacino.y < q.base - 70 * S) {
+      f.schianto = true; f.jet = Math.min(f.jet, 2);
+      for (const n in f.p) f.p[n].oy -= 7 * S;
+      if (c) c.cdVolo = Math.max(c.cdVolo, 160);
+    }
+  }
+  // Lo schianto: l'eroe arriva a terra in mezzo alla folla, e quelli intorno volano via.
+  function schiantoCorsa(f) {
+    const q = orda, x = f.p.bacino.x, R = 105 * S;
+    f.schianto = false;
+    if (corsa) corsa.schianti = (corsa.schianti || 0) + 1;
+    let presi = 0;
+    for (const z of q.zombie) {
+      if (!vivoZ(z) || z.volo || Math.abs(z.x - x) > R) continue;
+      const via = z.x >= x ? 1 : -1, c = corpoZ(z);
+      colpoArma({ z, x: c[0], y: c[1] }, 1.6 * vitaZombie(), via, 9, "schianto");
+      if (vivoZ(z)) { z.vx = via * 8 * S * (pesante(z) ? 0.35 : 1); z.botta = Math.max(z.botta, pesante(z) ? 40 : 50); }
+      presi++;
+    }
+    polvere(x - 12 * S, q.base - 1, 8); polvere(x + 12 * S, q.base - 1, 8);
+    if (particelle.length < MAX_PARTICELLE - 2) {
+      particelle.push({ tipo: "onda", x, y: q.base - 6 * S, vx: 0, vy: 0, vita: 18, max: 18, colore: "#ffffff" });
+      particelle.push({ tipo: "onda", x, y: q.base - 6 * S, vx: 0, vy: 0, vita: 26, max: 26, colore: coloreCorsa() });
+    }
+    scossa = Math.max(scossa, 12); fermoColpo = Math.max(fermoColpo, 4);
+    suona("boom", x, 0.7);
+    scrivi("SBAM!", x, q.base - 70 * S, true);
+    return presi;
+  }
+
   // L'eroe da solo contro l'orda: picchia quello che ha a portata, spara a chi
   // arriva, va incontro al più vicino.
   function pensaSolo(f) {
     const q = orda;
     if (q.fase !== "lotta") { f.pensa = 10; return; }
+    if (puoDecollareCorsa(f)) { decollaCorsa(f); return; }
     const z = zombieVicino(f.cx, 40 * S);
     if (z) {
       f.dir = z.x >= f.cx ? 1 : -1; f.zMira = z;
@@ -12539,6 +12884,7 @@
     if (k > 0.005) { ctx.strokeStyle = pronto ? "#ffffff" : "#56b8ff"; ctx.lineWidth = 4 * S; ctx.beginPath(); ctx.arc(x0, y0, R + 4 * S, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, k)); ctx.stroke(); }
     scriviUI("\u{1F3AF}", x0, y0 - 6 * S, 20 * S, "#ffffff", "center");
     scriviUI(dici("Finale"), x0, y0 + 15 * S, 9 * S, pronto ? "#17171c" : GRIGIO_UI, "center");
+    if (tastoDi("finale")) { pannelloUI(x0 + R * 0.55, y0 - R - 2 * S, 16 * S, 14 * S, 4 * S, null, "#17171c"); scriviUI(tastoDi("finale"), x0 + R * 0.55 + 8 * S, y0 - R + 5 * S, 9 * S, ORO, "center", 900); }
     tastiUI.push({ x: x0 - R, y: y0 - R, w: 2 * R, h: 2 * R, fa: () => tastoFinale() });
     for (let i = 0; i < 3; i++) {
       const x = x0 + sx * (R + 18 * S + r + i * (2 * r + 10 * S)), y = y0, id = c.slot[i];
@@ -12547,7 +12893,7 @@
       if (!id) ctx.setLineDash([4 * S, 4 * S]);
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
       if (id) { scriviUI(OGGETTI[id].icona, x, y + 1, 18 * S, "#ffffff", "center"); tastiUI.push({ x: x - r, y: y - r, w: 2 * r, h: 2 * r, fa: () => usaOggetto(i) }); }
-      scriviUI(String(i + 1), x + r * 0.72, y - r * 0.72, 9 * S, GRIGIO_UI, "center");
+      scriviUI(tastoDi("oggetto" + (i + 1)) || String(i + 1), x + r * 0.72, y - r * 0.72, 9 * S, tastiera ? ORO : GRIGIO_UI, "center");
     }
     // Le armi e i loro livelli (una stella per l'evoluzione).
     const armi = Object.keys(c.armi), ya = y0 + R + 22 * S;
@@ -12758,6 +13104,10 @@
   const corsaModale = () => !!(classifica.aperta || (corsa && (corsa.fase === "scelta" || corsa.fase === "fine" || corsa.scelta || corsa.forziere)));
 
   window.__ring = {
+    // Solo per i test: un tasto premuto (il codice fisico, come `e.code`), e la mappa dei tasti.
+    tastoGiu: (code, opz) => { let fermato = false; premiTasto(Object.assign({ code, repeat: false, target: null, preventDefault() {}, stopPropagation() { fermato = true; } }, opz || {})); return fermato; },
+    mappaTasti: () => Object.assign({}, mappaTasti),
+    rimappa: (id) => { rimappa = id; },
     // Solo per i test: il conto dei K.O., una creatura, una nube.
     punti: (robot, mela) => { punteggio.robot = robot; punteggio.mela = mela; },
     creatura: (el, per, x) => { nuovaCreatura(el, x === undefined ? W / 2 : x, pavimento - 40 * S, per); },
@@ -12901,10 +13251,11 @@
                      onde: (corsa.onde || []).length, dardi: (corsa.dardi || []).length, lame: (corsa.lame || []).length, telefoni: corsa.telefoni ? corsa.telefoni.length : 0, bottega: !!corsa.bottega,
                      imprevisti: (corsa.imprevisti || []).slice(), invuln: corsa.invuln || 0, scudo: corsa.scudo || 0, scadenza: corsa.scadenza || 0,
                      tiri: (corsa.tiri || []).length, pozze: (corsa.pozze || []).length, sbloccati: (corsa.sbloccati || []).slice(), nuovo: corsa.nuovo || null,
-                     protagonisti: (corsa.protagonisti || []).slice(), frenesia: corsa.frenesia || 0, gelato: corsa.gelato || 0, minuti: (corsa.tLotta || 0) / 3600, sorprese: corsa.sorprese || 0,
+                     protagonisti: (corsa.protagonisti || []).slice(), frenesia: corsa.frenesia || 0, gelato: corsa.gelato || 0, minuti: (corsa.tLotta || 0) / 3600, sorprese: corsa.sorprese || 0, schianti: corsa.schianti || 0,
                      tasti: tastiUI.length, modale: corsaModale() } : null,
     classifica: { aperta: classifica.aperta, voci: classifica.voci ? classifica.voci.length : null }, recordCorsa, banca, bottega: Object.assign({}, bottega),
     audio: { acceso: audio.acceso, pronto: !!audio.ctx, anelli: Object.keys(audio.anelli).filter((k) => audio.anelli[k]) },
+    tastiera: { attiva: tastiera, rimappa, chi: radiale.chi, controller: radiale.aperto },
     mira: mira ? (() => { const o = origineMira(mira), e = fineMira(o, mira.dir, mira.a);
                           return { a: mira.a, v: mira.v, dir: mira.dir, t: mira.t, da: mira.da.tipo, resta: Math.max(0, MIRA.attesa - mira.t), ox: o.x, oy: o.y, fx: e.x, fy: e.y }; })() : null,
     lampoMira: lampoMira ? { ox: lampoMira.ox, oy: lampoMira.oy, fx: lampoMira.fx, fy: lampoMira.fy, t: lampoMira.t, preso: lampoMira.preso } : null,

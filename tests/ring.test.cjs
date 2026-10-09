@@ -3480,7 +3480,7 @@ test("la corsa: le varianti potenziate, e nel ring libero non escono mai", () =>
   amb.avanza(60); r.comandi.colpo("zombie");
   const visti = new Set();
   amb.avanza(60 * 90, (s) => { if (s.orda) for (const z of s.orda.zombie) visti.add(z.tipo); });
-  for (const t of ["corazzato", "rabbioso", "capo", "botto", "gelido", "saltatore", "sputatore", "doro", "dragoFuoco", "dragoFulmine", "dragoVeleno"]) assert.ok(!visti.has(t), t + " nel ring libero");
+  for (const t of ["corazzato", "rabbioso", "capo", "botto", "gelido", "saltatore", "sputatore", "doro", "dragoFuoco", "dragoFulmine", "dragoVeleno", "corvo"]) assert.ok(!visti.has(t), t + " nel ring libero");
   // Nella corsa, il round del capo ha il capo.
   const { amb: a2, r: r2 } = corsaAvviata({}, "mela", 99);
   avanzaCorsa(a2, r2, 200); r2.corsa.prossimo("boss"); r2.corsa.vinci();
@@ -3718,6 +3718,44 @@ test("la corsa: le sorprese, lo zombie d'oro, la pioggia di gemme, il forziere c
   dentro(amb);
 });
 
+test("la corsa: in ogni round nemici da terra e in volo insieme, e i volanti cambiano quota", () => {
+  const { amb, r } = corsaAvviata({}, "robot", 17);
+  const aria = new Set(), terra = new Set(), quote = new Map();
+  avanzaCorsa(amb, r, 60 * 40, (s) => {
+    if (s.orda) for (const z of s.orda.zombie) {
+      if (z.stato === "giu") continue;
+      (z.volo ? aria : terra).add(s.corsa.round);
+      if (z.volo && z.stato === "va") { const k = s.orda.zombie.indexOf(z) + ":" + z.tipo; const q = quote.get(k) || [1e9, -1e9]; quote.set(k, [Math.min(q[0], z.y), Math.max(q[1], z.y)]); }
+    }
+    return s.corsa.fase !== "fine";
+  });
+  const round = [...terra].filter((n) => n >= 1);
+  assert.ok(round.length >= 2, "almeno due round giocati");
+  for (const n of round) if (amb.stato().corsa.round > n) assert.ok(aria.has(n), "nel round " + n + " c'è anche chi vola");
+  assert.ok([...quote.values()].some(([a, b]) => b - a > 40), "i volanti salgono e scendono, non stanno a una quota sola");
+});
+
+test("la corsa: l'eroe vola a prendere i volanti, e torna giù di schianto sulla folla", () => {
+  const { amb, r } = corsaAvviata({}, "robot", 23);
+  inLotta(amb, r);
+  r.corsa.arma("dardi", 0);
+  for (const dx of [-160, 170, 240]) vicinoAllEroe(amb, r, "corvo", Math.abs(dx));
+  let vola = false, alto = 0;
+  avanzaCorsa(amb, r, 60 * 20, (s) => {
+    const f = s.lottatori.find((l) => l.tipo === "robot");
+    if (f.vola) { vola = true; alto = Math.max(alto, s.orda.base - f.bacino.y); }
+    return !(vola && alto > 70);
+  });
+  assert.ok(vola, "con i volanti in alto l'eroe decolla");
+  assert.ok(alto > 70, "e sale davvero: " + Math.round(alto));
+  // Mentre è in aria, sotto si raduna la folla: quando torna giù ci piomba sopra.
+  const f = amb.lottatore("robot");
+  for (const dx of [-40, -20, 25, 45]) r.zombie("lento", f.bacino.x + dx);
+  avanzaCorsa(amb, r, 60 * 15, (s) => s.corsa.schianti === 0 && s.corsa.fase === "lotta");
+  assert.ok(amb.stato().corsa.schianti > 0, "lo schianto sulla folla");
+  dentro(amb);
+});
+
 test("la corsa: col passare dei minuti gli zombie reggono di più e mordono più forte", () => {
   const { amb, r } = corsaAvviata({}, "robot", 9);
   inLotta(amb, r);
@@ -3733,6 +3771,93 @@ test("la corsa: col passare dei minuti gli zombie reggono di più e mordono più
   const dDopo = hp - amb.stato().corsa.hp;
   assert.ok(forte > debole * 3, "al quarto minuto uno zombie regge molto di più: " + debole + " → " + forte);
   assert.ok(dDopo > dPrima * 2, "e lo stesso colpo fa più male: " + dPrima + " → " + dDopo);
+});
+
+// ·· LA TASTIERA (09/10/2026) ··
+test("la tastiera: Q W E… fanno le mosse del controller, A e D camminano, Z mira e spara; mai mentre si scrive", () => {
+  const amb = ambiente({});
+  const r = amb.finestra.__ring;
+  amb.avanza(60);
+  const chi = amb.stato().tastiera.chi;
+  // (se in quel momento è a terra, si riprova finché si rialza)
+  let fatto = false;
+  for (let i = 0; i < 60 && !fatto; i++) { fatto = r.tastoGiu("KeyQ"); if (!fatto) amb.avanza(5); }
+  assert.ok(fatto, "Q: la prima mossa del controller parte");
+  assert.ok(["pugno", "avanza"].includes(amb.lottatore(chi).azione), "un pugno (o la corsa per arrivarci): " + amb.lottatore(chi).azione);
+  assert.strictEqual(r.tastoGiu("KeyQ", { target: { tagName: "INPUT" } }), false, "nei campi di testo i tasti sono di chi scrive");
+  assert.strictEqual(r.tastoGiu("KeyQ", { ctrlKey: true }), false, "con Ctrl i tasti sono del browser");
+  assert.strictEqual(r.tastoGiu("KeyM"), false, "un tasto senza azione resta alla pagina");
+  amb.avanza(60);
+  // A: verso sinistra.
+  let x0 = null, mosso = false;
+  for (let i = 0; i < 80 && !mosso; i++) {
+    const f = amb.lottatore(chi);
+    if (x0 === null && r.tastoGiu("KeyA")) x0 = f.bacino.x;
+    else if (x0 !== null) { r.tastoGiu("KeyA", { repeat: true }); mosso = f.bacino.x < x0 - 25; }
+    amb.avanza(4);
+  }
+  assert.ok(mosso, "A tenuto premuto: si cammina a sinistra");
+  // G cambia chi si comanda; H apre il controller.
+  r.tastoGiu("KeyG");
+  assert.notStrictEqual(amb.stato().tastiera.chi, chi, "G: si passa all'altro");
+  const aperto = amb.stato().tastiera.controller;
+  r.tastoGiu("KeyH");
+  assert.strictEqual(amb.stato().tastiera.controller, !aperto, "H: il controller si apre e si chiude");
+  // Z: la mira; Z di nuovo: si spara.
+  let mirando = false;
+  for (let i = 0; i < 60 && !mirando; i++) { r.tastoGiu("KeyZ"); mirando = !!amb.stato().mira; if (!mirando) amb.avanza(5); }
+  assert.ok(mirando, "Z apre la mira");
+  r.tastoGiu("KeyZ");
+  amb.avanza(2);
+  assert.ok(!amb.stato().mira, "e Z spara");
+  dentro(amb);
+});
+
+test("la tastiera nella corsa: A sceglie il robot, Q W E le carte, X C V gli oggetti, Z il colpo finale", () => {
+  const amb = ambiente({});
+  const r = amb.finestra.__ring;
+  amb.avanza(30); r.corsa.apri(5); amb.avanza(20);
+  assert.ok(r.tastoGiu("KeyA"), "A: si gioca col robot (sta a sinistra)");
+  assert.strictEqual(amb.stato().corsa.chi, "robot");
+  avanzaCorsa(amb, r, 200);
+  r.corsa.esperienza(40); amb.avanza(2);
+  assert.ok(amb.stato().corsa.carte, "un livello: le carte");
+  assert.ok(r.tastoGiu("KeyW"), "W prende la seconda carta");
+  assert.ok(!amb.stato().corsa.carte || amb.stato().corsa.liv > 1);
+  avanzaCorsa(amb, r, 5);
+  r.corsa.ferisci(40);
+  const hp = amb.stato().corsa.hp;
+  r.corsa.dai("pozione", 1);
+  assert.ok(r.tastoGiu("KeyC"), "C usa il secondo oggetto");
+  assert.ok(amb.stato().corsa.hp > hp, "la pozione cura");
+  r.corsa.energia(100);
+  let partito = false;
+  for (let i = 0; i < 60 && !partito; i++) { partito = r.tastoGiu("KeyZ"); if (!partito) avanzaCorsa(amb, r, 5); }
+  assert.ok(partito && amb.stato().mira, "Z: il colpo finale parte con la mira");
+});
+
+test("la tastiera si rimappa: il tasto nuovo si scambia col vecchio, e resta nel browser", () => {
+  const amb = ambiente({});
+  const r = amb.finestra.__ring;
+  amb.avanza(30);
+  assert.strictEqual(r.mappaTasti().mossa1, "KeyQ", "di serie: Q");
+  assert.strictEqual(r.mappaTasti().sinistra, "KeyA");
+  assert.strictEqual(r.mappaTasti().finale, "KeyZ");
+  r.rimappa("mossa1");
+  r.tastoGiu("KeyL");
+  assert.strictEqual(r.mappaTasti().mossa1, "KeyL");
+  r.rimappa("mossa1");
+  r.tastoGiu("KeyW");
+  assert.strictEqual(r.mappaTasti().mossa1, "KeyW");
+  assert.strictEqual(r.mappaTasti().mossa2, "KeyL", "W era della seconda mossa: le due si scambiano");
+  r.rimappa("finale");
+  r.tastoGiu("Escape");
+  assert.strictEqual(r.mappaTasti().finale, "KeyZ", "Esc annulla");
+  const salvati = JSON.parse(amb.memoria["mut-ring-tasti"]);
+  assert.strictEqual(salvati.mossa1, "KeyW");
+  const dopo = ambiente({ memoria: { "mut-ring-tasti": amb.memoria["mut-ring-tasti"] } });
+  dopo.avanza(10);
+  assert.strictEqual(dopo.finestra.__ring.mappaTasti().mossa2, "KeyL", "alla visita dopo i tasti sono quelli scelti");
 });
 
 // ·· L'AUDIO (09/10/2026) ··

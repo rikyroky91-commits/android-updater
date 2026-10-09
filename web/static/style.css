@@ -1438,6 +1438,18 @@ html.natale .testata::after {
 @media print { .natale-tela { display: none; } }
 
 /* ======================================================================
+   HALLOWEEN (09/10/2026) — `html.halloween`, acceso da solo in stagione
+   (1° ottobre - 2 novembre) e dal tasto con la zucca. Zucche, lucine,
+   zombie, mani che camminano, pipistrelli e ragnatele li disegna
+   `halloween.js` su un canvas che non riceve clic. Qui: il tasto e le
+   iniziali del marchio color zucca.
+   ====================================================================== */
+.halloween-tasto[aria-pressed="true"] { background: #e8691b; border-color: #e8691b; color: #fff; }
+.halloween-tela { position: fixed; top: 0; left: 0; z-index: 19; pointer-events: none; display: block; }
+html.halloween .marchio .iniziale, html.halloween .pieduccio .sigla .iniziale:first-child { color: #ff8a1a; text-shadow: 0 0 10px rgba(255,138,26,.45); }
+@media print { .halloween-tela { display: none; } }
+
+/* ======================================================================
    CODICE MODELLO ACCANTO AL NOME (30/09/2026)
    ====================================================================== */
 .codice-modello {
@@ -1644,6 +1656,15 @@ html.ring-trema .pieduccio { animation-duration: .31s; }
 .ring-tasto:hover { border-color: var(--verde); }
 .ring-tasto[aria-pressed="true"] { background: var(--verde); border-color: var(--verde); color: var(--su-tinta, #fff); }
 .ring-tasto:disabled { opacity: .45; cursor: not-allowed; }
+/* La tastiera del ring (09/10/2026): una riga per azione, il tasto a destra si clicca per cambiarlo. */
+.ring-tasti { display: grid; gap: .25rem; }
+.ring-tasti[hidden] { display: none; }
+.ring-tasti-riga { display: flex; align-items: center; justify-content: space-between; gap: .5rem; font-size: .82rem; }
+.ring-chiave { min-width: 2.6rem; padding: .2rem .5rem; border-radius: .4rem; border: 1px solid var(--bordo-firmware, #d4d0c8); border-bottom-width: 3px;
+  background: var(--carta, #fff); color: inherit; font: 800 .8rem/1.2 Archivo, sans-serif; cursor: pointer; }
+.ring-nota { font-size: .78rem; color: var(--testo-nota, #514f4e); margin: 0 0 .4rem; }
+.ring-chiave:hover { border-color: var(--verde); }
+.ring-chiave[aria-pressed="true"] { background: var(--verde); border-color: var(--verde); color: var(--su-tinta, #fff); }
 .ring-scelta { flex: 1; font-weight: 600; display: flex; justify-content: space-between; }
 .ring-scelta span { font-weight: 400; opacity: .75; }
 .ring-piccolo { padding: .2rem .5rem; font-size: .78rem; }
