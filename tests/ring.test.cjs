@@ -3585,6 +3585,8 @@ function inLotta(amb, r) {
 }
 // Uno zombie a una certa distanza dall'eroe, dalla parte dove c'è più posto.
 function vicinoAllEroe(amb, r, tipo, distanza) {
+  // (finito il round, si aspetta il prossimo con l'orda)
+  if (!amb.stato().orda || amb.stato().orda.fase !== "lotta" || amb.stato().corsa.fase !== "lotta") { r.corsa.prossimo("ondata"); inLotta(amb, r); }
   const s = amb.stato(), f = amb.lottatore(s.corsa.chi), lato = f.bacino.x < 600 ? 1 : -1;
   r.zombie(tipo, f.bacino.x + lato * distanza);
   return amb.stato().orda.zombie[amb.stato().orda.zombie.length - 1];
@@ -3682,25 +3684,31 @@ test("la corsa: il botto scoppia, il gelido rallenta, il saltatore salta, lo spu
   vicinoAllEroe(amb, r, "botto", 60);
   let scoppiato = false;
   const hp0 = amb.stato().corsa.hp, u0 = amb.stato().corsa.uccisi;
-  avanzaCorsa(amb, r, 60 * 8, (s) => { scoppiato = !s.orda.zombie.some((z) => z.tipo === "botto" && z.stato !== "giu"); return !scoppiato; });
+  avanzaCorsa(amb, r, 60 * 8, (s) => { scoppiato = !(s.orda && s.orda.zombie.some((z) => z.tipo === "botto" && z.stato !== "giu")); return !scoppiato; });
   assert.ok(scoppiato, "il botto è scoppiato (o è stato abbattuto prima)");
   assert.ok(amb.stato().corsa.uccisi > u0 || amb.stato().corsa.hp < hp0, "e qualcosa è successo");
   // Il gelido: il suo morso rallenta.
   // (se l'eroe lo abbatte prima che morda, ne arriva un altro)
   let gelato = 0;
-  for (let i = 0; i < 12 && !gelato; i++) {
-    if (!amb.stato().orda.zombie.some((z) => z.tipo === "gelido" && z.stato !== "giu")) vicinoAllEroe(amb, r, "gelido", 40);
+  for (let i = 0; i < 30 && !gelato; i++) {
+    if (!amb.stato().orda || !amb.stato().orda.zombie.some((z) => z.tipo === "gelido" && z.stato !== "giu")) vicinoAllEroe(amb, r, "gelido", 40);
     avanzaCorsa(amb, r, 60 * 2, (s) => { gelato = Math.max(gelato, s.corsa.gelato); return gelato === 0; });
   }
   // Il saltatore: da lontano salta, e in volo sta più in alto del terreno.
-  vicinoAllEroe(amb, r, "saltatore", 160);
+  // (se l'eroe lo abbatte prima, o gli è già addosso, ne arriva un altro da lontano)
   let salto = 0;
-  avanzaCorsa(amb, r, 60 * 8, (s) => { for (const z of s.orda.zombie) if (z.tipo === "saltatore" && z.stato === "salto") salto = Math.max(salto, s.orda.base - z.y); return salto < 20; });
+  for (let i = 0; i < 12 && salto < 20; i++) {
+    if (amb.stato().corsa.fase !== "lotta") { r.corsa.prossimo("ondata"); inLotta(amb, r); r.corsa.senzaVolo(); }
+    vicinoAllEroe(amb, r, "saltatore", 170);
+    avanzaCorsa(amb, r, 60 * 2, (s) => { if (s.orda) for (const z of s.orda.zombie) if (z.tipo === "saltatore" && z.stato === "salto") salto = Math.max(salto, s.orda.base - z.y); return salto < 20 && s.corsa.fase === "lotta"; });
+  }
   assert.ok(salto >= 20, "il saltatore si alza da terra: " + salto);
   // Lo sputatore: resta a distanza e sputa.
-  vicinoAllEroe(amb, r, "sputatore", 200);
   let sputa = false;
-  avanzaCorsa(amb, r, 60 * 8, (s) => { sputa = sputa || s.orda.zombie.some((z) => z.tipo === "sputatore" && z.stato === "sputa"); return !sputa; });
+  for (let i = 0; i < 12 && !sputa; i++) {
+    if (!amb.stato().orda || !amb.stato().orda.zombie.some((z) => z.tipo === "sputatore" && z.stato !== "giu")) vicinoAllEroe(amb, r, "sputatore", 200);
+    avanzaCorsa(amb, r, 60 * 2, (s) => { sputa = sputa || !!(s.orda && s.orda.zombie.some((z) => z.tipo === "sputatore" && z.stato === "sputa")); return !sputa && s.corsa.fase === "lotta"; });
+  }
   assert.ok(sputa, "lo sputatore sputa da lontano");
   assert.ok(gelato > 0, "il morso del gelido rallenta");
   dentro(amb);
