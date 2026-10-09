@@ -4958,6 +4958,7 @@
   // La manata del grosso butta a terra subito.
   function morso(z, f) {
     if (f.coppia || f.riparo > 0) return;              // a metà di una mossa in coppia (e un attimo dopo) non lo prendono
+    if (f.schianto) return;                             // l'eroe che piomba sulla folla: arriva lui, non lo mordono
     const x = (z.x + f.p.collo.x) / 2, y = f.p.collo.y + 4 * S, grosso = pesante(z);
     if (f.azione === "para" && f.dir === -z.dir) {
       scintille(x, y, 5, "#bfe9ff"); scrivi("PARATO!", x, y - 8 * S, false);
@@ -4997,6 +4998,12 @@
     // Quelli rimasti si sbriciolano.
     for (const z of q.zombie) if (z.stato !== "giu") { z.stato = "giu"; z.s = 0; z.cade = -z.dir; polvere(z.x, q.base - 20 * S, 4); }
     for (const f of lottatori) { f.zMira = null; f.cinque = false; f.ordine = null; if (!f.ko && !f.esploso && !f.preso && !f.tenuto) { f.azione = null; f.pensa = 6; } }
+  }
+  // Da terra lo zombie arriva a chi sta sul suo stesso piano; nella corsa anche all'eroe che vola
+  // basso (09/10 notte): gli afferra le gambe. Lassù in alto invece è al sicuro, ma solo lassù.
+  function daTerra(l, q) {
+    if (!(l.jet > 0)) return Math.abs(Math.min(pavimento, l.base) - q.base) < 26 * S;
+    return !!(corsa && corsa.chi && l.tipo === corsa.chi && Math.max(l.p.piedeA.y, l.p.piedeD.y) > q.base - 62 * S);
   }
   function aggiornaOrda() {
     const q = orda;
@@ -5076,11 +5083,11 @@
       let f = null, d0 = 1e9;
       for (const l of lottatori) {
         if (!l.p || l.esploso || l.fuori || l.fuoriCampo || l.ko > 0) continue;
-        const d = Math.abs(l.p.bacino.x - z.x) + (Math.abs(Math.min(pavimento, l.base) - q.base) > 26 * S || l.jet > 0 ? 400 * S : 0);
+        const d = Math.abs(l.p.bacino.x - z.x) + (daTerra(l, q) ? 0 : 400 * S);
         if (d < d0) { d0 = d; f = l; }
       }
       if (!f) { z.fase += 0.04; continue; }                  // tutti a terra: ciondola e aspetta
-      const dx = f.p.bacino.x - z.x, sopra = Math.abs(Math.min(pavimento, f.base) - q.base) < 26 * S && !(f.jet > 0);
+      const dx = f.p.bacino.x - z.x, sopra = daTerra(f, q);
       z.dir = dx >= 0 ? 1 : -1;
       if (corsa && specialeZombie(z, q, Z, f, dx, sopra)) continue;
       if (z.stato === "colpo") {
@@ -12304,7 +12311,8 @@
         if (f.ko > 0 || f.esploso) f.schianto = false;
         else if (piede > orda.base - 8 * S) schiantoCorsa(f);
       }
-      if (f && f.caccia && !(f.jet > 0)) f.caccia = false;
+      // Finito il carburante a mezz'aria (senza passare da `atterraCorsa`): anche così, sulla folla si piomba.
+      if (f && f.caccia && !(f.jet > 0)) { f.caccia = false; if (orda && f.p && !(f.ko > 0) && !f.schianto) preparaSchianto(f, orda, c); }
     }
     if (c.fase === "fine") { if (sulSito && classifica.voci && passi - classifica.letta > 600) caricaClassifica(); return; }
     if (!c.chi) return;
@@ -12382,7 +12390,7 @@
     if (!c || c.cdVolo > 0 || verso < 0 || f.jet > 0 || f.ko > 0 || f.tel || mira || !f.p || c.fase !== "lotta") return false;
     if (!orda.zombie.some(inAlto)) return false;
     // Se ha uno zombie addosso, prima se lo toglie (tranne una volta ogni tanto: si scappa in alto).
-    if (zombieVicino(f.cx, 34 * S) && Math.random() < 0.8) return false;
+    if (zombieVicino(f.cx, 34 * S) && Math.random() < 0.5) return false;
     return true;
   }
   function decollaCorsa(f) {
@@ -12401,7 +12409,8 @@
     f.dir = -lato;
     f.meta = Math.max(q.l + 20 * S, Math.min(q.r - 20 * S, z.x + lato * 24 * S));
     // Il bacino un po' sotto il volante: i pugni partono all'altezza delle spalle.
-    f.volaY = Math.max(testataBasso + 60 * S, Math.min(q.base - 50 * S, z.y + 16 * S));
+    // (mai più basso delle teste degli zombie da terra: lassù non lo raggiungono, e lo si vede in volo)
+    f.volaY = Math.max(testataBasso + 60 * S, Math.min(q.base - 85 * S, z.y + 16 * S));
     const dx = Math.abs(z.x - b.x), dy = Math.abs(z.y - (b.y - 16 * S));
     if (dx < 42 * S && dy < 28 * S) {
       f.zMira = z;
@@ -12413,13 +12422,16 @@
   function atterraCorsa(f) {
     const q = orda, c = corsa;
     f.jet = Math.min(f.jet, 18); f.meta = f.cx; f.pensa = 10; f.caccia = false; f.zMira = null;
-    // Sotto c'è folla: giù in picchiata, e lo schianto all'arrivo (vedi `aggiornaCorsa`).
+    preparaSchianto(f, q, c);
+  }
+  // Sotto c'è folla: giù in picchiata, e lo schianto all'arrivo (vedi `aggiornaCorsa`).
+  function preparaSchianto(f, q, c) {
     const sotto = q.zombie.filter((z) => vivoZ(z) && !z.volo && Math.abs(z.x - f.p.bacino.x) < 100 * S).length;
-    if (sotto >= 2 && f.p.bacino.y < q.base - 70 * S) {
-      f.schianto = true; f.jet = Math.min(f.jet, 2);
-      for (const n in f.p) f.p[n].oy -= 7 * S;
-      if (c) c.cdVolo = Math.max(c.cdVolo, 160);
-    }
+    if (sotto < 2 || f.p.bacino.y > q.base - 60 * S) return false;
+    f.schianto = true; f.jet = Math.min(f.jet, 2);
+    for (const n in f.p) f.p[n].oy -= 7 * S;
+    if (c) c.cdVolo = Math.max(c.cdVolo, 160);
+    return true;
   }
   // Lo schianto: l'eroe arriva a terra in mezzo alla folla, e quelli intorno volano via.
   function schiantoCorsa(f) {
@@ -13251,7 +13263,7 @@
                      onde: (corsa.onde || []).length, dardi: (corsa.dardi || []).length, lame: (corsa.lame || []).length, telefoni: corsa.telefoni ? corsa.telefoni.length : 0, bottega: !!corsa.bottega,
                      imprevisti: (corsa.imprevisti || []).slice(), invuln: corsa.invuln || 0, scudo: corsa.scudo || 0, scadenza: corsa.scadenza || 0,
                      tiri: (corsa.tiri || []).length, pozze: (corsa.pozze || []).length, sbloccati: (corsa.sbloccati || []).slice(), nuovo: corsa.nuovo || null,
-                     protagonisti: (corsa.protagonisti || []).slice(), frenesia: corsa.frenesia || 0, gelato: corsa.gelato || 0, minuti: (corsa.tLotta || 0) / 3600, sorprese: corsa.sorprese || 0, schianti: corsa.schianti || 0,
+                     protagonisti: (corsa.protagonisti || []).slice(), frenesia: corsa.frenesia || 0, gelato: corsa.gelato || 0, minuti: (corsa.tLotta || 0) / 3600, sorprese: corsa.sorprese || 0, schianti: corsa.schianti || 0, cdVolo: corsa.cdVolo || 0,
                      tasti: tastiUI.length, modale: corsaModale() } : null,
     classifica: { aperta: classifica.aperta, voci: classifica.voci ? classifica.voci.length : null }, recordCorsa, banca, bottega: Object.assign({}, bottega),
     audio: { acceso: audio.acceso, pronto: !!audio.ctx, anelli: Object.keys(audio.anelli).filter((k) => audio.anelli[k]) },

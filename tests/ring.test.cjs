@@ -3739,19 +3739,26 @@ test("la corsa: l'eroe vola a prendere i volanti, e torna giù di schianto sulla
   const { amb, r } = corsaAvviata({}, "robot", 23);
   inLotta(amb, r);
   r.corsa.arma("dardi", 0);
-  for (const dx of [-160, 170, 240]) vicinoAllEroe(amb, r, "corvo", Math.abs(dx));
+  // (i corvacci si rimettono quando calano: l'eroe deve avere sempre qualcuno in alto da inseguire)
+  const corvi = () => amb.stato().orda.zombie.filter((z) => z.tipo === "corvo" && z.stato !== "giu").length;
   let vola = false, alto = 0;
-  avanzaCorsa(amb, r, 60 * 20, (s) => {
-    const f = s.lottatori.find((l) => l.tipo === "robot");
-    if (f.vola) { vola = true; alto = Math.max(alto, s.orda.base - f.bacino.y); }
-    return !(vola && alto > 70);
-  });
+  for (let i = 0; i < 30 && !(vola && alto > 70); i++) {
+    if (corvi() < 3) for (const d of [170, 240]) vicinoAllEroe(amb, r, "corvo", d);
+    avanzaCorsa(amb, r, 60, (s) => {
+      const f = s.lottatori.find((l) => l.tipo === "robot");
+      if (f.vola) { vola = true; alto = Math.max(alto, s.orda.base - f.bacino.y); }
+      return !(vola && alto > 70);
+    });
+  }
   assert.ok(vola, "con i volanti in alto l'eroe decolla");
   assert.ok(alto > 70, "e sale davvero: " + Math.round(alto));
   // Mentre è in aria, sotto si raduna la folla: quando torna giù ci piomba sopra.
-  const f = amb.lottatore("robot");
-  for (const dx of [-40, -20, 25, 45]) r.zombie("lento", f.bacino.x + dx);
-  avanzaCorsa(amb, r, 60 * 15, (s) => s.corsa.schianti === 0 && s.corsa.fase === "lotta");
+  for (let i = 0; i < 40 && amb.stato().corsa.schianti === 0; i++) {
+    const f = amb.lottatore("robot");
+    if (f.vola && amb.stato().orda.zombie.filter((z) => !z.volo && z.stato !== "giu" && Math.abs(z.x - f.bacino.x) < 90).length < 3) for (const dx of [-30, 30]) r.zombie("lento", f.bacino.x + dx);
+    if (!f.vola && corvi() < 2) vicinoAllEroe(amb, r, "corvo", 200);
+    avanzaCorsa(amb, r, 30, (s) => s.corsa.schianti === 0);
+  }
   assert.ok(amb.stato().corsa.schianti > 0, "lo schianto sulla folla");
   dentro(amb);
 });
