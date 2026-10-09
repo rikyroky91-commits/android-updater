@@ -465,7 +465,7 @@
     fulmini = []; duello = 0; sfida = null; sfidaPausa = 0; orda = null;
     danni = [];
     scritte = []; telefoni = []; particelle = []; evento = null;
-    creature = []; nubi = []; finale = null;
+    creature = []; nubi = []; finale = null; mira = null; lampoMira = null; miraBuio = 0;
     gocce = []; spruzzi = []; bagnato = 0; pioveDa = 0; pioggiaFino = 0; prossimoLampo = 300;
     if (sisma) fineSisma();
     lapilli = []; colate = []; meteore = []; sciame = null; bruciature = [];
@@ -1743,6 +1743,15 @@
     if (bersaglio && bersaglio.closest && bersaglio.closest(".ring-pannello, .ultimora-barra")) return;
     // Nell'estensione i tasti stanno nello shadow DOM: un clic lì non prende lottatori.
     if (ospite && (bersaglio === ospite || (evento.composedPath && evento.composedPath().indexOf(ospite) >= 0))) return;
+    // La mira sta sopra a tutto: il secondo tocco fa partire il colpo.
+    if (mira) {
+      sparaMira();
+      clicMio = true;
+      if (evento.preventDefault) evento.preventDefault();
+      if (evento.stopPropagation) evento.stopPropagation();
+      riparti();
+      return;
+    }
     // I tasti dello scontro di energie: si martellano. Vengono prima di tutto il resto.
     const tasto = sottoTastoSfida(evento.clientX, evento.clientY);
     if (tasto >= 0) {
@@ -1927,7 +1936,7 @@
   window.addEventListener("touchstart", (e) => {
     const t = e.touches && e.touches[0];
     raggioPresa = 30;
-    if (t && !fermo && (qualcosaSotto(t.clientX, t.clientY) || sottoRadiale(t.clientX, t.clientY) > -2 || sottoTastoSfida(t.clientX, t.clientY) >= 0)) e.preventDefault();
+    if (t && !fermo && (mira || qualcosaSotto(t.clientX, t.clientY) || sottoRadiale(t.clientX, t.clientY) > -2 || sottoTastoSfida(t.clientX, t.clientY) >= 0)) e.preventDefault();
   }, { passive: false });
   // Finché si tiene qualcosa col dito la pagina non deve scorrere.
   window.addEventListener("touchmove", (e) => {
@@ -7333,6 +7342,176 @@
     }
     scossa = Math.max(scossa, 26);
   }
+  // ·· LA MIRA DELLA MOSSA FINALE (09/10/2026, chiesta da Riccardo) ··
+  // Premi una volta: il tempo rallenta, si fa buio e dalle mani del personaggio
+  // parte una linea di tiro che ruota su e giù in diagonale, come una lancetta.
+  // Premi la seconda volta: il colpo parte lungo la linea e prende tutto quello
+  // che attraversa. Se non spari entro qualche secondo parte da solo.
+  // `giro` è quanto ruota la linea a ogni tic di fisica e `lento` quanto rallenta
+  // il tempo: insieme fanno una passata in poco più di un secondo. Rallentare di
+  // più rende la linea a scatti, perché la fisica gira meno volte del disegno.
+  // `su` e `giu` sono gli angoli massimi sopra e sotto l'orizzonte, in radianti.
+  const MIRA = { giro: 0.036, attesa: 140, lento: 0.55, spesso: 9, su: 1.0, giu: 0.6 };
+  let mira = null, miraBuio = 0, lampoMira = null;
+  // Il verso: dove sono i nemici più vicini.
+  function versoMira(f) {
+    const x0 = f.p.bacino.x;
+    let meglio = 1e9, dir = f.dir || 1;
+    for (const l of lottatori) if (l !== f && l.p && !l.esploso && !l.fuoriCampo) {
+      const d = Math.abs(l.p.bacino.x - x0); if (d < meglio) { meglio = d; dir = l.p.bacino.x >= x0 ? 1 : -1; }
+    }
+    if (orda) for (const z of orda.zombie) if (vivoZ(z)) {
+      const d = Math.abs(z.x - x0); if (d < meglio) { meglio = d; dir = z.x >= x0 ? 1 : -1; }
+    }
+    return dir;
+  }
+  // Da dove parte la linea: le mani, che nella carica stanno davanti al petto.
+  function origineMira(m) {
+    const p = m.da.p;
+    return { x: (p.manoA.x + p.manoD.x) / 2 + m.dir * 6 * S, y: (p.manoA.y + p.manoD.y) / 2 };
+  }
+  // Fin dove arriva: il bordo della finestra, il pavimento o la striscia in alto.
+  function fineMira(o, dir, a) {
+    const dx = dir * Math.cos(a), dy = Math.sin(a);
+    let k = dx > 0 ? (W - o.x) / dx : o.x / -dx;
+    if (dy > 0.001) k = Math.min(k, (pavimento - o.y) / dy);
+    if (dy < -0.001) k = Math.min(k, (testataBasso - o.y) / dy);
+    k = Math.max(0, k);
+    return { x: o.x + dx * k, y: o.y + dy * k, dx, dy, k };
+  }
+  function avviaMira(f) {
+    if (mira || !f || !f.p || f.esploso || f.ko > 0 || fatale) return false;
+    const dir = versoMira(f);
+    f.dir = dir;
+    mira = { da: f, dir, a: -0.15, v: -MIRA.giro, t: 0, ritmo0: ritmo };
+    ritmo = MIRA.lento;
+    f.azione = null; f.ordine = null; f.pensa = 1e9;                // resta fermo a caricare
+    inizia(f, "carica"); f.durata = 1e9;
+    scrivi("MIRA!", f.p.bacino.x, f.base - 92 * S, true);
+    return true;
+  }
+  function chiudiMira(sparato) {
+    if (!mira) return;
+    const f = mira.da;
+    ritmo = mira.ritmo0;
+    mira = null;
+    if (f && f.p && !f.esploso) { f.azione = null; f.pensa = sparato ? 24 : 10; }
+  }
+  function aggiornaMira() {
+    miraBuio += ((mira ? 0.62 : 0) - miraBuio) * 0.14;
+    if (!mira) return;
+    const m = mira, f = m.da;
+    if (!f.p || f.esploso || f.ko > 0 || f.preso || f.tenuto) { chiudiMira(false); return; }
+    m.t++;
+    f.dir = m.dir;
+    f.ki = Math.max(f.ki || 0, 60);
+    m.a += m.v;
+    if (m.a <= -MIRA.su) { m.a = -MIRA.su; m.v = Math.abs(m.v); }
+    else if (m.a >= MIRA.giu) { m.a = MIRA.giu; m.v = -Math.abs(m.v); }
+    if (m.t % 4 === 0 && particelle.length < MAX_PARTICELLE) {
+      const o = origineMira(m);
+      particelle.push({ tipo: "scintilla", x: o.x + caso(-6, 6) * S, y: o.y + caso(-6, 6) * S, vx: 0, vy: -caso(0.4, 1.4) * S,
+                        vita: 16, max: 16, colore: COLORI_ANIME[f.tipo] || "#56e1ff" });
+    }
+    if (m.t > MIRA.attesa) sparaMira();                            // chi non spara, spara da solo
+  }
+  // Quanto un cerchio sta vicino alla linea: la distanza dal punto più vicino del
+  // segmento, e dove sta quel punto.
+  function sullaLinea(o, e, x, y) {
+    const t = Math.max(0, Math.min(e.k, (x - o.x) * e.dx + (y - o.y) * e.dy));
+    const px = o.x + e.dx * t, py = o.y + e.dy * t;
+    return { d: Math.hypot(x - px, y - py), x: px, y: py };
+  }
+  // Il colpo: un raggio dalle mani fino al bordo, lungo la linea.
+  function sparaMira() {
+    if (!mira) return { presi: 0, zombie: 0 };
+    const m = mira, f = m.da, col = COLORI_ANIME[f.tipo] || "#56e1ff";
+    const o = origineMira(m), e = fineMira(o, m.dir, m.a), largo = MIRA.spesso * S;
+    let presi = 0, zPresi = 0;
+    for (const l of lottatori) {
+      if (l === f || !l.p || l.esploso || l.fuoriCampo) continue;
+      let dove = null;
+      for (const n in l.p) {
+        const q = l.p[n], v = sullaLinea(o, e, q.x, q.y);
+        if (v.d <= (q.r || 4) + largo && (!dove || v.d < dove.d)) dove = v;
+      }
+      if (!dove) continue;
+      presi++;
+      colpisci(f, l, 7.5, dove.x, dove.y, "ZAAAP!");
+    }
+    if (orda) {
+      for (const z of orda.zombie) {
+        if (!vivoZ(z)) continue;
+        const c = corpoZ(z), v1 = sullaLinea(o, e, c[0], c[1]), v2 = sullaLinea(o, e, c[3], c[4]);
+        if (v1.d > c[2] + largo && v2.d > c[5] + largo) continue;
+        zPresi++;
+        colpisciZombie(z, 9, m.dir, z.x, c[1], f);
+      }
+    }
+    for (const c of creature) {
+      if (c.t > c.vita) continue;                                  // c.vita è quanto dura, c.t quanto ha vissuto
+      if (sullaLinea(o, e, c.x, c.y).d > 16 * S + largo) continue;
+      c.vita = c.t; zPresi++;
+      polvere(c.x, c.y, 8);
+    }
+    lampoMira = { ox: o.x, oy: o.y, fx: e.x, fy: e.y, t: 0, colore: col, preso: presi + zPresi > 0 };
+    scossa = Math.max(scossa, 14); fermoColpo = Math.max(fermoColpo, 7);
+    for (let i = 0; i < 26 && particelle.length < MAX_PARTICELLE; i++) {
+      const k = Math.random();
+      particelle.push({ tipo: "scintilla", x: o.x + (e.x - o.x) * k, y: o.y + (e.y - o.y) * k, vx: caso(-3, 3) * S, vy: caso(-2, 2) * S,
+                        vita: Math.round(caso(14, 30)), max: 30, colore: Math.random() < 0.4 ? "#ffffff" : col });
+    }
+    scintille(e.x, e.y, 10, col);                                  // dove il raggio sbatte
+    scrivi(presi + zPresi > 0 ? "PRESO!" : "MANCATO!", f.p.bacino.x + m.dir * 120 * S, f.base - 110 * S, true);
+    chiudiMira(true);
+    return { presi, zombie: zPresi };
+  }
+  function disegnaMira() {
+    if (miraBuio > 0.01) {
+      ctx.save();
+      ctx.fillStyle = "rgba(8,6,18," + (miraBuio * 0.72).toFixed(3) + ")";
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+    if (lampoMira) {
+      // Il colpo appena sparato: un raggio che si allarga e svanisce.
+      const L = lampoMira, k = 1 - L.t / 26, h = MIRA.spesso * S * (0.6 + 1.8 * (1 - k));
+      ctx.save(); ctx.lineCap = "round";
+      ctx.globalAlpha = Math.max(0, k); ctx.strokeStyle = L.colore; ctx.lineWidth = h * 2;
+      ctx.beginPath(); ctx.moveTo(L.ox, L.oy); ctx.lineTo(L.fx, L.fy); ctx.stroke();
+      ctx.globalAlpha = Math.max(0, k * 0.9); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = h * 0.7;
+      ctx.beginPath(); ctx.moveTo(L.ox, L.oy); ctx.lineTo(L.fx, L.fy); ctx.stroke();
+      ctx.restore();
+      if (++L.t > 26) lampoMira = null;
+    }
+    if (!mira) return;
+    const m = mira, f = m.da, col = COLORI_ANIME[f.tipo] || "#56e1ff", pulsa = 0.55 + 0.45 * Math.sin(passi * 0.5);
+    const o = origineMira(m), e = fineMira(o, m.dir, m.a);
+    ctx.save();
+    // Il ventaglio: fin dove arriva la lancetta, in alto e in basso.
+    const R = 70 * S, a0 = m.dir > 0 ? -MIRA.su : Math.PI - MIRA.giu, a1 = m.dir > 0 ? MIRA.giu : Math.PI + MIRA.su;
+    ctx.globalAlpha = 0.18; ctx.fillStyle = col;
+    ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.arc(o.x, o.y, R, a0, a1); ctx.closePath(); ctx.fill();
+    // La linea di tiro, con l'alone.
+    ctx.lineCap = "round";
+    ctx.globalAlpha = 0.28 + 0.2 * pulsa; ctx.strokeStyle = col; ctx.lineWidth = MIRA.spesso * 2 * S;
+    ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(e.x, e.y); ctx.stroke();
+    ctx.globalAlpha = 0.95; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.8 * S;
+    ctx.setLineDash([12 * S, 9 * S]); ctx.lineDashOffset = -passi * 1.4;
+    ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(e.x, e.y); ctx.stroke();
+    ctx.setLineDash([]);
+    // Il mirino dove la linea finisce.
+    ctx.strokeStyle = col; ctx.lineWidth = 2.4 * S;
+    ctx.beginPath(); ctx.arc(e.x, e.y, (9 + 3 * pulsa) * S, 0, Math.PI * 2); ctx.stroke();
+    // Quanto tempo resta, sopra la testa di chi mira.
+    const resta = Math.max(0, 1 - m.t / MIRA.attesa), bx = f.p.bacino.x - 30 * S, by = f.base - 78 * S;
+    ctx.globalAlpha = 0.9; ctx.fillStyle = "#141414";
+    ctx.fillRect(bx, by, 60 * S, 5 * S);
+    ctx.fillStyle = resta > 0.3 ? col : "#e0443a";
+    ctx.fillRect(bx, by, 60 * S * resta, 5 * S);
+    ctx.restore();
+  }
+
   // Il K.O. della mossa finale: uno solo, nel momento che decide la scena.
   function contaFatale() {
     const F = fatale;
@@ -8513,7 +8692,7 @@
     colpoDaMano(a, b); colpoDaMano(b, a);
     aggiornaLame(); aggiornaFulmini();
     aggiornaTelefoni(); aggiornaCreature(); aggiornaNubi(); aggiornaFinale(); aggiornaProiettili(); aggiornaParticelle(); aggiornaEventi(); aggiornaDanni();
-    aggiornaArti(); aggiornaMeteo(); aggiornaSisma(); aggiornaMeteore(); aggiornaBuco(); aggiornaFatale(); aggiornaOrda(); aggiornaOnde(); aggiornaVite();
+    aggiornaArti(); aggiornaMeteo(); aggiornaSisma(); aggiornaMeteore(); aggiornaBuco(); aggiornaFatale(); aggiornaMira(); aggiornaOrda(); aggiornaOnde(); aggiornaVite();
     if (anime) controllaScontro();
     for (const sc of scie) sc.vita--;
     if (scie.length && scie[0].vita <= 0) scie = scie.filter((sc) => sc.vita > 0);
@@ -9677,6 +9856,7 @@
     if (uragano) disegnaUragano();
     disegnaFinale(false);
     disegnaBuioFatale();
+    disegnaMira();
     disegnaVulcano(); disegnaColate(); disegnaMirini();
     for (const t of telefoni) if (t.stato !== "impugnato" && !t.inBuco) disegnaTelefono(t);
     for (const pz of pezzi) disegnaPezzo(pz);
@@ -9790,7 +9970,7 @@
     gocce = []; spruzzi = []; bagnato = 0; piovendo = false; orda = null; sfida = null;
     if (sisma) fineSisma();
     lapilli = []; colate = []; meteore = []; sciame = null; bruciature = [];
-    moltG = 1; ritmo = 1;
+    moltG = 1; ritmo = 1; mira = null; lampoMira = null; miraBuio = 0;
     if (barra && barra.classList) barra.classList.remove("ultimora-guasta", "ultimora-colpita");
     if (faccina && faccina.classList) faccina.classList.remove("stordito");
   }
@@ -9936,6 +10116,12 @@
           f.mutato = true; f.ki = 100; inizia(f, "trasforma"); qualcuno = true;
         }
         if (!qualcuno) return false;
+      }
+      else if (nome === "mira") {
+        // La mira a comando: il primo in piedi apre la linea di tiro. Il secondo tocco spara.
+        if (mira) { sparaMira(); return true; }
+        const pronti = lottatori.filter((f) => f.p && !f.ko && !f.esploso && !f.preso && !f.tenuto);
+        if (!pronti.length || !avviaMira(pronti[Math.floor(Math.random() * pronti.length)])) return false;
       }
       else if (nome === "meteoriti") avviaMeteore();
       else if (nome === "zombie") { if (orda) { if (orda.fase !== "festa") fineOrda(false); } else avviaOrda(0); }
@@ -10250,6 +10436,17 @@
     decolla: (tipo, impazzito) => { const f = lottatori.find((l) => l.tipo === tipo); if (f) decolla(f, !!impazzito); },
     avviaEvento: (nome) => { prossimoEvento = 1e9; prossimaOrda = 1e9; if (nome === "luna") { moltG = 0.45; evento = { nome, durata: 620 }; } },
     danneggiaBordo: (lato, pos, forza) => danneggiaBordo(lato, pos, forza),
+    // Solo per i test: apri la mira, spostala a un'altezza, spara.
+    mira: (tipo) => avviaMira(lottatori.find((l) => l.tipo === tipo) || lottatori[0]),
+    // punta la linea verso un punto della finestra e la ferma lì
+    miraA: (x, y) => {
+      if (!mira) return false;
+      const o = origineMira(mira);
+      mira.dir = x >= o.x ? 1 : -1; mira.da.dir = mira.dir;
+      mira.a = Math.max(-MIRA.su, Math.min(MIRA.giu, Math.atan2(y - o.y, Math.abs(x - o.x)))); mira.v = 0;
+      return true;
+    },
+    spara: () => sparaMira(),
     stato: () => ({ telefoni: telefoni.map((t) => ({ x: t.x, y: t.y, stato: t.stato, tipo: t.tipo })),
     danniBordi: danniBordi.map((d) => d.lato), verso, barreVita, anime, stile, fulmini: fulmini.length, duello,
     tempo, pezzi: pezzi.length, proiettili: proiettili.length,
@@ -10257,6 +10454,9 @@
     fatale: fatale ? { tipo: fatale.tipo, fase: fatale.fase, t: fatale.t, da: fatale.da.tipo, a: fatale.a.tipo, contato: fatale.contato,
                        r: fatale.d && fatale.d.r ? fatale.d.r : 0 } : null,
     fataleRound, fataliFatti, fataleBuio, fataleVoluto, fataleDebito,
+    mira: mira ? (() => { const o = origineMira(mira), e = fineMira(o, mira.dir, mira.a);
+                          return { a: mira.a, v: mira.v, dir: mira.dir, t: mira.t, da: mira.da.tipo, resta: Math.max(0, MIRA.attesa - mira.t), ox: o.x, oy: o.y, fx: e.x, fy: e.y }; })() : null,
+    lampoMira: lampoMira ? { ox: lampoMira.ox, oy: lampoMira.oy, fx: lampoMira.fx, fy: lampoMira.fy, t: lampoMira.t, preso: lampoMira.preso } : null,
     buco: buco ? { x: buco.x, y: buco.y, r: buco.r, fase: buco.fase, dentro: buco.dentro.map((d) => d.tipo), passati: buco.passati, uscita: doveEsce(buco.x, buco.y) } : null,
     arti: arti.length, macchie: macchie.length, acquazzone, natale, uragano: !!uragano, cruento, ritmo,
     pioggia: gocce.length, pioggiaInFondo: gocce.reduce((n, g) => n + (g.y > pavimento * 0.7 ? 1 : 0), 0), piovendo, bagnato, sisma: sisma ? { t: sisma.t, x: sisma.x, alto: sisma.alto, forza: sisma.k } : null,
@@ -10305,7 +10505,7 @@
     }) : ginocchia(f)).map((g) => [g.x, g.y]),
     fuori: f.fuori || 0, tenuto: !!f.tenuto,
     dir: f.dir, forza: f.forza, stordito: f.stordito, rialzo: f.rialzo, inVolo: f.inVolo, fantasma: f.fantasma,
-  })), punteggio: Object.assign({}, punteggio), pavimento, larghezza: W, altezza: H, scala: S,
+  })), punteggio: Object.assign({}, punteggio), pavimento, testataBasso, larghezza: W, altezza: H, scala: S,
     creature: creature.map((c) => ({ el: c.el, x: c.x, y: c.y, per: c.per, colpo: c.colpo })), nubi: nubi.length,
     finale: finale ? { tipo: finale.tipo, t: finale.t, uscito: !!finale.lampo, lancio: !!finale.perso } : null,
     ostacoli: ostacoli.length, riquadri: ostacoli.map((o) => [o.l, o.t, o.r, o.b].map(Math.round)) }) };
