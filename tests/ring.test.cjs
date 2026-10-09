@@ -3368,12 +3368,17 @@ test("la corsa: la mossa finale parte con la mira, e all'ultima possibilità sal
   amb.avanza(30);
   // Serve uno zombie in piedi da colpire dopo.
   amb.avanza(60 * 20, (st) => !(st.orda && st.orda.zombie.some((q) => q.stato === "va" || q.stato === "colpo")));
-  // Tre vite giù: l'ultima possibilità, lenti e col colpo carico.
+  // Tre vite giù: l'ultima possibilità, lenti, e il colpo finale da ricaricare resistendo.
+  r.corsa.energia(0);
   for (let i = 0; i < 3; i++) r.corsa.ferisci(9999);
   let s = amb.stato().corsa;
   assert.strictEqual(s.vite, 0);
   assert.ok(s.ultima, "finite le vite si resta in piedi, all'ultima possibilità");
-  assert.strictEqual(s.energia, 100, "col colpo finale pronto");
+  assert.ok(s.energia < 100, "il colpo finale non si riempie da solo all'improvviso");
+  const e0 = s.energia;
+  amb.avanza(30);
+  assert.ok(amb.stato().corsa.energia > e0, "si ricarica piano, resistendo");
+  r.corsa.energia(100);
   assert.strictEqual(s.fase, "lotta");
   // Il colpo va a segno: round vinto e una vita torna.
   partita = false;

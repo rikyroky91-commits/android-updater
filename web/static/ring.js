@@ -1836,7 +1836,7 @@
     if (corsa && corsa.chi && f && f.tipo === corsa.chi && altro !== f) { altro.danni += forzaCorsa() - 1; caricaCorsa(CORSA.perColpo); }
     altro.danni++;
     let ko = altro.danni >= altro.soglia;
-    if (eroeColpito) { altro.danni = 0; ko = feritaEroe(Math.min(forza, 7) * 2, x, y); }
+    if (eroeColpito) { altro.danni = 0; ko = feritaEroe(Math.min(forza, 7) * 2.4, x, y); }
     // Ha imparato qualcosa: chi ha colpito rifà volentieri quella mossa, chi
     // era a metà di un'altra azione la rimpiange, chi l'ha presa si copre di più.
     impara(f, f.azione, 1, ko ? 3 : 1);
@@ -4623,7 +4623,7 @@
     const x = Math.max(q.l + 8 * S, Math.min(q.r - 8 * S, q.cx + lato * caso(150, 330) * S));
     // Dalla nona ondata in poi sono più svelti, e ogni quattro ondate reggono un colpo in più.
     // (nella corsa l'ondata è sempre la prima: conta il round)
-    const oltre = Math.max(0, (corsa && corsa.chi ? corsa.round : q.ondata) - 8), svelti = Math.min(1.8, 1 + 0.05 * oltre);
+    const oltre = Math.max(0, corsa && corsa.chi ? corsa.round - 4 : q.ondata - 8), svelti = Math.min(1.8, 1 + 0.05 * oltre);
     q.zombie.push({ x, lato, dir: -lato, tipo: ZOMBI[tipo] ? tipo : "lento", t: 0, s: 0, stato: "esce", hp: Z.hp + Math.floor(oltre / 4), vel: caso(Z.vel[0], Z.vel[1]) * svelti,
                     tono: Math.floor(Math.random() * TONI_ZOMBIE.length), fase: caso(0, 6), vx: 0, botta: 0, lampo: 0, cade: 0, occhio: Math.random() < 0.5 ? 1 : -1 });
     q.nati++;
@@ -10785,21 +10785,21 @@
   //    browser e basta.
   // Il compagno che non lotta sta «in panchina»: fuori campo, come chi è dentro
   // il buco nero, e torna solo per i duelli, da avversario.
-  const CORSA = { vite: 3, viteMax: 5, hp: 100, ultima: 0.4, lento: 0.55, energia: 100, perUcciso: 7, perColpo: 6,
-                  intro: 130, vinto: 120, invulnerabile: 110, cura: 0.25, tempo: [32, 44] };
+  const CORSA = { vite: 3, viteMax: 5, hp: 100, ultima: 0.3, lento: 0.55, energia: 100, perUcciso: 7, perColpo: 6, ricarica: 0.12,
+                  intro: 130, vinto: 120, invulnerabile: 110, cura: 0.12, tempo: [26, 34] };
   const TIPI_ROUND = { ondata: ["\u{1F9DF}", "Ondata"], duello: ["⚔️", "Duello"], tempo: ["⏱️", "Sopravvivenza"], boss: ["\u{1F480}", "Il capo"] };
   // I potenziamenti: `max` 0 vuol dire che si prende quante volte si vuole.
   const POTERI = {
-    cuore: { icona: "❤️", nome: "Cuore d'acciaio", max: 5, peso: 3, testo: () => "+20 " + dici("vita massima") },
+    cuore: { icona: "❤️", nome: "Cuore d'acciaio", max: 5, peso: 3, testo: () => "+15 " + dici("vita massima") },
     cura: { icona: "\u{1FA79}", nome: "Rimessa a nuovo", max: 0, peso: 2.5, testo: () => dici("Vita al massimo"), quando: (c) => c.hp < c.hpMax * 0.75 },
-    vita: { icona: "\u{1F496}", nome: "Una vita in più", max: 0, peso: 0.8, testo: () => "+1 " + dici("vita"), quando: (c) => c.vite < CORSA.viteMax },
+    vita: { icona: "\u{1F496}", nome: "Una vita in più", max: 0, peso: 0.35, testo: () => "+1 " + dici("vita"), quando: (c) => c.round >= 4 && c.vite < CORSA.viteMax },
     forza: { icona: "\u{1F44A}", nome: "Pugni pesanti", max: 5, peso: 3, testo: () => "+20% " + dici("danni") },
     velocita: { icona: "\u{1F45F}", nome: "Passo svelto", max: 3, peso: 2.2, testo: () => "+12% " + dici("velocità") },
     armi: { icona: "\u{1F52B}", nome: "Armeria", max: 3, peso: 2, testo: (l) => dici(["Pistola a ogni round", "Bazooka a ogni round", "Lanciafiamme a ogni round"][Math.min(2, l)]) },
     pelle: { icona: "\u{1F6E1}️", nome: "Pelle dura", max: 4, peso: 2.4, testo: () => "-12% " + dici("danni presi") },
     carica: { icona: "⚡", nome: "Energia", max: 3, peso: 2.4, testo: () => dici("Colpo finale più in fretta") },
     mira: { icona: "\u{1F3AF}", nome: "Occhio fermo", max: 3, peso: 2, testo: () => dici("La mira gira più piano") },
-    sete: { icona: "\u{1FA78}", nome: "Sete", max: 3, peso: 2, testo: () => "+3 " + dici("vita per ogni nemico") },
+    sete: { icona: "\u{1FA78}", nome: "Sete", max: 3, peso: 2, testo: () => "+1 " + dici("vita per ogni nemico") },
     tasche: { icona: "\u{1FA99}", nome: "Tasche piene", max: 3, peso: 2, testo: () => "+1 " + dici("moneta per ogni nemico") },
   };
   const OGGETTI = {
@@ -10815,7 +10815,7 @@
                             meteoriti: ["☄️", "Meteoriti"], buco: ["\u{1F573}️", "Buco nero"], temporale: ["⛈️", "Temporale"],
                             jet: ["\u{1F680}", "Jetpack impazziti"], uragano: ["\u{1F32A}️", "Uragano"] };
   // Il danno di un morso, prima della pelle dura e della crescita a ogni round.
-  const MORSO_CORSA = { lento: 6, svelto: 5, striscia: 5, gonfio: 6, grosso: 15, corazzato: 8, rabbioso: 5, capo: 20 };
+  const MORSO_CORSA = { lento: 7, svelto: 6, striscia: 6, gonfio: 7, grosso: 18, corazzato: 10, rabbioso: 7, capo: 24 };
   const PUNTI_ZOMBIE = { lento: 10, svelto: 10, striscia: 10, gonfio: 12, grosso: 30, corazzato: 20, rabbioso: 20, capo: 300 };
   const PERSONAGGI_CORSA = [["", "Classici"], ["guerrieri", "Super guerrieri"], ["maghi", "Maghi"], ["lame", "Duellanti"]];
   const eroe = () => (corsa && corsa.chi ? lottatori.find((l) => l.tipo === corsa.chi) || null : null);
@@ -10823,8 +10823,9 @@
   const eDellaCorsa = (f) => !!(corsa && corsa.chi && f && f.tipo === corsa.chi);
   const livello = (id) => (corsa && corsa.livelli[id]) || 0;
   const forzaCorsa = () => 1 + 0.2 * livello("forza");
-  // I danni presi crescono piano fino al dodicesimo round, poi in fretta: la corsa deve finire.
-  const crescita = () => { const r = corsa ? corsa.round : 1; return 1 + 0.05 * Math.max(0, r - 1) + 0.03 * Math.pow(Math.max(0, r - 12), 1.5); };
+  // I danni presi crescono del 7% a round, e dall'ottavo molto più in fretta: la corsa deve finire.
+  // (09/10/2026, Riccardo: «troppo facile e durano troppo le partite». Prima: 5% a round, la spinta dal 12°; cura fra i round 25%, ora 12%.)
+  const crescita = () => { const r = corsa ? corsa.round : 1; return 1 + 0.07 * Math.max(0, r - 1) + 0.04 * Math.pow(Math.max(0, r - 8), 1.5); };
   const pelleCorsa = () => 1 - 0.12 * livello("pelle");
   const nomeDi = (tipo) => (stile ? nomeProprio(tipo) : dici(tipo === "robot" ? "Robot" : "Mela"));
 
@@ -10928,7 +10929,7 @@
     if (corsa.prossimoTipo) { const t = corsa.prossimoTipo; corsa.prossimoTipo = null; return t; }
     if (n === 1) return "ondata";
     const prima = corsa.tipo, r = corsa.rng;
-    const voci = [[4, "ondata"], [prima === "duello" ? 0 : 3, "duello"], [n >= 3 && prima !== "tempo" ? 2.4 : 0, "tempo"], [n >= 4 && prima !== "boss" ? 2 : 0, "boss"]];
+    const voci = [[4, "ondata"], [prima === "duello" ? 0 : 3, "duello"], [n >= 3 && prima !== "tempo" ? 2.4 : 0, "tempo"], [n >= 3 && prima !== "boss" ? 2 : 0, "boss"]];
     let tot = 0; for (const v of voci) tot += v[0];
     let x = r() * tot;
     for (const v of voci) if ((x -= v[0]) <= 0) return v[1];
@@ -10954,9 +10955,9 @@
   }
   function scegliVariante(n) {
     const r = corsa.rng, v = [];
-    const voci = ["furioso", "armato"].concat(stile === "maghi" || n < 7 ? [] : ["gigante"]);
-    if (n >= 4) v.push(voci[Math.floor(r() * voci.length)]);
-    if (n >= 10) { const altra = voci.filter((x) => v.indexOf(x) < 0); v.push(altra[Math.floor(r() * altra.length)]); }
+    const voci = ["furioso", "armato"].concat(stile === "maghi" || n < 5 ? [] : ["gigante"]);
+    if (n >= 3) v.push(voci[Math.floor(r() * voci.length)]);
+    if (n >= 7) { const altra = voci.filter((x) => v.indexOf(x) < 0); v.push(altra[Math.floor(r() * altra.length)]); }
     return v;
   }
   function iniziaLotta() {
@@ -10984,7 +10985,10 @@
   // La ricetta di un'ondata della corsa: quella del ring, con dentro le varianti potenziate.
   function ricettaCorsa(n) {
     const R = ricettaOndata(Math.min(14, n), corsa.rng);
-    const pc = Math.min(0.45, 0.07 * (n - 2)), pr = Math.min(0.5, 0.08 * (n - 2));
+    // Più fitti che nel ring libero: più zombie insieme e meno attesa fra uno e l'altro.
+    R.insieme = Math.min(14, R.insieme + 2);
+    for (const v of R.coda) v.attesa = Math.max(4, Math.round(v.attesa * 0.6));
+    const pc = Math.min(0.5, 0.1 * (n - 1)), pr = Math.min(0.55, 0.1 * (n - 1));
     for (const v of R.coda) {
       if (v.tipo === "lento" && corsa.rng() < pc) v.tipo = "corazzato";
       else if ((v.tipo === "svelto" || v.tipo === "striscia") && corsa.rng() < pr) v.tipo = "rabbioso";
@@ -11029,7 +11033,7 @@
     c.monete += paga; c.punti += punti;
     suona(come === "salvezza" ? "salvo" : "vittoria");
     if (come === "salvezza") {
-      c.ultima = false; c.vite = 1; c.hp = Math.round(c.hpMax * 0.5);
+      c.ultima = false; c.vite = 1; c.hp = Math.round(c.hpMax * 0.5); c.salvezze = (c.salvezze || 0) + 1;
       scrivi("SALVO!", eroe().p.bacino.x, eroe().base - 120 * S, true);
     }
     c.ultimoPremio = { monete: paga, punti, pulito: c.danniRound === 0 };
@@ -11065,7 +11069,7 @@
     const id = c.carte[i], f = eroe();
     c.livelli[id] = livello(id) + 1;
     suona("premio");
-    if (id === "cuore") { c.hpMax += 20; c.hp += 20; }
+    if (id === "cuore") { c.hpMax += 15; c.hp += 15; }
     if (id === "cura") c.hp = c.hpMax;
     if (id === "vita") { if (c.ultima) { c.ultima = false; c.vite = 1; c.hp = Math.max(c.hp, Math.round(c.hpMax * 0.5)); } else c.vite = Math.min(CORSA.viteMax, c.vite + 1); }
     if (f) scintille(f.p.bacino.x, f.p.bacino.y - 20 * S, 16, "#ffd84a");
@@ -11079,7 +11083,7 @@
     c.vetrina = [];
     while (c.vetrina.length < 4 && ids.length) { const j = Math.floor(c.rng() * ids.length); c.vetrina.push(ids[j]); ids.splice(j, 1); }
   }
-  const prezzo = (id) => Math.round(OGGETTI[id].prezzo * (1 + 0.06 * Math.max(0, corsa.round - 1)));
+  const prezzo = (id) => Math.round(OGGETTI[id].prezzo * 1.3 * (1 + 0.1 * Math.max(0, corsa.round - 1)));
   function compra(i) {
     const c = corsa;
     if (!c || c.fase !== "negozio") return false;
@@ -11103,7 +11107,7 @@
     if (c.invuln > 0 || c.scudo > 0) { scintille(x, y, 6, "#bfe9ff"); return false; }
     danno = Math.max(1, Math.round(danno * crescita() * pelleCorsa()));
     c.hp -= danno; c.danniRound += danno;
-    caricaCorsa(danno * 0.25);
+    caricaCorsa(Math.min(danno, 30) * 0.25);                       // un colpo enorme non riempie il colpo finale
     c.lampo = 8;
     if (c.hp > 0) return false;
     if (c.ultima) { c.hp = 0; finisciCorsa(); return true; }
@@ -11115,7 +11119,9 @@
       return true;
     }
     // Finite le vite: l'ultima possibilità.
-    c.ultima = true; c.hp = Math.round(c.hpMax * CORSA.ultima); c.energia = CORSA.energia; c.invuln = CORSA.invulnerabile;
+    // Il colpo finale NON si riempie: si ricarica piano mentre si resiste feriti, e dopo ogni salvataggio
+    // ancora più piano. (Pieno subito, chi mirava bene si salvava sempre e la corsa non finiva più.)
+    c.ultima = true; c.hp = Math.round(c.hpMax * CORSA.ultima); c.invuln = CORSA.invulnerabile;
     scrivi("ULTIMA POSSIBILITÀ!", f.p.bacino.x, f.base - 120 * S, true);
     respingiTutti(f, 11);
     return true;
@@ -11149,7 +11155,7 @@
     c.monete += (z.tipo === "capo" ? 15 : z.tipo === "corazzato" || z.tipo === "rabbioso" || z.tipo === "grosso" ? 2 : 1) + livello("tasche");
     c.punti += PUNTI_ZOMBIE[z.tipo] || 10;
     caricaCorsa(z.tipo === "capo" ? 30 : CORSA.perUcciso);
-    if (livello("sete")) c.hp = Math.min(c.hpMax, c.hp + 3 * livello("sete"));
+    if (livello("sete")) c.hp = Math.min(c.hpMax, c.hp + livello("sete"));
   }
   // Il K.O. nella corsa: niente conto del ring, niente balletto per l'avversario.
   function koCorsa(f, altro) {
@@ -11157,7 +11163,7 @@
     scrivi("K.O.!", altro.p.bacino.x, Math.max(testataBasso + 30 * S, altro.base - 72 * S), true);
     if (altro.tipo !== corsa.chi && corsa.fase === "lotta") {
       corsa.uccisi++; corsa.punti += 150 + 25 * corsa.round; corsa.monete += 6 + livello("tasche") * 2;
-      if (livello("sete")) corsa.hp = Math.min(corsa.hpMax, corsa.hp + 6 * livello("sete"));
+      if (livello("sete")) corsa.hp = Math.min(corsa.hpMax, corsa.hp + 3 * livello("sete"));
       vinciRound("ko");
     }
   }
@@ -11227,7 +11233,7 @@
     if (c.fase === "intro" && c.t >= CORSA.intro) iniziaLotta();
     else if (c.fase === "lotta") {
       // All'ultima possibilità il colpo finale si ricarica da solo, in fretta.
-      if (c.ultima && !mira) c.energia = Math.min(CORSA.energia, c.energia + 0.45);
+      if (c.ultima && !mira) c.energia = Math.min(CORSA.energia, c.energia + CORSA.ricarica / (1 + (c.salvezze || 0)));
       // Gli imprevisti del round, uno alla volta.
       if (c.imprevisti.length && --c.prossimoImprevisto <= 0) {
         if (!evento && !fatale) { avviaEvento(c.imprevisti[c.lanciati || 0] || c.imprevisti[0], true); c.lanciati = (c.lanciati || 0) + 1; }
