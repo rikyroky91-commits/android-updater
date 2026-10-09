@@ -3710,7 +3710,9 @@ test("la corsa: il botto scoppia, il gelido rallenta, il saltatore salta, lo spu
     avanzaCorsa(amb, r, 60 * 2, (s) => { sputa = sputa || !!(s.orda && s.orda.zombie.some((z) => z.tipo === "sputatore" && z.stato === "sputa")); return !sputa && s.corsa.fase === "lotta"; });
   }
   assert.ok(sputa, "lo sputatore sputa da lontano");
-  assert.ok(gelato > 0, "il morso del gelido rallenta");
+  { const st = amb.stato(), f = amb.lottatore("robot");
+    assert.ok(gelato > 0, "il morso del gelido rallenta (" + JSON.stringify({ fase: st.corsa.fase, round: st.corsa.round, imprevisti: st.corsa.imprevisti, vola: f.vola, ko: f.ko, azione: f.azione,
+      invuln: st.corsa.invuln, scudo: st.corsa.scudo, gelidi: st.orda ? st.orda.zombie.filter((z) => z.tipo === "gelido").map((z) => z.stato + "@" + Math.round(z.x - f.bacino.x)) : null }) + ")"); }
   dentro(amb);
 });
 
