@@ -3480,7 +3480,7 @@ test("la corsa: le varianti potenziate, e nel ring libero non escono mai", () =>
   amb.avanza(60); r.comandi.colpo("zombie");
   const visti = new Set();
   amb.avanza(60 * 90, (s) => { if (s.orda) for (const z of s.orda.zombie) visti.add(z.tipo); });
-  for (const t of ["corazzato", "rabbioso", "capo"]) assert.ok(!visti.has(t), t + " nel ring libero");
+  for (const t of ["corazzato", "rabbioso", "capo", "botto", "gelido", "saltatore", "sputatore", "doro", "dragoFuoco", "dragoFulmine", "dragoVeleno"]) assert.ok(!visti.has(t), t + " nel ring libero");
   // Nella corsa, il round del capo ha il capo.
   const { amb: a2, r: r2 } = corsaAvviata({}, "mela", 99);
   avanzaCorsa(a2, r2, 200); r2.corsa.prossimo("boss"); r2.corsa.vinci();
@@ -3575,6 +3575,164 @@ test("la corsa: le monete restano fra una corsa e l'altra, e la bottega le spend
   const monete = amb.stato().corsa.monete;
   r.corsa.finisci();
   assert.strictEqual(amb.stato().banca, 450 + monete, "a fine corsa le monete vanno in banca");
+});
+
+// ·· I NEMICI NUOVI, LE SORPRESE, IL RITMO (09/10/2026, sera) ··
+// Arriva al primo momento di lotta del round, togliendo di mezzo carte e forzieri.
+function inLotta(amb, r) {
+  avanzaCorsa(amb, r, 600, (s) => !(s.corsa.fase === "lotta" && s.orda && s.orda.fase === "lotta" && !s.corsa.pausa));
+  assert.strictEqual(amb.stato().corsa.fase, "lotta");
+}
+// Uno zombie a una certa distanza dall'eroe, dalla parte dove c'è più posto.
+function vicinoAllEroe(amb, r, tipo, distanza) {
+  const s = amb.stato(), f = amb.lottatore(s.corsa.chi), lato = f.bacino.x < 600 ? 1 : -1;
+  r.zombie(tipo, f.bacino.x + lato * distanza);
+  return amb.stato().orda.zombie[amb.stato().orda.zombie.length - 1];
+}
+
+test("la corsa: a ogni round con l'orda un nemico nuovo, e i protagonisti cambiano sempre", () => {
+  const { amb, r } = corsaAvviata({}, "robot", 31);
+  inLotta(amb, r);
+  const nuovi = [], protagonisti = [amb.stato().corsa.protagonisti];
+  for (let i = 0; i < 14; i++) {
+    r.corsa.prossimo(i === 5 ? "duello" : "ondata"); r.corsa.vinci();
+    avanzaCorsa(amb, r, 400, (s) => s.corsa.fase !== "lotta" || !s.orda && s.corsa.tipo !== "duello");
+    const c = amb.stato().corsa;
+    if (c.tipo === "duello") { assert.strictEqual(c.nuovo, null, "nel duello niente novità"); continue; }
+    nuovi.push(c.nuovo); protagonisti.push(c.protagonisti);
+  }
+  assert.deepStrictEqual(nuovi.slice(0, 12), ["striscia", "botto", "dragoFuoco", "gonfio", "saltatore", "dragoFulmine", "corazzato", "gelido", "grosso", "dragoVeleno", "sputatore", "rabbioso"]);
+  assert.strictEqual(nuovi[12], null, "finiti i nuovi, i round mescolano quelli già visti");
+  for (let i = 1; i < protagonisti.length; i++) {
+    assert.ok(protagonisti[i].length >= 2, "due o tre protagonisti a round");
+    // (al secondo round i tipi visti sono solo tre: lì uno può tornare)
+    if (i >= 2) assert.ok(!protagonisti[i].some((t) => protagonisti[i - 1].includes(t)), "mai gli stessi del round prima: " + protagonisti[i - 1] + " → " + protagonisti[i]);
+  }
+  dentro(amb);
+});
+
+test("la corsa: il nemico nuovo si vede subito, fra i primi ad arrivare", () => {
+  const { amb, r } = corsaAvviata({}, "mela", 12);
+  inLotta(amb, r);
+  r.corsa.prossimo("ondata"); r.corsa.vinci();
+  const arrivati = [];
+  avanzaCorsa(amb, r, 60 * 12, (s) => {
+    if (s.orda && s.corsa.round === 2) for (const z of s.orda.zombie) if (!arrivati.includes(z)) arrivati.push(z.tipo);
+    return !arrivati.includes("striscia");
+  });
+  assert.strictEqual(amb.stato().corsa.nuovo, "striscia");
+  assert.ok(arrivati.includes("striscia"), "lo strisciante arriva nei primi secondi del suo round");
+});
+
+test("la corsa: i draghetti volano, tirano fuoco, e le armi li abbattono", () => {
+  const { amb, r } = corsaAvviata({}, "robot", 5);
+  inLotta(amb, r);
+  r.corsa.arma("dardi", 0);
+  vicinoAllEroe(amb, r, "dragoFuoco", 200);
+  let tiri = 0, alto = 1e9, ferito = false;
+  const hp0 = amb.stato().corsa.hp;
+  avanzaCorsa(amb, r, 60 * 15, (s) => {
+    const d = s.orda.zombie.find((z) => z.tipo === "dragoFuoco");
+    if (d && d.stato !== "giu") alto = Math.min(alto, d.y);
+    tiri = Math.max(tiri, s.corsa.tiri);
+    if (s.corsa.hp < hp0) ferito = true;
+    return !(tiri > 0 && ferito);
+  });
+  assert.ok(alto < amb.stato().pavimento - 90, "il draghetto sta a mezz'aria: " + Math.round(amb.stato().pavimento - alto));
+  assert.ok(tiri > 0, "e tira");
+  // Con i dardi (cercano il bersaglio anche in aria) e il fulmine viene giù, e lascia la sua gemma.
+  r.corsa.arma("dardi", 5); r.corsa.arma("fulmine", 5);
+  const u0 = amb.stato().corsa.uccisi;
+  avanzaCorsa(amb, r, 60 * 20, (s) => s.orda && s.orda.zombie.some((z) => z.tipo === "dragoFuoco" && z.stato !== "giu"));
+  assert.ok(!amb.stato().orda || !amb.stato().orda.zombie.some((z) => z.tipo === "dragoFuoco" && z.stato !== "giu"), "il draghetto viene abbattuto");
+  assert.ok(amb.stato().corsa.uccisi > u0);
+  dentro(amb);
+});
+
+test("la corsa: il fulmine avvisa con la linea prima di cadere, il veleno lascia la pozza", () => {
+  const { amb, r } = corsaAvviata({}, "mela", 8);
+  inLotta(amb, r);
+  r.corsa.arma("orbita", 0);
+  vicinoAllEroe(amb, r, "dragoFulmine", 180);
+  vicinoAllEroe(amb, r, "dragoVeleno", 220);
+  let saetta = null, pozze = 0;
+  avanzaCorsa(amb, r, 60 * 20, (s) => {
+    for (const t of r.corsa.tiri()) if (t.tipo === "saetta" && !saetta) saetta = t;
+    pozze = Math.max(pozze, s.corsa.pozze);
+    return !(saetta && pozze > 0);
+  });
+  assert.ok(saetta, "il draghetto elettrico tira il suo fulmine");
+  assert.ok(saetta.t < 20, "e il fulmine resta un attimo solo linea, prima di cadere");
+  assert.ok(pozze > 0, "il veleno a terra fa la pozza");
+  dentro(amb);
+});
+
+test("la corsa: il botto scoppia, il gelido rallenta, il saltatore salta, lo sputatore sputa", () => {
+  const { amb, r } = corsaAvviata({}, "robot", 21);
+  inLotta(amb, r);
+  r.corsa.arma("dardi", 0);
+  // Il botto: arrivato addosso scoppia, e porta via anche gli zombie intorno.
+  vicinoAllEroe(amb, r, "botto", 60);
+  let scoppiato = false;
+  const hp0 = amb.stato().corsa.hp, u0 = amb.stato().corsa.uccisi;
+  avanzaCorsa(amb, r, 60 * 8, (s) => { scoppiato = !s.orda.zombie.some((z) => z.tipo === "botto" && z.stato !== "giu"); return !scoppiato; });
+  assert.ok(scoppiato, "il botto è scoppiato (o è stato abbattuto prima)");
+  assert.ok(amb.stato().corsa.uccisi > u0 || amb.stato().corsa.hp < hp0, "e qualcosa è successo");
+  // Il gelido: il suo morso rallenta.
+  // (se l'eroe lo abbatte prima che morda, ne arriva un altro)
+  let gelato = 0;
+  for (let i = 0; i < 12 && !gelato; i++) {
+    if (!amb.stato().orda.zombie.some((z) => z.tipo === "gelido" && z.stato !== "giu")) vicinoAllEroe(amb, r, "gelido", 40);
+    avanzaCorsa(amb, r, 60 * 2, (s) => { gelato = Math.max(gelato, s.corsa.gelato); return gelato === 0; });
+  }
+  // Il saltatore: da lontano salta, e in volo sta più in alto del terreno.
+  vicinoAllEroe(amb, r, "saltatore", 160);
+  let salto = 0;
+  avanzaCorsa(amb, r, 60 * 8, (s) => { for (const z of s.orda.zombie) if (z.tipo === "saltatore" && z.stato === "salto") salto = Math.max(salto, s.orda.base - z.y); return salto < 20; });
+  assert.ok(salto >= 20, "il saltatore si alza da terra: " + salto);
+  // Lo sputatore: resta a distanza e sputa.
+  vicinoAllEroe(amb, r, "sputatore", 200);
+  let sputa = false;
+  avanzaCorsa(amb, r, 60 * 8, (s) => { sputa = sputa || s.orda.zombie.some((z) => z.tipo === "sputatore" && z.stato === "sputa"); return !sputa; });
+  assert.ok(sputa, "lo sputatore sputa da lontano");
+  assert.ok(gelato > 0, "il morso del gelido rallenta");
+  dentro(amb);
+});
+
+test("la corsa: le sorprese, lo zombie d'oro, la pioggia di gemme, il forziere col paracadute, la frenesia", () => {
+  const { amb, r } = corsaAvviata({}, "robot", 3);
+  inLotta(amb, r);
+  assert.ok(r.corsa.sorpresa("oro"));
+  assert.ok(amb.stato().orda.zombie.some((z) => z.tipo === "doro"), "lo zombie d'oro c'è");
+  const g0 = amb.stato().corsa.gemme;
+  assert.ok(r.corsa.sorpresa("gemme"));
+  assert.ok(amb.stato().corsa.gemme >= g0 + 16, "piovono gemme");
+  assert.ok(r.corsa.sorpresa("forziere"));
+  assert.ok(amb.stato().corsa.forzieri > 0, "scende un forziere");
+  assert.ok(r.corsa.sorpresa("frenesia"));
+  assert.ok(amb.stato().corsa.frenesia > 0, "le armi vanno al doppio");
+  // E da sole: in un minuto di lotta almeno tre.
+  const { amb: a2, r: r2 } = corsaAvviata({}, "mela", 4);
+  avanzaCorsa(a2, r2, 60 * 60);
+  assert.ok(a2.stato().corsa.sorprese >= 3 || a2.stato().corsa.fase === "fine", "le sorprese arrivano da sole: " + a2.stato().corsa.sorprese);
+  dentro(amb);
+});
+
+test("la corsa: col passare dei minuti gli zombie reggono di più e mordono più forte", () => {
+  const { amb, r } = corsaAvviata({}, "robot", 9);
+  inLotta(amb, r);
+  r.corsa.minuti(0);
+  const debole = vicinoAllEroe(amb, r, "lento", 300).hp;
+  r.corsa.ferisci(10);
+  const dPrima = amb.stato().corsa.hpMax - amb.stato().corsa.hp;
+  r.corsa.dai("pozione", 0); r.corsa.usa(0);
+  r.corsa.minuti(4);
+  const forte = vicinoAllEroe(amb, r, "lento", 300).hp;
+  const hp = amb.stato().corsa.hp;
+  r.corsa.ferisci(10);
+  const dDopo = hp - amb.stato().corsa.hp;
+  assert.ok(forte > debole * 3, "al quarto minuto uno zombie regge molto di più: " + debole + " → " + forte);
+  assert.ok(dDopo > dPrima * 2, "e lo stesso colpo fa più male: " + dPrima + " → " + dDopo);
 });
 
 // ·· L'AUDIO (09/10/2026) ··

@@ -1194,7 +1194,7 @@
   const andatura = (f) => {
     const ng = gambe(f), k = ng === 2 ? 1 : ng === 1 ? 0.72 : braccia(f) ? 0.5 : 0.32;
     // Nella corsa: il passo svelto, e le ferite dell'ultima possibilità.
-    return corsa && corsa.chi && f.tipo === corsa.chi ? k * (1 + 0.12 * livello("velocita")) * (corsa.ultima ? CORSA.lento : 1) : k;
+    return corsa && corsa.chi && f.tipo === corsa.chi ? k * (1 + 0.12 * livello("velocita")) * (corsa.ultima ? CORSA.lento : 1) * (corsa.gelato > 0 ? 0.6 : 1) : k;
   };
   // Il gomito fra la spalla e la mano, piegato verso l'alto (unità della posa).
   function gomitoDi(sp, mano) {
@@ -4487,6 +4487,19 @@
     corazzato: { costo: 2.5, hp: 4, vel: [0.55, 0.75], scala: 1.05, dal: 99, carica: 24, portata: 28 },
     rabbioso: { costo: 2, hp: 2, vel: [2.3, 2.8], scala: 0.95, dal: 99, carica: 12, portata: 26 },
     capo: { costo: 20, hp: 20, vel: [0.42, 0.5], scala: 1.9, dal: 99, carica: 34, portata: 46 },
+    // Le novità della corsa (09/10/2026, sera): ne arriva uno nuovo a ogni round con l'orda.
+    // Il botto ha una bomba sulla schiena e scoppia addosso (e chi lo abbatte fa saltare i vicini);
+    // il gelido morde e rallenta; il saltatore balza addosso da lontano; lo sputatore resta a
+    // distanza e sputa veleno; lo zombie d'oro scappa carico di monete. I draghetti volano:
+    // fuoco dritto, fulmine con la linea che avvisa, veleno a parabola che lascia una pozza.
+    botto: { costo: 1.6, hp: 2, vel: [1.15, 1.4], scala: 1, dal: 99, carica: 34, portata: 30 },
+    gelido: { costo: 1.6, hp: 3, vel: [0.7, 0.9], scala: 1.02, dal: 99, carica: 22, portata: 28 },
+    saltatore: { costo: 1.6, hp: 2, vel: [1, 1.25], scala: 0.95, dal: 99, carica: 14, portata: 26 },
+    sputatore: { costo: 1.8, hp: 2, vel: [0.6, 0.8], scala: 1, dal: 99, carica: 24, portata: 27 },
+    doro: { costo: 1, hp: 4, vel: [1.7, 2], scala: 0.92, dal: 99, carica: 99, portata: 0 },
+    dragoFuoco: { costo: 2.5, hp: 2, vel: [1.6, 2], scala: 1, dal: 99, carica: 34, portata: 0, volo: "fuoco" },
+    dragoFulmine: { costo: 2.5, hp: 2, vel: [1.8, 2.2], scala: 1, dal: 99, carica: 30, portata: 0, volo: "fulmine" },
+    dragoVeleno: { costo: 2.5, hp: 3, vel: [1.4, 1.7], scala: 1.05, dal: 99, carica: 34, portata: 0, volo: "veleno" },
   };
   const pesante = (z) => z.tipo === "grosso" || z.tipo === "capo";
   const TEMI_ONDATA = {
@@ -4629,26 +4642,41 @@
     const x = Math.max(q.l + 8 * S, Math.min(q.r - 8 * S, q.cx + lato * caso(150, 330) * S));
     // Dalla nona ondata in poi sono più svelti, e ogni quattro ondate reggono un colpo in più.
     // (nella corsa l'ondata è sempre la prima: conta il round)
-    const oltre = Math.max(0, corsa && corsa.chi ? corsa.round - 3 : q.ondata - 8), svelti = Math.min(1.8, 1 + 0.05 * oltre);
-    q.zombie.push({ x, lato, dir: -lato, tipo: ZOMBI[tipo] ? tipo : "lento", t: 0, s: 0, stato: "esce", hp: Z.hp + Math.floor(oltre / 4), vel: caso(Z.vel[0], Z.vel[1]) * svelti,
+    // Nella corsa contano i minuti di lotta (vedi `pressione`): più vita e più passo, senza tetto alla vita.
+    const nellaCorsa = !!(corsa && corsa.chi);
+    const oltre = Math.max(0, q.ondata - 8), svelti = nellaCorsa ? Math.min(1.8, 1 + 0.12 * pressione()) : Math.min(1.8, 1 + 0.05 * oltre);
+    const hp = nellaCorsa ? Math.max(1, Math.round(Z.hp * vitaZombie() * 10) / 10) : Z.hp + Math.floor(oltre / 4);
+    q.zombie.push({ x, lato, dir: -lato, tipo: ZOMBI[tipo] ? tipo : "lento", t: 0, s: 0, stato: "esce", hp, vel: caso(Z.vel[0], Z.vel[1]) * svelti,
                     tono: Math.floor(Math.random() * TONI_ZOMBIE.length), fase: caso(0, 6), vx: 0, botta: 0, lampo: 0, cade: 0, occhio: Math.random() < 0.5 ? 1 : -1 });
     q.nati++;
-    polvere(x, q.base - 1, 4);
     const z = q.zombie[q.zombie.length - 1];
+    // Il primo del nemico nuovo del round porta per un po' un segno sopra la testa.
+    if (nellaCorsa && corsa.nuovo === z.tipo && !corsa.vistoNuovo) { corsa.vistoNuovo = true; z.nuovo = 180; }
+    if (Z.volo) {
+      // Il draghetto non esce dal terreno: arriva in volo dal bordo, e resta a mezz'aria.
+      z.volo = Z.volo; z.x = lato < 0 ? q.l + 12 * S : q.r - 12 * S; z.dir = -lato;
+      // (sotto il cruscotto; se fra il cruscotto e il terreno c'è poco spazio, come sui telefoni, vola più basso)
+      // La quota è sopra il terreno dell'orda: se l'orda trasloca su un altro piano, il draghetto la segue.
+      z.quota = caso(120, 175) * S; z.alto = quotaDrago(z, q); z.y = z.alto - 40 * S;
+      z.distanza = caso(120, 210) * S; z.cd = Math.round(caso(50, 110)); z.ali = caso(0, 6); z.tiri = 0;
+      return;
+    }
+    polvere(x, q.base - 1, 4);
     if (z.tipo === "capo") {
       z.x = Math.max(q.l + 60 * S, Math.min(q.r - 60 * S, z.x));             // è largo: dentro la finestra per intero
-      z.hp = z.hpMax = 18 + 3 * (corsa ? corsa.round : 1);
+      z.hp = z.hpMax = corsa && corsa.chi ? Math.round((14 + 2.5 * corsa.round) * (1 + 0.5 * pressione())) : 18 + 3 * (corsa ? corsa.round : 1);
       scossa = Math.max(scossa, 14); polvere(x, q.base - 1, 14);
       scrivi(dici("Il capo") + "!", x, q.base - 140 * S, true);
     }
   }
-  const vivoZ = (z) => !z.inBuco && (z.stato === "va" || z.stato === "colpo" || (z.stato === "esce" && z.s > 22));
+  // In piedi (o in volo): si può colpire e colpisce. Il salto, lo sputo e la picchiata sono della corsa.
+  const vivoZ = (z) => !z.inBuco && (z.stato === "va" || z.stato === "colpo" || z.stato === "salto" || z.stato === "sputa" || z.stato === "tuffo" || (z.stato === "esce" && z.s > 22));
   // Lo zombie vivo più vicino a un punto, entro un raggio; `lato` (facoltativo) chiede quelli da una parte sola.
   function zombieVicino(x, raggio, lato) {
     let scelto = null, d0 = raggio;
     if (!orda) return null;
     for (const z of orda.zombie) {
-      if (!vivoZ(z) || (lato && (z.x - x) * lato < 0)) continue;
+      if (!vivoZ(z) || (lato && (z.x - x) * lato < 0) || (z.volo && !dragoBasso(z))) continue;     // il draghetto in alto non si raggiunge
       const d = Math.abs(z.x - x);
       if (d < d0) { d0 = d; scelto = z; }
     }
@@ -4656,7 +4684,8 @@
   }
   // Dove stanno petto e testa di uno zombie: [x, y, raggio, x, y, raggio]. Lo strisciante è basso.
   function corpoZ(z) {
-    const sc = ZOMBI[z.tipo].scala, b = orda.base;
+    const sc = ZOMBI[z.tipo].scala, b = orda.base - (z.alzo || 0);
+    if (z.volo) return [z.x, z.y, 12 * S * sc, z.x + z.dir * 15 * S * sc, z.y - 6 * S * sc, 7 * S * sc];
     if (z.tipo === "striscia") return [z.x, b - 9 * S, 9 * S, z.x + z.dir * 14 * S, b - 13 * S, 7 * S];
     return [z.x, b - 34 * S * sc, 10 * S * sc, z.x + z.dir * 2 * S, b - 52 * S * sc, 8 * S * sc];
   }
@@ -4694,6 +4723,8 @@
     scrivi("SPLAT!", x, y - 8 * S, false);
     if (da && da.p && anime) da.ki = Math.min(100, da.ki + 6);
     if (z.tipo === "gonfio") scoppioGonfio(z);
+    if (z.tipo === "botto") scoppioBotto(z, false);
+    if (z.volo) z.vy = -1.5 * S;                              // il draghetto sobbalza e cade
     return true;
   }
   // Il gonfio scoppia: una nube verde che stende gli zombie vicini e fa tossire chi c'è dentro.
@@ -4715,6 +4746,205 @@
       }
     }
   }
+  // ·· I nemici nuovi della corsa (09/10/2026, sera) ··
+  // Riccardo: «cerca di cambiare i nemici spesso, più varianti di zombie, e nuovi nemici tipo
+  // uccelli ma simili a draghi che sparano elettricità, fuoco o veleno in base al tipo».
+  // I colori dei draghetti: corpo, pancia, scuro, bagliore.
+  const COLORI_DRAGO = { fuoco: ["#e2552d", "#ffcf6b", "#8e2a12", "#ff9a3d"], fulmine: ["#3c6fd9", "#fff3a0", "#1d3b80", "#9fe8ff"], veleno: ["#4f9e3a", "#d6f29a", "#2c5e1f", "#9cff6b"] };
+  // In picchiata il draghetto scende all'altezza del petto: lì lo si prende anche a pugni.
+  const dragoBasso = (z) => !!orda && z.y > orda.base - 82 * S;
+  // Contro chi tirano: l'eroe della corsa (o, se manca, il primo che sta in campo).
+  function bersaglioDrago() {
+    const f = corsa && corsa.chi ? eroe() : null;
+    if (f && f.p && !f.fuoriCampo && !f.esploso) return f;
+    return lottatori.find((l) => l.p && !l.fuoriCampo && !l.esploso && !l.fuori) || null;
+  }
+  // Quanto dista un punto dal corpo (il segmento dal bacino alla testa).
+  function lontanoDalCorpo(f, x, y) {
+    const a = f.p.bacino, b = f.p.testa, vx = b.x - a.x, vy = b.y - a.y, l2 = vx * vx + vy * vy || 1;
+    const u = Math.max(0, Math.min(1, ((x - a.x) * vx + (y - a.y) * vy) / l2));
+    return Math.hypot(x - a.x - u * vx, y - a.y - u * vy);
+  }
+  // L'eroe preso da un tiro, da una picchiata o da uno scoppio: la ferita della corsa, una spinta,
+  // e giù a terra se ci ha rimesso una vita.
+  function colpitoEroe(f, danno, x, y, dir, spinta) {
+    if (!f || !f.p || !corsa || !corsa.chi || corsa.fase !== "lotta") return false;
+    if (corsa.invuln > 0 || corsa.scudo > 0) { scintille(x, y, 6, "#bfe9ff"); return false; }
+    if (barrieraRegge(f, 2.4, x, y)) return false;
+    const via = feritaEroe(danno, x, y);
+    if (spinta) for (const n in f.p) f.p[n].ox -= dir * spinta * S;
+    f.dolore = 18; f.stordito = Math.max(f.stordito || 0, 8);
+    segna(f, x, y, 2);
+    if (via) { f.ko = Math.max(f.ko, 80); f.inVolo = true; f.jet = 0; f.azione = null; }
+    return true;
+  }
+  // Il draghetto: arriva in volo dal bordo, si mette a qualche passo dall'eroe, a mezz'aria, carica
+  // e tira; ogni tre volte scende in picchiata, gli passa accanto e risale dall'altra parte.
+  const quotaDrago = (z, q) => Math.min(q.base - 76 * S, Math.max(testataBasso + 100 * S, q.base - z.quota));
+  function muoviDrago(z, q, Z) {
+    z.alto = quotaDrago(z, q);
+    z.x += z.vx; z.vx *= 0.9;
+    z.ali += z.stato === "tuffo" ? 0.16 : 0.36;
+    if (z.stato === "giu") { z.vy = (z.vy || 0) + 0.32 * S; z.y = Math.min(q.base - 6 * S, z.y + z.vy); return; }
+    z.x = Math.max(q.l + 10 * S, Math.min(q.r - 10 * S, z.x));
+    if (z.stato === "esce") {
+      z.y += (z.alto - z.y) * 0.06; z.x += z.dir * z.vel * 1.2 * S;
+      if (z.s >= 46) { z.stato = "va"; z.s = 0; }
+      return;
+    }
+    if (z.botta > 0) {
+      // Colpito o gelato: resta sospeso (e la picchiata finisce lì).
+      z.botta--;
+      if (z.stato === "tuffo" || z.stato === "colpo") { z.stato = "va"; z.s = 0; z.cd = Math.max(z.cd, 40); }
+      z.y += (z.alto - z.y) * 0.02;
+      return;
+    }
+    const f = bersaglioDrago();
+    if (!f || f.ko > 0) { z.y += (z.alto + Math.sin(z.t * 0.05 + z.fase) * 9 * S - z.y) * 0.05; if (z.stato !== "va") { z.stato = "va"; z.s = 0; } return; }
+    const hx = f.p.bacino.x, hy = f.p.bacino.y;
+    if (z.stato === "tuffo") {
+      const T = z.tuffo; T.t++;
+      const u = Math.min(1, T.t / T.dur);
+      z.x = T.x0 + (T.x1 - T.x0) * u; z.y = T.y0 + (T.yb - T.y0) * Math.sin(Math.PI * u);
+      z.dir = T.x1 >= T.x0 ? 1 : -1;
+      if (!T.preso && Math.abs(z.x - hx) < 26 * S && Math.abs(z.y - (hy - 10 * S)) < 34 * S) {
+        T.preso = true;
+        if (colpitoEroe(f, MORSO_CORSA[z.tipo] || 8, (z.x + hx) / 2, z.y, z.dir, 3)) scrivi("CHOMP!", z.x, z.y - 18 * S, false);
+      }
+      if (u >= 1) { z.stato = "va"; z.s = 0; z.cd = Math.round(caso(60, 100)); }
+      return;
+    }
+    z.dir = hx >= z.x ? 1 : -1;
+    // A mezz'aria, a qualche passo dall'eroe, dalla parte dove già sta (se lì non c'è posto, dall'altra).
+    let lato = z.x >= hx ? 1 : -1, dove = hx + lato * z.distanza;
+    if (dove < q.l + 30 * S || dove > q.r - 30 * S) { lato = -lato; dove = hx + lato * z.distanza; }
+    dove = Math.max(q.l + 30 * S, Math.min(q.r - 30 * S, dove));
+    const dx = dove - z.x;
+    z.x += Math.sign(dx) * Math.min(Math.abs(dx), z.vel * S * (z.stato === "colpo" ? 0.3 : 1));
+    z.y += (z.alto + Math.sin(z.t * 0.05 + z.fase) * 9 * S - z.y) * 0.08;
+    // Due draghetti non volano uno sull'altro: si scostano.
+    for (const w of q.zombie) if (w !== z && w.volo && w.stato !== "giu" && Math.abs(w.x - z.x) < 44 * S && Math.abs(w.y - z.y) < 34 * S) z.x += (z.x >= w.x ? 1 : -1) * 1.2 * S;
+    if (z.stato === "colpo") {
+      if (z.s === Z.carica) tiroDrago(z, f);
+      if (z.s >= Z.carica + 16) { z.stato = "va"; z.s = 0; z.cd = Math.round(caso(110, 170) / (1 + 0.25 * pressione())); }
+      return;
+    }
+    if (corsa && corsa.fase === "lotta" && --z.cd <= 0 && Math.abs(dx) < 90 * S) {
+      z.tiri++;
+      if (z.tiri % 3 === 0) {
+        const x1 = Math.max(q.l + 20 * S, Math.min(q.r - 20 * S, 2 * hx - z.x));
+        z.stato = "tuffo"; z.s = 0; z.tuffo = { t: 0, dur: 64, x0: z.x, y0: z.y, x1, yb: hy - 10 * S, preso: false };
+        suona("soffio", z.x, 0.5);
+      } else { z.stato = "colpo"; z.s = 0; }
+    }
+  }
+  // Il tiro, secondo il tipo: la palla di fuoco va dritta, il fulmine cade dove l'eroe stava (una
+  // linea tratteggiata avvisa prima), il veleno fa la parabola e a terra lascia una pozza.
+  function tiroDrago(z, f) {
+    const c = corsa;
+    if (!c || !c.tiri) return;
+    const bx = z.x + z.dir * 20 * S, by = z.y - 5 * S, hx = f.p.bacino.x, hy = f.p.bacino.y - 8 * S, k = pressione();
+    if (z.volo === "fuoco") {
+      const dx = hx - bx, dy = hy - by, l = Math.hypot(dx, dy) || 1, v = (4.4 + 0.4 * k) * S;
+      c.tiri.push({ tipo: "fuoco", x: bx, y: by, vx: dx / l * v, vy: dy / l * v, g: 0, r: 7 * S, danno: 8, t: 0 });
+      suona("fiamma", bx, 0.6);
+    } else if (z.volo === "fulmine") {
+      c.tiri.push({ tipo: "saetta", x: bx, y: by, x1: hx, y1: f.base - 2 * S, t: 0, scocca: Math.round(Math.max(24, 38 - 3 * k)), danno: 10 });
+      suona("zap", bx, 0.35);
+    } else lancioVeleno(bx, by, hx, f.base, 6 * S, 5, true);
+    scintille(bx, by, 5, COLORI_DRAGO[z.volo][3]);
+  }
+  function lancioVeleno(x, y, hx, base, r, danno, pozza) {
+    if (!corsa || !corsa.tiri) return;
+    const T = 40, g = 0.22 * S, ty = base - 24 * S;
+    corsa.tiri.push({ tipo: "veleno", x, y, vx: (hx - x) / T, vy: (ty - y) / T - 0.5 * g * T, g, r, danno, pozza, t: 0 });
+    suona("acqua", x, 0.5);
+  }
+  // Che cosa fanno di diverso gli zombie nuovi (true: questo passo l'hanno già fatto loro).
+  function specialeZombie(z, q, Z, f, dx, sopra) {
+    const d = Math.abs(dx);
+    switch (z.tipo) {
+      case "botto":
+        // Arrivato addosso non morde: la miccia corre, e scoppia.
+        if (z.stato !== "colpo") return false;
+        if (z.s >= Z.carica) scoppioBotto(z, true);
+        else if (z.s % 5 === 0) scintille(z.x - z.dir * 9 * S, q.base - 60 * S, 2, "#ffd84a");
+        return true;
+      case "saltatore": {
+        if (z.stato === "salto") {
+          const T = z.salto; T.t++;
+          if (T.t <= 16) return true;                                         // accovacciato, prende la rincorsa
+          const u = Math.min(1, (T.t - 16) / 26);
+          z.x = T.x0 + (T.x1 - T.x0) * u; z.alzo = 72 * S * Math.sin(Math.PI * u);
+          if (u >= 1) {
+            z.alzo = 0; z.stato = "va"; z.s = 0; z.saltoCd = 150; polvere(z.x, q.base - 1, 5);
+            if (sopra && Math.abs(f.p.bacino.x - z.x) < (Z.portata + 12) * S && !f.ko && !f.esploso && !f.preso) morso(z, f);
+          }
+          return true;
+        }
+        if (z.saltoCd > 0) z.saltoCd--;
+        if (z.stato === "va" && sopra && !(z.saltoCd > 0) && d > 80 * S && d < 210 * S) {
+          z.stato = "salto"; z.s = 0;
+          z.salto = { t: 0, x0: z.x, x1: Math.max(q.l + 8 * S, Math.min(q.r - 8 * S, f.p.bacino.x - z.dir * 22 * S)) };
+          suona("salto", z.x, 0.5);
+          return true;
+        }
+        return false;
+      }
+      case "sputatore": {
+        if (z.stato === "sputa") {
+          if (z.s === 18) lancioVeleno(z.x + z.dir * 10 * S, q.base - 52 * S, f.p.bacino.x, f.base, 5 * S, 4, false);
+          if (z.s >= 36) { z.stato = "va"; z.s = 0; z.cdSputo = Math.round(caso(120, 170)); }
+          return true;
+        }
+        if (z.cdSputo > 0) z.cdSputo--;
+        if (z.stato === "va" && sopra && d > 70 * S && d < 260 * S) {
+          if (!(z.cdSputo > 0)) { z.stato = "sputa"; z.s = 0; return true; }
+          if (d < 170 * S) { z.fase += 0.03; return true; }                 // resta lì, a distanza
+        }
+        return false;
+      }
+      case "doro": {
+        // Scappa verso il bordo più lontano; dopo otto secondi si rintana e addio monete.
+        if (z.t > 480) { z.stato = "giu"; z.s = 51; polvere(z.x, q.base - 1, 10); scintille(z.x, q.base - 30 * S, 10, "#ffd84a"); return true; }
+        z.dir = dx >= 0 ? -1 : 1;
+        const bordo = z.dir < 0 ? q.l + 24 * S : q.r - 24 * S;
+        if (Math.abs(z.x - bordo) > 8 * S) { z.x += z.dir * z.vel * S; z.fase += 0.3; }
+        if (z.t % 5 === 0) scintille(z.x + caso(-10, 10) * S, q.base - caso(10, 60) * S, 1, "#ffe27a");
+        return true;
+      }
+    }
+    return false;
+  }
+  // Il botto scoppia: chi gli sta intorno salta in aria, anche gli altri zombie (la reazione a
+  // catena è il bello). Se scoppia da solo, addosso all'eroe, ferisce anche lui.
+  function scoppioBotto(z, suo) {
+    if (z.scoppiato || !orda) return;
+    z.scoppiato = true;
+    const c = corpoZ(z), x = c[0], y = c[1], R = 74 * S;
+    if (particelle.length < MAX_PARTICELLE - 4) {
+      particelle.push({ tipo: "lampo", x, y, vx: 0, vy: 0, vita: 7, max: 7, r: R });
+      particelle.push({ tipo: "onda", x, y, vx: 0, vy: 0, vita: 18, max: 18, colore: "#ffd27a" });
+    }
+    for (let k = 0; k < 8 && particelle.length < MAX_PARTICELLE; k++) {
+      const a = caso(0, Math.PI * 2), dd = caso(0.1, 0.45) * R;
+      particelle.push({ tipo: "fuoco", x: x + Math.cos(a) * dd, y: y + Math.sin(a) * dd * 0.5, vx: Math.cos(a) * S, vy: -caso(0.4, 1.2) * S, vita: 22, max: 26, r: caso(7, 13) * S });
+    }
+    scossa = Math.max(scossa, 9); suona("boom", x, 0.8);
+    scrivi("BOOM!", x, y - 30 * S, false);
+    for (const w of orda.zombie) {
+      if (w === z || !vivoZ(w)) continue;
+      const cw = corpoZ(w);
+      if (Math.hypot(cw[0] - x, cw[1] - y) > R) continue;
+      if (corsa && corsa.chi) colpoArma({ z: w, x: cw[0], y: cw[1] }, 3 * vitaZombie(), w.x >= x ? 1 : -1, 8, "botto");
+      else colpisciZombie(w, 6, w.x >= x ? 1 : -1, w.x, cw[1], null);
+    }
+    if (suo) {
+      const f = bersaglioDrago();
+      if (f && f.p && !(f.ko > 0) && Math.abs(f.p.bacino.x - x) < R && Math.abs(f.p.bacino.y - y) < R) colpitoEroe(f, MORSO_CORSA.botto || 12, x, y, f.p.bacino.x >= x ? 1 : -1, 6);
+      if (vivoZ(z)) { z.hp = 0.01; colpisciZombie(z, 9, -z.dir || 1, x, y, null); }
+    }
+  }
   // Il morso: non è un colpo della partita. Stordisce, spinge, e al terzo butta a terra.
   // La manata del grosso butta a terra subito.
   function morso(z, f) {
@@ -4731,6 +4961,7 @@
     if (corsa && corsa.chi && f.tipo === corsa.chi) {
       if (corsa.invuln > 0 || corsa.scudo > 0) { z.botta = 24; z.vx = -z.dir * 3 * S; scintille(x, y, 5, "#bfe9ff"); return; }
       if (feritaEroe(MORSO_CORSA[z.tipo] || 8, x, y)) f.morsiZ = 2;
+      if (z.tipo === "gelido") { corsa.gelato = 150; suona("gelo", x, 0.6); scintille(x, y, 8, "#dff6ff"); }
       if (z.tipo === "capo") { scossa = Math.max(scossa, 12); if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "onda", x: z.x, y: orda.base - 4 * S, vx: 0, vy: 0, vita: 18, max: 18, colore: "#c9a0ff" }); }
     }
     f.morsiZ = (f.morsiZ || 0) + 1;
@@ -4768,12 +4999,18 @@
     if (q.fase === "pausa") { if (--q.pausa <= 0) nuovaOndata(); }
     else if (q.fase === "lotta") {
       const R = q.ricetta, vivi = q.zombie.reduce((n, z) => n + (z.stato !== "giu" ? 1 : 0), 0);
+      q.dallUltimo = (q.dallUltimo || 0) + 1;
       if (R.coda.length && vivi < R.insieme && --q.prossimo <= 0) {
         const v = R.coda.shift();
         nuovoZombie(v.tipo, v.lato);
-        q.prossimo = R.coda.length ? R.coda[0].attesa : 0;
+        q.prossimo = R.coda.length ? R.coda[0].attesa : 0; q.dallUltimo = 0;
       }
-      if (!R.coda.length && vivi === 0) fineOndata();
+      // Nella corsa, arrivati tutti, gli ultimi due o tre non tengono fermo il round: dopo qualche
+      // secondo si sbriciolano (lasciando le loro gemme), e si va avanti. Il capo no: quello va battuto.
+      if (corsa && corsa.chi && !R.coda.length && vivi > 0 && vivi <= 3 && q.dallUltimo > 300 && !q.zombie.some((z) => z.tipo === "capo" && z.stato !== "giu")) {
+        for (const z of q.zombie) if (vivoZ(z) || z.stato === "esce") { z.hp = 0.01; z.stato = "va"; colpisciZombie(z, 9, -z.dir || 1, z.x, corpoZ(z)[1], null); }
+      }
+      if (!R.coda.length && q.zombie.every((z) => z.stato === "giu")) fineOndata();
       else if (++q.tOndata > (corsa ? 7200 : ORDA.limite)) {
         // Troppo lunga: quelli rimasti si sbriciolano e si passa oltre.
         R.coda = [];
@@ -4813,9 +5050,12 @@
       z.t++; z.s++;
       if (z.lampo > 0) z.lampo--;
       if (z.gelo > 0) z.gelo--;
+      if (z.nuovo > 0) z.nuovo--;
+      if (z.volo) { muoviDrago(z, q, Z); continue; }
       z.x += z.vx; z.vx *= 0.86;
       z.x = Math.max(q.l + 6 * S, Math.min(q.r - 6 * S, z.x));
       if (z.stato === "giu") continue;
+      if (z.alzo > 0 && z.stato !== "salto") z.alzo = Math.max(0, z.alzo - 4 * S);      // colpito a mezz'aria: giù
       if (z.stato === "esce") { if (z.s % 6 === 0 && z.s < 40) polvere(z.x, q.base - 1, 1); if (z.s >= 46) { z.stato = "va"; z.s = 0; } continue; }
       if (z.botta > 0) { z.botta--; continue; }
       // Va verso il lottatore sveglio più vicino che sta su questo piano.
@@ -4828,6 +5068,7 @@
       if (!f) { z.fase += 0.04; continue; }                  // tutti a terra: ciondola e aspetta
       const dx = f.p.bacino.x - z.x, sopra = Math.abs(Math.min(pavimento, f.base) - q.base) < 26 * S && !(f.jet > 0);
       z.dir = dx >= 0 ? 1 : -1;
+      if (corsa && specialeZombie(z, q, Z, f, dx, sopra)) continue;
       if (z.stato === "colpo") {
         if (z.s === Z.carica && sopra && Math.abs(dx) < (Z.portata + 7) * S && !f.ko && !f.esploso && !f.preso) morso(z, f);
         if (z.s >= Z.carica + 26) { z.stato = "va"; z.s = 0; }
@@ -5154,11 +5395,14 @@
     ctx.restore();
   }
   function disegnaZombie(z) {
+    if (z.volo) { disegnaDrago(z); segnoNuovo(z); return; }
     const q = orda, T = TONI_ZOMBIE[z.tono], d = z.dir, nero = "#17171c", Z = ZOMBI[z.tipo], sc = Z.scala;
     const gonfio = z.tipo === "gonfio", grosso = pesante(z), rabbioso = z.tipo === "rabbioso", svelto = z.tipo === "svelto" || rabbioso;
     const corazzato = z.tipo === "corazzato", capo = z.tipo === "capo";
-    const pelle = z.lampo > 0 ? "#ffffff" : z.gelo > 0 ? "#cfeeff" : rabbioso ? "#d9a08c" : capo ? "#8aa47c" : corazzato ? "#93b48a" : gonfio ? "#b9dc6e" : grosso ? "#86a878" : svelto ? "#b7d1a6" : "#9dbf8c";
-    const scura = rabbioso ? "#a8604c" : gonfio ? "#8fb650" : grosso ? "#628556" : "#6f9164";
+    const botto = z.tipo === "botto", gelido = z.tipo === "gelido", saltatore = z.tipo === "saltatore", sputatore = z.tipo === "sputatore", doro = z.tipo === "doro";
+    const pelle = z.lampo > 0 ? "#ffffff" : z.gelo > 0 ? "#cfeeff" : botto ? (z.stato === "colpo" && passi % 6 < 3 ? "#ff7a5a" : "#c9b27a") : gelido ? "#c4e6f5"
+      : saltatore ? "#cbd96c" : sputatore ? "#bba3d2" : doro ? "#ffd84a" : rabbioso ? "#d9a08c" : capo ? "#8aa47c" : corazzato ? "#93b48a" : gonfio ? "#b9dc6e" : grosso ? "#86a878" : svelto ? "#b7d1a6" : "#9dbf8c";
+    const scura = botto ? "#8f7a48" : gelido ? "#7fb0c8" : saltatore ? "#8a9a3a" : sputatore ? "#7d5f99" : doro ? "#b8901c" : rabbioso ? "#a8604c" : gonfio ? "#8fb650" : grosso ? "#628556" : "#6f9164";
     const emerge = z.stato === "esce" ? Math.max(0, 1 - z.s / 46) : 0;
     const k = z.stato === "giu" ? Math.min(1, z.s / 16) : 0;                   // 0 in piedi, 1 steso
     ctx.save();
@@ -5173,8 +5417,15 @@
       g.addColorStop(0, "rgba(170,90,255,.28)"); g.addColorStop(1, "rgba(170,90,255,0)");
       ctx.fillStyle = g; ctx.fillRect(z.x - 90 * S, q.base - 150 * S, 180 * S, 150 * S);
     }
-    ctx.translate(z.x, q.base + emerge * 62 * S * sc);
+    // Lo zombie d'oro brilla.
+    if (doro && z.stato !== "giu") {
+      const g = ctx.createRadialGradient(z.x, q.base - 34 * S, 4 * S, z.x, q.base - 34 * S, 54 * S);
+      g.addColorStop(0, "rgba(255,216,74,.45)"); g.addColorStop(1, "rgba(255,216,74,0)");
+      ctx.fillStyle = g; ctx.fillRect(z.x - 54 * S, q.base - 90 * S, 108 * S, 90 * S);
+    }
+    ctx.translate(z.x, q.base - (z.alzo || 0) + emerge * 62 * S * sc);
     ctx.scale(sc, sc);
+    if (z.stato === "salto" && z.salto && z.salto.t <= 16) ctx.scale(1.1, 0.84);          // il saltatore si accovaccia
     if (z.tipo === "striscia") {
       if (k > 0) { ctx.translate(0, 3 * S * k); ctx.scale(1, 1 - 0.5 * k); }
       disegnaStrisciante(z, T, pelle, scura, nero);
@@ -5194,6 +5445,23 @@
     ctx.strokeStyle = T[1]; ctx.lineWidth = (grosso ? 6 : 4.4) * S;
     for (const p of [p2, p1]) { ctx.beginPath(); ctx.moveTo(anca.x, anca.y); ctx.lineTo((anca.x + p.x) / 2 + d * 1.5 * S, (anca.y + p.y) / 2); ctx.lineTo(p.x, p.y); ctx.stroke(); }
     for (const p of [p2, p1]) { ctx.fillStyle = "#3a3f4a"; ctx.strokeStyle = nero; ctx.lineWidth = 1 * S; ctx.beginPath(); ctx.ellipse(p.x + d * 1.4 * S, p.y, 4.2 * S, 2.4 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    if (botto) {
+      // La bomba sulla schiena, con la miccia accesa (che corre quando è arrivato addosso).
+      const bx = -d * 9 * S, by = -40 * S, corre = z.stato === "colpo" ? 1.7 : 1;
+      ctx.strokeStyle = "#5a4630"; ctx.lineWidth = 2 * S; ctx.beginPath(); ctx.moveTo(bx + d * 5 * S, by - 5 * S); ctx.lineTo(d * 6 * S, -28 * S); ctx.stroke();
+      ctx.fillStyle = "#26262e"; ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
+      ctx.beginPath(); ctx.arc(bx, by, 8.5 * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,.28)"; ctx.beginPath(); ctx.arc(bx - 2.6 * S, by - 3 * S, 2.4 * S, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#6b5a3a"; ctx.lineWidth = 1.6 * S; ctx.beginPath(); ctx.moveTo(bx, by - 8 * S); ctx.quadraticCurveTo(bx - d * 5 * S, by - 13 * S, bx - d * 2 * S, by - 18 * S); ctx.stroke();
+      tondo(bx - d * 2 * S, by - 18 * S, (2.2 + Math.sin(z.t * 0.8)) * corre * S, "#ffb62e"); tondo(bx - d * 2 * S, by - 18 * S, 1.1 * S, "#ffffff");
+    } else if (doro) {
+      // Il sacco delle monete.
+      const bx = -d * 9 * S, by = -38 * S;
+      ctx.fillStyle = "#a0703a"; ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
+      ctx.beginPath(); ctx.ellipse(bx, by, 8 * S, 9.5 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = "#5a3d1c"; ctx.lineWidth = 1.4 * S; ctx.beginPath(); ctx.moveTo(bx - 4 * S, by - 7 * S); ctx.lineTo(bx + 4 * S, by - 7 * S); ctx.stroke();
+      tondo(bx, by + 1 * S, 3.4 * S, "#ffd84a"); tondo(bx - 1 * S, by, 1.1 * S, "#fff3b0");
+    }
     // Il busto, piegato in avanti (lo svelto di più), con la maglia a brandelli.
     const spalla = { x: d * ((svelto ? 10 : 5) + 3 * colpo) * S + indietro + dond, y: (svelto ? -45 : -47) * S };
     const largo = grosso ? 1.35 : 1;
@@ -5225,6 +5493,13 @@
     ctx.fillStyle = pelle; ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
     ctx.beginPath(); ctx.arc(0, 0, 8 * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = scura; ctx.beginPath(); ctx.ellipse(-d * 3.4 * S, 2.6 * S, 2.4 * S, 1.6 * S, 0.4, 0, Math.PI * 2); ctx.fill();
+    if (sputatore) {
+      // Le guance gonfie: si gonfiano ancora prima dello sputo.
+      const gonfie = z.stato === "sputa" ? Math.min(1, z.s / 18) * 2 : 0;
+      ctx.fillStyle = pelle; ctx.strokeStyle = nero; ctx.lineWidth = 1 * S;
+      ctx.beginPath(); ctx.arc(d * 5 * S, 3.5 * S, (3.6 + gonfie) * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      tondo(d * 7 * S, 7.5 * S + Math.abs(Math.sin(z.t * 0.07)) * 2 * S, 1.3 * S, "#8fe05a");
+    }
     if (corazzato || capo) {
       // L'elmo: una calotta di metallo con la fessura; quello del capo ha le corna.
       ctx.fillStyle = capo ? "#4a4258" : "#8d96a6"; ctx.strokeStyle = nero; ctx.lineWidth = 1 * S;
@@ -5236,6 +5511,20 @@
           ctx.beginPath(); ctx.moveTo(lato * 6 * S, -7 * S); ctx.quadraticCurveTo(lato * 15 * S, -10 * S, lato * 14 * S, -20 * S); ctx.quadraticCurveTo(lato * 10 * S, -12 * S, lato * 3 * S, -8.5 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
         }
       }
+    } else if (gelido) {
+      // Il gelido: una corona di ghiaccioli.
+      ctx.fillStyle = "#eaf8ff"; ctx.strokeStyle = "#7fb0c8"; ctx.lineWidth = 0.9 * S; ctx.beginPath();
+      for (const [u, h] of [[-5, 7], [-1.5, 10], [2.5, 8], [5.5, 5]]) { ctx.moveTo((u - 1.8) * S, -6.6 * S); ctx.lineTo((u - d * 0.8) * S, (-6.6 - h) * S); ctx.lineTo((u + 1.8) * S, -6.6 * S); }
+      ctx.fill(); ctx.stroke();
+    } else if (saltatore) {
+      // Il saltatore: una cresta di spine all'indietro.
+      ctx.fillStyle = scura; ctx.strokeStyle = nero; ctx.lineWidth = 0.9 * S; ctx.beginPath();
+      for (const [u, v] of [[1, -8], [-2.5, -7], [-5.5, -5]]) { ctx.moveTo(d * u * S, v * S); ctx.lineTo(d * (u - 4) * S, (v - 5) * S); ctx.lineTo(d * (u - 2.5) * S, (v + 1.5) * S); }
+      ctx.fill(); ctx.stroke();
+    } else if (doro) {
+      // Lo zombie d'oro ha una coroncina storta.
+      ctx.fillStyle = "#fff3b0"; ctx.strokeStyle = "#8a6510"; ctx.lineWidth = 0.9 * S; ctx.beginPath();
+      ctx.moveTo(-5 * S, -6.5 * S); ctx.lineTo(-5.5 * S, -12 * S); ctx.lineTo(-2.5 * S, -9 * S); ctx.lineTo(0, -13 * S); ctx.lineTo(2.5 * S, -9 * S); ctx.lineTo(5.5 * S, -12 * S); ctx.lineTo(5 * S, -6.5 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
     } else if (svelto && !rabbioso) {
       // Lo svelto ha un cappuccio stracciato.
       ctx.fillStyle = T[1]; ctx.strokeStyle = nero; ctx.lineWidth = 1 * S; ctx.beginPath();
@@ -5256,9 +5545,9 @@
       ctx.stroke();
     } else {
       const grande = z.occhio > 0 ? d * 4.4 : d * 0.2, piccolo = z.occhio > 0 ? d * 0.2 : d * 4.4;
-      ctx.fillStyle = "#f4f7e6"; ctx.strokeStyle = nero; ctx.lineWidth = 0.8 * S;
-      ctx.beginPath(); ctx.arc(grande * S, -1.4 * S, 2.5 * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.arc(piccolo * S, -1 * S, 1.5 * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = gelido ? "#e8fbff" : "#f4f7e6"; ctx.strokeStyle = nero; ctx.lineWidth = 0.8 * S;
+      ctx.beginPath(); ctx.arc(grande * S, -1.4 * S, (saltatore ? 3 : 2.5) * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(piccolo * S, -1 * S, (saltatore ? 2.8 : 1.5) * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       tondo((grande + d * 0.6) * S, -1.4 * S, 0.9 * S, svelto ? "#b3261e" : nero); tondo((piccolo + d * 0.3) * S, -1 * S, 0.6 * S, svelto ? "#b3261e" : nero);
       if (rabbioso || capo) {
         // Occhi accesi: rossi il rabbioso, viola il capo.
@@ -5271,6 +5560,11 @@
     ctx.fillStyle = "#3a1f24"; ctx.strokeStyle = nero; ctx.lineWidth = 0.8 * S;
     ctx.beginPath(); ctx.ellipse(d * 2.6 * S, 4 * S, (2.2 + 1.2 * colpo) * S, (1.5 + 1.6 * colpo) * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.restore();
+    if (gelido && z.stato !== "giu") {
+      // Il fiato gelato davanti alla bocca.
+      const u = (z.t % 50) / 50;
+      ctx.globalAlpha = (1 - u) * 0.55; tondo(testa.x + d * (9 + 10 * u) * S, testa.y + 4 * S - u * 3 * S, (2 + 3 * u) * S, "#eaf8ff"); ctx.globalAlpha = 1;
+    }
     // Le braccia tese in avanti; quando morde si alzano e calano (il grosso le cala dall'alto).
     for (const [su, tono] of [[2.5, scura], [-2.5, pelle]]) {
       const alza = (grosso ? 22 : 9) * colpo * (1 - colpo) * 4;
@@ -5281,6 +5575,88 @@
       ctx.strokeStyle = tono; ctx.beginPath(); ctx.moveTo(gomito.x, gomito.y); ctx.lineTo(mano.x, mano.y); ctx.stroke();
       ctx.fillStyle = tono; ctx.strokeStyle = nero; ctx.lineWidth = 0.9 * S; ctx.beginPath(); ctx.arc(mano.x, mano.y, (grosso ? 3.8 : 2.7) * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
+    ctx.restore();
+    segnoNuovo(z);
+  }
+  // Sopra il primo nemico nuovo del round, per tre secondi: una freccia d'oro che saltella.
+  function segnoNuovo(z) {
+    if (!(z.nuovo > 0) || z.stato === "giu" || !orda) return;
+    const y = (z.volo ? z.y - 30 * S : orda.base - (z.alzo || 0) - 80 * S * ZOMBI[z.tipo].scala) - Math.abs(Math.sin(passi * 0.15)) * 6 * S;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, z.nuovo / 30);
+    ctx.fillStyle = "#ffd84a"; ctx.strokeStyle = "#17171c"; ctx.lineWidth = 1.6 * S; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(z.x - 8 * S, y - 10 * S); ctx.lineTo(z.x + 8 * S, y - 10 * S); ctx.lineTo(z.x, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  // Il draghetto: corpo da lucertola, ali da pipistrello, due cornetti, e la punta della coda che
+  // dice che cosa tira (una fiammella, una saetta, una goccia).
+  function disegnaDrago(z) {
+    const C = COLORI_DRAGO[z.volo], d = z.dir, sc = ZOMBI[z.tipo].scala, nero = "#17171c";
+    const corpo = z.lampo > 0 ? "#ffffff" : z.gelo > 0 ? "#cfeeff" : C[0];
+    const carica = z.stato === "colpo" ? Math.min(1, z.s / ZOMBI[z.tipo].carica) : 0;
+    ctx.save();
+    if (z.stato === "giu") ctx.globalAlpha = Math.max(0, 1 - Math.max(0, z.s - 26) / 24);
+    ctx.translate(z.x, z.y);
+    let ang = 0;
+    if (z.stato === "giu") ang = Math.min(1, z.s / 18) * 1.4;
+    else if (z.stato === "tuffo" && z.tuffo) ang = Math.cos(Math.PI * Math.min(1, z.tuffo.t / z.tuffo.dur)) * 0.55;    // muso giù scendendo, su risalendo
+    ctx.scale(d * sc, sc); ctx.rotate(ang);
+    ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
+    const b = z.stato === "giu" ? -0.3 : Math.sin(z.ali);
+    const ala = (colore) => {
+      ctx.fillStyle = colore; ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
+      ctx.beginPath(); ctx.moveTo(3 * S, -5 * S);
+      ctx.lineTo(-3 * S, (-5 - 24 * b) * S);
+      ctx.quadraticCurveTo(-9 * S, (-4 - 13 * b) * S, -14 * S, (-5 - 18 * b) * S);
+      ctx.quadraticCurveTo(-15 * S, (-3 - 6 * b) * S, -10 * S, -1.5 * S);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -4 * S); ctx.lineTo(-8 * S, (-4 - 12 * b) * S); ctx.stroke();
+    };
+    // L'ala di là, più scura.
+    ctx.save(); ctx.translate(4 * S, -2 * S); ctx.scale(0.85, 0.85); ala(C[2]); ctx.restore();
+    // La coda, con la punta del suo elemento.
+    const onda = Math.sin(z.t * 0.12) * 3 * S, px = -30 * S, py = -1 * S + onda;
+    ctx.strokeStyle = nero; ctx.lineWidth = 5.2 * S; ctx.beginPath(); ctx.moveTo(-9 * S, 1 * S); ctx.quadraticCurveTo(-21 * S, 5 * S + onda, px, py); ctx.stroke();
+    ctx.strokeStyle = corpo; ctx.lineWidth = 3 * S; ctx.stroke();
+    ctx.lineWidth = 1 * S; ctx.strokeStyle = nero;
+    if (z.volo === "fuoco") {
+      ctx.fillStyle = C[3]; ctx.beginPath(); ctx.moveTo(px + 1 * S, py - 3 * S); ctx.quadraticCurveTo(px - 7 * S, py - 7 * S, px - 11 * S, py - 1 * S + Math.sin(z.t * 0.4) * 2 * S);
+      ctx.quadraticCurveTo(px - 7 * S, py + 5 * S, px + 1 * S, py + 3 * S); ctx.closePath(); ctx.fill();
+      tondo(px - 3 * S, py, 2 * S, "#ffe27a");
+    } else if (z.volo === "fulmine") {
+      ctx.strokeStyle = "#fff3a0"; ctx.lineWidth = 2.2 * S; ctx.beginPath();
+      ctx.moveTo(px, py); ctx.lineTo(px - 5 * S, py - 5 * S); ctx.lineTo(px - 4 * S, py); ctx.lineTo(px - 10 * S, py - 3 * S); ctx.stroke();
+    } else {
+      tondo(px - 3.5 * S, py, 3.6 * S, C[3]); tondo(px - 4.5 * S, py + 4 * S + (z.t % 40) / 40 * 4 * S, 1.2 * S, C[3]);
+    }
+    // Il corpo, la pancia, le spine sulla schiena, le zampette.
+    ctx.strokeStyle = nero; ctx.lineWidth = 2.2 * S; ctx.beginPath();
+    ctx.moveTo(-4 * S, 5 * S); ctx.lineTo(-6 * S, 11 * S); ctx.moveTo(4 * S, 5 * S); ctx.lineTo(3 * S, 11 * S); ctx.stroke();
+    ctx.fillStyle = C[2]; ctx.beginPath();
+    for (const u of [-7, -2, 3]) { ctx.moveTo((u - 2.5) * S, -6.5 * S); ctx.lineTo((u - 1) * S, -11 * S); ctx.lineTo((u + 2) * S, -7 * S); }
+    ctx.fill();
+    ctx.fillStyle = corpo; ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
+    ctx.beginPath(); ctx.ellipse(0, 0, 13 * S, 8 * S, -0.12, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = C[1]; ctx.beginPath(); ctx.ellipse(2 * S, 3.2 * S, 9 * S, 3.8 * S, -0.12, 0, Math.PI * 2); ctx.fill();
+    // Il collo, la testa col muso, i cornetti, l'occhio (acceso quando carica).
+    ctx.strokeStyle = nero; ctx.lineWidth = 6.4 * S; ctx.beginPath(); ctx.moveTo(8 * S, -3 * S); ctx.lineTo(15 * S, -8 * S); ctx.stroke();
+    ctx.strokeStyle = corpo; ctx.lineWidth = 4.2 * S; ctx.stroke();
+    ctx.fillStyle = C[1]; ctx.strokeStyle = nero; ctx.lineWidth = 1 * S;
+    for (const [u, w] of [[14, -1], [18.5, 1]]) { ctx.beginPath(); ctx.moveTo(u * S, -13 * S); ctx.quadraticCurveTo((u - 3 + w) * S, -17 * S, (u - 4 + w) * S, -21 * S); ctx.lineTo((u + 2) * S, -13.5 * S); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    ctx.fillStyle = corpo; ctx.lineWidth = 1.1 * S;
+    ctx.beginPath(); ctx.arc(17 * S, -9 * S, 6 * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(23 * S, -7.5 * S, 5.4 * S, 3.2 * S, 0.1, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    tondo(26 * S, -9 * S, 0.8 * S, nero);
+    ctx.strokeStyle = nero; ctx.lineWidth = 1 * S; ctx.beginPath(); ctx.moveTo(19.5 * S, -6 * S); ctx.lineTo(28 * S, -6.4 * S + carica * 2.5 * S); ctx.stroke();
+    tondo(18.5 * S, -10.5 * S, 2.3 * S, carica > 0 ? C[3] : "#ffffff");
+    tondo(19.2 * S, -10.5 * S, 1.1 * S, nero);
+    if (carica > 0) {
+      // In bocca si accende il tiro.
+      ctx.globalAlpha = (ctx.globalAlpha || 1) * (0.4 + 0.5 * carica); tondo(28 * S, -6 * S, (2 + 5 * carica) * S, C[3]);
+      ctx.globalAlpha = 1; tondo(28 * S, -6 * S, (1 + 2 * carica) * S, "#ffffff");
+    }
+    // L'ala di qua.
+    ala(corpo);
     ctx.restore();
   }
   // In alto: che ondata è e quanti ne restano (una testina a zombie, piena finché è in piedi).
@@ -10804,7 +11180,7 @@
   // Il compagno che non lotta sta «in panchina»: fuori campo, come chi è dentro
   // il buco nero, e torna solo per i duelli, da avversario.
   const CORSA = { vite: 3, viteMax: 5, hp: 100, ultima: 0.3, lento: 0.55, energia: 100, perUcciso: 4, perColpo: 5, ricarica: 0.12,
-                  intro: 90, vinto: 60, invulnerabile: 110, cura: 0.06, tempo: [30, 40], calamita: 70, maxGemme: 140, maxZombie: 34 };
+                  intro: 50, vinto: 35, invulnerabile: 110, cura: 0.04, tempo: [16, 22], calamita: 70, maxGemme: 140, maxZombie: 34 };
   const TIPI_ROUND = { ondata: ["\u{1F9DF}", "Ondata"], duello: ["⚔️", "Duello"], tempo: ["⏱️", "Sopravvivenza"], boss: ["\u{1F480}", "Il capo"] };
   // I potenziamenti che escono a ogni livello. `abbinata` delle armi indica quale serve per l'evoluzione.
   const POTERI = {
@@ -10857,23 +11233,41 @@
                             meteoriti: ["☄️", "Meteoriti"], buco: ["\u{1F573}️", "Buco nero"], temporale: ["⛈️", "Temporale"],
                             jet: ["\u{1F680}", "Jetpack impazziti"], uragano: ["\u{1F32A}️", "Uragano"] };
   // Il danno di un morso, prima della pelle dura e della crescita a ogni round.
-  const MORSO_CORSA = { lento: 6, svelto: 5, striscia: 5, gonfio: 6, grosso: 15, corazzato: 8, rabbioso: 6, capo: 20 };
-  const PUNTI_ZOMBIE = { lento: 10, svelto: 10, striscia: 10, gonfio: 12, grosso: 30, corazzato: 20, rabbioso: 20, capo: 300 };
-  const GEMMA_ZOMBIE = { lento: 1, svelto: 1, striscia: 1, gonfio: 2, grosso: 4, corazzato: 3, rabbioso: 2, capo: 25 };
+  // (per i draghetti è la picchiata; per il botto, lo scoppio)
+  const MORSO_CORSA = { lento: 6, svelto: 5, striscia: 5, gonfio: 6, grosso: 15, corazzato: 8, rabbioso: 6, capo: 20,
+                        botto: 13, gelido: 6, saltatore: 7, sputatore: 5, doro: 0, dragoFuoco: 8, dragoFulmine: 8, dragoVeleno: 8 };
+  const PUNTI_ZOMBIE = { lento: 10, svelto: 10, striscia: 10, gonfio: 12, grosso: 30, corazzato: 20, rabbioso: 20, capo: 300,
+                         botto: 14, gelido: 14, saltatore: 14, sputatore: 16, doro: 100, dragoFuoco: 25, dragoFulmine: 25, dragoVeleno: 25 };
+  const GEMMA_ZOMBIE = { lento: 1, svelto: 1, striscia: 1, gonfio: 2, grosso: 4, corazzato: 3, rabbioso: 2, capo: 25,
+                         botto: 2, gelido: 2, saltatore: 2, sputatore: 2, doro: 6, dragoFuoco: 3, dragoFulmine: 3, dragoVeleno: 3 };
+  // Chi entra nella corsa, nell'ordine: uno nuovo a ogni round con l'orda (all'inizio ci sono solo il
+  // lento e lo svelto). Finiti i nuovi, ogni round ha due o tre protagonisti a sorte, mai quelli di prima.
+  const NOVITA_CORSA = ["striscia", "botto", "dragoFuoco", "gonfio", "saltatore", "dragoFulmine", "corazzato", "gelido", "grosso", "dragoVeleno", "sputatore", "rabbioso"];
+  const NEMICI_CORSA = { striscia: ["\u{1F41B}", "Strisciante"], botto: ["\u{1F4A3}", "Botto"], dragoFuoco: ["\u{1F409}\u{1F525}", "Draghetto di fuoco"],
+                         gonfio: ["\u{1F922}", "Gonfio"], saltatore: ["\u{1F997}", "Saltatore"], dragoFulmine: ["\u{1F409}⚡", "Draghetto elettrico"],
+                         corazzato: ["\u{1F6E1}️", "Corazzato"], gelido: ["❄️", "Gelido"], grosso: ["\u{1FAA3}", "Bestione"],
+                         dragoVeleno: ["\u{1F409}\u{1F9EA}", "Draghetto velenoso"], sputatore: ["\u{1F4A6}", "Sputatore"], rabbioso: ["\u{1F621}", "Rabbioso"] };
   const PERSONAGGI_CORSA = [["", "Classici"], ["guerrieri", "Super guerrieri"], ["maghi", "Maghi"], ["lame", "Duellanti"]];
   const eroe = () => (corsa && corsa.chi ? lottatori.find((l) => l.tipo === corsa.chi) || null : null);
   const nemicoCorsa = () => (corsa && corsa.chi ? lottatori.find((l) => l.tipo !== corsa.chi) || null : null);
   const eDellaCorsa = (f) => !!(corsa && corsa.chi && f && f.tipo === corsa.chi);
   const livello = (id) => (corsa && corsa.livelli[id]) || 0;
   const forzaCorsa = () => (1 + 0.15 * livello("forza")) * (1 + 0.06 * (bottega.forza || 0));
-  // I danni presi crescono a ogni round e, dal decimo, sempre più in fretta: infinita sì, ma prima o poi si cade.
-  const crescita = () => { const r = corsa ? corsa.round : 1; return 1 + 0.06 * Math.max(0, r - 1) + 0.02 * Math.pow(Math.max(0, r - 10), 1.5); };
+  // La pressione: i minuti di lotta della corsa (le carte e i forzieri non contano). Da lì crescono la
+  // vita degli zombie, i danni che si prendono e il loro passo: poco nel primo minuto, molto al quarto.
+  // Lasciando fare all'eroe e alle armi si cade fra il secondo e il quinto minuto (misurato); giocando
+  // (il colpo finale, gli oggetti) si va più in là. Infinita sì, ma prima o poi si cade.
+  const pressione = () => (corsa && corsa.tLotta ? corsa.tLotta / 3600 : 0);
+  // Dal quarto minuto in poi la crescita diventa esponenziale: con tutte le armi evolute si arrivava
+  // al tredicesimo minuto senza giocare, e una corsa così non finisce più (misurato).
+  const vitaZombie = () => { const k = pressione(); return (1 + 0.3 * k + 0.35 * k * k) * Math.pow(1.6, Math.max(0, k - 4)); };
+  const crescita = () => { const k = pressione(); return (1 + 0.15 * k + 0.17 * k * k) * Math.pow(1.4, Math.max(0, k - 4)); };
   const pelleCorsa = () => (1 - 0.1 * livello("pelle")) * (1 - 0.05 * (bottega.pelle || 0));
   const areaCorsa = () => 1 + 0.12 * livello("area");
   const ricaricaCorsa = () => (1 - 0.08 * livello("ricarica")) * (1 - 0.04 * (bottega.ricarica || 0));
   const raggioCalamita = () => CORSA.calamita * S * (1 + 0.4 * livello("calamita") + 0.25 * (bottega.calamita || 0));
   const nomeDi = (tipo) => (stile ? nomeProprio(tipo) : dici(tipo === "robot" ? "Robot" : "Mela"));
-  const xpPerLivello = (l) => Math.round(5 + 4 * l + Math.pow(l, 1.55));
+  const xpPerLivello = (l) => Math.round(3 + 2.2 * l + Math.pow(l, 1.4));
   function salvaBottega() {
     try { deposito.setItem("mut-ring-banca", String(banca)); deposito.setItem("mut-ring-bottega", JSON.stringify(bottega)); } catch (errore) { /* pazienza */ }
   }
@@ -10927,6 +11321,8 @@
       liv: 1, xp: 0, daScegliere: 0, scelta: null, forziere: null, pausa: false, armi: {}, armiT: {},
       gemme: [], aTerra: [], forzieri: [], onde: [], saette: [], dardi: [], lame: [], numeri: [],
       invuln: 0, scudo: 0, imprevisti: [], prossimoImprevisto: 0, nemicoGiu: false, iniziata: Date.now(), danniRound: 0, inviato: false, nome: "",
+      tLotta: 0, tiri: [], pozze: [], sbloccati: ["lento", "svelto"], novita: 0, nuovo: null, protagonisti: [], gelato: 0, frenesia: 0,
+      prossimaSorpresa: 600, ultimaSorpresa: null, sorprese: 0,
     });
     try { corsa.nome = deposito.getItem("mut-ring-nome") || ""; } catch (errore) { /* niente nome */ }
     corsa.armi[(ARMA_DI_PARTENZA[stile] || ARMA_DI_PARTENZA[""])[tipo]] = 1;
@@ -10992,7 +11388,7 @@
     if (corsa.prossimoTipo) { const t = corsa.prossimoTipo; corsa.prossimoTipo = null; return t; }
     if (n === 1) return "ondata";
     const prima = corsa.tipo, r = corsa.rng;
-    const voci = [[5, "ondata"], [prima === "duello" ? 0 : 2, "duello"], [n >= 3 && prima !== "tempo" ? 2.4 : 0, "tempo"], [n >= 3 && prima !== "boss" ? 2.2 : 0, "boss"]];
+    const voci = [[5, "ondata"], [prima === "duello" ? 0 : 1.5, "duello"], [n >= 3 && prima !== "tempo" ? 2.4 : 0, "tempo"], [n >= 5 && prima !== "boss" && corsa.tipi.slice(-3).indexOf("boss") < 0 ? 2.2 : 0, "boss"]];
     let tot = 0; for (const v of voci) tot += v[0];
     let x = r() * tot;
     for (const v of voci) if ((x -= v[0]) <= 0) return v[1];
@@ -11004,6 +11400,9 @@
     c.tipo = scegliTipoRound(c.round);
     c.tipi.push(c.tipo);
     c.fase = "intro"; c.t = 0; c.nemicoGiu = false; c.danniRound = 0; c.variante = null; c.scadenza = 0;
+    // Il nemico nuovo di questo round (solo dove c'è l'orda).
+    c.nuovo = null; c.vistoNuovo = false;
+    if (c.tipo !== "duello" && c.round > 1 && c.novita < NOVITA_CORSA.length) { c.nuovo = NOVITA_CORSA[c.novita++]; c.sbloccati.push(c.nuovo); }
     // Un po' di fiato fra un round e l'altro (le vite, quelle, non tornano).
     if (!c.ultima) c.hp = Math.min(c.hpMax, c.hp + Math.round(c.hpMax * CORSA.cura));
     // Gli imprevisti: dal secondo round, sempre più spesso.
@@ -11045,23 +11444,53 @@
     avviaOrda(1, Math.floor(c.rng() * 1e9) + 1);
     if (orda) { orda.corsa = ricetta; orda.pausa = 10; }
   }
-  // La ricetta di un round: sempre più zombie, più insieme, più varianti. Si
-  // incollano le ricette del ring libero finché non si arriva al totale.
+  // La ricetta di un round: sempre più zombie, e sempre altri. I protagonisti del round sono la novità
+  // (se c'è) e uno o due a sorte fra quelli già visti, mai gli stessi del round prima: escono sei volte
+  // più spesso degli altri, così ogni round ha la sua faccia.
   function ricettaCorsa(n, molt) {
-    const totale = Math.round((8 + 4.5 * n) * (molt || 1));
-    const R = ricettaOndata(Math.min(14, n), corsa.rng);
-    for (let k = 1; R.coda.length < totale && k < 12; k++) R.coda = R.coda.concat(ricettaOndata(Math.min(14, n + k), corsa.rng).coda);
-    R.coda = R.coda.slice(0, Math.min(140, totale));
-    R.insieme = Math.min(CORSA.maxZombie, 6 + 2 * n);
-    const pc = Math.min(0.45, 0.06 * (n - 1)), pr = Math.min(0.5, 0.07 * (n - 1));
-    for (const v of R.coda) {
-      v.attesa = Math.max(4, Math.round(v.attesa * 0.55));
-      if (v.tipo === "lento" && corsa.rng() < pc) v.tipo = "corazzato";
-      else if ((v.tipo === "svelto" || v.tipo === "striscia") && corsa.rng() < pr) v.tipo = "rabbioso";
+    const c = corsa, rng = c.rng, k = pressione();
+    const pro = c.nuovo ? [c.nuovo] : [];
+    const altri = c.sbloccati.filter((t) => pro.indexOf(t) < 0 && (c.protagonisti || []).indexOf(t) < 0);
+    const quanti = c.nuovo ? 2 : 2 + (rng() < 0.4 ? 1 : 0);
+    while (pro.length < quanti && altri.length) pro.push(altri.splice(Math.floor(rng() * altri.length), 1)[0]);
+    // (all'inizio i tipi sono pochi: se non bastano, torna uno del round prima)
+    const resto = c.sbloccati.filter((t) => pro.indexOf(t) < 0);
+    while (pro.length < 2 && resto.length) pro.push(resto.splice(Math.floor(rng() * resto.length), 1)[0]);
+    c.protagonisti = pro;
+    const pesi = {};
+    for (const t of c.sbloccati) pesi[t] = pro.indexOf(t) >= 0 ? 6 : 0.8;
+    if (pro.every((t) => ZOMBI[t].volo)) pesi.lento = Math.max(pesi.lento || 0, 3);      // qualcuno a terra ci vuole
+    const totale = Math.min(120, Math.round((12 + 3.2 * n) * (molt || 1)));
+    const maxVolo = Math.min(10, 2 + Math.floor(n / 2)), maxGrossi = 1 + Math.floor(n / 4);
+    let volo = 0, grossi = 0;
+    const tipi = [];
+    while (tipi.length < totale) {
+      let tot = 0; for (const t in pesi) tot += pesi[t];
+      let x = rng() * tot, tipo = "lento";
+      for (const t in pesi) { tipo = t; if ((x -= pesi[t]) <= 0) break; }
+      if (ZOMBI[tipo].volo) { if (volo >= maxVolo) tipo = "lento"; else volo++; }
+      if (tipo === "grosso") { if (grossi >= maxGrossi) tipo = "lento"; else grossi++; }
+      tipi.push(tipo);
     }
-    R.coda[0].attesa = 10;
-    R.totale = R.coda.length;
-    return R;
+    // La novità si fa vedere subito: fra i primi tre.
+    if (c.nuovo) {
+      const i = tipi.indexOf(c.nuovo), j = 1 + Math.floor(rng() * 2);
+      if (i < 0) tipi[j] = c.nuovo;
+      else if (i > 2) { tipi[i] = tipi[j]; tipi[j] = c.nuovo; }
+    }
+    const arrivo = n === 1 ? "lati" : ARRIVI[Math.floor(rng() * ARRIVI.length)];
+    const passo = Math.max(9, 30 - 1.6 * n) / (1 + 0.3 * k);
+    let lato = rng() < 0.5 ? -1 : 1;
+    const coda = tipi.map((tipo, i) => {
+      let attesa = Math.round(passo * (0.6 + 0.8 * rng()));
+      if (arrivo === "lati" || arrivo === "tenaglia") { lato = -lato; if (arrivo === "tenaglia" && i % 2) attesa = 4; }
+      else if (arrivo === "sinistra" || arrivo === "destra") lato = rng() < 0.8 ? (arrivo === "sinistra" ? -1 : 1) : (arrivo === "sinistra" ? 1 : -1);
+      else if (i % 3 === 0) { lato = rng() < 0.5 ? -1 : 1; attesa = Math.round(passo * 2.2); }
+      else attesa = Math.round(4 + 6 * rng());
+      return { tipo, lato, attesa: Math.max(4, attesa) };
+    });
+    coda[0].attesa = 10;
+    return { n, tema: pro.join("+"), arrivo, coda, totale: coda.length, insieme: Math.min(CORSA.maxZombie, 10 + 2 * n + Math.floor(4 * k)) };
   }
   // Il duello: l'altro personaggio entra dal lato opposto, potenziato a seconda del round.
   function entraNemico() {
@@ -11071,7 +11500,7 @@
     const n = corpoNuovo(tipo, x, -lato, f.base);
     n.supporto = f.supporto;
     const v = c.variante || [];
-    n.soglia = Math.round((6 + 0.9 * c.round) * (v.indexOf("gigante") >= 0 ? 1.4 : 1) * (v.length > 1 ? 1.15 : 1));
+    n.soglia = Math.round((5 + 0.6 * c.round) * (v.indexOf("gigante") >= 0 ? 1.4 : 1) * (v.length > 1 ? 1.15 : 1));
     n.danni = 0; n.pensa = 30; n.dir = -lato; n.cdArmi = {};
     if (v.indexOf("furioso") >= 0) n.furia = 1e7;
     if (v.indexOf("armato") >= 0) { daiArma(n, c.round >= 6 ? "lanciafiamme" : "bazooka"); n.riarma = 900; }
@@ -11244,7 +11673,13 @@
       const i = c.forzieri.findIndex((z) => tutte || Math.hypot(hx - z.x, hy - z.y) < 40 * S);
       if (i >= 0) { c.forzieri.splice(i, 1); apriForziere(); }
     }
-    for (const z of c.forzieri) { z.vy = (z.vy || 0) + 0.3 * S; z.y += z.vy; if (z.y > z.base - 12 * S) { z.y = z.base - 12 * S; z.vy = 0; } }
+    // (quello col paracadute scende piano e va verso l'eroe)
+    for (const z of c.forzieri) {
+      if (z.paracadute) { z.vy = Math.min(1.1 * S, (z.vy || 0) + 0.05 * S); z.x += Math.sign(hx - z.x) * Math.min(Math.abs(hx - z.x), 0.7 * S); }
+      else z.vy = (z.vy || 0) + 0.3 * S;
+      z.y += z.vy;
+      if (z.y > z.base - 12 * S) { z.y = z.base - 12 * S; z.vy = 0; z.paracadute = false; }
+    }
   }
 
   // ·· Le armi automatiche ··
@@ -11278,7 +11713,7 @@
     n.cdArmi = n.cdArmi || {};
     if ((n.cdArmi[chiave] || 0) > passi) return false;
     n.cdArmi[chiave] = passi + 30;
-    n.danni += danno * 0.14;
+    n.danni += danno * 0.22;
     scintille(b.x, b.y, 6, "#ffd84a"); numero(b.x, b.y - 30 * S, danno);
     if (spinta) for (const k in n.p) n.p[k].ox -= dir * spinta * 0.4 * S;
     if (n.danni >= n.soglia && f) { n.danni = n.soglia - 1; f.dir = dir || 1; colpisci(f, n, 6, b.x, b.y, "POW!"); }
@@ -11289,12 +11724,13 @@
     if (!f || !f.p || f.fuoriCampo || c.fase !== "lotta") return;
     const hx = f.p.bacino.x, hy = f.p.bacino.y - 6 * S, A = areaCorsa(), K = ricaricaCorsa(), T = c.armiT;
     const B = bersagliCorsa();
-    const tic = (id, cd) => { T[id] = (T[id] || 0) + 1; if (T[id] >= cd * K) { T[id] = 0; return true; } return false; };
+    // (nella frenesia le armi vanno al doppio)
+    const tic = (id, cd) => { T[id] = (T[id] || 0) + (c.frenesia > 0 ? 2 : 1); if (T[id] >= cd * K) { T[id] = 0; return true; } return false; };
     // Telefoni in orbita.
     const lo = c.armi.orbita;
     if (lo) {
       const evo = lo === 6, n = evo ? 8 : 1 + Math.ceil(lo / 2) + (lo >= 4 ? 1 : 0), R = (evo ? 74 : 44 + 5 * lo) * S * A;
-      c.giro = (c.giro || 0) + (evo ? 0.09 : lo >= 3 ? 0.07 : 0.055);
+      c.giro = (c.giro || 0) + (evo ? 0.09 : lo >= 3 ? 0.07 : 0.055) * (c.frenesia > 0 ? 1.7 : 1);
       c.telefoni = [];
       for (let i = 0; i < n; i++) {
         const a = c.giro + i * Math.PI * 2 / n, x = hx + Math.cos(a) * R, y = hy + Math.sin(a) * R * 0.62;
@@ -11450,6 +11886,12 @@
     lasciaGemma(x, y, GEMMA_ZOMBIE[z.tipo] || 1, "gemma");
     if (c.rng() < 0.06 + 0.03 * livello("tasche")) lasciaGemma(x, y, 1 + livello("tasche"), "moneta");
     if (z.tipo === "capo") { c.forzieri.push({ x, y, base: orda.base, vy: -4 * S }); lasciaOggetto(x + 20 * S, y, oggettoCorsa()); for (let i = 0; i < 6; i++) lasciaGemma(x, y, 3, "moneta"); }
+    else if (z.tipo === "doro") {
+      // Lo zombie d'oro: una fontana di monete e tre gemme grosse.
+      for (let i = 0; i < 10; i++) lasciaGemma(x, y, 1 + livello("tasche"), "moneta");
+      for (let i = 0; i < 3; i++) lasciaGemma(x, y, Math.max(4, Math.round(xpPerLivello(c.liv) / 8)), "gemma");
+      scintille(x, y, 18, "#ffd84a"); suona("moneta", x, 1);
+    }
     else if (c.rng() < 0.012 * (1 + 0.3 * (bottega.fortuna || 0))) lasciaOggetto(x, y, oggettoCorsa());
   }
   // Il K.O. nella corsa: niente conto del ring, niente balletto per l'avversario; l'avversario lascia un forziere.
@@ -11517,6 +11959,83 @@
     return true;
   }
 
+  // ·· Le sorprese ··
+  // Ogni dodici-diciotto secondi di lotta succede qualcosa di buono, senza annunci: si vede e basta.
+  // Lo zombie d'oro scappa carico di monete; piovono gemme dal cielo; scende un forziere col
+  // paracadute; le armi vanno al doppio per otto secondi (la frenesia). Mai la stessa due volte di fila.
+  const SORPRESE = ["oro", "gemme", "forziere", "frenesia"];
+  function sorpresa(nome) {
+    const c = corsa, f = eroe();
+    if (!c || !c.chi || c.fase !== "lotta" || !f || !f.p || f.fuoriCampo) return false;
+    const conOrda = !!(orda && orda.fase === "lotta");
+    if (!nome) {
+      const voci = SORPRESE.filter((n) => n !== c.ultimaSorpresa && (n !== "oro" || conOrda));
+      nome = voci[Math.floor(c.rng() * voci.length)];
+    }
+    if (SORPRESE.indexOf(nome) < 0 || (nome === "oro" && !conOrda)) return false;
+    c.ultimaSorpresa = nome; c.sorprese++;
+    const base = orda ? orda.base : f.base, hx = f.p.bacino.x;
+    if (nome === "oro") {
+      nuovoZombie("doro", c.rng() < 0.5 ? -1 : 1);
+      const z = orda.zombie[orda.zombie.length - 1];
+      z.hp = Math.round((3 + 2 * pressione()) * 10) / 10;
+      suona("moneta", z.x, 0.8);
+    } else if (nome === "gemme") {
+      const valore = Math.max(2, Math.round(xpPerLivello(c.liv) / 14));
+      for (let i = 0; i < 16; i++) {
+        c.gemme.push({ x: caso(30 * S, W - 30 * S), y: testataBasso + caso(0, 90) * S, vx: 0, vy: caso(0.5, 2) * S, base, valore, tipo: "gemma", t: 60, tirata: false });
+      }
+      suona("preso", hx, 0.7);
+    } else if (nome === "forziere") {
+      const x = Math.max(40 * S, Math.min(W - 40 * S, hx + (c.rng() < 0.5 ? -1 : 1) * caso(90, 200) * S));
+      c.forzieri.push({ x, y: testataBasso + 30 * S, base, vy: 0, paracadute: true });
+      suona("pop", x, 0.7);
+    } else {
+      c.frenesia = 480;
+      suona("potenza", hx, 0.7); scintille(hx, f.p.bacino.y - 10 * S, 18, ORO);
+    }
+    return true;
+  }
+  // I tiri dei draghetti e degli sputatori, e le pozze di veleno.
+  function aggiornaTiri() {
+    const c = corsa, f = eroe();
+    if (!c.tiri) return;
+    const base = orda ? orda.base : f && f.p ? f.base : pavimento;
+    const vivo = !!(f && f.p && !f.fuoriCampo && !f.esploso && !(f.ko > 0) && c.fase === "lotta");
+    c.tiri = c.tiri.filter((t) => {
+      t.t++;
+      if (t.tipo === "saetta") {
+        if (t.t === t.scocca) {
+          suona("tuono", t.x1, 0.45); scossa = Math.max(scossa, 5); scintille(t.x1, t.y1, 10, "#fff6a8");
+          if (vivo && Math.abs(f.p.bacino.x - t.x1) < 26 * S) colpitoEroe(f, t.danno, f.p.bacino.x, f.p.bacino.y - 20 * S, f.p.bacino.x >= t.x ? 1 : -1, 3);
+          // Il fulmine non guarda in faccia nessuno: prende anche gli zombie che stanno lì.
+          if (orda) for (const z of orda.zombie) if (vivoZ(z) && !z.volo && Math.abs(z.x - t.x1) < 26 * S) colpoArma({ z, x: z.x, y: corpoZ(z)[1] }, 2 * vitaZombie(), 1, 2, "saetta");
+        }
+        return t.t < t.scocca + 12;
+      }
+      t.vy += t.g || 0; t.x += t.vx; t.y += t.vy;
+      if (t.tipo === "fuoco" && t.t % 3 === 0 && particelle.length < MAX_PARTICELLE - 30) particelle.push({ tipo: "fuoco", x: t.x, y: t.y, vx: 0, vy: -0.3 * S, vita: 12, max: 14, r: caso(3, 5) * S });
+      if (vivo && lontanoDalCorpo(f, t.x, t.y) < t.r + 9 * S) {
+        colpitoEroe(f, t.danno, t.x, t.y, Math.sign(t.vx) || 1, t.tipo === "fuoco" ? 3 : 1.5);
+        scintille(t.x, t.y, 8, t.tipo === "fuoco" ? "#ffb62e" : "#9cff6b");
+        if (t.tipo === "fuoco") scrivi("FWOOSH!", t.x, t.y - 16 * S, false);
+        return false;
+      }
+      if (t.y >= base - 3 * S) {
+        if (t.pozza) c.pozze.push({ x: t.x, y: base, r: 30 * S, t: 0, vita: 300 });
+        scintille(t.x, base - 3 * S, 6, t.tipo === "fuoco" ? "#ffb62e" : "#9cff6b");
+        return false;
+      }
+      return t.t < 300 && t.x > -30 && t.x < W + 30 && t.y > -60;
+    });
+    // La pozza: chi ci sta dentro coi piedi perde un po' di vita ogni mezzo secondo.
+    c.pozze = c.pozze.filter((p) => {
+      p.t++;
+      if (vivo && p.t % 30 === 0 && Math.abs(f.p.bacino.x - p.x) < p.r && Math.abs(f.base - p.y) < 20 * S) colpitoEroe(f, 2, f.p.bacino.x, p.y - 6 * S, 0, 0);
+      return p.t < p.vita;
+    });
+  }
+
   // ·· Il passo della corsa (dentro `passo`) ··
   function aggiornaCorsa() {
     const c = corsa;
@@ -11525,6 +12044,8 @@
     if (c.lampo > 0) c.lampo--;
     if (c.invuln > 0) c.invuln--;
     if (c.scudo > 0) c.scudo--;
+    if (c.gelato > 0) c.gelato--;
+    if (c.frenesia > 0) c.frenesia--;
     if (c.fase === "fine") { if (sulSito && classifica.voci && passi - classifica.letta > 600) caricaClassifica(); return; }
     if (!c.chi) return;
     // La valvola: con fotogrammi oltre i 45 ms di media, al massimo 20 zombie insieme (finché non si torna sotto i 30).
@@ -11532,10 +12053,14 @@
     if (orda && orda.ricetta) { orda.ricetta.insiemeBase = orda.ricetta.insiemeBase || orda.ricetta.insieme; orda.ricetta.insieme = c.affanno ? Math.min(20, orda.ricetta.insiemeBase) : orda.ricetta.insiemeBase; }
     aggiornaRaccolta();
     aggiornaArmi();
+    aggiornaTiri();
     // Un livello in sospeso: le tre carte, appena non si sta mirando né aprendo un forziere.
     if (c.daScegliere > 0 && !c.scelta && !c.forziere && !mira && c.fase !== "fine") apriLivello();
     if (c.fase === "intro" && c.t >= CORSA.intro) iniziaLotta();
     else if (c.fase === "lotta") {
+      c.tLotta++;
+      // Una sorpresa ogni dodici-diciotto secondi.
+      if (--c.prossimaSorpresa <= 0) { sorpresa(); c.prossimaSorpresa = Math.round(720 + c.rng() * 360); }
       // All'ultima possibilità il colpo finale si ricarica piano, e più piano dopo ogni salvataggio.
       if (c.ultima && !mira) c.energia = Math.min(CORSA.energia, c.energia + CORSA.ricarica / (1 + c.salvezze));
       // Gli imprevisti del round, uno alla volta.
@@ -11552,6 +12077,8 @@
         const n = nemicoCorsa();
         // Chi è armato, ogni tanto, si ricarica.
         if (n && n.riarma > 0 && --n.riarma === 0) { if (!n.arma && !n.ko && !n.fuoriCampo) daiArma(n, c.round >= 6 ? "lanciafiamme" : "bazooka"); n.riarma = 900; }
+        // Un duello non ferma la corsa: dopo mezzo minuto l'avversario crolla sfinito (e il forziere lo lascia lo stesso).
+        if (c.t > 1800 && n && n.p && !n.fuoriCampo && !(n.ko > 0) && eroe()) { koCorsa(eroe(), n); return; }
       }
     } else if (c.fase === "vinto" && c.t >= CORSA.vinto && !c.forzieri.length && !c.forziere) prossimoRound();
   }
@@ -11728,6 +12255,14 @@
       g.addColorStop(0, "rgba(255,140,40,0)"); g.addColorStop(0.75, evo ? "rgba(255,70,20,.28)" : "rgba(255,140,40,.2)"); g.addColorStop(1, "rgba(255,90,30,0)");
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, Math.PI * 2); ctx.fill();
     }
+    for (const p of c.pozze || []) {
+      // La pozza di veleno, con le bolle.
+      ctx.globalAlpha = 0.8 * Math.max(0, Math.min(1, p.t / 10, (p.vita - p.t) / 40));
+      ctx.fillStyle = "#5fbf3a"; ctx.beginPath(); ctx.ellipse(p.x, p.y - 1.5 * S, p.r, p.r * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#9cff6b"; ctx.beginPath(); ctx.ellipse(p.x - p.r * 0.2, p.y - 2.5 * S, p.r * 0.5, p.r * 0.09, 0, 0, Math.PI * 2); ctx.fill();
+      for (let i = 0; i < 3; i++) { const u = (p.t * 0.02 + i / 3) % 1; tondo(p.x + (i - 1) * p.r * 0.5, p.y - 3 * S - u * 10 * S, (1.6 - u) * 1.5 * S, "#c4f59a"); }
+      ctx.globalAlpha = 1;
+    }
     for (const g of c.gemme) {
       const r = (g.tipo === "moneta" ? 4.6 : 3.4 + Math.min(4, g.valore * 0.6)) * S, y = g.y - (g.tirata ? 0 : Math.abs(Math.sin(g.t * 0.08)) * 2 * S);
       if (g.tipo === "moneta") {
@@ -11749,7 +12284,19 @@
       scriviUI(OGGETTI[o.id].icona, o.x, y + 1, 13 * S, "#ffffff", "center");
     }
     for (const z of c.forzieri) {
-      const y = z.y - Math.abs(Math.sin(passi * 0.08)) * 5 * S;
+      const y = z.paracadute ? z.y : z.y - Math.abs(Math.sin(passi * 0.08)) * 5 * S;
+      if (z.paracadute) {
+        // Il paracadute: una cupola a spicchi bianchi e rossi, e i fili.
+        const cy = y - 44 * S, R = 24 * S;
+        ctx.strokeStyle = "#17171c"; ctx.lineWidth = 1 * S; ctx.beginPath();
+        for (const u of [-1, -0.35, 0.35, 1]) { ctx.moveTo(z.x + u * R, cy); ctx.lineTo(z.x, y - 10 * S); }
+        ctx.stroke();
+        for (let i = 0; i < 4; i++) {
+          ctx.fillStyle = i % 2 ? "#ffffff" : "#ff5a5a"; ctx.beginPath(); ctx.moveTo(z.x, cy);
+          ctx.arc(z.x, cy, R, Math.PI + i * Math.PI / 4, Math.PI + (i + 1) * Math.PI / 4); ctx.closePath(); ctx.fill();
+        }
+        ctx.strokeStyle = "#17171c"; ctx.lineWidth = 1.4 * S; ctx.beginPath(); ctx.arc(z.x, cy, R, Math.PI, 0); ctx.closePath(); ctx.stroke();
+      }
       const g = ctx.createRadialGradient(z.x, y, 2 * S, z.x, y, 34 * S);
       g.addColorStop(0, "rgba(255,216,74,.55)"); g.addColorStop(1, "rgba(255,216,74,0)");
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(z.x, y, 34 * S, 0, Math.PI * 2); ctx.fill();
@@ -11761,6 +12308,7 @@
   function disegnaArmiCorsa() {
     const c = corsa, col = coloreCorsa();
     ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+    disegnaTiri();
     for (const o of c.onde) {
       const k = 1 - o.r / o.R;
       ctx.globalAlpha = Math.max(0, k) * 0.85; ctx.strokeStyle = c.armi.onda === 6 ? ORO : "#bfe9ff"; ctx.lineWidth = (3 + 5 * k) * S;
@@ -11805,6 +12353,38 @@
     }
     ctx.restore();
   }
+  // I tiri dei nemici: la palla di fuoco con la scia, il veleno, il fulmine (prima la linea che
+  // avvisa e il cerchio a terra, poi la saetta).
+  function disegnaTiri() {
+    for (const t of corsa.tiri || []) {
+      if (t.tipo === "saetta") {
+        if (t.t < t.scocca) {
+          const k = t.t / t.scocca;
+          ctx.globalAlpha = passi % 6 < 3 ? 0.8 : 0.35;
+          ctx.strokeStyle = "#9fe8ff"; ctx.lineWidth = 1.6 * S; ctx.setLineDash([6 * S, 6 * S]);
+          ctx.beginPath(); ctx.moveTo(t.x, t.y); ctx.lineTo(t.x1, t.y1); ctx.stroke(); ctx.setLineDash([]);
+          ctx.globalAlpha = 0.5 + 0.45 * k; ctx.strokeStyle = "#fff3a0"; ctx.lineWidth = 2 * S;
+          ctx.beginPath(); ctx.ellipse(t.x1, t.y1, (28 - 12 * k) * S, (6 - 2.5 * k) * S, 0, 0, Math.PI * 2); ctx.stroke();
+        } else {
+          if (!t.punti) { t.punti = []; for (let i = 0; i <= 7; i++) { const u = i / 7; t.punti.push([t.x + (t.x1 - t.x) * u + (i && i < 7 ? caso(-9, 9) * S : 0), t.y + (t.y1 - t.y) * u]); } }
+          ctx.globalAlpha = Math.max(0, 1 - (t.t - t.scocca) / 12);
+          ctx.beginPath(); t.punti.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+          ctx.strokeStyle = "#9fe8ff"; ctx.lineWidth = 5 * S; ctx.stroke();
+          ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2 * S; ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      if (t.tipo === "fuoco") {
+        for (let i = 3; i >= 1; i--) { ctx.globalAlpha = 0.28 * (4 - i) / 3; tondo(t.x - t.vx * i * 1.6, t.y - t.vy * i * 1.6, t.r * (1 - i * 0.15), "#ff7a2a"); }
+        ctx.globalAlpha = 1;
+        tondo(t.x, t.y, t.r, "#ff7a2a"); tondo(t.x, t.y, t.r * 0.62, "#ffd84a"); tondo(t.x - t.r * 0.2, t.y - t.r * 0.2, t.r * 0.25, "#fff6d8");
+      } else {
+        ctx.globalAlpha = 0.5; tondo(t.x - t.vx * 2, t.y - t.vy * 2, t.r * 0.55, "#5fbf3a"); ctx.globalAlpha = 1;
+        tondo(t.x, t.y, t.r, "#5fbf3a"); tondo(t.x - t.r * 0.3, t.y - t.r * 0.3, t.r * 0.35, "#d6f29a");
+      }
+    }
+  }
   // Sotto i lottatori: il buio dei menu, l'aura rossa dell'ultima possibilità.
   function disegnaFondoCorsa() {
     const c = corsa;
@@ -11848,6 +12428,25 @@
     const c = corsa, f = eroe();
     if (!f || !f.p || f.fuoriCampo) return;
     const b = f.p.bacino;
+    if (c.frenesia > 0 && c.fase === "lotta") {
+      // La frenesia: un anello d'oro che pulsa, e scintille che girano.
+      const k = c.frenesia < 90 && passi % 8 < 4 ? 0.3 : 1, R = (40 + 4 * Math.sin(passi * 0.3)) * S;
+      ctx.save(); ctx.globalAlpha = 0.75 * k; ctx.strokeStyle = ORO; ctx.lineWidth = 3 * S;
+      ctx.beginPath(); ctx.ellipse(b.x, b.y - 8 * S, R, R * 0.8, 0, 0, Math.PI * 2); ctx.stroke();
+      for (let i = 0; i < 4; i++) { const a = passi * 0.12 + i * Math.PI / 2; tondo(b.x + Math.cos(a) * R, b.y - 8 * S + Math.sin(a) * R * 0.8, 3 * S, "#fff3b0"); }
+      ctx.restore();
+    }
+    if (c.gelato > 0) {
+      // Morso dal gelido: brina addosso finché il passo non torna normale.
+      ctx.save(); ctx.globalAlpha = Math.min(1, c.gelato / 30) * 0.7;
+      ctx.fillStyle = "rgba(190,235,255,.35)"; ctx.beginPath(); ctx.ellipse(b.x, b.y - 14 * S, 22 * S, 40 * S, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#eaf8ff"; ctx.lineWidth = 1.4 * S; ctx.beginPath();
+      for (let i = 0; i < 3; i++) {
+        const x = b.x + (i - 1) * 14 * S, y = b.y - 20 * S + ((passi * 0.6 + i * 23) % 50) * S * 0.6;
+        for (let a = 0; a < 3; a++) { const u = a * Math.PI / 3; ctx.moveTo(x - Math.cos(u) * 3 * S, y - Math.sin(u) * 3 * S); ctx.lineTo(x + Math.cos(u) * 3 * S, y + Math.sin(u) * 3 * S); }
+      }
+      ctx.stroke(); ctx.restore();
+    }
     if (c.scudo > 0) {
       const k = c.scudo < 60 ? (passi % 8 < 4 ? 0.3 : 1) : 1;
       ctx.save(); ctx.globalAlpha = 0.85 * k;
@@ -11959,16 +12558,25 @@
       if (evo) scriviUI("★", x + 15 * S, ya + 14 * S, 9 * S, "#ff62d6", "center");
       else for (let k = 0; k < 5; k++) { ctx.fillStyle = k < l ? ORO : "rgba(255,255,255,.2)"; ctx.fillRect(x + 4 * S + k * 4.6 * S, ya + 12 * S, 3.4 * S, 3 * S); }
     });
+    if (c.frenesia > 0) {
+      // La frenesia: armi al doppio, finché la barretta non si svuota.
+      const x = xs + 4 * S + armi.length * 34 * S;
+      pannelloUI(x, ya - 14 * S, 40 * S, 34 * S, 7 * S, ORO, "rgba(70,48,0,.9)");
+      scriviUI("×2", x + 20 * S, ya - 1 * S, 15 * S, ORO, "center", 900);
+      ctx.fillStyle = ORO; ctx.fillRect(x + 5 * S, ya + 12 * S, 30 * S * Math.min(1, c.frenesia / 480), 3 * S);
+    }
   }
   function disegnaIntro() {
     const c = corsa, t = c.t / CORSA.intro, a = Math.min(1, t * 6, (1 - t) * 5), T = TIPI_ROUND[c.tipo];
-    const w = Math.min(380 * S, W - 32), h = (c.tipo === "duello" || c.imprevisti.length ? 128 : 100) * S, x = W / 2 - w / 2, y = H * 0.32 - h / 2;
+    const righe = (c.tipo === "duello" ? 1 : 0) + (c.imprevisti.length ? 1 : 0) + (c.nuovo ? 1 : 0);
+    const w = Math.min(380 * S, W - 32), h = (100 + 22 * righe + (righe ? 6 : 0)) * S, x = W / 2 - w / 2, y = H * 0.32 - h / 2;
     ctx.save(); ctx.globalAlpha = Math.max(0, a);
     pannelloUI(x, y, w, h, 14 * S, coloreCorsa());
     scriviUI(dici("Round") + " " + c.round, W / 2, y + 30 * S, 30 * S, "#ffffff", "center", 900);
     scriviUI(T[0] + "  " + dici(T[1]), W / 2, y + 62 * S, 17 * S, ORO, "center");
     let riga = y + 92 * S;
     if (c.tipo === "duello") { scriviUI(dici("Contro") + " " + nomeNemicoAtteso(), W / 2, riga, 12 * S, GRIGIO_UI, "center", 700); riga += 20 * S; }
+    if (c.nuovo && NEMICI_CORSA[c.nuovo]) { scriviUI(dici("Nuovo nemico") + ": " + NEMICI_CORSA[c.nuovo][0] + " " + dici(NEMICI_CORSA[c.nuovo][1]), W / 2, riga, 13 * S, "#7dffb0", "center", 800); riga += 22 * S; }
     if (c.imprevisti.length) scriviUI(dici("Imprevisti") + ": " + c.imprevisti.map((n) => IMPREVISTI_CORSA[n][0] + " " + dici(IMPREVISTI_CORSA[n][1])).join("  "), W / 2, riga, 12 * S, GRIGIO_UI, "center", 700);
     ctx.restore();
   }
@@ -12264,6 +12872,8 @@
       vinci: () => vinciRound("prova"), prossimo: (tipo) => { if (corsa) corsa.prossimoTipo = tipo; }, finisci: () => finisciCorsa(), chiudi: () => chiudiCorsa(),
       monete: (n) => { if (corsa) corsa.monete = n; }, energia: (n) => { if (corsa) corsa.energia = n; }, dai: (id, i) => { if (corsa) corsa.slot[i || 0] = id; },
       tocca: (x, y) => { const t = tastoCorsa(x, y); if (t) t.fa(); return !!t; }, tasti: () => tastiUI.map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.h })),
+      sorpresa: (nome) => sorpresa(nome), minuti: (m) => { if (corsa && corsa.chi) corsa.tLotta = Math.round(m * 3600); },
+      tiri: () => (corsa && corsa.tiri ? corsa.tiri.map((t) => ({ tipo: t.tipo, x: t.x, y: t.y, t: t.t })) : []),
     },
     // Solo per i test: apri la mira, spostala a un'altezza, spara.
     mira: (tipo) => avviaMira(lottatori.find((l) => l.tipo === tipo) || lottatori[0]),
@@ -12290,6 +12900,8 @@
                      forziere: corsa.forziere ? corsa.forziere.premi.length : 0, gemme: (corsa.gemme || []).length, aTerra: (corsa.aTerra || []).map((o) => o.id), forzieri: (corsa.forzieri || []).length,
                      onde: (corsa.onde || []).length, dardi: (corsa.dardi || []).length, lame: (corsa.lame || []).length, telefoni: corsa.telefoni ? corsa.telefoni.length : 0, bottega: !!corsa.bottega,
                      imprevisti: (corsa.imprevisti || []).slice(), invuln: corsa.invuln || 0, scudo: corsa.scudo || 0, scadenza: corsa.scadenza || 0,
+                     tiri: (corsa.tiri || []).length, pozze: (corsa.pozze || []).length, sbloccati: (corsa.sbloccati || []).slice(), nuovo: corsa.nuovo || null,
+                     protagonisti: (corsa.protagonisti || []).slice(), frenesia: corsa.frenesia || 0, gelato: corsa.gelato || 0, minuti: (corsa.tLotta || 0) / 3600, sorprese: corsa.sorprese || 0,
                      tasti: tastiUI.length, modale: corsaModale() } : null,
     classifica: { aperta: classifica.aperta, voci: classifica.voci ? classifica.voci.length : null }, recordCorsa, banca, bottega: Object.assign({}, bottega),
     audio: { acceso: audio.acceso, pronto: !!audio.ctx, anelli: Object.keys(audio.anelli).filter((k) => audio.anelli[k]) },
@@ -12305,7 +12917,7 @@
                    ondata: orda.ondata, ondate: orda.ondate, superate: orda.superate, seme: orda.seme, vite: orda.vite, traslochi: orda.traslochi || 0, l: orda.l, r: orda.r,
                    coppie: Object.assign({}, orda.coppie), coppiaAttesa: orda.coppiaAttesa, latiDi: Object.assign({}, orda.lati),
                    ricetta: orda.ricetta ? { tema: orda.ricetta.tema, arrivo: orda.ricetta.arrivo, totale: orda.ricetta.totale, insieme: orda.ricetta.insieme, restano: orda.ricetta.coda.length } : null,
-                   zombie: orda.zombie.map((z) => ({ x: z.x, stato: z.stato, hp: z.hp, lato: z.lato, tipo: z.tipo })) } : null, primatoOrda,
+                   zombie: orda.zombie.map((z) => ({ x: z.x, y: z.volo ? z.y : orda.base - (z.alzo || 0), volo: z.volo || null, stato: z.stato, hp: z.hp, lato: z.lato, tipo: z.tipo })) } : null, primatoOrda,
     radiale: (() => { const g = lottatori.length ? geometriaRadiale() : { x: 0, y: 0, centro: 0, spicchi: [], largo: 0 };
                       return { aperto: radiale.aperto, apre: radiale.apre, chi: radiale.chi, lato: radiale.lato, x: g.x, y: g.y, centro: g.centro, largo: g.largo, voci: vociRadiale().map((v) => v[0]),
                                spicchi: g.spicchi.map((q) => ({ x: q.x, y: q.y, giro: q.giro })),
