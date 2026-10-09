@@ -98,6 +98,9 @@
   "guidaS11": {
     "message": "Desde el panel, «Carrera infinita» convierte el ring en un juego: elige un personaje y afronta solo una ronda tras otra, oleadas de zombis, duelos, supervivencia y un jefe. Tres vidas que no vuelven, un premio a elegir tras cada ronda y una tienda con tres huecos. El golpe final se apunta: de tus manos sale una línea que sube y baja, y disparas cuando cruza a los enemigos."
   },
+  "guidaS12": {
+    "message": "El sonido está apagado hasta que lo enciendes: el botón «Sonido» del panel (o el altavoz en la carrera infinita). Cada puñetazo, explosión, zombi y fanfarria se sintetiza al momento, no se descarga nada, y suena del lado de la pantalla donde ocurre."
+  },
   "guidaS8": {
     "message": "Cuando dos ataques de energía chocan aparecen dos botones en los extremos de la barra: machaca el del lado de tu luchador y el choque se inclina a su favor."
   },

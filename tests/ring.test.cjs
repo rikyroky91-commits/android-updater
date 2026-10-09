@@ -29,7 +29,7 @@ function riquadro(l, t, r, b) {
   return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
 }
 
-function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false, premio = null, pannello = false } = {}) {
+function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false, premio = null, pannello = false, audio = null } = {}) {
   const richieste = [];
   const ascoltatori = {};
   const contesto2d = new Proxy({}, {
@@ -55,7 +55,7 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
   // Il pannello del ring, ridotto ai tasti della corsa: basta a far girare il codice che li collega
   // mentre lo script si avvia (lì il 09/10/2026 si leggeva lo stato della corsa prima che esistesse).
   const tastoPannello = (attr) => ({ attr, hidden: false, ascolta: {}, addEventListener(t, fn) { this.ascolta[t] = fn; }, setAttribute() {}, getAttribute: () => null });
-  const tastiPannello = { "[data-corsa]": [tastoPannello("data-corsa")], "[data-classifica]": [tastoPannello("data-classifica")] };
+  const tastiPannello = { "[data-corsa]": [tastoPannello("data-corsa")], "[data-classifica]": [tastoPannello("data-classifica")], "[data-audio]": [tastoPannello("data-audio")] };
   const tastoOpzioni = { hidden: true, addEventListener() {}, setAttribute() {}, focus() {} };
   const finto = pannello ? { hidden: true, querySelectorAll: (sel) => tastiPannello[sel] || [], querySelector: () => null, setAttribute() {}, addEventListener() {},
                              classList: { contains: () => false, add() {}, remove() {}, toggle() {} } } : null;
@@ -94,6 +94,7 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
     finestra.localStorage = { getItem() { throw new Error("il ring dell'estensione non deve usare localStorage"); }, setItem() { throw new Error("no"); } };
   }
   if (premio) finestra.__ringPremium = premio;
+  if (audio) finestra.AudioContext = audio;
   const sandbox = {
     window: finestra, document: documento, Math, Date, Object, JSON, String, Number,
     getComputedStyle: () => ({ getPropertyValue: () => "" }),
@@ -3462,5 +3463,63 @@ test("la corsa nell'estensione: si gioca uguale, ma senza rete e senza campo per
   assert.strictEqual(s.corsa.fase, "fine");
   assert.strictEqual(s.classifica.voci, null, "nessuna classifica chiesta a nessuno");
   assert.ok(s.recordCorsa > 0, "il record resta nel browser");
+  dentro(amb);
+});
+
+// ·· L'AUDIO (09/10/2026) ··
+// Un contesto audio finto: conta le note e i rumori che partono, e controlla che i valori siano numeri veri.
+function audioFinto() {
+  const conto = { contesti: 0, note: 0, rumori: 0, cattivi: 0 };
+  const param = () => ({ value: 0, setValueAtTime(v) { if (!Number.isFinite(v)) conto.cattivi++; }, exponentialRampToValueAtTime(v) { if (!(v > 0) || !Number.isFinite(v)) conto.cattivi++; },
+                         setTargetAtTime(v) { if (!Number.isFinite(v)) conto.cattivi++; } });
+  const nodo = (extra) => Object.assign({ connect() {}, disconnect() {} }, extra);
+  class Finto {
+    constructor() { conto.contesti++; this.currentTime = 0; this.sampleRate = 8000; this.state = "running"; this.destination = nodo(); }
+    createGain() { return nodo({ gain: param() }); }
+    createDynamicsCompressor() { return nodo(); }
+    createStereoPanner() { return nodo({ pan: param() }); }
+    createBiquadFilter() { return nodo({ type: "", frequency: param(), Q: param() }); }
+    createOscillator() { conto.note++; return nodo({ type: "", frequency: param(), detune: param(), start() {}, stop() {} }); }
+    createBufferSource() { conto.rumori++; return nodo({ buffer: null, loop: false, start() {}, stop() {} }); }
+    createBuffer(c, n) { return { getChannelData: () => new Float32Array(n) }; }
+    resume() {}
+  }
+  Finto.conto = conto;
+  return Finto;
+}
+
+test("l'audio: spento finché non lo si accende, e la scelta resta", () => {
+  const Finto = audioFinto();
+  const amb = ambiente({ audio: Finto, pannello: true });
+  const r = amb.finestra.__ring;
+  amb.avanza(400);
+  assert.strictEqual(Finto.conto.contesti, 0, "spento: nessun contesto audio, nessun suono");
+  assert.strictEqual(amb.stato().audio.acceso, false);
+  amb.tastiPannello["[data-audio]"][0].ascolta.click();
+  assert.strictEqual(amb.stato().audio.acceso, true);
+  assert.strictEqual(amb.memoria["mut-ring-audio"], "on", "la scelta resta nel browser");
+  assert.strictEqual(Finto.conto.contesti, 1);
+  r.comandi.audio(false);
+  assert.strictEqual(amb.memoria["mut-ring-audio"], "off");
+});
+
+test("l'audio: la lotta suona, la mira canta, la corsa ha i suoi suoni, e nessun valore storto", () => {
+  const Finto = audioFinto();
+  const amb = ambiente({ audio: Finto, memoria: { "mut-ring-audio": "on" } });
+  const r = amb.finestra.__ring;
+  amb.premi(5, 5); amb.rilascia(5, 5);                          // il primo gesto sblocca l'audio
+  const prima = Finto.conto.note + Finto.conto.rumori;
+  amb.avanza(60 * 30);
+  assert.ok(Finto.conto.note + Finto.conto.rumori > prima + 20, "picchiandosi, si sente");
+  r.mira("robot");
+  amb.avanza(60);
+  assert.ok(amb.stato().audio.anelli.includes("mira"), "mentre si mira suona una nota continua");
+  r.spara();
+  amb.avanza(400);
+  r.corsa.apri(7); amb.avanza(20); r.corsa.scegli("mela"); amb.avanza(300);
+  r.corsa.vinci(); amb.avanza(140); r.corsa.premio(0); r.corsa.monete(99); r.corsa.compra(0); r.corsa.avanti();
+  amb.avanza(200);
+  r.corsa.finisci();
+  assert.strictEqual(Finto.conto.cattivi, 0, "nessuna frequenza o volume che un browser vero rifiuterebbe");
   dentro(amb);
 });

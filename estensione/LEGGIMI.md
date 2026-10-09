@@ -140,6 +140,10 @@ Nell'estensione la corsa è gratis, come il colpo finale, ma i personaggi a paga
 
 La classifica globale sta solo sul sito: l'estensione non manda niente a nessuno, tiene il record nel browser e il tasto «Classifica» lì non c'è.
 
+### L'audio (09/10/2026, gratis)
+
+Spento finché non lo si accende (tasto «Audio» nella tendina, o l'altoparlante nel cruscotto della corsa). Niente file: ogni suono è sintetizzato al momento con Web Audio, quindi l'estensione non scarica niente. Il contesto audio nasce solo al primo gesto, come vogliono i browser.
+
 ### Premium: cosa c'è e cosa manca
 
 Le scelte stanno in `premium.json`:

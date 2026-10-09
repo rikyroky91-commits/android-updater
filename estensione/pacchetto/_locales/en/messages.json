@@ -98,6 +98,9 @@
   "guidaS11": {
     "message": "From the menu, “Endless run” turns the ring into a game: pick a fighter and take on round after round alone, zombie waves, duels, survival and a boss. Three lives that don't come back, a reward to pick after every round, a shop with three slots. The final move is aimed: a line sweeps up and down from your hands, and you fire when it crosses the enemies."
   },
+  "guidaS12": {
+    "message": "Sound is off until you turn it on: the “Sound” button in the panel (or the speaker in the endless run). Every punch, explosion, zombie and jingle is synthesized on the spot, nothing is downloaded, and it comes from the side of the screen where it happens."
+  },
   "guidaS8": {
     "message": "When two energy attacks collide, two buttons pop up at the ends of the bar: hammer the one on your fighter's side and the clash goes their way."
   },

@@ -34,7 +34,7 @@ from pathlib import Path
 RADICE = Path(__file__).resolve().parent.parent
 QUI = Path(__file__).resolve().parent
 VARIANTI = {"pacchetto": {"premium_di_prova": True}, "store": {"premium_di_prova": False}}
-VERSIONE = "0.8.0"
+VERSIONE = "0.9.0"
 NOME = "Page Brawl"
 
 MANIFEST = {
@@ -132,6 +132,7 @@ GUIDA = {
         "guidaS9": "About one round in three ends with a finishing move: the scene goes dark and the winner sends the other into orbit, bounces them between the edges of the window or flattens them like a pancake. Each character set has its own. You can also call one from the panel.",
         "guidaS10": "Powering up changes the body: the super warriors bulk up with a blazing crest and a jacket torn to shreds, the robot becomes a steel colossus, the apple a towering tree, the duelists hooded knights with a double blade. In the free ring it happens on its own when one of them is one hit from a K.O.",
         "guidaS11": "From the menu, “Endless run” turns the ring into a game: pick a fighter and take on round after round alone, zombie waves, duels, survival and a boss. Three lives that don't come back, a reward to pick after every round, a shop with three slots. The final move is aimed: a line sweeps up and down from your hands, and you fire when it crosses the enemies.",
+        "guidaS12": "Sound is off until you turn it on: the “Sound” button in the panel (or the speaker in the endless run). Every punch, explosion, zombie and jingle is synthesized on the spot, nothing is downloaded, and it comes from the side of the screen where it happens.",
         "guidaS8": "When two energy attacks collide, two buttons pop up at the ends of the bar: hammer the one on your fighter's side and the clash goes their way.",
         "guidaS5gratis": "Super warriors, wizards, duelists, weapons, weather, meteorites, the black hole, the zombie horde and gravity are part of Premium. For now it is free: open the panel and press “Unlock Premium for free”.",
         "guidaOpzioni": "Open the options",
@@ -164,6 +165,7 @@ GUIDA = {
         "guidaS9": "Circa un round su tre si chiude con un colpo finale: la scena si fa buia e chi vince manda l'altro in orbita, lo fa rimbalzare fra i bordi della finestra o lo schiaccia come una frittella. Ogni coppia di personaggi ha il suo. Lo puoi anche chiamare dalla tendina.",
         "guidaS10": "Chi si potenzia cambia corpo: i super guerrieri si gonfiano, con la cresta accesa e la casacca a brandelli, il robot diventa un colosso d'acciaio, la mela un albero enorme, i duellanti cavalieri incappucciati con la lama doppia. Nel ring libero succede da solo quando a uno manca un colpo al K.O.",
         "guidaS11": "Dal menu, «Corsa infinita» trasforma il ring in un gioco: scegli un personaggio e affronta da solo un round dopo l'altro, ondate di zombie, duelli, sopravvivenza e un capo. Tre vite che non tornano, un premio da scegliere dopo ogni round, un negozio con tre posti. Il colpo finale si mira: dalle mani parte una linea che sale e scende, e spari quando attraversa i nemici.",
+        "guidaS12": "L'audio è spento finché non lo accendi: il tasto «Audio» nella tendina (o l'altoparlante nella corsa infinita). Pugni, esplosioni, zombie e fanfare sono sintetizzati al momento, non si scarica niente, e il suono arriva dal lato dello schermo dove succede la cosa.",
         "guidaS8": "Quando due colpi d'energia si scontrano spuntano due tasti ai capi della barra: martella quello dalla parte del tuo lottatore e lo scontro va a lui.",
         "guidaS5gratis": "Super guerrieri, maghi, duellanti, armi, meteo, meteoriti, buco nero, orda di zombie e gravità fanno parte di Premium. Per ora è gratis: apri la tendina e premi «Sblocca Premium gratis».",
         "guidaOpzioni": "Apri le opzioni",
@@ -196,6 +198,7 @@ GUIDA = {
         "guidaS9": "Más o menos una ronda de cada tres acaba con un golpe final: la escena se oscurece y el que gana manda al otro a la órbita, lo hace rebotar entre los bordes de la ventana o lo aplasta como una tortita. Cada pareja de personajes tiene el suyo. También puedes pedirlo desde el panel.",
         "guidaS10": "Al potenciarse cambia el cuerpo: los superguerreros se hinchan, con la cresta encendida y la chaqueta hecha jirones, el robot se vuelve un coloso de acero, la manzana un árbol enorme, los duelistas caballeros encapuchados con hoja doble. En el ring libre pasa solo cuando a uno le falta un golpe para el K.O.",
         "guidaS11": "Desde el panel, «Carrera infinita» convierte el ring en un juego: elige un personaje y afronta solo una ronda tras otra, oleadas de zombis, duelos, supervivencia y un jefe. Tres vidas que no vuelven, un premio a elegir tras cada ronda y una tienda con tres huecos. El golpe final se apunta: de tus manos sale una línea que sube y baja, y disparas cuando cruza a los enemigos.",
+        "guidaS12": "El sonido está apagado hasta que lo enciendes: el botón «Sonido» del panel (o el altavoz en la carrera infinita). Cada puñetazo, explosión, zombi y fanfarria se sintetiza al momento, no se descarga nada, y suena del lado de la pantalla donde ocurre.",
         "guidaS8": "Cuando dos ataques de energía chocan aparecen dos botones en los extremos de la barra: machaca el del lado de tu luchador y el choque se inclina a su favor.",
         "guidaS5gratis": "Los superguerreros, los magos, los duelistas, las armas, el clima, los meteoritos, el agujero negro, la horda de zombis y la gravedad forman parte de Premium. Por ahora es gratis: abre el panel y pulsa «Desbloquear Premium gratis».",
         "guidaOpzioni": "Abrir las opciones",
@@ -228,6 +231,7 @@ GUIDA = {
         "guidaS9": "Environ une manche sur trois se termine par un coup final : la scène s'assombrit et le vainqueur envoie l'autre en orbite, le fait rebondir entre les bords de la fenêtre ou l'aplatit comme une crêpe. Chaque duo de personnages a le sien. Vous pouvez aussi le déclencher depuis le panneau.",
         "guidaS10": "Celui qui se renforce change de corps : les super guerriers gonflent, avec une crête enflammée et une veste en lambeaux, le robot devient un colosse d'acier, la pomme un arbre immense, les duellistes des chevaliers encapuchonnés à la lame double. Dans le ring libre, cela arrive tout seul quand il ne reste qu'un coup avant le K.O.",
         "guidaS11": "Depuis le panneau, « Course infinie » transforme le ring en jeu : choisissez un personnage et affrontez seul une manche après l'autre, des vagues de zombies, des duels, de la survie et un chef. Trois vies qui ne reviennent pas, une récompense à choisir après chaque manche, une boutique à trois emplacements. Le coup final se vise : une ligne part de vos mains, monte et descend, et vous tirez quand elle croise les ennemis.",
+        "guidaS12": "Le son est coupé tant que vous ne l'activez pas : le bouton « Son » du panneau (ou le haut-parleur dans la course infinie). Coups, explosions, zombies et fanfares sont synthétisés sur le moment, rien n'est téléchargé, et le son vient du côté de l'écran où ça se passe.",
         "guidaS8": "Quand deux attaques d'énergie se rencontrent, deux boutons apparaissent aux extrémités de la barre : martelez celui du côté de votre combattant et le choc tourne en sa faveur.",
         "guidaS5gratis": "Super guerriers, mages, duellistes, armes, météo, météorites, trou noir, horde de zombies et gravité font partie de Premium. Pour l'instant c'est gratuit : ouvrez le panneau et appuyez sur « Débloquer Premium gratuitement ».",
         "guidaOpzioni": "Ouvrir les options",
@@ -260,6 +264,7 @@ GUIDA = {
         "guidaS9": "Etwa jede dritte Runde endet mit einem Finalschlag: Die Szene wird dunkel und der Sieger schießt den anderen in die Umlaufbahn, lässt ihn zwischen den Fensterrändern abprallen oder drückt ihn platt wie einen Pfannkuchen. Jedes Figurenpaar hat seinen eigenen. Du kannst ihn auch aus dem Menü auslösen.",
         "guidaS10": "Wer sich auflädt, bekommt einen neuen Körper: Die Superkrieger legen an Masse zu, mit leuchtendem Kamm und zerfetzter Jacke, der Roboter wird zum Stahlkoloss, der Apfel zu einem riesigen Baum, die Duellanten zu Kapuzenrittern mit doppelter Klinge. Im freien Ring passiert es von selbst, wenn einem noch ein Treffer bis zum K.o. fehlt.",
         "guidaS11": "Im Menü macht „Endloslauf“ aus dem Ring ein Spiel: Wähle eine Figur und kämpfe allein Runde um Runde, gegen Zombiewellen, in Duellen, ums Überleben und gegen einen Boss. Drei Leben, die nicht zurückkommen, nach jeder Runde eine Belohnung zur Wahl, ein Laden mit drei Plätzen. Der Finalschlag wird gezielt: Aus deinen Händen kommt eine Linie, die auf und ab schwenkt, und du feuerst, wenn sie die Gegner kreuzt.",
+        "guidaS12": "Der Ton ist aus, bis du ihn einschaltest: die Taste „Ton“ im Menü (oder der Lautsprecher im Endloslauf). Jeder Schlag, jede Explosion, jeder Zombie und jede Fanfare wird sofort erzeugt, nichts wird heruntergeladen, und der Ton kommt von der Seite des Bildschirms, wo es passiert.",
         "guidaS8": "Wenn zwei Energieangriffe aufeinanderprallen, erscheinen zwei Tasten an den Enden des Balkens: Hämmere auf die Taste deines Kämpfers, dann kippt das Duell zu seinen Gunsten.",
         "guidaS5gratis": "Superkrieger, Magier, Duellanten, Waffen, Wetter, Meteoriten, das Schwarze Loch, die Zombiehorde und Schwerkraft gehören zu Premium. Im Moment ist es gratis: Öffne das Menü und drücke „Premium gratis freischalten“.",
         "guidaOpzioni": "Optionen öffnen",
@@ -810,7 +815,7 @@ def file_attesi(variante: str) -> dict:
     attesi = {
         "manifest.json": json.dumps(MANIFEST, ensure_ascii=False, indent=2) + "\n",
         "sfondo.js": SFONDO.replace("__STILE_PAGINA__", json.dumps(STILE_PAGINA, ensure_ascii=False)) + SFONDO_GUIDA,
-        "benvenuto.html": pagina_guida(NOME, 6, ["guidaS1", "guidaS2", "guidaS7", "guidaS9", "guidaS10", "guidaS11", "guidaS8", "guidaS3", "guidaS4"]
+        "benvenuto.html": pagina_guida(NOME, 6, ["guidaS1", "guidaS2", "guidaS7", "guidaS9", "guidaS10", "guidaS11", "guidaS12", "guidaS8", "guidaS3", "guidaS4"]
                                        + ([("guidaS5gratis" if scelte["sbloccoGratis"] else "guidaS5")] if scelte["premium"] else []) + ["guidaS6"]),
         "benvenuto.css": GUIDA_CSS, "benvenuto.js": GUIDA_JS,
         "prepara.js": prepara,

@@ -165,6 +165,7 @@
     "MIRA!": ["AIM!", "¡APUNTA!", "VISE !", "ZIELEN!"],
     "PRESO!": ["HIT!", "¡ACERTADO!", "TOUCHÉ !", "TREFFER!"],
     "MANCATO!": ["MISS!", "¡FALLADO!", "RATÉ !", "VERFEHLT!"],
+    "Audio": ["Sound", "Sonido", "Son", "Ton"],
     // La corsa infinita (09/10/2026).
     "vita massima": ["max life", "vida máxima", "vie max", "max. Leben"],
     "Vita al massimo": ["Full life", "Vida al máximo", "Vie au maximum", "Volles Leben"],

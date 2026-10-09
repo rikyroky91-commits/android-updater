@@ -98,6 +98,9 @@
   "guidaS11": {
     "message": "Depuis le panneau, « Course infinie » transforme le ring en jeu : choisissez un personnage et affrontez seul une manche après l'autre, des vagues de zombies, des duels, de la survie et un chef. Trois vies qui ne reviennent pas, une récompense à choisir après chaque manche, une boutique à trois emplacements. Le coup final se vise : une ligne part de vos mains, monte et descend, et vous tirez quand elle croise les ennemis."
   },
+  "guidaS12": {
+    "message": "Le son est coupé tant que vous ne l'activez pas : le bouton « Son » du panneau (ou le haut-parleur dans la course infinie). Coups, explosions, zombies et fanfares sont synthétisés sur le moment, rien n'est téléchargé, et le son vient du côté de l'écran où ça se passe."
+  },
   "guidaS8": {
     "message": "Quand deux attaques d'énergie se rencontrent, deux boutons apparaissent aux extrémités de la barre : martelez celui du côté de votre combattant et le choc tourne en sa faveur."
   },

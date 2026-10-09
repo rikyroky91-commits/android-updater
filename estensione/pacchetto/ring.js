@@ -156,6 +156,235 @@
   const sulSito = !window.__ringRadice;                        // l'estensione non parla con nessun server
   let corsa = null, recordCorsa = 0, tastiUI = [], campoNome = null;
   const classifica = { aperta: false, voci: null, letta: -1e9, stato: "", mia: -1 };
+
+  // ·· L'AUDIO (09/10/2026, chiesto da Riccardo: «aggiungi l'audio a tutto da attivare opzionalmente») ··
+  // Spento finché non lo si accende (tasto «Audio» nel pannello, e l'altoparlante
+  // nel cruscotto della corsa); la scelta resta nel browser. Niente file: ogni
+  // suono è sintetizzato al momento con Web Audio (oscillatori, rumore, filtri),
+  // così pesa zero byte e va bene anche nell'estensione, che non scarica niente.
+  //  - LE PAROLE. Quasi tutto quello che succede nel ring scrive già la sua
+  //    onomatopea (POW!, CLANG!, KABOOM!, SPLAT!…): `scrivi` la passa a
+  //    `suonaParola`, che la traduce in un suono della famiglia giusta. Così
+  //    un'azione nuova che scrive la sua parola ha già il suo suono.
+  //  - GLI EVENTI SENZA PAROLA (lo sparo, l'onda d'energia, il jetpack, i
+  //    fulmini, le esplosioni, la mira, i menu della corsa) chiamano `suona`.
+  //  - I SUONI CHE DURANO (pioggia, vento dell'uragano, ronzio del buco nero, la
+  //    nota della mira che sale e scende con la linea) sono anelli che
+  //    `aggiornaAudio` alza e abbassa.
+  //  - Il suono viene da dove succede la cosa: sinistra o destra secondo la x.
+  //  - Al massimo AUDIO.voci suoni insieme, e la stessa famiglia non si ripete
+  //    prima di AUDIO.pausa millisecondi: in una mischia con l'orda sennò è rumore.
+  // (tempi in passi di fisica: la stessa famiglia non prima di 3 passi, cioè 50 ms)
+  const AUDIO = { volume: 0.42, voci: 14, pausa: 3 };
+  const audio = { acceso: false, ctx: null, uscita: null, rumore: null, finiscono: [], ultimo: {}, anelli: {} };
+  try { audio.acceso = deposito.getItem("mut-ring-audio") === "on"; } catch (errore) { /* resta spento */ }
+  // Il contesto audio nasce al primo gesto (i browser non lasciano suonare prima).
+  function preparaAudio() {
+    if (!audio.acceso) return null;
+    if (!audio.ctx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      try {
+        const c = new Ctx();
+        const comp = c.createDynamicsCompressor ? c.createDynamicsCompressor() : null;
+        const g = c.createGain(); g.gain.value = AUDIO.volume;
+        if (comp) { g.connect(comp); comp.connect(c.destination); } else g.connect(c.destination);
+        // Un secondo di rumore bianco, riusato da tutti i suoni di rumore.
+        const n = Math.floor(c.sampleRate || 44100), buf = c.createBuffer(1, n, c.sampleRate || 44100), d = buf.getChannelData(0);
+        for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+        audio.ctx = c; audio.uscita = g; audio.rumore = buf;
+      } catch (errore) { audio.ctx = null; return null; }
+    }
+    if (audio.ctx.state === "suspended" && audio.ctx.resume) { try { audio.ctx.resume(); } catch (errore) { /* al prossimo gesto */ } }
+    return audio.ctx;
+  }
+  function accendiAudio(si) {
+    audio.acceso = !!si;
+    try { deposito.setItem("mut-ring-audio", audio.acceso ? "on" : "off"); } catch (errore) { /* pazienza */ }
+    if (audio.acceso) { preparaAudio(); suona("clic"); }
+    else for (const k in audio.anelli) fermaAnello(k);
+    for (const b of dentroPannello("[data-audio]")) b.setAttribute("aria-pressed", audio.acceso ? "true" : "false");
+    return audio.acceso;
+  }
+  // Dove va il suono: un nodo di panoramica (se il browser lo ha) attaccato all'uscita.
+  function canaleAudio(x) {
+    const c = audio.ctx;
+    if (x === undefined || !c.createStereoPanner) return audio.uscita;
+    const p = c.createStereoPanner();
+    p.pan.value = Math.max(-0.8, Math.min(0.8, (x / Math.max(1, W)) * 2 - 1)) * 0.7;
+    p.connect(audio.uscita);
+    return p;
+  }
+  // Due mattoni: una nota (con scivolata) e un soffio di rumore filtrato.
+  function notaAudio(c, out, t0, f0, f1, dur, tipo, vol, attacco) {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = tipo || "sine";
+    o.frequency.setValueAtTime(Math.max(20, f0), t0);
+    if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t0 + (attacco || 0.005));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(out);
+    o.start(t0); o.stop(t0 + dur + 0.02);
+    return o;
+  }
+  function soffioAudio(c, out, t0, dur, vol, filtro, f0, f1, q) {
+    const s = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain();
+    s.buffer = audio.rumore;
+    fl.type = filtro || "lowpass"; fl.Q.value = q || 0.8;
+    fl.frequency.setValueAtTime(Math.max(30, f0), t0);
+    if (f1 && f1 !== f0) fl.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t0 + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    s.connect(fl); fl.connect(g); g.connect(out);
+    s.start(t0, Math.random() * 0.5); s.stop(t0 + dur + 0.02);
+    return s;
+  }
+  const varia = (f, k) => f * (1 + (Math.random() * 2 - 1) * (k || 0.08));
+  // Le ricette: ogni famiglia di suoni, con la sua durata (serve a contare le voci).
+  const SUONI_AUDIO = {
+    pugno: [0.16, (c, o, t, k) => { notaAudio(c, o, t, varia(150), 55, 0.13, "sine", 0.9 * k); soffioAudio(c, o, t, 0.06, 0.5 * k, "bandpass", varia(1400), 600, 1.2); }],
+    forte: [0.3, (c, o, t, k) => { notaAudio(c, o, t, varia(110), 38, 0.26, "sine", 1 * k); soffioAudio(c, o, t, 0.12, 0.7 * k, "lowpass", 2600, 300); }],
+    metallo: [0.45, (c, o, t, k) => { const f = varia(1250, 0.12); notaAudio(c, o, t, f, f * 0.98, 0.42, "triangle", 0.35 * k); notaAudio(c, o, t, f * 2.76, f * 2.7, 0.3, "sine", 0.18 * k); soffioAudio(c, o, t, 0.03, 0.3 * k, "highpass", 3000, 3000); }],
+    taglio: [0.22, (c, o, t, k) => { soffioAudio(c, o, t, 0.2, 0.5 * k, "bandpass", varia(900), 5200, 2.5); }],
+    sparo: [0.25, (c, o, t, k) => { soffioAudio(c, o, t, 0.18, 0.9 * k, "lowpass", 5000, 400); notaAudio(c, o, t, 220, 60, 0.1, "square", 0.25 * k); }],
+    boom: [1.2, (c, o, t, k) => { soffioAudio(c, o, t, 1.1 * Math.min(1.4, k), 1 * Math.min(1, k), "lowpass", 900, 60, 0.6); notaAudio(c, o, t, 70, 28, 0.8, "sine", 0.9 * Math.min(1, k)); }],
+    zap: [0.5, (c, o, t, k) => { notaAudio(c, o, t, 1800, 120, 0.45, "sawtooth", 0.28 * k); notaAudio(c, o, t, 900, 80, 0.45, "square", 0.12 * k); }],
+    morso: [0.3, (c, o, t, k) => { const g = notaAudio(c, o, t, varia(95, 0.2), 70, 0.28, "sawtooth", 0.3 * k); g.detune.value = (Math.random() - 0.5) * 300; soffioAudio(c, o, t, 0.1, 0.3 * k, "bandpass", 500, 300, 2); }],
+    splat: [0.3, (c, o, t, k) => { soffioAudio(c, o, t, 0.25, 0.6 * k, "lowpass", 1200, 150, 1.5); notaAudio(c, o, t, 180, 60, 0.12, "sine", 0.4 * k); }],
+    soffio: [0.4, (c, o, t, k) => { soffioAudio(c, o, t, 0.38, 0.4 * k, "bandpass", 700, 300, 0.7); }],
+    bip: [0.25, (c, o, t, k) => { const f = varia(1300, 0.15); notaAudio(c, o, t, f, f, 0.09, "square", 0.12 * k); notaAudio(c, o, t + 0.11, f * 1.25, f * 1.25, 0.09, "square", 0.12 * k); }],
+    tonfo: [0.2, (c, o, t, k) => { notaAudio(c, o, t, varia(120), 70, 0.16, "triangle", 0.5 * k); soffioAudio(c, o, t, 0.05, 0.3 * k, "lowpass", 900, 300); }],
+    ko: [1.4, (c, o, t, k) => { for (const [f, v] of [[196, 0.5], [294, 0.3], [392, 0.22]]) notaAudio(c, o, t, f, f * 0.99, 1.3, "sine", v * k, 0.01); soffioAudio(c, o, t, 0.2, 0.4 * k, "lowpass", 3000, 200); }],
+    preso: [0.5, (c, o, t, k) => { [784, 988, 1319].forEach((f, i) => notaAudio(c, o, t + i * 0.06, f, f, 0.22, "triangle", 0.25 * k)); }],
+    mancato: [0.5, (c, o, t, k) => { notaAudio(c, o, t, 330, 160, 0.42, "triangle", 0.3 * k); }],
+    carica: [0.6, (c, o, t, k) => { notaAudio(c, o, t, 180, 900, 0.55, "sawtooth", 0.12 * k, 0.05); notaAudio(c, o, t, 360, 1800, 0.55, "sine", 0.1 * k, 0.05); }],
+    potenza: [1, (c, o, t, k) => { notaAudio(c, o, t, 110, 440, 0.9, "sawtooth", 0.18 * k, 0.1); soffioAudio(c, o, t, 0.9, 0.3 * k, "bandpass", 300, 3000, 1); }],
+    salto: [0.25, (c, o, t, k) => { notaAudio(c, o, t, varia(260), 620, 0.2, "sine", 0.3 * k); }],
+    pop: [0.12, (c, o, t, k) => { notaAudio(c, o, t, 600, 1400, 0.08, "sine", 0.35 * k); }],
+    acqua: [0.4, (c, o, t, k) => { soffioAudio(c, o, t, 0.35, 0.5 * k, "bandpass", 2400, 700, 1.4); }],
+    gelo: [0.6, (c, o, t, k) => { for (let i = 0; i < 5; i++) notaAudio(c, o, t + i * 0.05, varia(2400, 0.2), varia(2600, 0.2), 0.12, "sine", 0.1 * k); soffioAudio(c, o, t, 0.5, 0.15 * k, "highpass", 4000, 6000); }],
+    fiamma: [0.8, (c, o, t, k) => { soffioAudio(c, o, t, 0.75, 0.55 * k, "lowpass", 700, 1500, 0.9); }],
+    onda: [1, (c, o, t, k) => { notaAudio(c, o, t, 140, 70, 0.95, "sawtooth", 0.16 * k, 0.04); soffioAudio(c, o, t, 0.9, 0.35 * k, "bandpass", 1200, 400, 1.2); }],
+    jet: [0.7, (c, o, t, k) => { soffioAudio(c, o, t, 0.65, 0.4 * k, "bandpass", 400, 1600, 1); }],
+    tuono: [2.2, (c, o, t, k) => { soffioAudio(c, o, t, 0.12, 0.8 * k, "highpass", 2000, 2000); soffioAudio(c, o, t + 0.05, 2, 0.9 * k, "lowpass", 500, 50, 0.5); }],
+    clic: [0.06, (c, o, t, k) => { notaAudio(c, o, t, 1500, 1100, 0.04, "square", 0.08 * k); }],
+    moneta: [0.35, (c, o, t, k) => { notaAudio(c, o, t, 988, 988, 0.08, "square", 0.1 * k); notaAudio(c, o, t + 0.07, 1319, 1319, 0.25, "square", 0.1 * k); }],
+    premio: [0.6, (c, o, t, k) => { [523, 659, 784, 1047].forEach((f, i) => notaAudio(c, o, t + i * 0.07, f, f, 0.3, "triangle", 0.2 * k)); }],
+    via: [0.9, (c, o, t, k) => { [392, 392, 523].forEach((f, i) => notaAudio(c, o, t + i * 0.22, f, f, i === 2 ? 0.5 : 0.16, "square", 0.12 * k)); }],
+    vittoria: [1.1, (c, o, t, k) => { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => notaAudio(c, o, t + i * 0.1, f, f, i === 5 ? 0.5 : 0.12, "square", 0.11 * k)); }],
+    vita: [0.9, (c, o, t, k) => { [440, 349, 262].forEach((f, i) => notaAudio(c, o, t + i * 0.16, f, f * 0.97, 0.3, "triangle", 0.3 * k)); }],
+    ultima: [1.2, (c, o, t, k) => { for (let i = 0; i < 2; i++) { notaAudio(c, o, t + i * 0.5, 70, 50, 0.16, "sine", 0.9 * k); notaAudio(c, o, t + i * 0.5 + 0.18, 64, 45, 0.16, "sine", 0.7 * k); } }],
+    salvo: [1.2, (c, o, t, k) => { [392, 523, 659, 784, 1047].forEach((f, i) => notaAudio(c, o, t + i * 0.08, f, f, 0.5, "triangle", 0.22 * k)); }],
+    fine: [1.6, (c, o, t, k) => { [392, 370, 349, 262].forEach((f, i) => notaAudio(c, o, t + i * 0.3, f, f * (i === 3 ? 0.9 : 1), i === 3 ? 0.9 : 0.26, "triangle", 0.28 * k)); }],
+    scudo: [0.6, (c, o, t, k) => { notaAudio(c, o, t, 300, 600, 0.5, "sine", 0.25 * k, 0.03); notaAudio(c, o, t, 450, 900, 0.5, "triangle", 0.12 * k, 0.03); }],
+    cura: [0.6, (c, o, t, k) => { [660, 880, 1100].forEach((f, i) => notaAudio(c, o, t + i * 0.09, f, f * 1.02, 0.3, "sine", 0.2 * k)); }],
+  };
+  // Il volume di ogni famiglia, misurato: registrati tutti in fila (`__ring.provaSuoni` in un
+  // OfflineAudioContext) i fendenti, il jetpack e le fanfare uscivano un terzo degli altri.
+  const VOLUMI_AUDIO = { taglio: 3, bip: 2.5, jet: 3, moneta: 3, via: 3.5, vittoria: 3.5, fiamma: 2.5, soffio: 2, potenza: 2.5, carica: 2,
+                         onda: 1.8, morso: 2, acqua: 1.6, premio: 1.8, preso: 1.5, salvo: 1.6, fine: 1.5, cura: 1.8, clic: 1.5 };
+  // Le parole del ring, raggruppate per famiglia (la parola italiana, prima della traduzione).
+  const PAROLE_AUDIO = [
+    [/^(POW|BAM|SBAM|TUMP|ZOT|PAF|BONK|TIÈ|ORA|DAI|STRIKE|GRAH)!/, "pugno"],
+    [/^(CLANG|TING|TZING|PARATO)!/, "metallo"],
+    [/^(SLASH|SWISH|WHOOSH|FIUU|MULINELLO)!/, "taglio"],
+    [/^(FWOOSH)!/, "fiamma"],
+    [/^(BOOM|BOOOM|KABOOM|KA-BOOOM|KRAK|CRASH|CREPA|METEORA)!/, "boom"],
+    [/^BANG!/, "sparo"],
+    [/^ZAAAP!/, "zap"],
+    [/^(GNAM|CHOMP)!/, "morso"],
+    [/^(SPLAT|SLURP)!/, "splat"],
+    [/^(PUFF|COFF|PTUI)!/, "soffio"],
+    [/^(DRIIN|TRIIN|BIP|NOTIFICA|BZZT|TIC|CLICK)!/, "bip"],
+    [/^(SBONK|SLAP|TONF|CRACK|OPS|SCIVOLONE)!/, "tonfo"],
+    [/^K\.O\.!/, "ko"],
+    [/^PRESO!/, "preso"],
+    [/^MANCATO!/, "mancato"],
+    [/^MIRA!/, "carica"],
+    [/^(SOVRACCARICO|COLOSSO|GRANDE ALBERO|CAVALIERE|SFERA FINALE|COLPO FINALE)/, "potenza"],
+    [/^(SU|HOP|OPLÀ|VAI|CAMBIO|CINQUE)!/, "salto"],
+    [/^POP!/, "pop"],
+    [/^SPLASH!/, "acqua"],
+    [/^BRRR!/, "gelo"],
+    [/^ULTIMA POSSIBILIT/, "ultima"],
+    [/^SALVO!/, "salvo"],
+    [/^-1 /, "vita"],
+  ];
+  function suonaParola(testo, x, grande) {
+    if (!audio.acceso) return;
+    const t = String(testo);
+    for (const [re, nome] of PAROLE_AUDIO) if (re.test(t)) { suona(nome, x, grande ? 1.2 : 1); return; }
+  }
+  function suona(nome, x, forza) {
+    if (!audio.acceso || !SUONI_AUDIO[nome]) return false;
+    const c = preparaAudio();
+    if (!c || c.state === "closed") return false;
+    if (passi - (audio.ultimo[nome] === undefined ? -1e9 : audio.ultimo[nome]) < AUDIO.pausa) return false;
+    audio.finiscono = audio.finiscono.filter((p) => p > passi);
+    if (audio.finiscono.length >= AUDIO.voci && nome !== "ko" && nome !== "fine" && nome !== "vita") return false;
+    audio.ultimo[nome] = passi;
+    const [dur, ricetta] = SUONI_AUDIO[nome];
+    try {
+      ricetta(c, canaleAudio(x), c.currentTime + 0.005, Math.max(0.2, Math.min(1.6, forza || 1)) * (VOLUMI_AUDIO[nome] || 1));
+      audio.finiscono.push(passi + Math.ceil(dur * 60));
+    } catch (errore) { return false; }
+    return true;
+  }
+  // ·· I suoni che durano ··
+  function anello(nome, crea) {
+    if (audio.anelli[nome]) return audio.anelli[nome];
+    const c = preparaAudio();
+    if (!c) return null;
+    try { audio.anelli[nome] = crea(c); } catch (errore) { audio.anelli[nome] = null; }
+    return audio.anelli[nome];
+  }
+  function fermaAnello(nome) {
+    const a = audio.anelli[nome];
+    if (!a) return;
+    try { for (const s of a.fonti) s.stop(); } catch (errore) { /* già fermo */ }
+    audio.anelli[nome] = null;
+  }
+  // Un rumore continuo filtrato (pioggia, vento), o una nota continua (buco nero, mira).
+  const anelloRumore = (filtro, f, q) => (c) => {
+    const s = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain();
+    s.buffer = audio.rumore; s.loop = true; fl.type = filtro; fl.frequency.value = f; fl.Q.value = q; g.gain.value = 0;
+    s.connect(fl); fl.connect(g); g.connect(audio.uscita); s.start();
+    return { fonti: [s], g, fl };
+  };
+  const anelloNota = (tipo, f) => (c) => {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = tipo; o.frequency.value = f; g.gain.value = 0;
+    o.connect(g); g.connect(audio.uscita); o.start();
+    return { fonti: [o], g, o };
+  };
+  function livelloAnello(nome, crea, quanto, imposta) {
+    if (!(quanto > 0.001) && !audio.anelli[nome]) return;
+    const a = anello(nome, crea);
+    if (!a) return;
+    const t = audio.ctx.currentTime;
+    a.g.gain.setTargetAtTime(Math.max(0, quanto), t, 0.12);
+    if (imposta) imposta(a, t);
+    if (!(quanto > 0.001)) { a.spento = (a.spento || 0) + 1; if (a.spento > 40) fermaAnello(nome); } else a.spento = 0;
+  }
+  let fulminiSentiti = new WeakSet();
+  // Ogni sei passi: pioggia, vento, buco nero, la nota della mira; e i tuoni dei fulmini nuovi.
+  function aggiornaAudio() {
+    if (!audio.acceso || !audio.ctx || passi % 6) return;
+    for (const z of fulmini) if (!fulminiSentiti.has(z)) { fulminiSentiti.add(z); suona("tuono", z.x, z.cielo ? 1.2 : 0.8); }
+    livelloAnello("pioggia", anelloRumore("bandpass", 1800, 0.6), piovendo ? 0.09 : 0);
+    livelloAnello("vento", anelloRumore("lowpass", 500, 1.5), uragano ? 0.16 : 0,
+                  (a, t) => a.fl.frequency.setTargetAtTime(380 + 260 * Math.sin(passi * 0.05), t, 0.3));
+    livelloAnello("buco", anelloNota("sine", 52), buco ? 0.32 : 0, (a, t) => a.o.frequency.setTargetAtTime(48 + 10 * Math.sin(passi * 0.08), t, 0.2));
+    // La mira canta: la nota sale quando la linea punta in alto, e si alza ancora quando aggancia qualcuno.
+    livelloAnello("mira", anelloNota("triangle", 440), mira ? 0.07 : 0, (a, t) => {
+      if (!mira) return;
+      const k = (mira.a + MIRA.su) / (MIRA.su + MIRA.giu);       // 0 in alto, 1 in basso
+      a.o.frequency.setTargetAtTime(880 - 420 * k, t, 0.04);
+    });
+  }
+
   let costume = "nessuno", tavolozza = null;
   // IL TEMPO DI GARA (01/10/2026, su richiesta): il primo minuto è
   // tranquillo (niente eventi né jetpack, solo telefoni e orologi, al massimo
@@ -1172,6 +1401,7 @@
 
   // --- Il jetpack: si decolla, si lotta in aria, ogni tanto impazzisce ----
   function decolla(f, impazzito) {
+    if (f && f.p) suona("jet", f.p.bacino.x, 0.8);
     if (verso < 0) return;                       // sottosopra niente jetpack
     if (anime) { prendiIlVolo(f); return; }      // i super guerrieri volano da sé
     f.volo = false;
@@ -1551,6 +1781,7 @@
     } catch (errore) { return testo; }
   }
   function scrivi(testo, x, y, grande) {
+    if (audio.acceso) suonaParola(testo, x, grande);
     scritte.push({ testo: dici(testo), x: Math.max(50, Math.min(W - 50, x)), y: Math.max(26, y), vita: grande ? 70 : 26, grande });
   }
 
@@ -1756,6 +1987,7 @@
   const qualcosaSotto = (x, y) => !!(chiTrovo(x, y) || telefonoSotto(x, y));
 
   function prendi(evento) {
+    if (audio.acceso) preparaAudio();                            // i browser lasciano suonare solo dopo un gesto
     if (fermo || (evento.button !== undefined && evento.button > 0)) return;
     const bersaglio = evento.target;
     if (bersaglio && bersaglio.closest && bersaglio.closest(".ring-pannello, .ultimora-barra, .corsa-nome")) return;   // (il campo del nome della corsa è un vero modulo)
@@ -1773,7 +2005,7 @@
     // La corsa: i suoi tasti, e nei menu ogni tocco è suo.
     if (corsa || classifica.aperta) {
       const t = tastoCorsa(evento.clientX, evento.clientY);
-      if (t) t.fa();
+      if (t) { suona("clic"); t.fa(); }
       else if (corsa && corsa.fase === "scelta") {
         // Nella scelta si può anche toccare direttamente il personaggio.
         const f = lottatori.find((l) => l.p && !l.fuoriCampo && Math.hypot(l.p.bacino.x - evento.clientX, l.p.bacino.y - 12 * S - evento.clientY) < 46 * S);
@@ -2258,6 +2490,7 @@
   }
 
   function lanciaTelefono(f, altro) {
+    if (f && f.p) suona("taglio", f.p.bacino.x, 0.6);
     const t = f.tel;
     f.tel = null;
     if (!t) return;
@@ -2430,6 +2663,7 @@
 
   // --- Pistole: proiettili da cartone -----------------------------------
   function spara(f, altro) {
+    if (f && f.p) suona(f.arma && f.arma.tipo === "bazooka" ? "jet" : "sparo", f.p.bacino.x);
     const t = f.arma;
     if (!t || (t.tipo !== "pistola" && t.tipo !== "bazooka")) return;
     f.colpiArma--;
@@ -2469,6 +2703,7 @@
   // dentro si becca un colpo solo (ma gli zombie bruciano di continuo), e il
   // pavimento resta annerito.
   function fiammata(f, altro) {
+    if (f && f.p && !(f.t % 18)) suona("fiamma", f.p.bacino.x, 0.8);
     const t = f.arma;
     if (!t || t.tipo !== "lanciafiamme") return;
     if (f.t === 6) { f.colpiArma--; scrivi("FWOOSH!", t.x, t.y - 14 * S, false); }
@@ -3169,6 +3404,7 @@
   // lottatori, gli oggetti e i pezzi vicini vengono sbalzati via.
   const MAX_PARTICELLE = 320;
   function esplosione(x, y, potenza, att, inPieno) {
+    suona("boom", x, potenza);
     const R = 80 * S * potenza;
     scossa = Math.max(scossa, Math.round(10 + 8 * potenza)); fermoColpo = Math.max(fermoColpo, 6);
     const metti = (q) => { if (particelle.length < MAX_PARTICELLE) particelle.push(q); };
@@ -5410,6 +5646,7 @@
               gambe(f) === 2 && braccia(f) === 2);
   }
   function potenzia(f) {
+    if (f && f.p) suona("potenza", f.p.bacino.x);
     f.potenziato = 720; f.ki = 60;
     if (!stile || stile === "lame") f.forma = 1;                  // il colosso, l'albero, il cavaliere
     const b = f.p.bacino;
@@ -5418,6 +5655,7 @@
     scossa = Math.max(scossa, 10);
   }
   function sparaOnda(f) {
+    if (f && f.p) suona("onda", f.p.bacino.x);
     // Chi risponde al colpo dell'altro tira anche con meno energia: quella che ha.
     if (f.ki < 45 && !(f.risposta && f.ki >= 5)) return;
     f.ki = Math.max(0, f.ki - 45);
@@ -5443,6 +5681,7 @@
     }
   }
   function teletrasporta(f, altro) {
+    if (f && f.p) suona("zap", f.p.bacino.x, 0.5);
     if (f.esploso || f.tenuto || f.preso || f.ko || !altro || altro.esploso) return false;
     f.ki = Math.max(0, f.ki - 15);
     const da = { x: f.p.bacino.x, y: f.p.bacino.y };
@@ -6534,6 +6773,7 @@
   // Il gelo: chi lo prende resta in un blocco di ghiaccio, fermo com'era. Il
   // blocco cade e si appoggia sul piede più basso; un colpo lo manda in pezzi.
   function congela(f, da, x, y) {
+    suona("gelo", x);
     if (f.esploso || f.preso || f.tenuto || barrieraRegge(f, 3, x, y)) return;
     if (f.tel) lasciaCadere(f);
     if (f.tiene) molla(f);
@@ -7564,6 +7804,7 @@
     for (const c of chi.creature) { c.vita = c.t; polvere(c.x, c.y, 8); colpi.push([c.x, c.y]); }
     const presi = chi.lott.length, zPresi = chi.zombie.length + chi.creature.length;
     lampoMira = { ox: o.x, oy: o.y, fx: e.x, fy: e.y, t: 0, colore: col, preso: presi + zPresi > 0, colpi };
+    suona("zap", o.x, 1.5);
     scossa = Math.max(scossa, 14); fermoColpo = Math.max(fermoColpo, 7);
     for (let i = 0; i < 30 && particelle.length < MAX_PARTICELLE; i++) {
       const k = Math.random(), sp = caso(1, 4) * S, lato = Math.random() < 0.5 ? 1 : -1;
@@ -8849,7 +9090,7 @@
     colpoDaMano(a, b); colpoDaMano(b, a);
     aggiornaLame(); aggiornaFulmini();
     aggiornaTelefoni(); aggiornaCreature(); aggiornaNubi(); aggiornaFinale(); aggiornaProiettili(); aggiornaParticelle(); aggiornaEventi(); aggiornaDanni();
-    aggiornaArti(); aggiornaMeteo(); aggiornaSisma(); aggiornaMeteore(); aggiornaBuco(); aggiornaFatale(); aggiornaMira(); aggiornaCorsa(); aggiornaOrda(); aggiornaOnde(); aggiornaVite();
+    aggiornaArti(); aggiornaMeteo(); aggiornaSisma(); aggiornaMeteore(); aggiornaBuco(); aggiornaFatale(); aggiornaMira(); aggiornaCorsa(); aggiornaAudio(); aggiornaOrda(); aggiornaOnde(); aggiornaVite();
     if (anime) controllaScontro();
     for (const sc of scie) sc.vita--;
     if (scie.length && scie[0].vita <= 0) scie = scie.filter((sc) => sc.vita > 0);
@@ -10397,6 +10638,8 @@
     },
     // La corsa infinita e la sua classifica (09/10/2026).
     corsa() { return apriCorsa(); },
+    // L'audio (09/10/2026): spento finché non lo si accende.
+    audio(si) { return accendiAudio(si === undefined ? !audio.acceso : !!si); },
     classifica(si) { apriClassifica(si === undefined ? !classifica.aperta : si); },
     scommetti, ricarica() { if (!scommessa && gettoni < 10) { gettoni = 100; esito = "Gettoni ricaricati."; salvaGettoni(); aggiornaPannello(); } },
   };
@@ -10455,6 +10698,7 @@
     for (const b of dentroPannello("[data-colpo]")) b.addEventListener("click", () => comandi.colpo(b.getAttribute("data-colpo")));
     // La corsa si gioca sul canvas: il pannello si chiude, sennò la copre.
     for (const b of dentroPannello("[data-corsa]")) b.addEventListener("click", () => { apriPannello(false); comandi.corsa(); });
+    for (const b of dentroPannello("[data-audio]")) { b.setAttribute("aria-pressed", audio.acceso ? "true" : "false"); b.addEventListener("click", () => comandi.audio()); }
     for (const b of dentroPannello("[data-classifica]")) {
       if (!sulSito) b.hidden = true;                             // l'estensione non manda e non chiede niente a nessuno
       else b.addEventListener("click", () => { apriPannello(false); comandi.classifica(true); });
@@ -10647,6 +10891,7 @@
     if (!corsa || corsa.fase === "fine" || !corsa.chi) return;
     if (mira) chiudiMira(false);
     corsa.fase = "fine"; corsa.t = 0;
+    suona("fine");
     if (orda && orda.fase !== "festa") fineOrda(false);
     const n = nemicoCorsa();
     if (n && !n.panchina) panchina(n);
@@ -10705,6 +10950,7 @@
     }
     c.prossimoImprevisto = 200;
     if (c.tipo === "duello") c.variante = scegliVariante(c.round);
+    suona("via");
   }
   function scegliVariante(n) {
     const r = corsa.rng, v = [];
@@ -10781,6 +11027,7 @@
     if (orda && orda.fase !== "festa") fineOrda(true);
     const paga = 10 + 2 * c.round, punti = 100 * c.round + (c.danniRound === 0 ? 50 * c.round : 0);
     c.monete += paga; c.punti += punti;
+    suona(come === "salvezza" ? "salvo" : "vittoria");
     if (come === "salvezza") {
       c.ultima = false; c.vite = 1; c.hp = Math.round(c.hpMax * 0.5);
       scrivi("SALVO!", eroe().p.bacino.x, eroe().base - 120 * S, true);
@@ -10817,6 +11064,7 @@
     if (!c || c.fase !== "premi" || !c.carte[i]) return false;
     const id = c.carte[i], f = eroe();
     c.livelli[id] = livello(id) + 1;
+    suona("premio");
     if (id === "cuore") { c.hpMax += 20; c.hp += 20; }
     if (id === "cura") c.hp = c.hpMax;
     if (id === "vita") { if (c.ultima) { c.ultima = false; c.vite = 1; c.hp = Math.max(c.hp, Math.round(c.hpMax * 0.5)); } else c.vite = Math.min(CORSA.viteMax, c.vite + 1); }
@@ -10838,6 +11086,7 @@
     const id = c.vetrina[i], posto = c.slot.indexOf(null);
     if (!id || posto < 0 || c.monete < prezzo(id)) return false;
     c.monete -= prezzo(id); c.slot[posto] = id; c.vetrina[i] = null;
+    suona("moneta");
     return true;
   }
   function avanti() {
@@ -10936,6 +11185,7 @@
     if (!c || c.fase !== "lotta" || !f || !c.slot[i] || mira) return false;
     const id = c.slot[i], x = f.p.bacino.x, y = f.p.bacino.y;
     c.slot[i] = null;
+    suona({ pozione: "cura", scudo: "scudo", carica: "carica", gelo: "gelo", bomba: "boom", bazooka: "metallo", lanciafiamme: "metallo" }[id], x, id === "bomba" ? 1.4 : 1);
     if (id === "pozione") { c.hp = Math.min(c.hpMax, c.hp + Math.round(c.hpMax * 0.5)); scintille(x, y - 20 * S, 14, "#7dffb0"); }
     else if (id === "scudo") c.scudo = 360;
     else if (id === "carica") c.energia = CORSA.energia;
@@ -11237,6 +11487,8 @@
     scriviUI(obiettivo(), x2 + 10 * S, y0 + 54 * S, 12 * S, ORO);
     let xi = x2 + w2 - 12 * S;
     for (let i = c.imprevisti.length - 1; i >= 0; i--) { scriviUI(IMPREVISTI_CORSA[c.imprevisti[i]][0], xi, y0 + 34 * S, 14 * S, "#ffffff", "right"); xi -= 20 * S; }
+    // L'audio si accende e si spegne anche da qui, senza aprire il pannello.
+    tastoUI(x2 + w2 - (c.esci > passi ? 106 : 60) * S, y0 + 6 * S, 26 * S, 22 * S, audio.acceso ? "🔊" : "🔇", () => accendiAudio(!audio.acceso), { colore: "#3a3647", scritta: "#ffffff", px: 12 * S });
     // L'uscita chiede conferma: un tocco la arma, il secondo (entro tre secondi) chiude la corsa.
     if (c.esci > passi) tastoUI(x2 + w2 - 76 * S, y0 + 6 * S, 70 * S, 22 * S, dici("Esci?"), () => finisciCorsa(), { colore: "#e0443a", scritta: "#ffffff", px: 11 * S });
     else tastoUI(x2 + w2 - 30 * S, y0 + 6 * S, 24 * S, 22 * S, "✕", () => { c.esci = passi + 180; }, { colore: "#3a3647", scritta: "#ffffff", px: 12 * S });
@@ -11540,6 +11792,19 @@
     decolla: (tipo, impazzito) => { const f = lottatori.find((l) => l.tipo === tipo); if (f) decolla(f, !!impazzito); },
     avviaEvento: (nome) => { prossimoEvento = 1e9; prossimaOrda = 1e9; if (nome === "luna") { moltG = 0.45; evento = { nome, durata: 620 }; } },
     danneggiaBordo: (lato, pos, forza) => danneggiaBordo(lato, pos, forza),
+    // Solo per le prove: suona tutti i suoni in fila dentro un contesto dato (un OfflineAudioContext), per ascoltarli e misurarli.
+    provaSuoni: (c, gap) => {
+      const prima = [audio.ctx, audio.uscita, audio.rumore];
+      const g = c.createGain(), comp = c.createDynamicsCompressor();
+      g.gain.value = AUDIO.volume; g.connect(comp); comp.connect(c.destination);
+      const n = Math.floor(c.sampleRate), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+      audio.ctx = c; audio.uscita = g; audio.rumore = buf;
+      const nomi = Object.keys(SUONI_AUDIO);
+      try { nomi.forEach((nome, i) => SUONI_AUDIO[nome][1](c, canaleAudio(W / 2), 0.1 + i * gap, VOLUMI_AUDIO[nome] || 1)); }
+      finally { audio.ctx = prima[0]; audio.uscita = prima[1]; audio.rumore = prima[2]; }
+      return nomi;
+    },
     // Solo per i test: la corsa senza toccare il canvas.
     corsa: {
       apri: (seme) => { const ok = apriCorsa(); if (corsa && seme) corsa.semeVoluto = seme; return ok; },
@@ -11573,6 +11838,7 @@
                      imprevisti: (corsa.imprevisti || []).slice(), invuln: corsa.invuln || 0, scudo: corsa.scudo || 0, scadenza: corsa.scadenza || 0,
                      tasti: tastiUI.length, modale: corsaModale() } : null,
     classifica: { aperta: classifica.aperta, voci: classifica.voci ? classifica.voci.length : null }, recordCorsa,
+    audio: { acceso: audio.acceso, pronto: !!audio.ctx, anelli: Object.keys(audio.anelli).filter((k) => audio.anelli[k]) },
     mira: mira ? (() => { const o = origineMira(mira), e = fineMira(o, mira.dir, mira.a);
                           return { a: mira.a, v: mira.v, dir: mira.dir, t: mira.t, da: mira.da.tipo, resta: Math.max(0, MIRA.attesa - mira.t), ox: o.x, oy: o.y, fx: e.x, fy: e.y }; })() : null,
     lampoMira: lampoMira ? { ox: lampoMira.ox, oy: lampoMira.oy, fx: lampoMira.fx, fy: lampoMira.fy, t: lampoMira.t, preso: lampoMira.preso } : null,

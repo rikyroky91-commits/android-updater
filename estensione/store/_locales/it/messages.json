@@ -98,6 +98,9 @@
   "guidaS11": {
     "message": "Dal menu, «Corsa infinita» trasforma il ring in un gioco: scegli un personaggio e affronta da solo un round dopo l'altro, ondate di zombie, duelli, sopravvivenza e un capo. Tre vite che non tornano, un premio da scegliere dopo ogni round, un negozio con tre posti. Il colpo finale si mira: dalle mani parte una linea che sale e scende, e spari quando attraversa i nemici."
   },
+  "guidaS12": {
+    "message": "L'audio è spento finché non lo accendi: il tasto «Audio» nella tendina (o l'altoparlante nella corsa infinita). Pugni, esplosioni, zombie e fanfare sono sintetizzati al momento, non si scarica niente, e il suono arriva dal lato dello schermo dove succede la cosa."
+  },
   "guidaS8": {
     "message": "Quando due colpi d'energia si scontrano spuntano due tasti ai capi della barra: martella quello dalla parte del tuo lottatore e lo scontro va a lui."
   },
