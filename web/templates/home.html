@@ -71,7 +71,10 @@
   {# LA TENDINA DEL RING (01/10/2026, su richiesta): si apre dal tasto col
      guantone. Scommesse con gettoni finti (restano nel browser), armi e
      oggetti da mettere in campo a mano, imprevisti da accendere e spegnere.
-     Senza JavaScript resta nascosta. #}
+     Senza JavaScript resta nascosta.
+     LA CORSA INFINITA (09/10/2026): il tasto «Corsa infinita» la apre (si gioca
+     da soli, round dopo round); «Classifica» mostra la classifica globale, che
+     sta solo sul sito: nell'estensione ring.js nasconde quel tasto. #}
   <div class="ring-pannello" id="ring-pannello" data-pannello hidden role="region" aria-label="Opzioni del combattimento">
     <div class="ring-pannello-testa">
       <strong>Il ring</strong>
@@ -81,6 +84,10 @@
       <h3>Modalità</h3>
       <div class="ring-griglia">
         <button type="button" class="ring-tasto" data-barre aria-pressed="false">&#10084; Barre della vita</button>
+      </div>
+      <div class="ring-griglia">
+        <button type="button" class="ring-tasto ring-largo" data-corsa>&#127939; Corsa infinita</button>
+        <button type="button" class="ring-tasto" data-classifica>&#127942; Classifica</button>
       </div>
     </section>
     <section class="ring-sezione">
@@ -244,4 +251,4 @@
 </div>
 {% endblock %}
 
-{% block script %}<script src="{{ statico('ring.js') }}" defer></script>{% endblock %}
+{% block script %}<script src="{{ statico('classifica.js') }}" defer></script><script src="{{ statico('ring.js') }}" defer></script>{% endblock %}

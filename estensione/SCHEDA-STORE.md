@@ -8,9 +8,9 @@ Controllato sulla documentazione di Chrome il 02/10/2026 e ricontrollato il 05/1
 
 **Un punto da verificare nella console: il video.** La pagina `cws-dashboard-listing` elenca fra le cose da fornire anche il link a un video YouTube che mostra l'estensione, e dichiara facoltativo solo il riquadro grande (1400×560). Non ho potuto aprire la console per vedere se il campo blocca davvero l'invio. Se lo blocca, basta mezzo minuto di schermo registrato con la lotta, il controller e l'orda, caricato su YouTube come «non in elenco».
 
-## In breve, per questa uscita (0.7.0, Premium sbloccabile gratis)
+## In breve, per questa uscita (0.8.0, Premium sbloccabile gratis)
 
-1. `python3 estensione/costruisci.py --zip` e si carica `estensione/zip/page-brawl-0.7.0-store.zip`.
+1. `python3 estensione/costruisci.py --zip` e si carica `estensione/zip/page-brawl-0.8.0-store.zip`.
 2. `premium.json` è già a posto: `premium_attivo: true`, `sblocco_gratis: true`, `url_acquisto` vuoto. Chi installa vede i lucchetti e, in cima alla tendina, il tasto **Sblocca Premium gratis**.
 3. Nella scheda dello store si incollano le descrizioni di questa pagina (dicono che Premium per ora è gratis) e, nelle istruzioni per la verifica, il testo del passo 8: spiega al revisore come aprire tutto.
 4. In «Distribuzione» l'estensione resta **gratis** e senza acquisti in-app.
@@ -79,6 +79,7 @@ Join in:
 • First to ten wins: the tenth K.O. sends the loser flying out of the ring, then the match starts over.
 • Finishing moves: about one round in three ends with a short scene. The lights go down and the winner launches the other into orbit, bounces them off the edges of the window, flattens them like a pancake, drops a huge energy sphere or a meteor on them, or cracks the floor open — and the page itself ends up cracked and scorched.
 • Transformations: the robot turns into a steel colossus and the apple into a towering tree when one of them is one hit away from a K.O.
+• Endless run: pick a fighter and play alone, round after round: zombie waves, duels, survival and a boss. Three lives that don't come back, a reward to choose after every round, a shop with three item slots. The final move is aimed: a line sweeps up and down from the fighter's hands and you fire when it crosses the enemies. Your best score stays on your device.
 • The fighters learn: the more they fight, the more varied their moves get.
 
 The power button in the corner turns everything off and on again. The page itself is never changed. A short "How it works" page opens after installation and can be reopened from the panel.
@@ -112,6 +113,7 @@ Partecipa anche tu:
 • Si gioca a dieci: il decimo K.O. manda lo sconfitto fuori dal ring, poi si ricomincia.
 • Colpi finali: circa un round su tre si chiude con una breve scena. Si abbassano le luci e chi vince manda l'altro in orbita, lo fa rimbalzare fra i bordi della finestra, lo schiaccia come una frittella, gli lascia cadere addosso una sfera enorme o una meteora, o spacca il pavimento: e la pagina resta crepata e bruciata.
 • Trasformazioni: il robot diventa un colosso d'acciaio e la mela un albero enorme quando a uno dei due manca un colpo al K.O.
+• Corsa infinita: scegli un personaggio e gioca da solo, un round dopo l'altro: ondate di zombie, duelli, sopravvivenza e un capo. Tre vite che non tornano, un premio da scegliere dopo ogni round, un negozio con tre posti per gli oggetti. Il colpo finale si mira: dalle mani del lottatore parte una linea che sale e scende, e spari quando attraversa i nemici. Il tuo record resta sul tuo dispositivo.
 • I lottatori imparano: più combattono, più le mosse diventano varie.
 
 Il tasto di accensione nell'angolo spegne e riaccende tutto. La pagina non viene mai modificata. Dopo l'installazione si apre una breve pagina «Come funziona», che si riapre dalla tendina.

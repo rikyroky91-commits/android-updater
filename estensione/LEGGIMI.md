@@ -132,6 +132,14 @@ Chi è trasformato si disegna più grande (la fisica resta quella di prima) e pi
 
 Tutte e due stanno nel gruppo **armi** (Premium) e piovono col resto delle armi.
 
+### La corsa infinita (09/10/2026, gratis)
+
+Dal pannello, «Corsa infinita» trasforma il ring in un gioco a round: si sceglie un personaggio e si lotta da soli, un round dopo l'altro (ondata di zombie, duello contro l'altro personaggio, sopravvivenza a tempo, ondata con un capo), con tre vite che non si ricaricano, un premio fra tre carte dopo ogni round e un negozio con tre posti per gli oggetti, pagati con monete che valgono solo per quella corsa. Il colpo finale si carica lottando e parte con la mira: dalle mani parte una linea che ruota su e giù, e il secondo tocco spara lungo la linea. Finite le vite si resta in piedi, feriti e lenti, col colpo finale carico: se va a segno il round è vinto e una vita torna.
+
+Nell'estensione la corsa è gratis, come il colpo finale, ma i personaggi a pagamento restano a pagamento: nella scelta le tre famiglie hanno il lucchetto finché Premium è chiuso. Gli imprevisti della corsa (meteoriti, buco nero, terremoto…) capitano anche senza Premium, perché non si scelgono: fanno parte del round.
+
+La classifica globale sta solo sul sito: l'estensione non manda niente a nessuno, tiene il record nel browser e il tasto «Classifica» lì non c'è.
+
 ### Premium: cosa c'è e cosa manca
 
 Le scelte stanno in `premium.json`:

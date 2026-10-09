@@ -2136,6 +2136,97 @@ def api_ricerche_recenti():
                         headers={"Cache-Control": "no-cache"})
 
 
+# --- LA CLASSIFICA DELLA CORSA INFINITA (09/10/2026) ---------------------------
+# Il ring della home ha una modalità a round («Corsa infinita», in
+# `static/ring.js`). A fine corsa il giocatore mette un nome e manda il
+# punteggio qui; la classifica la rilegge ogni dieci secondi mentre è aperta.
+# Niente account e niente dati personali: un nome scelto da chi gioca, i
+# punti, il round. L'estensione del browser non chiama mai queste rotte.
+#
+# Il punteggio lo calcola il browser, quindi si può falsificare: qui si
+# scartano i valori fuori misura (più punti di quanti un round ne possa dare,
+# corse più veloci di quanto si possa giocare), si limita quante corse manda
+# lo stesso indirizzo, e si tengono fuori i nomi offensivi più ovvi. Non è una
+# difesa perfetta e non pretende di esserlo: è un gioco.
+_CORSA_PERSONAGGI = {"robot", "mela"}
+_CORSA_STILI = {"", "guerrieri", "maghi", "lame"}
+_CORSA_NOME = re.compile(r"^[\w .'\-]{1,16}$", re.UNICODE)
+_CORSA_PAROLACCE = ("cazz", "merd", "puttan", "troia", "frocio", "negro", "nigg", "nazi", "hitler",
+                    "fuck", "shit", "bitch", "cunt", "fagg", "stronz", "vaffan", "coglion")
+_CORSA_INVII: dict[str, list[float]] = {}
+_CORSA_INVII_MAX = 6            # corse per indirizzo...
+_CORSA_INVII_FINESTRA = 600     # ...ogni dieci minuti
+
+
+def _nome_corsa(grezzo) -> str | None:
+    nome = " ".join(str(grezzo or "").split())
+    if not _CORSA_NOME.match(nome) or any(ord(c) < 32 for c in nome):
+        return None
+    piatto = nome.lower().translate(str.maketrans("013457@$", "oieastas"))
+    piatto = re.sub(r"[^a-z]", "", piatto)
+    if any(p in piatto for p in _CORSA_PAROLACCE):
+        return None
+    return nome
+
+
+def _indirizzo(request: Request) -> str:
+    # Davanti c'è Caddy (deploy/oracle/Caddyfile), che scrive l'indirizzo vero
+    # in X-Forwarded-For e scarta quello eventualmente mandato dal client.
+    avanti = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    return avanti or (request.client.host if request.client else "?")
+
+
+def _troppi_invii(chi: str, adesso: float) -> bool:
+    if len(_CORSA_INVII) > 5000:      # non deve crescere senza fine
+        for k in [k for k, v in _CORSA_INVII.items() if not v or adesso - v[-1] > _CORSA_INVII_FINESTRA]:
+            _CORSA_INVII.pop(k, None)
+    recenti = [t for t in _CORSA_INVII.get(chi, []) if adesso - t < _CORSA_INVII_FINESTRA]
+    if len(recenti) >= _CORSA_INVII_MAX:
+        _CORSA_INVII[chi] = recenti
+        return True
+    recenti.append(adesso)
+    _CORSA_INVII[chi] = recenti
+    return False
+
+
+@app.get("/api/corsa/classifica")
+def api_corsa_classifica(limite: int = Query(default=10, ge=1, le=50)):
+    return JSONResponse({"voci": storage.classifica_corsa(limite)}, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/corsa/punteggio")
+async def api_corsa_punteggio(request: Request):
+    import time as _time
+    errore = lambda testo, codice=422: JSONResponse({"errore": testo}, status_code=codice, headers={"Cache-Control": "no-store"})
+    try:
+        if int(request.headers.get("content-length") or 0) > 2048:
+            return errore("Troppo lungo", 413)
+        dati = await request.json()
+    except Exception:
+        return errore("Non è andata", 400)
+    if not isinstance(dati, dict):
+        return errore("Non è andata", 400)
+    nome = _nome_corsa(dati.get("nome"))
+    if not nome:
+        return errore("Nome non valido")
+    try:
+        punti, round_ = int(dati.get("punti")), int(dati.get("round"))
+        uccisi, durata = int(dati.get("uccisi") or 0), int(dati.get("durata") or 0)
+    except (TypeError, ValueError):
+        return errore("Non è andata", 400)
+    personaggio, stile = str(dati.get("personaggio") or ""), str(dati.get("stile") or "")
+    if personaggio not in _CORSA_PERSONAGGI or stile not in _CORSA_STILI:
+        return errore("Non è andata", 400)
+    # Fuori misura: un round dà al massimo qualche centinaio di punti, e dura almeno una decina di secondi.
+    if not (1 <= round_ <= 999 and 0 <= punti <= 1500 * round_ + 2000 and 0 <= uccisi <= 100000 and durata >= 8 * round_):
+        return errore("Punteggio non valido")
+    if _troppi_invii(_indirizzo(request), _time.time()):
+        return errore("Troppe corse di fila: riprova fra qualche minuto", 429)
+    nuovo, posizione = storage.salva_punteggio_corsa(nome, punti, round_, personaggio, stile, uccisi, durata)
+    return JSONResponse({"ok": True, "id": nuovo, "posizione": posizione, "voci": storage.classifica_corsa(10)},
+                        headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/suggerimenti")
 def api_suggerimenti(q: str = Query(default="")):
     return JSONResponse({"voci": suggest.suggest(q, limit=8)})

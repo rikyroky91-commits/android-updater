@@ -280,6 +280,21 @@ CREATE TABLE IF NOT EXISTS richieste_accesso (
     creata_il   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_richieste_utente ON richieste_accesso(utente_id);
+-- La classifica della corsa infinita del ring (09/10/2026): nome scelto dal
+-- giocatore, punti, fin dove è arrivato. Niente account, niente email, niente
+-- indirizzi: solo quello che si vede in classifica.
+CREATE TABLE IF NOT EXISTS classifica_corsa (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome        TEXT NOT NULL,
+    punti       INTEGER NOT NULL,
+    round       INTEGER NOT NULL,
+    personaggio TEXT NOT NULL,
+    stile       TEXT NOT NULL DEFAULT '',
+    uccisi      INTEGER NOT NULL DEFAULT 0,
+    durata      INTEGER NOT NULL DEFAULT 0,
+    creato_il   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_classifica_punti ON classifica_corsa(punti DESC, id);
 """
 
 
@@ -1240,6 +1255,52 @@ def ricerche_recenti(limit: int = 10) -> list[str]:
         "SELECT testo FROM ricerche_recenti ORDER BY quando DESC LIMIT ?", (limit,)
     ).fetchall()
     return [r["testo"] if hasattr(r, "keys") else r[0] for r in righe]
+
+
+# --- La classifica della corsa infinita --------------------------------------
+# Se ne tengono i migliori CLASSIFICA_TENUTI: chi sta sotto non si vedrebbe mai,
+# e la tabella non deve crescere senza fine.
+CLASSIFICA_TENUTI = 500
+
+
+def salva_punteggio_corsa(nome: str, punti: int, round_: int, personaggio: str,
+                          stile: str = "", uccisi: int = 0, durata: int = 0) -> tuple[int, int]:
+    """Registra una corsa finita. Torna (id, posizione in classifica).
+
+    I valori arrivano già controllati dalla rotta (`web/main.py`): qui si
+    scrive e basta."""
+    with transaction() as conn:
+        cur = conn.execute(
+            """INSERT INTO classifica_corsa (nome, punti, round, personaggio, stile, uccisi, durata, creato_il)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (nome, int(punti), int(round_), personaggio, stile, int(uccisi), int(durata), now_iso()),
+        )
+        nuovo = int(cur.lastrowid)
+        conn.execute(
+            """DELETE FROM classifica_corsa WHERE id NOT IN
+               (SELECT id FROM classifica_corsa ORDER BY punti DESC, id ASC LIMIT ?)""",
+            (CLASSIFICA_TENUTI,),
+        )
+        # A parità di punti è davanti chi ci è arrivato prima.
+        sopra = conn.execute(
+            "SELECT COUNT(*) FROM classifica_corsa WHERE punti > ? OR (punti = ? AND id < ?)",
+            (int(punti), int(punti), nuovo),
+        ).fetchone()[0]
+    return nuovo, int(sopra) + 1
+
+
+def classifica_corsa(limit: int = 10) -> list[dict]:
+    conn = connect()
+    righe = conn.execute(
+        """SELECT id, nome, punti, round, personaggio, stile, creato_il FROM classifica_corsa
+           ORDER BY punti DESC, id ASC LIMIT ?""",
+        (max(1, min(100, int(limit))),),
+    ).fetchall()
+    return [
+        {"id": r["id"], "nome": r["nome"], "punti": r["punti"], "round": r["round"],
+         "personaggio": r["personaggio"], "stile": r["stile"], "quando": r["creato_il"]}
+        for r in righe
+    ]
 
 
 def clear_search_history() -> None:

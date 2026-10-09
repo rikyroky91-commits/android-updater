@@ -29,7 +29,7 @@ function riquadro(l, t, r, b) {
   return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
 }
 
-function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false, premio = null } = {}) {
+function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false, premio = null, pannello = false } = {}) {
   const richieste = [];
   const ascoltatori = {};
   const contesto2d = new Proxy({}, {
@@ -52,6 +52,13 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
     getBoundingClientRect: () => riquadro(l, t, r, b), closest: () => null,
   }));
   const classi = new Set();
+  // Il pannello del ring, ridotto ai tasti della corsa: basta a far girare il codice che li collega
+  // mentre lo script si avvia (lì il 09/10/2026 si leggeva lo stato della corsa prima che esistesse).
+  const tastoPannello = (attr) => ({ attr, hidden: false, ascolta: {}, addEventListener(t, fn) { this.ascolta[t] = fn; }, setAttribute() {}, getAttribute: () => null });
+  const tastiPannello = { "[data-corsa]": [tastoPannello("data-corsa")], "[data-classifica]": [tastoPannello("data-classifica")] };
+  const tastoOpzioni = { hidden: true, addEventListener() {}, setAttribute() {}, focus() {} };
+  const finto = pannello ? { hidden: true, querySelectorAll: (sel) => tastiPannello[sel] || [], querySelector: () => null, setAttribute() {}, addEventListener() {},
+                             classList: { contains: () => false, add() {}, remove() {}, toggle() {} } } : null;
   const tasto = { hidden: true, attr: {}, title: "", ascolta: {},
     addEventListener(t, fn) { this.ascolta[t] = fn; }, setAttribute(k, v) { this.attr[k] = v; } };
   const documento = {
@@ -65,6 +72,8 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
         if (sel === "[data-ring]") return tela;
         if (sel === ".ultimora-barra") return barra;
         if (sel === "[data-gioca]") return tasto;
+        if (sel === "[data-pannello]") return finto;
+        if (sel === "[data-opzioni]" && finto) return tastoOpzioni;
       }
       if (sel === ".ricerca-grande input" && campo) return { getBoundingClientRect: () => riquadro(...campo) };
       return null;
@@ -103,7 +112,7 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
   }, extra);
   const amb = {
     finestra, documento, richieste, ascoltatori, classi, pavimento,
-    tela, tasto, memoria,
+    tela, tasto, memoria, tastiPannello,
     stato: () => finestra.__ring.stato(),
     lottatore: (tipo) => finestra.__ring.stato().lottatori.find((f) => f.tipo === tipo),
     // Fa girare N fotogrammi da ~16,7 ms, come farebbe il browser.
@@ -3251,5 +3260,207 @@ test("la mira: chi non spara, spara da solo; gli zombie si falciano lungo la lin
   amb.avanza(400);
   assert.strictEqual(amb.stato().mira, null, "la mira non resta aperta per sempre");
   assert.strictEqual(amb.stato().ritmo, 1, "e il tempo torna normale anche così");
+  dentro(amb);
+});
+
+// ·· LA CORSA INFINITA (09/10/2026) ··
+function corsaAvviata(opz = {}, chi = "robot", seme = 4242) {
+  const amb = ambiente(opz);
+  const r = amb.finestra.__ring;
+  amb.avanza(30);
+  assert.ok(r.corsa.apri(seme), "la corsa deve aprirsi");
+  amb.avanza(20);
+  assert.ok(r.corsa.scegli(chi), "si deve poter scegliere il personaggio");
+  return { amb, r };
+}
+
+test("la corsa: il tasto del pannello la apre, anche mentre lo script si avvia", () => {
+  const amb = ambiente({ pannello: true });
+  amb.avanza(30);
+  const tasto = amb.tastiPannello["[data-corsa]"][0];
+  assert.ok(tasto.ascolta.click, "il tasto «Corsa infinita» deve essere collegato");
+  tasto.ascolta.click();
+  amb.avanza(30);
+  const s = amb.stato();
+  assert.strictEqual(s.corsa.fase, "scelta");
+  assert.ok(s.corsa.modale, "nella scelta il tocco è tutto della corsa");
+  assert.ok(s.corsa.tasti >= 6, "le famiglie, i due «Gioca con» e l'uscita");
+  assert.strictEqual(amb.tastiPannello["[data-classifica]"][0].hidden, false, "sul sito il tasto della classifica c'è");
+});
+
+test("la corsa: da soli contro l'orda, il compagno in panchina, le vite che non tornano", () => {
+  const { amb, r } = corsaAvviata();
+  let s = amb.stato();
+  assert.strictEqual(s.corsa.round, 1);
+  assert.strictEqual(s.corsa.tipo, "ondata", "il primo round è sempre un'ondata");
+  assert.strictEqual(s.corsa.vite, 3);
+  assert.ok(amb.lottatore("mela").fuoriCampo, "la mela sta in panchina");
+  amb.avanza(200);
+  s = amb.stato();
+  assert.strictEqual(s.corsa.fase, "lotta");
+  assert.ok(s.orda, "parte l'orda");
+  // L'orda va verso chi lotta, non verso chi è in panchina.
+  amb.avanza(900);
+  dentro(amb);
+  assert.ok(amb.stato().corsa.uccisi > 0 || amb.stato().corsa.fase !== "lotta", "l'eroe da solo deve abbattere qualcuno");
+  // Le ferite: la vita scende, a zero se ne va una vita e la vita torna piena.
+  const prima = amb.stato().corsa;
+  r.corsa.ferisci(prima.hp + 5);
+  s = amb.stato().corsa;
+  assert.strictEqual(s.vite, prima.vite - 1, "a vita zero si perde una vita");
+  assert.strictEqual(s.hp, s.hpMax, "e si riparte con la vita piena");
+  assert.ok(s.invuln > 0, "per un attimo non si viene toccati");
+});
+
+test("la corsa: fine round, tre carte, il negozio coi suoi tre posti, il round dopo", () => {
+  const { amb, r } = corsaAvviata();
+  amb.avanza(200);
+  r.corsa.vinci();
+  amb.avanza(140);
+  let s = amb.stato().corsa;
+  assert.strictEqual(s.fase, "premi");
+  assert.strictEqual(s.carte.length, 3, "tre premi fra cui scegliere");
+  assert.strictEqual(new Set(s.carte).size, 3, "tutti diversi");
+  const carta = s.carte[0];
+  assert.ok(r.corsa.premio(0));
+  s = amb.stato().corsa;
+  assert.strictEqual(s.livelli[carta], 1, "il premio sale di livello");
+  assert.strictEqual(s.fase, "negozio");
+  assert.strictEqual(s.vetrina.length, 4);
+  r.corsa.monete(0);
+  assert.ok(!r.corsa.compra(0), "senza monete non si compra");
+  r.corsa.monete(500);
+  for (let i = 0; i < 4; i++) r.corsa.compra(i);
+  s = amb.stato().corsa;
+  assert.strictEqual(s.slot.filter(Boolean).length, 3, "tre posti e non di più");
+  assert.ok(s.monete < 500, "le monete della corsa si spendono");
+  r.corsa.prossimo("duello");
+  assert.ok(r.corsa.avanti());
+  s = amb.stato().corsa;
+  assert.strictEqual(s.round, 2);
+  assert.strictEqual(s.tipo, "duello");
+  amb.avanza(160);
+  assert.ok(!amb.lottatore("mela").fuoriCampo, "nel duello l'altro entra, da avversario");
+  // Il duello finisce col K.O. dell'avversario.
+  const n = amb.lottatore("mela");
+  assert.ok(n, "c'è l'avversario");
+  amb.avanza(60 * 90, (st) => st.corsa.fase === "lotta");
+  s = amb.stato().corsa;
+  assert.ok(s.fase === "vinto" || s.fase === "fine", "il duello finisce: " + s.fase);
+  if (s.fase === "vinto") assert.ok(amb.lottatore("mela").ko > 0, "vinto vuol dire avversario K.O.");
+  dentro(amb);
+});
+
+test("la corsa: la mossa finale parte con la mira, e all'ultima possibilità salva il round", () => {
+  const { amb, r } = corsaAvviata();
+  amb.avanza(200);
+  r.corsa.energia(10);
+  assert.ok(!r.corsa.finale(), "scarica non parte");
+  r.corsa.energia(100);
+  // (se in quel momento l'eroe è a terra, aspetta di rialzarsi)
+  let partita = false;
+  for (let i = 0; i < 60 && !partita; i++) { partita = r.corsa.finale(); if (!partita) amb.avanza(5); }
+  assert.ok(partita, "carica parte");
+  assert.ok(amb.stato().mira, "e compare la mira");
+  assert.strictEqual(amb.stato().corsa.energia, 0, "l'energia si consuma");
+  r.spara();
+  amb.avanza(30);
+  // Serve uno zombie in piedi da colpire dopo.
+  amb.avanza(60 * 20, (st) => !(st.orda && st.orda.zombie.some((q) => q.stato === "va" || q.stato === "colpo")));
+  // Tre vite giù: l'ultima possibilità, lenti e col colpo carico.
+  for (let i = 0; i < 3; i++) r.corsa.ferisci(9999);
+  let s = amb.stato().corsa;
+  assert.strictEqual(s.vite, 0);
+  assert.ok(s.ultima, "finite le vite si resta in piedi, all'ultima possibilità");
+  assert.strictEqual(s.energia, 100, "col colpo finale pronto");
+  assert.strictEqual(s.fase, "lotta");
+  // Il colpo va a segno: round vinto e una vita torna.
+  partita = false;
+  for (let i = 0; i < 60 && !partita; i++) { partita = r.corsa.finale(); if (!partita) amb.avanza(5); }
+  assert.ok(partita, "all'ultima possibilità il colpo finale parte");
+  const z = amb.stato().orda.zombie.find((q) => q.stato === "va" || q.stato === "colpo");
+  assert.ok(z, "c'è uno zombie da colpire");
+  r.miraA(z.x, amb.stato().pavimento - 30);
+  r.spara();
+  s = amb.stato().corsa;
+  assert.strictEqual(s.fase, "vinto", "preso qualcuno: il round è vinto");
+  assert.strictEqual(s.vite, 1, "e una vita torna");
+  assert.ok(!s.ultima);
+  // E se all'ultima possibilità si va giù di nuovo, la corsa finisce.
+  amb.avanza(150);
+  if (amb.stato().corsa.fase === "premi") { r.corsa.premio(0); r.corsa.avanti(); amb.avanza(160); }
+  for (let i = 0; i < 2; i++) r.corsa.ferisci(9999);
+  assert.ok(amb.stato().corsa.ultima || amb.stato().corsa.fase === "fine");
+  r.corsa.ferisci(9999);
+  assert.strictEqual(amb.stato().corsa.fase, "fine", "giù all'ultima possibilità: fine della corsa");
+  assert.ok(amb.stato().recordCorsa > 0, "il record resta nel browser");
+});
+
+test("la corsa: gli oggetti si usano dai loro posti", () => {
+  const { amb, r } = corsaAvviata();
+  amb.avanza(200);
+  r.corsa.ferisci(60);
+  const hp = amb.stato().corsa.hp;
+  r.corsa.dai("pozione", 0);
+  assert.ok(r.corsa.usa(0));
+  assert.ok(amb.stato().corsa.hp > hp, "la pozione cura");
+  assert.strictEqual(amb.stato().corsa.slot[0], null, "e si consuma");
+  r.corsa.dai("scudo", 1);
+  r.corsa.usa(1);
+  const s0 = amb.stato().corsa;
+  r.corsa.ferisci(30);
+  assert.strictEqual(amb.stato().corsa.hp, s0.hp, "con lo scudo niente danni");
+  for (const id of ["bomba", "gelo", "carica", "bazooka", "lanciafiamme"]) { r.corsa.dai(id, 2); assert.ok(r.corsa.usa(2), id); amb.avanza(20); }
+  assert.strictEqual(amb.stato().corsa.energia, 100, "la carica riempie il colpo finale");
+  dentro(amb);
+});
+
+test("la corsa: il pannello non cambia le regole a metà, e si esce tornando al ring di prima", () => {
+  const { amb, r } = corsaAvviata();
+  amb.avanza(200);
+  assert.strictEqual(r.comandi.colpo("zombie"), false, "niente orde a comando durante la corsa");
+  assert.strictEqual(r.comandi.ricomincia(), false);
+  assert.strictEqual(r.comandi.stile("maghi"), false, "il personaggio si sceglie solo all'inizio");
+  r.corsa.finisci();
+  assert.strictEqual(amb.stato().corsa.fase, "fine");
+  r.corsa.chiudi();
+  amb.avanza(60);
+  const s = amb.stato();
+  assert.strictEqual(s.corsa, null);
+  assert.ok(s.lottatori.every((f) => !f.fuoriCampo), "fuori dalla corsa tornano tutti e due");
+  dentro(amb);
+});
+
+test("la corsa: le varianti potenziate, e nel ring libero non escono mai", () => {
+  // Nel ring libero, tante ondate: mai un corazzato, un rabbioso o un capo.
+  const amb = ambiente({});
+  const r = amb.finestra.__ring;
+  r.comandi.sorprese(false);
+  amb.avanza(60); r.comandi.colpo("zombie");
+  const visti = new Set();
+  amb.avanza(60 * 90, (s) => { if (s.orda) for (const z of s.orda.zombie) visti.add(z.tipo); });
+  for (const t of ["corazzato", "rabbioso", "capo"]) assert.ok(!visti.has(t), t + " nel ring libero");
+  // Nella corsa, il round del capo ha il capo.
+  const { amb: a2, r: r2 } = corsaAvviata({}, "mela", 99);
+  a2.avanza(200); r2.corsa.vinci(); a2.avanza(140); r2.corsa.premio(0); r2.corsa.prossimo("boss"); r2.corsa.avanti();
+  const tipi = new Set();
+  a2.avanza(60 * 90, (s) => { if (s.orda) for (const z of s.orda.zombie) tipi.add(z.tipo); return !tipi.has("capo"); });
+  assert.ok(tipi.has("capo"), "nel round del capo arriva il capo");
+  dentro(a2);
+});
+
+test("la corsa nell'estensione: si gioca uguale, ma senza rete e senza campo per il nome", () => {
+  const { amb, r } = corsaAvviata({ estensione: true });
+  amb.avanza(200);
+  r.corsa.vinci();
+  amb.avanza(140);
+  r.corsa.premio(0); r.corsa.avanti();
+  amb.avanza(200);
+  r.corsa.finisci();
+  amb.avanza(30);
+  const s = amb.stato();
+  assert.strictEqual(s.corsa.fase, "fine");
+  assert.strictEqual(s.classifica.voci, null, "nessuna classifica chiesta a nessuno");
+  assert.ok(s.recordCorsa > 0, "il record resta nel browser");
   dentro(amb);
 });
