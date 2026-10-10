@@ -76,10 +76,16 @@ Alla prima installazione si apre `benvenuto.html`: sei passi (l'ultimo è il con
 Scelto uno stile, in campo non ci sono più il robot e la mela ma due personaggi inventati per quel tema:
 
 - **Super guerrieri** (Zefir e Brasa): volano, onde di energia, sfera gigante, teletrasporto, e la **trasformazione** («sovraccarico», due forme: anelli di luce sopra la testa, bordi e occhi accesi, colpi più forti).
-- **Maghi** (Merlo e Ortica): bacchetta e scopa; dardi, raggio, gelo, rimpicciolimento, fulmine, levitazione, scudo, sparizione.
+- **Maghi** (Merlo e Ortica): bacchetta e scopa; dardi, raggio, gelo, rimpicciolimento, fulmine, levitazione, scudo, sparizione. Dal 10/10/2026 anche:
+  - **Sciame di falene**: falene di luce che svolazzano verso l'altro e pungono (ogni tre punture, un colpo).
+  - **Catene di rune**: un cerchio di rune si accende sotto i piedi dell'altro; se non ne esce prima che si chiuda, catene di luce lo legano per un paio di secondi.
+  - **Pioggia di stelle**: la bacchetta al cielo e una pioggia di stelle cadenti intorno all'altro (ogni due che lo prendono, un colpo); un luccichio a terra avvisa dove cadranno.
+  - **Maledizione di smeraldo**, la mossa finale: solo a energia piena, una lunga carica coi segni che l'annunciano, poi un raggio verde che passa attraverso scudi e ghiaccio. **Chi lo prende perde tutta la vita in un colpo**; ma è lento e si vede arrivare, e chi ha i riflessi si scansa o sparisce. I maghi la tirano più volentieri su chi è legato o gelato.
 - **Duellanti** (Rovo e Scia): lama di energia; fendenti, affondi, lo scatto che attraversa l'avversario, la lama lanciata, le lame incrociate.
 
 Nomi, facce e vestiti sono inventati qui: non richiamano personaggi di altri. Vale la pena tenerlo così anche nelle schede degli store.
+
+**L'aspetto rifatto (10/10/2026).** Tutti e tre: braccia e gambe col contorno, testa con orecchio, naso e un'ombra, scarpe diverse per stile. I **maghi** hanno la tunica svasata con l'orlo che ondeggia, le pieghe e i ricami (stelle e luna), le maniche larghe, il cappello con la punta piegata, la fibbia e la luna, la bacchetta intagliata col cristallo che si accende, tre lucine che girano intorno; Merlo ha baffi arricciati e sopracciglia folte, Ortica le lentiggini. I **duellanti** la corazza a piastre con la linea accesa, lo spallaccio coi ribattini, i bracciali, le ginocchiere e gli stivali corazzati. I **combattenti** la casacca con lo scollo e il risvolto bordato, lo stemma sul petto, la cintura annodata con le code che sventolano, gli stivali col risvolto.
 
 ### Gli imprevisti nuovi (05/10/2026)
 
@@ -106,6 +112,7 @@ Circa un round su tre si chiude con una scena: quando all'altro manca un colpo s
 - **Schiacciata**: chi vince salta molto in alto e gli atterra sopra; l'altro resta piatto come una frittella per un paio di secondi.
 - **Onda finale** (super guerrieri): un'onda a bruciapelo lo porta fino al bordo.
 - **Statua** (maghi): lo gela, poi una saetta manda il ghiaccio in pezzi.
+- **Maledizione di smeraldo** (maghi, 10/10/2026): il raggio verde a bruciapelo, che lo solleva e lo lascia giù.
 - **Taglio netto** (duellanti): uno scatto attraverso, un attimo fermi, poi l'altro cade.
 - **Sfera finale** (05/10/2026): si carica sopra la testa una sfera enorme, più del doppio della sfera gigante dei super guerrieri, e gliela lascia cadere addosso. Lo scoppio **sfonda la pagina**: la striscia delle notizie si crepa in cinque punti (coi buchi veri), i bordi si rovinano, il pavimento resta bruciato e i telefoni lì intorno si spaccano.
 - **Meteora**: lo manda per aria con un montante e gli tira addosso una meteora; cadendo lascia lo stesso genere di segni.

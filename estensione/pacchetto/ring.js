@@ -59,6 +59,7 @@
   const EVENTI_PREMIO = { meteoriti: 1, zombie: 1, buco: 1 };
   const MOSSE_PREMIO = { onda: 1, carica: 1, teletrasporto: 1, sfera: 1, disco: 1, lampo: 1, barriera: 1, autodistruzione: 1, telecinesi: 1,
                          trasforma: 1, dardi: 1, gelo: 1, rimpicciolisci: 1, fulmine: 1, levita: 1, scudo: 1, raggio: 1, sparizione: 1,
+                         falene: 1, catene: 1, stelle: 1, smeraldo: 1,
                          "scatto-lama": 1, "lancio-lama": 1, duello: 1, scontro: 1 };
   // A quale gruppo a pagamento appartiene un tasto della tendina (o nessuno).
   function gruppoDi(tasto) {
@@ -705,7 +706,7 @@
     }
     lottatori = [crea("robot", cx0 - scarto, 1, base0), crea("mela", cx0 + scarto, -1, base0)];
     if (lame()) for (const f of lottatori) accendiLama(f);
-    fulmini = []; duello = 0; sfida = null; sfidaPausa = 0; orda = null;
+    fulmini = []; rune = []; cadute = []; duello = 0; sfida = null; sfidaPausa = 0; orda = null;
     danni = [];
     scritte = []; telefoni = []; particelle = []; evento = null;
     creature = []; nubi = []; finale = null; mira = null; lampoMira = null; miraBuio = 0; centroMira = null;
@@ -981,6 +982,34 @@
         else { q.manoA = [54, 20]; q.gomitoA = [52, 11]; q.collo[1] += 3; }
         q.manoD = [40, -6]; q.gomitoD = [44, -3];
         break;
+      case "falene": {
+        // Le mani si aprono davanti al petto e lo sciame esce dalla bacchetta.
+        const k = Math.min(1, f.t / 12), w = Math.sin(f.t * 0.5) * 2;
+        q.manoA = [58 + 6 * k + w, 10 + 14 * k]; q.gomitoA = [52, 8 + 6 * k];
+        q.manoD = [56 + 4 * k - w, 6 + 10 * k]; q.gomitoD = [48, 4 + 4 * k];
+        break;
+      }
+      case "catene": {
+        // La bacchetta punta a terra, verso i piedi dell'altro: il cerchio si accende lì.
+        const k = Math.min(1, f.t / 10);
+        q.manoA = [62 - 26 * k, 14 + 14 * k]; q.gomitoA = [52 - 10 * k, 10 + 6 * k];
+        q.manoD = [40, -8]; q.gomitoD = [44, -4]; q.collo[1] += 3 * k; q.testa[1] += 4 * k;
+        break;
+      }
+      case "stelle": {
+        // La bacchetta al cielo, che disegna un giro: le stelle arrivano da lassù.
+        const g = f.t * 0.35;
+        q.manoA = [88 + Math.sin(g) * 3, 4 + Math.cos(g) * 6]; q.gomitoA = [72, 6];
+        q.manoD = [86 + Math.cos(g) * 2, -2]; q.gomitoD = [70, -3]; q.testa[1] -= 1;
+        break;
+      }
+      case "smeraldo": {
+        // La carica: la bacchetta alzata dietro la testa, che trema; poi giù in avanti, di scatto.
+        const tr = f.t < SMERALDO.parte ? Math.sin(f.t * 1.7) * Math.min(1.6, f.t / 30) : 0;
+        if (f.t < SMERALDO.parte) { q.manoA = [84 + tr, -10 + tr]; q.gomitoA = [70, -4]; q.manoD = [52, 16]; q.gomitoD = [46, 8]; q.bacino[0] -= 1; }
+        else { const k = Math.min(1, (f.t - SMERALDO.parte) / 4); q.manoA = [84 - 30 * k, -10 + 42 * k]; q.gomitoA = [70 - 18 * k, -4 + 20 * k]; q.manoD = [40, -6]; q.gomitoD = [44, -3]; q.collo[1] += 4 * k; q.testa[1] += 4 * k; }
+        break;
+      }
       case "levita": {
         const k = f.t < 74 ? Math.min(1, f.t / 12) : Math.max(0, 1 - (f.t - 74) / 5);
         q.manoA = [50 + 28 * k, 14 + 4 * k]; q.gomitoA = [46 + 12 * k, 10 + 3 * k];
@@ -1376,6 +1405,7 @@
                    carica: 70, onda: 80, raffica: 40, rush: 44,
                    sfera: 150, disco: 56, lampo: 40, barriera: 110, avvinghia: 96, telecinesi: 124,
                    trasforma: 96, gelo: 44, rimpicciolisci: 40, fulmine: 50, levita: 100,
+                   falene: 46, catene: 40, stelle: 62, smeraldo: 104,
                    affondo: 24, rovescio: 26, scattoLama: 44, lancioLama: 40, pressa: 50, testata: 22,
                    cavallina: 46, sgabello: 46, trottola: 34, insieme: 38, bolide: 50, fionda: 34 };
 
@@ -2815,12 +2845,13 @@
       if (orda && !b.neve) {
         const z = zombieToccato(b.x, b.y, b.grande ? b.r : 5 * S);
         if (z) {
-          colpisciZombie(z, b.grande ? 9 : b.disco ? 6 : b.energia ? 2.6 : 4.4, Math.sign(b.vx) || 1, b.x, b.y, b.da);
-          if (!b.grande && !b.disco) { b.vita = 0; continue; }           // sfera gigante e disco passano oltre
+          colpisciZombie(z, b.incanto === "smeraldo" ? 40 : b.grande ? 9 : b.disco ? 6 : b.energia ? 2.6 : 4.4, Math.sign(b.vx) || 1, b.x, b.y, b.da);
+          if (!b.grande && !b.disco && b.incanto !== "smeraldo") { b.vita = 0; continue; }   // sfera gigante, disco e raggio verde passano oltre
         }
       }
       if (b.grande || b.disco) { aggiornaSpeciale(b); if (b.vita <= 0 && b.lamaDi) rientraLama(b.lamaDi); continue; }
       if (b.neve) b.vy += GRAVITA * S * moltG * verso * 0.6;
+      if (b.falena) guidaFalena(b);
       b.x += b.vx; b.y += b.vy; b.vita--;
       if (b.y > pavimento - 1 || b.x < 0 || b.x > W || (b.y < 0 && !b.neve)) {
         b.vita = 0; sbuffo(b); continue;
@@ -2834,7 +2865,7 @@
         if (orda && b.da && b.da.tipo) continue;                 // tregua: i colpi dell'alleato passano oltre
         for (const n of ["testa", "collo", "bacino"]) {
           const q = f.p[n];
-          if (Math.hypot(q.x - b.x, q.y - b.y) < q.r + 4 * S) {
+          if (Math.hypot(q.x - b.x, q.y - b.y) < q.r + (b.incanto === "smeraldo" ? 10 : 4) * S) {
             // Una lama di energia rimanda indietro pallottole e sfere (non sempre).
             // Il cavaliere para tutto: con la lama doppia nessun colpo passa.
             if (!b.neve && !b.incanto && !b.deviato && lamaPronta(f) && b.vx * f.dir < 0 &&
@@ -2845,6 +2876,8 @@
               break;
             }
             if (b.neve) { colpisci(b.da, f, 2.4, b.x, b.y, "SPLOF!"); sbuffo(b); }
+            else if (b.incanto === "smeraldo") colpoMortale(b.da, f, b.x, b.y);
+            else if (b.sciame) punge(b, f);
             else if (b.incanto === "gelo") congela(f, b.da, b.x, b.y);
             else if (b.incanto === "piccolo") rimpicciolisci(f, b.da, b.x, b.y);
             else if (b.energia) { colpisci(b.da, f, 2.6, b.x, b.y, "ZAP!"); scintille(b.x, b.y, 6, b.colore); }
@@ -5774,6 +5807,8 @@
                 ["trasforma", "\u{1F31F}", "Trasformazione", 40], ["avvinghia", "\u{1F4A5}", "Autodistruzione", 30]],
     maghi: [["raffica", "\u2728", "Dardi magici", 15], ["onda", "\u{1F300}", "Raggio", 45], ["gelo", "\u2744\uFE0F", "Gelo", 20], ["rimpicciolisci", "\u{1F52E}", "Rimpicciolisci", 25],
             ["fulmine", "\u26A1", "Fulmine", 25], ["levita", "\u{1F388}", "Levitazione", 30],
+            ["falene", "\u{1F98B}", "Sciame di falene", 20], ["catene", "\u26D3\uFE0F", "Catene di rune", 30],
+            ["stelle", "\u{1F320}", "Pioggia di stelle", 35], ["smeraldo", "\u{1F49A}", "Maledizione di smeraldo", 100],
             ["barriera", "\u{1F6E1}\uFE0F", "Scudo magico", 20], ["teletrasporto", "\u{1F4A8}", "Sparizione", 15], ["carica", "\u{1F525}", "Carica l'aura"]],
     lame: [["fendente", "\u2694\uFE0F", "Fendente"], ["affondo", "\u{1F5E1}\uFE0F", "Affondo"], ["rovescio", "\u21A9\uFE0F", "Rovescio"], ["scattoLama", "\u{1F4A8}", "Scatto tagliente"],
            ["lancioLama", "\u{1F3AF}", "Lama lanciata"], ["duello", "\u2716\uFE0F", "Incrocio di lame"],
@@ -6445,6 +6480,14 @@
       for (let j = i + 1; j < n; j++) {
         const p2 = proiettili[j];
         if (p2.vita <= 0 || p2.neve || p1.da === p2.da || !p1.da || !p2.da) continue;
+        if (p1.incanto === "smeraldo" || p2.incanto === "smeraldo") {
+          // Il raggio verde non si ferma: quello che incontra si spegne.
+          const v = p1.incanto === "smeraldo" ? p2 : p1;
+          if (v.incanto === "smeraldo" || Math.hypot(p1.x - p2.x, p1.y - p2.y) > 12 * S) continue;
+          v.vita = 0; scintille(v.x, v.y, 6, VERDE);
+          if (v === p1) break;
+          continue;
+        }
         const r1 = p1.grande ? p1.r : p1.disco ? 10 * S : 5 * S, r2 = p2.grande ? p2.r : p2.disco ? 10 * S : 5 * S;
         if (Math.hypot(p1.x - p2.x, p1.y - p2.y) > r1 + r2) continue;
         const x = (p1.x + p2.x) / 2, y = (p1.y + p2.y) / 2;
@@ -6890,6 +6933,10 @@
     if (f.azione === "rimpicciolisci" && f.t === 16 && f.ki >= 25) { f.ki -= 25; lanciaIncanto(f, altro, "piccolo"); }
     if (f.azione === "fulmine" && f.t === 18 && f.ki >= 25) { f.ki -= 25; fulmini.push({ x: puntoMira(f, altro).x, t: 0, da: f, punti: null }); }
     if (f.azione === "levita") eseguiLevita(f, altro);
+    if (f.azione === "falene" && f.t === 14 && f.ki >= 20) { f.ki -= 20; lanciaFalene(f, altro); }
+    if (f.azione === "catene" && f.t === 12 && f.ki >= 30) { f.ki -= 30; evocaRune(f, altro); }
+    if (f.azione === "stelle" && f.t === 20 && f.ki >= 35) { f.ki -= 35; chiamaStelle(f, altro); }
+    if (f.azione === "smeraldo" && !(fatale && fatale.da === f)) eseguiSmeraldo(f, altro);
   }
   // La presa a distanza: con una mano alzata si solleva l'avversario, che
   // resta sospeso a braccia e gambe larghe mentre una luce gli cresce dentro;
@@ -7210,12 +7257,21 @@
     const g = f.p.gomitoA, m = f.p.manoA, L = Math.hypot(m.x - g.x, m.y - g.y) || 1;
     return { x: m.x + (m.x - g.x) / L * 14 * S, y: m.y + (m.y - g.y) / L * 14 * S };
   };
-  const INCANTI = { gelo: 1, rimpicciolisci: 1, fulmine: 1, levita: 1, raffica: 1, onda: 1, carica: 1, barriera: 1, lampo: 1 };
+  const INCANTI = { gelo: 1, rimpicciolisci: 1, fulmine: 1, levita: 1, raffica: 1, onda: 1, carica: 1, barriera: 1, lampo: 1,
+                    falene: 1, catene: 1, stelle: 1, smeraldo: 1 };
   // Che incantesimo fare adesso (o nessuno: allora decide il resto del cervello).
   function incantesimo(f, altro) {
     const b = f.p.bacino, ob = altro.p.bacino, d = Math.hypot(ob.x - b.x, ob.y - b.y) / S;
     const fermo = altro.gelato > 0 || altro.stordito > 0 || altro.accecato > 0;
-    if (f.ki >= 20 && (altro.azione === "onda" || altro.azione === "raffica" || altro.azione === "fulmine" || altro.azione === "gelo" || altro.azione === "rimpicciolisci") && Math.random() < 0.4) { inizia(f, "barriera"); return true; }
+    // La maledizione di smeraldo non si para: si vede arrivare, e chi può si scansa.
+    if (scansaSmeraldo(f, altro)) return true;
+    if (f.ki >= 20 && (altro.azione === "onda" || altro.azione === "raffica" || altro.azione === "fulmine" || altro.azione === "gelo" || altro.azione === "rimpicciolisci" ||
+                       altro.azione === "falene" || altro.azione === "stelle") && Math.random() < 0.4) { inizia(f, "barriera"); return true; }
+    // A energia piena, la mossa finale: più volentieri se l'altro è fermo (legato, gelato, stordito).
+    if (f.ki >= 100 && d > 60 && !altro.ko && !altro.esploso && !orda && Math.random() < (fermo || altro.legato > 0 ? 0.8 : 0.22)) { inizia(f, "smeraldo"); return true; }
+    if (f.ki >= 30 && d > 40 && !fermo && !(altro.legato > 0) && !(altro.jet > 0) && Math.random() < 0.09) { inizia(f, "catene"); return true; }
+    if (f.ki >= 35 && Math.random() < (fermo || altro.legato > 0 ? 0.3 : 0.07)) { inizia(f, "stelle"); return true; }
+    if (f.ki >= 20 && d > 60 && Math.random() < 0.1) { inizia(f, "falene"); return true; }
     if (f.ki >= 30 && d > 60 && !altro.tenuto && (fermo ? Math.random() < 0.3 : Math.random() < 0.07)) { inizia(f, "levita"); return true; }
     if (f.ki >= 25 && Math.random() < (fermo ? 0.35 : 0.12)) { inizia(f, "fulmine"); return true; }
     if (f.ki >= 20 && d > 50 && !(altro.gelato > 0) && Math.random() < 0.12) { inizia(f, "gelo"); return true; }
@@ -7229,6 +7285,322 @@
     proiettili.push({ x: m.x, y: m.y, vx: (bx - m.x) / d * v, vy: (by - m.y) / d * v, da: f, vita: 170, energia: true, incanto: tipo,
                       colore: tipo === "gelo" ? "#7fd4f7" : "#b77bff" });
     scintille(m.x, m.y, 6, tipo === "gelo" ? "#dff6ff" : "#e4ccff");
+  }
+
+  // ·· LE MAGIE NUOVE (10/10/2026, su richiesta: «magie diverse e intriganti») ··
+  //   falene     uno sciame di falene di luce esce dalla bacchetta e svolazza verso
+  //              l'altro: ognuna punge, e ogni tre punture è un colpo vero
+  //   catene     un cerchio di rune si accende sotto i suoi piedi; se non ne esce prima
+  //              che si chiuda, catene di luce lo legano lì per un paio di secondi
+  //   stelle     la bacchetta al cielo, e una pioggia di stelle cadenti intorno a lui
+  //              (ogni due che lo prendono, un colpo)
+  //   smeraldo   LA MOSSA FINALE DEI MAGHI. Solo a energia piena: una lunga carica, coi
+  //              segni che lo annunciano, poi un raggio verde che passa attraverso scudi e
+  //              ghiaccio. Chi lo prende perde tutta la vita in un colpo, K.O. subito; ma è
+  //              lento, si vede arrivare, e chi ha i riflessi si scansa (o sparisce).
+  // Nomi, colori e segni sono nostri. Il raggio verde è anche uno dei colpi finali dei maghi.
+  const VERDE = "#3dff8a", VERDE_SCURO = "#0c5a2c";
+  const SMERALDO = { parte: 64, velocita: 7.2, energia: 100 };
+  let rune = [], cadute = [], sciami = 0;
+  function lanciaFalene(f, altro) {
+    const m = puntaBacchetta(f), id = ++sciami;
+    for (let i = 0; i < 7; i++) {
+      const a = (f.dir > 0 ? 0 : Math.PI) + caso(-1.2, 1.2), v = caso(2.6, 4) * S;
+      proiettili.push({ x: m.x, y: m.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 1.4 * S, da: f, vita: 230, energia: true, falena: true,
+                        bersaglio: altro, fase: caso(0, 6), colore: ["#ffe9a8", "#d2bcff", "#a8f3ff"][i % 3], ritardo: 6 + i * 3,
+                        sciame: id, serve: 3 });
+    }
+    scintille(m.x, m.y, 10, "#fff3c4");
+    scrivi("FRRR!", m.x, m.y - 18 * S, false);
+  }
+  // La falena: punta l'altro, ma svolazza di traverso, e non va mai dritta.
+  function guidaFalena(b) {
+    b.fase += 0.45;
+    const t = b.bersaglio;
+    if (b.ritardo > 0) b.ritardo--;
+    else if (!orda && t && t.p && !t.ko && !t.esploso && !t.fuoriCampo) {
+      const tx = t.p.collo.x, ty = (t.p.collo.y + t.p.bacino.y) / 2, d = Math.hypot(tx - b.x, ty - b.y) || 1;
+      b.vx += (tx - b.x) / d * 0.34 * S; b.vy += (ty - b.y) / d * 0.34 * S;
+    }
+    b.vx += Math.cos(b.fase * 0.7) * 0.28 * S; b.vy += Math.sin(b.fase) * 0.4 * S;
+    const v = Math.hypot(b.vx, b.vy), max = 5 * S;
+    if (v > max) { b.vx *= max / v; b.vy *= max / v; }
+  }
+  // Falene e stelle pungono: il colpo vero arriva ogni `serve` punture dello stesso sciame.
+  function punge(b, f) {
+    scintille(b.x, b.y, 5, b.colore);
+    const conto = f.punture || (f.punture = {});
+    conto[b.sciame] = (conto[b.sciame] || 0) + 1;
+    if (conto[b.sciame] % b.serve === 0) { colpisci(b.da, f, 3, b.x, b.y, b.falena ? "ZIP!" : "SBRANG!"); return; }
+    for (const n in f.p) f.p[n].ox -= Math.sign(b.vx || 1) * 0.6 * S;
+    f.dolore = Math.max(f.dolore || 0, 8);
+    if (Math.random() < 0.5) scrivi(b.falena ? "zip" : "tink", b.x, b.y - 10 * S, false);
+  }
+  function evocaRune(f, altro) {
+    const c = puntoMira(f, altro), x = orda ? c.x : altro.p.bacino.x, y = orda ? orda.base : altro.base;
+    rune.push({ x, y, t: 0, da: f, contro: orda ? null : altro, r: 32 * S, preso: null });
+    suona("gelo", x);
+  }
+  function chiamaStelle(f, altro) {
+    const c = puntoMira(f, altro), id = ++sciami;
+    for (let i = 0; i < 8; i++) cadute.push({ x: c.x + caso(-95, 95) * S, quando: 10 + i * 6, da: f, sciame: id, avviso: 0 });
+    scrivi("STELLE!", f.p.testa.x, f.p.testa.y - 30 * S, false);
+  }
+  function lega(f, da) {
+    if (f.esploso || f.preso || f.tenuto || f.fuoriCampo || f.ko) return false;
+    if (barrieraRegge(f, 3, f.p.collo.x, f.p.collo.y)) return false;
+    if (f.tel) lasciaCadere(f);
+    if (f.tiene) molla(f);
+    f.azione = null; f.scatto = 0; f.onda = null; f.jet = 0; f.volo = false; f.scalata = null;
+    f.legato = 140; f.stordito = Math.max(f.stordito || 0, 140);
+    scrivi("LEGATO!", f.p.collo.x, f.p.collo.y - 36 * S, false);
+    if (da && da.p) da.ki = Math.min(100, da.ki + 4);
+    return true;
+  }
+  function eseguiSmeraldo(f, altro) {
+    if (f.t === 1) {
+      if (f.ki < SMERALDO.energia || altro.ko || altro.esploso) { f.azione = null; return; }
+      scrivi("MALEDIZIONE DI SMERALDO!", f.p.bacino.x, f.p.testa.y - 46 * S, true);
+      suona("carica", f.p.bacino.x);
+    }
+    const q = puntaBacchetta(f);
+    if (f.t < SMERALDO.parte) {
+      // La luce verde che si raccoglie nella punta, da tutto intorno.
+      if (f.t % 2 === 0 && particelle.length < MAX_PARTICELLE - 10) {
+        const a = caso(0, Math.PI * 2), r = caso(40, 80) * S;
+        particelle.push({ tipo: "scintilla", x: q.x + Math.cos(a) * r, y: q.y + Math.sin(a) * r, vx: -Math.cos(a) * r / 14, vy: -Math.sin(a) * r / 14,
+                          vita: 14, max: 14, colore: Math.random() < 0.6 ? VERDE : "#d9ffe8" });
+      }
+      scossa = Math.max(scossa, f.t > 40 ? 2 : 0);
+    }
+    if (f.t === SMERALDO.parte) {
+      f.ki = 0;
+      const m = puntoMira(f, altro), bx = m.x, by = orda ? m.y : altro.p.collo.y + (altro.p.bacino.y - altro.p.collo.y) * 0.3;
+      const d = Math.hypot(bx - q.x, by - q.y) || 1, v = SMERALDO.velocita * S;
+      proiettili.push({ x: q.x, y: q.y, vx: (bx - q.x) / d * v, vy: (by - q.y) / d * v, da: f, vita: 260, energia: true, incanto: "smeraldo",
+                        colore: VERDE, fase: 0 });
+      scintille(q.x, q.y, 16, VERDE); scintille(q.x, q.y, 8, "#ffffff");
+      for (const n in f.p) f.p[n].ox += f.dir * 3 * S;                    // il contraccolpo
+      scossa = Math.max(scossa, 10);
+    }
+  }
+  // Chi vede caricare (o arrivare) il raggio verde, se è libero e sveglio, si scansa.
+  function scansaSmeraldo(f, altro) {
+    if (f.legato > 0 || f.gelato > 0 || f.stordito > 0) return false;
+    const c = f.p.collo;
+    const verde = proiettili.find((b) => b.incanto === "smeraldo" && b.da !== f && b.vita > 0 && (c.x - b.x) * b.vx > 0 && Math.hypot(b.x - c.x, b.y - c.y) < 230 * S);
+    const carica = altro.azione === "smeraldo" && altro.t > 36;
+    if (!verde && !carica) return false;
+    if (f.scansato === (verde || altro)) return false;                 // una prova sola per colpo
+    f.scansato = verde || altro;
+    if (Math.random() > 0.25 + 0.15 * (f.furbo || 0)) return false;
+    if (f.ki >= 15) return teletrasporta(f, altro);
+    inizia(f, "salto"); f.durata = 46;
+    return true;
+  }
+  // Tutta la vita in un colpo. Scudi e ghiaccio non lo fermano.
+  function colpoMortale(da, f, x, y) {
+    if (fatale || f.fuoriCampo || f.esploso) return;
+    if (orda && da && da.tipo && f.tipo && da.tipo !== f.tipo) return;                  // tregua
+    const c = f.p.collo;
+    for (let i = 0; i < 2 && particelle.length < MAX_PARTICELLE; i++) particelle.push({ tipo: "onda", x, y, vx: 0, vy: 0, vita: 16 + i * 8, max: 16 + i * 8, colore: VERDE });
+    scintille(x, y, 22, VERDE); scintille(x, y, 10, "#ffffff");
+    if (corsa && corsa.chi && f.tipo === corsa.chi) { colpisci(da, f, 9, x, y, "SMERALDO!"); return; }   // l'eroe della corsa ha le sue vite
+    if (f.azione === "barriera") { f.azione = null; schegge(c.x, c.y, 14, VERDE); }
+    if (f.gelato > 0) rompiGhiaccio(f, true);
+    if (f.tel) lasciaCadere(f);
+    if (f.tiene) molla(f);
+    f.azione = null; f.jet = 0; f.volo = false; f.scalata = null; f.scatto = 0; f.onda = null; f.legato = 0; f.stordito = 0;
+    f.danni = f.soglia; f.dolore = 30; f.verde = 150;
+    const dir = Math.sign(f.p.bacino.x - (da && da.p ? da.p.bacino.x : x)) || 1;
+    for (const n in f.p) { f.p[n].ox -= dir * 7 * S; f.p[n].oy += 4 * S; }
+    scrivi("SMERALDO!", c.x, c.y - 40 * S, true);
+    scossa = Math.max(scossa, 20); fermoColpo = Math.max(fermoColpo, 12);
+    if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "lampo", x: c.x, y: c.y, vx: 0, vy: 0, vita: 10, max: 10, r: 260 * S });
+    if (da && da.tipo && da !== f) { impara(da, "smeraldo", 1, 3); segnaKO(da, f); }
+    else f.ko = Math.max(f.ko, 130);
+    f.inVolo = true;
+  }
+  function aggiornaMagie() {
+    for (const r of rune) {
+      r.t++;
+      const f = r.contro;
+      // A metà carica chi è sveglio prova a uscirne.
+      if (r.t === 12 && f && !f.azione && !(f.stordito > 0) && !(f.legato > 0) && Math.random() < 0.15 + 0.2 * (f.furbo || 0)) {
+        f.dir = r.x >= f.p.bacino.x ? -1 : 1; inizia(f, "avanza", r.x + f.dir * 70 * S); f.corsa = 40;
+      }
+      if (r.t === 40) {
+        if (orda) {
+          for (const z of orda.zombie) if (vivoZ(z) && Math.abs(z.x - r.x) < r.r) { z.botta = Math.max(z.botta, 150); colpisciZombie(z, 3, 1, z.x, corpoZ(z)[1], r.da); }
+          scintille(r.x, r.y - 4 * S, 14, "#c9a6ff");
+        } else if (f && f.p && Math.abs(f.p.bacino.x - r.x) < r.r && Math.abs(f.base - r.y) < 14 * S && !(f.jet > 0) && lega(f, r.da)) r.preso = f;
+        else { scintille(r.x, r.y - 4 * S, 10, "#c9a6ff"); scrivi("MANCATO!", r.x, r.y - 30 * S, false); }
+      }
+    }
+    if (rune.length) rune = rune.filter((r) => r.t < (r.preso ? 70 : 54));
+    for (const c of cadute) {
+      c.avviso++;
+      if (--c.quando !== 0) continue;
+      const alto = Math.max(4, testataBasso + 4), x0 = c.x + caso(-70, 70) * S, d = Math.hypot(c.x - x0, pavimento - alto) || 1, v = 9.5 * S;
+      proiettili.push({ x: x0, y: alto, vx: (c.x - x0) / d * v, vy: (pavimento - alto) / d * v, da: c.da, vita: 160, energia: true, cometa: true,
+                        colore: Math.random() < 0.5 ? "#ffe27a" : "#ffc4f0", sciame: c.sciame, serve: 2 });
+    }
+    if (cadute.length) cadute = cadute.filter((c) => c.quando > 0);
+    for (const f of lottatori) {
+      if (f.legato > 0) { f.legato--; f.stordito = Math.max(f.stordito || 0, f.legato > 0 ? 2 : 0); if (f.ko || f.esploso) f.legato = 0; }
+      if (f.verde > 0) f.verde--;
+    }
+  }
+  // I segni delle magie: cerchi di rune per terra, catene, gli avvisi delle stelle, la carica verde.
+  const GLIFI = ["ᚠ", "ᚱ", "ᛟ", "ᚨ", "ᛞ", "ᛉ", "ᚦ", "ᛗ"];
+  function disegnaMagie() {
+    ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+    for (const r of rune) {
+      const k = Math.min(1, r.t / 40), chiuso = r.t >= 40, sv = chiuso ? Math.max(0, 1 - (r.t - 40) / (r.preso ? 30 : 14)) : 1;
+      const rx = r.r * (0.6 + 0.4 * k), ry = rx * 0.32, col = "#b98bff";
+      const g = ctx.createRadialGradient(r.x, r.y, 2, r.x, r.y, rx * 1.3);
+      g.addColorStop(0, "rgba(185,139,255," + (0.35 * k * sv).toFixed(3) + ")"); g.addColorStop(1, "rgba(185,139,255,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(r.x, r.y, rx * 1.3, ry * 1.6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = (0.5 + 0.5 * k) * sv; ctx.strokeStyle = col; ctx.lineWidth = 1.6 * S;
+      for (const f of [1, 0.72]) { ctx.beginPath(); ctx.ellipse(r.x, r.y, rx * f, ry * f, 0, 0, Math.PI * 2); ctx.stroke(); }
+      // la stella a sette punte dentro il cerchio, che gira
+      ctx.lineWidth = 1 * S; ctx.beginPath();
+      for (let i = 0; i <= 7; i++) { const a = r.t * 0.04 + (i * 3 * Math.PI * 2) / 7; const px = r.x + Math.cos(a) * rx * 0.72, py = r.y + Math.sin(a) * ry * 0.72; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); }
+      ctx.stroke();
+      ctx.fillStyle = "#efe2ff"; ctx.font = "700 " + Math.round(8 * S) + "px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (let i = 0; i < GLIFI.length; i++) {
+        const a = -r.t * 0.05 + (i * Math.PI * 2) / GLIFI.length;
+        ctx.fillText(GLIFI[i], r.x + Math.cos(a) * rx * 0.86, r.y + Math.sin(a) * ry * 0.86 - (chiuso ? 0 : Math.sin(r.t * 0.3 + i) * 1.5 * S));
+      }
+      ctx.globalAlpha = 1;
+    }
+    for (const f of lottatori) {
+      if (f.legato > 0 && f.p && !f.esploso) disegnaCatene(f);
+      if (f.verde > 0 && f.p && !f.esploso) {
+        // Chi l'ha presa resta avvolto di verde per un po', con dei fili che salgono.
+        const b = f.p.bacino, k = f.verde / 150;
+        const g = ctx.createRadialGradient(b.x, b.y - 12 * S, 3 * S, b.x, b.y - 12 * S, 46 * S);
+        g.addColorStop(0, "rgba(61,255,138," + (0.45 * k).toFixed(3) + ")"); g.addColorStop(1, "rgba(61,255,138,0)");
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y - 12 * S, 46 * S, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = VERDE; ctx.globalAlpha = 0.7 * k; ctx.lineWidth = 1.2 * S;
+        for (let i = 0; i < 3; i++) {
+          const x0 = b.x + (i - 1) * 9 * S, y0 = b.y - 6 * S, su = ((passi * 1.3 + i * 17) % 40) * S;
+          ctx.beginPath(); ctx.moveTo(x0, y0 - su); ctx.quadraticCurveTo(x0 + Math.sin(passi * 0.2 + i) * 6 * S, y0 - su - 10 * S, x0, y0 - su - 18 * S); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+      if (f.azione === "smeraldo" && f.t < SMERALDO.parte && f.p && !(fatale && fatale.da === f)) disegnaCaricaVerde(f, f.t / SMERALDO.parte);
+    }
+    for (const c of cadute) {
+      // Dove cadrà una stella: un luccichio a terra che cresce.
+      const k = Math.min(1, c.avviso / 20), y = pavimento - 1;
+      ctx.globalAlpha = 0.25 + 0.5 * k * (c.avviso % 6 < 3 ? 1 : 0.6);
+      ctx.strokeStyle = "#ffe27a"; ctx.lineWidth = 1 * S; ctx.beginPath(); ctx.ellipse(c.x, y, (4 + 8 * k) * S, (1.4 + 2 * k) * S, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+  // Le catene di luce: tre giri intorno al corpo, maglia per maglia, con l'ancora nel cerchio a terra.
+  function disegnaCatene(f) {
+    const p = f.p, k = Math.min(1, f.legato / 20), tr = Math.sin(passi * 0.5) * 0.6 * S;
+    const giri = [[p.collo, 11], [{ x: (p.collo.x + p.bacino.x) / 2, y: (p.collo.y + p.bacino.y) / 2 }, 12.5], [{ x: (p.ginocchioA.x + p.ginocchioD.x) / 2, y: (p.ginocchioA.y + p.ginocchioD.y) / 2 }, 9]];
+    ctx.save(); ctx.globalAlpha = k;
+    for (const [c, r] of giri) {
+      for (let i = 0; i < 12; i++) {
+        const a = passi * 0.02 + (i * Math.PI * 2) / 12, x = c.x + Math.cos(a) * r * S + tr, y = c.y + Math.sin(a) * r * 0.38 * S;
+        ctx.strokeStyle = i % 2 ? "#e2d0ff" : "#a879ff"; ctx.lineWidth = 1.5 * S;
+        ctx.beginPath(); ctx.ellipse(x, y, 2.6 * S, 1.6 * S, a + (i % 2 ? Math.PI / 2 : 0), 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+    // Le due catene che scendono a terra.
+    const b = p.bacino, y0 = f.base;
+    ctx.strokeStyle = "rgba(185,139,255,.8)"; ctx.lineWidth = 1.4 * S; ctx.setLineDash([3 * S, 2 * S]);
+    for (const lato of [-1, 1]) { ctx.beginPath(); ctx.moveTo(b.x + lato * 11 * S, b.y - 8 * S); ctx.lineTo(b.x + lato * 26 * S, y0); ctx.stroke(); }
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+  // La carica della maledizione: un anello di rune verdi che stringe intorno alla punta della
+  // bacchetta, fulmini verdi che la toccano, e intorno la scena che si scurisce.
+  function disegnaCaricaVerde(f, k) {
+    const q = puntaBacchetta(f);
+    const buio = ctx.createRadialGradient(q.x, q.y, 30 * S, q.x, q.y, Math.max(W, H) * 0.6);
+    buio.addColorStop(0, "rgba(4,20,10,0)"); buio.addColorStop(1, "rgba(4,20,10," + (0.32 * k).toFixed(3) + ")");
+    ctx.fillStyle = buio; ctx.fillRect(0, 0, W, H);
+    const r = (34 - 20 * k) * S;
+    const g = ctx.createRadialGradient(q.x, q.y, 1, q.x, q.y, r * 1.5);
+    g.addColorStop(0, "rgba(220,255,232," + (0.5 + 0.4 * k).toFixed(3) + ")"); g.addColorStop(0.4, "rgba(61,255,138," + (0.45 * k + 0.15).toFixed(3) + ")"); g.addColorStop(1, "rgba(61,255,138,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.x, q.y, r * 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = VERDE; ctx.lineWidth = 1.3 * S;
+    ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = "#d9ffe8"; ctx.font = "700 " + Math.round(7 * S) + "px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (let i = 0; i < 6; i++) { const a = passi * 0.12 + (i * Math.PI * 2) / 6; ctx.fillText(GLIFI[i], q.x + Math.cos(a) * r, q.y + Math.sin(a) * r); }
+    if (k > 0.3 && passi % 3 === 0) {
+      ctx.strokeStyle = "#c8ffdc"; ctx.lineWidth = 1 * S; ctx.beginPath();
+      const a = caso(0, Math.PI * 2); let x = q.x + Math.cos(a) * r * 2.2, y = q.y + Math.sin(a) * r * 2.2; ctx.moveTo(x, y);
+      for (let i = 1; i <= 4; i++) { x += (q.x - x) / (5 - i) + caso(-4, 4) * S; y += (q.y - y) / (5 - i) + caso(-4, 4) * S; ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+  }
+  // Le falene, le stelle cadenti e il raggio verde in volo.
+  function disegnaMagia(b) {
+    if (b.falena) {
+      const a = Math.atan2(b.vy, b.vx), ali = Math.abs(Math.sin(b.fase * 2.2));
+      ctx.save(); ctx.translate(b.x, b.y);
+      ctx.globalAlpha = 0.35; tondo(0, 0, 7 * S, b.colore); ctx.globalAlpha = 1;
+      ctx.rotate(a);
+      ctx.fillStyle = b.colore; ctx.strokeStyle = "rgba(60,40,80,.6)"; ctx.lineWidth = 0.6 * S;
+      for (const lato of [-1, 1]) {
+        ctx.beginPath(); ctx.ellipse(-0.5 * S, lato * (2.4 * ali + 0.6) * S, 3.4 * S, (2.6 * ali + 0.5) * S, lato * 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(-3 * S, lato * (1.6 * ali + 0.4) * S, 2 * S, (1.6 * ali + 0.4) * S, lato * 0.9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
+      tondo(0, 0, 1.2 * S, "#ffffff");
+      ctx.strokeStyle = b.colore; ctx.lineWidth = 0.5 * S; ctx.beginPath(); ctx.moveTo(1 * S, -0.4 * S); ctx.lineTo(3.4 * S, -1.8 * S); ctx.moveTo(1 * S, 0.4 * S); ctx.lineTo(3.4 * S, 1.8 * S); ctx.stroke();
+      ctx.restore();
+      return true;
+    }
+    if (b.cometa) {
+      const v = Math.hypot(b.vx, b.vy) || 1, ux = b.vx / v, uy = b.vy / v;
+      ctx.save();
+      const g = ctx.createLinearGradient(b.x, b.y, b.x - ux * 34 * S, b.y - uy * 34 * S);
+      g.addColorStop(0, b.colore); g.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.strokeStyle = g; ctx.lineWidth = 4 * S; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - ux * 34 * S, b.y - uy * 34 * S); ctx.stroke();
+      stella(b.x, b.y, 5 * S, b.colore); stella(b.x, b.y, 2.2 * S, "#ffffff");
+      ctx.restore();
+      return true;
+    }
+    if (b.incanto === "smeraldo") {
+      b.fase = (b.fase || 0) + 1;
+      const v = Math.hypot(b.vx, b.vy) || 1, ux = b.vx / v, uy = b.vy / v;
+      ctx.save(); ctx.lineCap = "round";
+      // la scia lunga, a strati
+      for (const [lung, w, al] of [[90, 14, 0.18], [60, 8, 0.35], [36, 3.5, 0.9]]) {
+        const g = ctx.createLinearGradient(b.x, b.y, b.x - ux * lung * S, b.y - uy * lung * S);
+        g.addColorStop(0, al === 0.9 ? "#e6fff0" : VERDE); g.addColorStop(1, "rgba(61,255,138,0)");
+        ctx.globalAlpha = al; ctx.strokeStyle = g; ctx.lineWidth = w * S;
+        ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - ux * lung * S, b.y - uy * lung * S); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      // la sfera, con un cuore bianco e un teschio di luce dentro
+      const r = (8 + Math.sin(b.fase * 0.6) * 1.2) * S;
+      const g = ctx.createRadialGradient(b.x, b.y, 1, b.x, b.y, r * 2.2);
+      g.addColorStop(0, "#ffffff"); g.addColorStop(0.3, VERDE); g.addColorStop(1, "rgba(61,255,138,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, r * 2.2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = VERDE_SCURO; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.arc(b.x, b.y - 0.6 * S, r * 0.42, 0, Math.PI * 2); ctx.fill();
+      ctx.fillRect(b.x - r * 0.24, b.y + r * 0.1, r * 0.48, r * 0.3);
+      ctx.globalAlpha = 1; tondo(b.x - r * 0.16, b.y - 0.8 * S, r * 0.1, "#eafff2"); tondo(b.x + r * 0.16, b.y - 0.8 * S, r * 0.1, "#eafff2");
+      // i fulmini che gli girano intorno
+      ctx.strokeStyle = "#b8ffd4"; ctx.lineWidth = 1 * S;
+      for (let i = 0; i < 3; i++) {
+        const a = b.fase * 0.4 + i * 2.1; let x = b.x, y = b.y; ctx.beginPath(); ctx.moveTo(x, y);
+        for (let j = 1; j <= 3; j++) { x = b.x + Math.cos(a + j * 0.3) * r * (0.8 + j * 0.5) + caso(-2, 2) * S; y = b.y + Math.sin(a + j * 0.3) * r * (0.8 + j * 0.5) + caso(-2, 2) * S; ctx.lineTo(x, y); }
+        ctx.stroke();
+      }
+      ctx.restore();
+      return true;
+    }
+    return false;
   }
   // Il gelo: chi lo prende resta in un blocco di ghiaccio, fermo com'era. Il
   // blocco cade e si appoggia sul piede più basso; un colpo lo manda in pezzi.
@@ -7378,13 +7750,52 @@
   }
   function disegnaBacchetta(f) {
     if ((f.staccati && f.staccati.A) || f.tel || f.arma) return;
-    const m = f.p.manoA, q = puntaBacchetta(f), col = COLORI_ANIME[f.tipo], lancia = !!INCANTI[f.azione];
-    linea(m, q, 2.1 * S, "#5a3a1e");
-    linea({ x: m.x + (q.x - m.x) * 0.72, y: m.y + (q.y - m.y) * 0.72 }, q, 1.5 * S, "#f3e3c2");
+    const m = f.p.manoA, q = puntaBacchetta(f), lancia = !!INCANTI[f.azione];
+    const col = f.azione === "smeraldo" ? VERDE : COLORI_ANIME[f.tipo];
+    // Il legno intagliato: l'impugnatura scura con le legature, il fusto chiaro che si assottiglia.
+    const at = (k) => ({ x: m.x + (q.x - m.x) * k, y: m.y + (q.y - m.y) * k });
+    linea(at(-0.12), q, 3.2 * S, NERO);
+    linea(at(-0.12), at(0.3), 2.6 * S, "#3e2614");
+    linea(at(0.3), q, 1.8 * S, "#8a5a2e");
+    linea(at(0.55), q, 1 * S, "#f3e3c2");
+    for (const k of [0.02, 0.12, 0.22]) { const a = at(k), b = at(k + 0.05); linea(a, b, 3 * S, "#c9a24a"); }
     ctx.save();
-    ctx.globalAlpha = lancia ? 0.55 : 0.3; tondo(q.x, q.y, (lancia ? 4.5 + Math.sin(passi * 0.6) : 2.6) * S, col);
-    ctx.globalAlpha = 1; tondo(q.x, q.y, 1.3 * S, "#ffffff");
+    // il cristallo in punta, che si accende quando lancia
+    const r = (lancia ? 4.6 + Math.sin(passi * 0.6) : 2.8) * S;
+    const g = ctx.createRadialGradient(q.x, q.y, 0.5, q.x, q.y, r * 1.8);
+    g.addColorStop(0, "#ffffff"); g.addColorStop(0.35, col); g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.globalAlpha = lancia ? 0.9 : 0.55; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.x, q.y, r * 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    const ang = Math.atan2(q.y - m.y, q.x - m.x);
+    ctx.translate(q.x, q.y); ctx.rotate(ang);
+    ctx.fillStyle = col; ctx.strokeStyle = NERO; ctx.lineWidth = 0.7 * S;
+    ctx.beginPath(); ctx.moveTo(-1.2 * S, -1.4 * S); ctx.lineTo(2.6 * S, 0); ctx.lineTo(-1.2 * S, 1.4 * S); ctx.lineTo(-2.2 * S, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    if (lancia) {
+      // il bagliore a quattro punte che gira
+      ctx.rotate(passi * 0.15); ctx.strokeStyle = "#ffffff"; ctx.globalAlpha = 0.8; ctx.lineWidth = 1 * S; ctx.beginPath();
+      for (let i = 0; i < 4; i++) { const a = (i * Math.PI) / 2; ctx.moveTo(Math.cos(a) * 2 * S, Math.sin(a) * 2 * S); ctx.lineTo(Math.cos(a) * (6 + Math.sin(passi * 0.5)) * S, Math.sin(a) * (6 + Math.sin(passi * 0.5)) * S); }
+      ctx.stroke();
+    }
     ctx.restore();
+  }
+  // Tre lucine che girano piano intorno al mago, del colore dei suoi ricami.
+  function scintilleMago(f) {
+    if (f.esploso || f.ko > 0) return;
+    const b = f.p.bacino, A = aspetto(f), bordo = formaDi(f) ? coloreAnime(f) : A.bordo;
+    ctx.save();
+    for (let i = 0; i < 3; i++) {
+      const a = passi * 0.035 + (i * Math.PI * 2) / 3, x = b.x + Math.cos(a) * 20 * S, y = b.y - 16 * S + Math.sin(a * 1.7) * 14 * S;
+      ctx.globalAlpha = 0.25 + 0.35 * (0.5 + 0.5 * Math.sin(passi * 0.2 + i * 2));
+      tondo(x, y, 2.4 * S, bordo); ctx.globalAlpha = 0.9; tondo(x, y, 0.8 * S, "#ffffff");
+    }
+    ctx.restore();
+  }
+  // La ginocchiera del duellante.
+  function ginocchiera(g, A, bordo, lontano) {
+    const col = lontano ? scuro(scuro(A.tuta)) : scuro(A.tuta);
+    ctx.fillStyle = col; ctx.strokeStyle = NERO; ctx.lineWidth = 1 * S;
+    ctx.beginPath(); ctx.arc(g.x, g.y, 3.4 * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = lontano ? scuro(bordo) : bordo; ctx.lineWidth = 0.9 * S; ctx.beginPath(); ctx.arc(g.x, g.y, 2 * S, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
   }
   // In volo i maghi stanno a cavallo di una scopa.
   function disegnaScopa(f) {
@@ -7765,21 +8176,28 @@
       ctx.strokeStyle = bordo; ctx.lineWidth = 1.6 * S; ctx.beginPath(); ctx.moveTo(-d * 6.6 * S, -6.6 * S); ctx.lineTo(-d * 8.8 * S, -2.6 * S); ctx.stroke();
     } else if (A.testa === "cappello") {
       if (A.barba) {
-        // Una barba bianca a punta, coi baffi.
+        // Una barba bianca a punta, a ciocche, coi baffi arricciati e le sopracciglia folte.
         ctx.fillStyle = A.capelli; ctx.beginPath(); ctx.moveTo(-d * 4.6 * S, 1.6 * S); ctx.quadraticCurveTo(d * 2 * S, 3.4 * S, d * 7.6 * S, 1.2 * S);
-        ctx.quadraticCurveTo(d * 6.4 * S, 10 * S, d * 2.4 * S + lag * 0.5, 16 * S); ctx.quadraticCurveTo(-d * 2.6 * S, 9 * S, -d * 4.6 * S, 1.6 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.quadraticCurveTo(d * 6.4 * S, 10 * S, d * 2.4 * S + lag * 0.5, 17 * S); ctx.quadraticCurveTo(-d * 2.6 * S, 9 * S, -d * 4.6 * S, 1.6 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = "rgba(0,0,0,.18)"; ctx.lineWidth = 0.8 * S; ctx.beginPath();
+        for (const k of [0, 1, 2]) { ctx.moveTo(d * (0.5 + 2.2 * k) * S, 4 * S); ctx.quadraticCurveTo(d * (1 + 1.6 * k) * S, 9 * S, d * (2 + 0.8 * k) * S + lag * 0.4, (13 - k) * S); }
+        ctx.stroke();
+        ctx.fillStyle = A.capelli; ctx.strokeStyle = nero; ctx.lineWidth = 0.8 * S;
+        for (const lato of [-1, 1]) {
+          ctx.beginPath(); ctx.moveTo(d * 3.4 * S, 3 * S); ctx.quadraticCurveTo(d * (3.4 + lato * 3.4) * S, 2 * S, d * (3.4 + lato * 4.6) * S, 4.4 * S);
+          ctx.quadraticCurveTo(d * (3.4 + lato * 2.4) * S, 4 * S, d * 3.4 * S, 4.2 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.ellipse(lato * 2.8 * S + d * 1.2 * S, -3.6 * S, 2 * S, 0.9 * S, lato * d * 0.25, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
       } else {
         // La frangia.
         ctx.beginPath(); ctx.moveTo(d * 7.7 * S, -2.2 * S); ctx.quadraticCurveTo(d * 2 * S, -6.4 * S, -d * 7.9 * S, -3.4 * S);
         ctx.lineTo(-d * 7.4 * S, -5.6 * S); ctx.lineTo(d * 7 * S, -5.6 * S); ctx.closePath(); ctx.fill();
       }
-      // Il cappello a punta, con la falda larga, la fascia e una stella.
-      ctx.fillStyle = A.cappello; ctx.strokeStyle = nero; ctx.lineWidth = 1 * S;
-      ctx.beginPath(); ctx.moveTo(-7.4 * S, -5.4 * S); ctx.quadraticCurveTo(-d * 2 * S, -15 * S, -d * 4.6 * S + lag, -25 * S + sv);
-      ctx.quadraticCurveTo(d * 3 * S, -15 * S, 7.4 * S, -5.4 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(0, -5.4 * S, 13 * S, 2.8 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.strokeStyle = bordo; ctx.lineWidth = 1.8 * S; ctx.beginPath(); ctx.moveTo(-6.4 * S, -7.6 * S); ctx.quadraticCurveTo(0, -6.2 * S, 6.4 * S, -7.6 * S); ctx.stroke();
-      stella(-d * 1 * S, -12.6 * S, 1.9 * S, bordo);
+      if (A.codini) {
+        // Le lentiggini di Ortica.
+        for (const [x, y] of [[4.2, 2.4], [5.6, 1.6], [5.2, 3.4]]) tondo(d * x * S, y * S, 0.45 * S, "rgba(140,70,40,.55)");
+      }
+      cappelloMago(f, A, bordo, lag, sv);
     } else if (A.testa === "visiera") {
       // Capelli corti e scuri, tirati su.
       ctx.beginPath(); ctx.moveTo(d * 7.6 * S, -4.4 * S); ctx.quadraticCurveTo(d * 5 * S, -11.4 * S, -d * 3 * S, -10.4 * S);
@@ -7790,6 +8208,119 @@
       ctx.quadraticCurveTo(-d * 10.6 * S, -9 * S, -d * 9.6 * S, 5.4 * S + sv * 0.4); ctx.lineTo(-d * 5.2 * S, 5 * S);
       ctx.quadraticCurveTo(-d * 5.4 * S, -3.4 * S, d * 1 * S, -4.6 * S); ctx.quadraticCurveTo(d * 5 * S, -4.4 * S, d * 7.8 * S, -2 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
     }
+  }
+  // ·· L'ASPETTO RIFATTO (10/10/2026, su richiesta: «migliora l'aspetto di maghi, duellanti e
+  // combattenti») ·· Arti col contorno, testa con orecchio, naso e un'ombra, scarpe per stile,
+  // e per ognuno i suoi dettagli: la tunica ricamata e il cappello piegato dei maghi, la corazza
+  // a piastre dei duellanti, la casacca annodata dei combattenti.
+  function artoBordato(a, b, c, sp, col) { arto(a, b, c, sp + 2 * S, NERO); arto(a, b, c, sp, col); }
+  // La manica larga dei maghi: si apre dal gomito al polso, con l'orlo ricamato.
+  function manicaLarga(gomito, mano, col, orlo) {
+    const L = Math.hypot(mano.x - gomito.x, mano.y - gomito.y) || 1, ux = (mano.x - gomito.x) / L, uy = (mano.y - gomito.y) / L, nx = -uy, ny = ux;
+    const fine = { x: mano.x - ux * 1.5 * S, y: mano.y - uy * 1.5 * S }, w0 = 3 * S, w1 = 6.4 * S;
+    ctx.fillStyle = col; ctx.strokeStyle = NERO; ctx.lineWidth = 1 * S; ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(gomito.x + nx * w0, gomito.y + ny * w0); ctx.lineTo(fine.x + nx * w1, fine.y + ny * w1);
+    ctx.quadraticCurveTo(fine.x + ux * 2.4 * S, fine.y + uy * 2.4 * S, fine.x - nx * w1, fine.y - ny * w1);
+    ctx.lineTo(gomito.x - nx * w0, gomito.y - ny * w0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = orlo; ctx.lineWidth = 1.4 * S; ctx.beginPath();
+    ctx.moveTo(fine.x + nx * w1 * 0.92 - ux * 1.6 * S, fine.y + ny * w1 * 0.92 - uy * 1.6 * S);
+    ctx.lineTo(fine.x - nx * w1 * 0.92 - ux * 1.6 * S, fine.y - ny * w1 * 0.92 - uy * 1.6 * S); ctx.stroke();
+  }
+  // Il bracciale del duellante sull'avambraccio, con la riga accesa.
+  function bracciale(gomito, mano, col, luce) {
+    const a = { x: gomito.x + (mano.x - gomito.x) * 0.38, y: gomito.y + (mano.y - gomito.y) * 0.38 }, b = { x: gomito.x + (mano.x - gomito.x) * 0.82, y: gomito.y + (mano.y - gomito.y) * 0.82 };
+    linea(a, b, 7.4 * S, NERO); linea(a, b, 5.6 * S, col);
+    ctx.globalAlpha = 0.9; linea(a, b, 1.2 * S, luce); ctx.globalAlpha = 1;
+  }
+  // Le scarpe, una per stile: stivali col risvolto, babbucce a punta arricciata, stivali corazzati.
+  function scarpa(f, piede, A, bordo, lontano) {
+    const d = f.dir, x = piede.x + d * 1.4 * S, y = piede.y - 0.4 * S, col = lontano ? scuro(A.scarpe) : A.scarpe;
+    ctx.save(); ctx.translate(x, y); ctx.scale(d, 1);
+    ctx.fillStyle = col; ctx.strokeStyle = NERO; ctx.lineWidth = 1 * S; ctx.lineJoin = "round";
+    if (stile === "maghi") {
+      ctx.beginPath(); ctx.moveTo(-4 * S, 2 * S); ctx.lineTo(-4.2 * S, -2.2 * S); ctx.quadraticCurveTo(0, -3.4 * S, 3 * S, -1.6 * S);
+      ctx.quadraticCurveTo(6.4 * S, -1.2 * S, 7.6 * S, -4 * S); ctx.quadraticCurveTo(8.6 * S, -1 * S, 5.4 * S, 2.2 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
+      tondo(7.6 * S, -4.2 * S, 0.9 * S, bordo);
+    } else if (stile === "lame") {
+      rettangoloTondo(-4.4 * S, -4.6 * S, 9.4 * S, 6.8 * S, 2.4 * S); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = bordo; ctx.lineWidth = 1.1 * S; ctx.beginPath(); ctx.moveTo(-3.4 * S, -1.6 * S); ctx.lineTo(4 * S, -1.6 * S); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.ellipse(0.6 * S, 0, 4.8 * S, 2.7 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = bordo; rettangoloTondo(-3.6 * S, -4.6 * S, 6 * S, 2.6 * S, 1 * S); ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // La tunica lunga dei maghi: svasata, con l'orlo che ondeggia, le pieghe e i ricami.
+  function tunica(f, p, A, bordo, ginA, ginD) {
+    const d = f.dir;
+    const ord = [[ginA, p.piedeA], [ginD, p.piedeD]].sort((u, v) => (u[0].x - v[0].x) * d);
+    const giu = ([g, pd]) => ({ x: g.x + (pd.x - g.x) * 0.62, y: g.y + (pd.y - g.y) * 0.62 });
+    const dietro = giu(ord[0]), davanti = giu(ord[1]);
+    const t0 = { x: p.bacino.x - d * 8.5 * S, y: p.bacino.y - 5 * S }, t1 = { x: p.bacino.x + d * 8.5 * S, y: p.bacino.y - 5 * S };
+    const hF = { x: davanti.x + d * 8 * S, y: davanti.y }, hB = { x: dietro.x - d * 8 * S, y: dietro.y };
+    const orlo = [];
+    for (let i = 0; i <= 10; i++) {
+      const k = i / 10;
+      orlo.push({ x: hF.x + (hB.x - hF.x) * k, y: hF.y + (hB.y - hF.y) * k + Math.sin(k * Math.PI * 4 + passi * 0.12) * 1.3 * S });
+    }
+    const g = ctx.createLinearGradient(0, t0.y, 0, Math.max(hF.y, hB.y));
+    g.addColorStop(0, mix(A.tuta, "#ffffff", 0.14)); g.addColorStop(1, scuro(A.tuta));
+    ctx.fillStyle = g; ctx.strokeStyle = NERO; ctx.lineWidth = 1 * S; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(t0.x, t0.y); ctx.lineTo(t1.x, t1.y);
+    ctx.quadraticCurveTo(t1.x + d * 4 * S, (t1.y + hF.y) / 2, hF.x, hF.y);
+    for (const q of orlo) ctx.lineTo(q.x, q.y);
+    ctx.quadraticCurveTo(t0.x - d * 4 * S, (t0.y + hB.y) / 2, t0.x, t0.y);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // le pieghe
+    ctx.strokeStyle = "rgba(0,0,0,.2)"; ctx.lineWidth = 1 * S; ctx.beginPath();
+    for (const k of [0.3, 0.55, 0.78]) {
+      const q = orlo[Math.round(k * 10)], tx = t1.x + (t0.x - t1.x) * k;
+      ctx.moveTo(tx, t0.y + 3 * S); ctx.quadraticCurveTo(tx + (q.x - tx) * 0.4 + d * 1.5 * S, (t0.y + q.y) / 2, q.x, q.y - 1.5 * S);
+    }
+    ctx.stroke();
+    // l'orlo ricamato, coi puntini
+    ctx.strokeStyle = bordo; ctx.lineWidth = 1.7 * S; ctx.beginPath();
+    orlo.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y - 1.8 * S) : ctx.moveTo(q.x, q.y - 1.8 * S))); ctx.stroke();
+    for (let i = 1; i < orlo.length; i += 2) tondo(orlo[i].x, orlo[i].y - 4 * S, 0.7 * S, bordo);
+    // i ricami: due stelle e una luna
+    const cx = (t0.x + t1.x) / 2, cy = (t0.y + Math.min(hF.y, hB.y)) / 2;
+    stella(cx + d * 2 * S, cy - 1 * S, 1.8 * S, bordo); stella(cx - d * 3.4 * S, cy + 4 * S, 1.2 * S, bordo);
+    luna(cx + d * 4.4 * S, cy + 5.6 * S, 1.8 * S, bordo, scuro(A.tuta), d);
+  }
+  function luna(x, y, r, col, fondo, d) {
+    tondo(x, y, r, col); tondo(x + d * r * 0.5, y - r * 0.25, r * 0.85, fondo);
+  }
+  // Il cappello dei maghi, nel riferimento della testa: punta piegata all'indietro, fibbia, luna e stelle.
+  function cappelloMago(f, A, bordo, lag, sv) {
+    const d = f.dir, lg = lag * d;
+    ctx.save(); ctx.scale(d, 1); ctx.lineJoin = "round";
+    const g = ctx.createLinearGradient(-6 * S, -26 * S, 6 * S, -5 * S);
+    g.addColorStop(0, mix(A.cappello, "#ffffff", 0.18)); g.addColorStop(1, scuro(A.cappello));
+    ctx.fillStyle = g; ctx.strokeStyle = NERO; ctx.lineWidth = 1 * S;
+    const punta = { x: -8 * S + lg, y: -26.5 * S + sv };
+    ctx.beginPath();
+    ctx.moveTo(-7.6 * S, -5.6 * S);
+    ctx.quadraticCurveTo(-5 * S, -14 * S, -2.8 * S, -18.6 * S);
+    ctx.quadraticCurveTo(-2.4 * S, -23.5 * S, punta.x, punta.y);
+    ctx.quadraticCurveTo(-0.6 * S, -21.6 * S, 1.8 * S, -17.6 * S);
+    ctx.quadraticCurveTo(4.8 * S, -12 * S, 7.6 * S, -5.6 * S);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // la piega
+    ctx.strokeStyle = "rgba(0,0,0,.3)"; ctx.beginPath(); ctx.moveTo(-2.8 * S, -18.6 * S); ctx.quadraticCurveTo(-0.4 * S, -17.4 * S, 1.8 * S, -17.6 * S); ctx.stroke();
+    // la fascia con la fibbia
+    ctx.fillStyle = scuro(A.cappello); ctx.strokeStyle = NERO;
+    ctx.beginPath(); ctx.moveTo(-7.1 * S, -6.6 * S); ctx.quadraticCurveTo(0, -5.4 * S, 7.1 * S, -6.6 * S); ctx.lineTo(6.4 * S, -9.2 * S); ctx.quadraticCurveTo(0, -8 * S, -6.4 * S, -9.2 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = bordo; ctx.lineWidth = 1.2 * S; ctx.strokeRect(1.2 * S, -9 * S, 2.8 * S, 2.6 * S);
+    // luna e stelle
+    luna(-1.4 * S, -13.2 * S, 2 * S, bordo, A.cappello, 1);
+    stella(1.6 * S, -11.4 * S, 1.2 * S, bordo);
+    stella(punta.x, punta.y, (1.3 + 0.4 * Math.sin(passi * 0.2)) * S, bordo);
+    // la falda: sotto più scura, sopra un filo di luce
+    ctx.fillStyle = scuro(A.cappello); ctx.strokeStyle = NERO; ctx.lineWidth = 1 * S;
+    ctx.beginPath(); ctx.ellipse(0, -5.2 * S, 13.6 * S, 3 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,.25)"; ctx.beginPath(); ctx.ellipse(0, -5.6 * S, 12 * S, 2 * S, 0, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    ctx.restore();
   }
   function disegnaUmano(f) {
     const p = f.p, A = aspetto(f), st = f.staccati || {}, nero = "#17171c", d = f.dir, [ginA, ginD] = ginocchia(f);
@@ -7808,30 +8339,22 @@
     if (cavaliere) mantello(f, p, "#1a1b22");
     if (sup) chiomaSuper(f, crine, scuro(crine));
     // Gamba e braccio lontani.
-    if (!st.gD) arto(p.bacino, ginD, p.piedeD, (sup ? 6.6 : 5) * S, scuro(A.gambe));
+    const gamba = (sup ? 6.6 : stile === "guerrieri" ? 5.6 : 5) * S;
+    if (!st.gD) { artoBordato(p.bacino, ginD, p.piedeD, gamba, scuro(A.gambe)); if (stile === "lame") ginocchiera(ginD, A, bordo, true); }
     if (!st.D) {
       // Trasformato: braccia più grosse, avambraccio pieno, pugno grande.
-      arto(p.collo, p.gomitoD, p.manoD, (sup ? 6 : 4.2) * S, scuro(A.maniche));
+      artoBordato(p.collo, p.gomitoD, p.manoD, (sup ? 6 : 4.2) * S, scuro(A.maniche));
       if (sup) linea(p.gomitoD, p.manoD, 7 * S, scuro(mix(A.pelle, "#ffffff", 0.1)));
+      if (A.veste) manicaLarga(p.gomitoD, p.manoD, scuro(A.tuta), scuro(bordo));
+      if (stile === "lame" && !cavaliere) bracciale(p.gomitoD, p.manoD, scuro(scuro(A.tuta)), scuro(bordo));
       pugno(p.gomitoD, p.manoD, A, scuro(bordo), true, sup);
     }
-    if (!st.gA) arto(p.bacino, ginA, p.piedeA, (sup ? 6.6 : 5) * S, A.gambe);
+    if (!st.gA) { artoBordato(p.bacino, ginA, p.piedeA, gamba, A.gambe); if (stile === "lame") ginocchiera(ginA, A, bordo, false); }
     // Le scarpe.
-    for (const piede of [p.piedeD, p.piedeA]) {
-      if ((piede === p.piedeD && st.gD) || (piede === p.piedeA && st.gA)) continue;
-      ctx.fillStyle = A.scarpe; ctx.strokeStyle = nero; ctx.lineWidth = 1 * S;
-      ctx.beginPath(); ctx.ellipse(piede.x + d * 1.4 * S, piede.y - 0.4 * S, 4.4 * S, 2.6 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    }
+    if (!st.gD) scarpa(f, p.piedeD, A, scuro(bordo), true);
+    if (!st.gA) scarpa(f, p.piedeA, A, bordo, false);
     // La veste lunga dei maghi segue le ginocchia.
-    if (A.veste) {
-      const ord = [[ginA, p.piedeA], [ginD, p.piedeD]].sort((u, v) => (u[0].x - v[0].x) * d);
-      const giu = ([g, pd]) => ({ x: g.x + (pd.x - g.x) * 0.5, y: g.y + (pd.y - g.y) * 0.5 });
-      const dietro = giu(ord[0]), davanti = giu(ord[1]);
-      ctx.fillStyle = A.tuta; ctx.strokeStyle = nero; ctx.lineWidth = 1 * S; ctx.lineJoin = "round"; ctx.beginPath();
-      ctx.moveTo(p.bacino.x - d * 8 * S, p.bacino.y - 4 * S); ctx.lineTo(p.bacino.x + d * 8 * S, p.bacino.y - 4 * S);
-      ctx.lineTo(davanti.x + d * 5.5 * S, davanti.y); ctx.lineTo(dietro.x - d * 5.5 * S, dietro.y); ctx.closePath(); ctx.fill(); ctx.stroke();
-      linea({ x: dietro.x - d * 5 * S, y: dietro.y - 1.4 * S }, { x: davanti.x + d * 5 * S, y: davanti.y - 1.4 * S }, 1.6 * S, bordo);
-    }
+    if (A.veste) tunica(f, p, A, bordo, ginA, ginD);
     // Il busto.
     const ang = Math.atan2(p.bacino.y - p.collo.y, p.bacino.x - p.collo.x) - Math.PI / 2;
     const lung = Math.hypot(p.bacino.x - p.collo.x, p.bacino.y - p.collo.y);
@@ -7885,21 +8408,58 @@
     ctx.strokeStyle = bordo; ctx.lineCap = "round"; ctx.lineWidth = 1.6 * S; ctx.beginPath();
     if (sup) { /* la casacca strappata se l'è già disegnata */ }
     else if (stile === "guerrieri") {
-      // La casacca incrociata e la fascia in vita, annodata.
-      ctx.moveTo(-5 * S, -lung / 2 - 2 * S); ctx.lineTo(d * 3 * S, lung / 2 - 6 * S);
-      ctx.moveTo(5 * S, -lung / 2 - 2 * S); ctx.lineTo(d * 0.5 * S, -lung / 2 + 5 * S); ctx.stroke();
-      ctx.fillStyle = bordo; ctx.fillRect(-7.6 * S, lung / 2 - 5.4 * S, 15.2 * S, 2.8 * S);
-      ctx.fillRect(-d * 4.4 * S - 1 * S, lung / 2 - 4.6 * S, 2 * S, 7.5 * S);
+      // La casacca: la maglia scura sotto lo scollo a V, il risvolto incrociato, lo stemma e la
+      // cintura annodata, con le due code che sventolano dietro.
+      const alto = -lung / 2 - 3 * S, basso = lung / 2 + 4 * S;
+      ctx.fillStyle = scuro(scuro(A.tuta)); ctx.beginPath();
+      ctx.moveTo(-4.6 * S, alto + 0.5 * S); ctx.lineTo(4.6 * S, alto + 0.5 * S); ctx.lineTo(d * 1.2 * S, alto + 10 * S); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = bordo; ctx.lineWidth = 2 * S;
+      ctx.beginPath(); ctx.moveTo(-d * 5 * S, alto + 0.5 * S); ctx.lineTo(d * 2.8 * S, basso - 9 * S); ctx.stroke();
+      ctx.lineWidth = 1.4 * S; ctx.beginPath(); ctx.moveTo(d * 5 * S, alto + 0.5 * S); ctx.lineTo(d * 1.2 * S, alto + 10 * S); ctx.stroke();
+      tondo(-d * 3.4 * S, alto + 8.5 * S, 2.6 * S, "#f4f1e6");
+      stella(-d * 3.4 * S, alto + 8.5 * S, 1.8 * S, scuro(A.tuta));
+      ctx.fillStyle = bordo; ctx.strokeStyle = nero; ctx.lineWidth = 1 * S;
+      rettangoloTondo(-8 * S, basso - 9.6 * S, 16 * S, 3.6 * S, 1.2 * S); ctx.fill(); ctx.stroke();
+      const sv = Math.sin(passi * 0.22) * 1.6 * S;
+      for (const k of [0, 1]) {
+        ctx.beginPath(); ctx.moveTo(-d * 3 * S, basso - 7.6 * S);
+        ctx.quadraticCurveTo(-d * (6 + 2 * k) * S, basso - 3 * S + sv * (k ? -1 : 1), -d * (8.5 + 3 * k) * S, basso + (2 + 2 * k) * S + sv);
+        ctx.lineTo(-d * (6.8 + 3 * k) * S, basso + (2.6 + 2 * k) * S + sv); ctx.quadraticCurveTo(-d * (4.6 + 2 * k) * S, basso - 3 * S, -d * 1.6 * S, basso - 7 * S);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+      ctx.beginPath(); ctx.arc(-d * 2.4 * S, basso - 7.8 * S, 1.7 * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     } else if (stile === "maghi") {
-      // Il cordone in vita e le stelle sulla veste.
-      ctx.moveTo(-7.6 * S, lung / 2 - 4 * S); ctx.lineTo(7.6 * S, lung / 2 - 4 * S); ctx.stroke();
-      stella(-d * 2.6 * S, -lung / 2 + 5.5 * S, 1.8 * S, bordo); stella(d * 3 * S, -lung / 2 + 11 * S, 1.3 * S, bordo);
-    } else {
-      // La giacca del duellante: una riga accesa e lo spallaccio.
-      ctx.moveTo(d * 1.5 * S, -lung / 2 - 1.5 * S); ctx.lineTo(d * 1.5 * S, lung / 2 + 2 * S); ctx.stroke();
+      // Lo scollo bordato, la spilla a luna, il cordone in vita con la nappa che penzola.
+      const alto = -lung / 2 - 3 * S;
+      ctx.lineWidth = 1.7 * S; ctx.beginPath();
+      ctx.moveTo(-5 * S, alto + 0.8 * S); ctx.quadraticCurveTo(d * 0.5 * S, alto + 8 * S, 5 * S, alto + 0.8 * S); ctx.stroke();
+      luna(d * 2.2 * S, alto + 6.6 * S, 1.6 * S, bordo, A.tuta, d);
+      stella(-d * 3 * S, -lung / 2 + 11 * S, 1.3 * S, bordo);
+      ctx.lineWidth = 2 * S; ctx.beginPath(); ctx.moveTo(-7.6 * S, lung / 2 - 4 * S); ctx.quadraticCurveTo(0, lung / 2 - 2.6 * S, 7.6 * S, lung / 2 - 4 * S); ctx.stroke();
+      const sv = Math.sin(passi * 0.2) * 1.2 * S;
+      ctx.lineWidth = 1.1 * S; ctx.beginPath(); ctx.moveTo(d * 3 * S, lung / 2 - 3.4 * S); ctx.lineTo(d * 3.6 * S + sv, lung / 2 + 5 * S); ctx.stroke();
+      tondo(d * 3.6 * S + sv, lung / 2 + 5.8 * S, 1.3 * S, bordo);
+    } else if (!cavaliere) {
+      // La corazza del duellante: piastre sul petto con la linea accesa, la cintura con la
+      // fibbia luminosa e lo spallaccio curvo coi ribattini.
+      const alto = -lung / 2 - 3 * S, basso = lung / 2 + 4 * S;
+      const g = ctx.createLinearGradient(-6 * S, alto, 6 * S, basso);
+      g.addColorStop(0, mix(scuro(A.tuta), "#ffffff", 0.22)); g.addColorStop(1, scuro(scuro(A.tuta)));
+      ctx.fillStyle = g; ctx.strokeStyle = nero; ctx.lineWidth = 1 * S;
+      rettangoloTondo(-6.6 * S, alto + 2 * S, 13.2 * S, lung - 2 * S, 3.4 * S); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.beginPath();
+      for (const k of [0.42, 0.66]) { ctx.moveTo(-6 * S, alto + lung * k); ctx.quadraticCurveTo(0, alto + lung * k + 1.6 * S, 6 * S, alto + lung * k); }
+      ctx.stroke();
+      ctx.globalAlpha = 0.35; ctx.strokeStyle = bordo; ctx.lineWidth = 4 * S;
+      ctx.beginPath(); ctx.moveTo(d * 1.5 * S, alto + 3 * S); ctx.lineTo(d * 1.5 * S, basso - 7 * S); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.lineWidth = 1.4 * S; ctx.stroke();
+      ctx.fillStyle = "#1b1e27"; ctx.fillRect(-7.6 * S, basso - 8.6 * S, 15.2 * S, 2.8 * S);
+      ctx.fillStyle = bordo; ctx.fillRect(d * 0.2 * S, basso - 8.9 * S, 2.6 * S, 3.4 * S);
       ctx.fillStyle = scuro(A.tuta); ctx.strokeStyle = nero; ctx.lineWidth = 1 * S;
-      rettangoloTondo(-8.6 * S, -lung / 2 - 4 * S, 17.2 * S, 5.4 * S, 2.6 * S); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = "#1b1e27"; ctx.fillRect(-7.6 * S, lung / 2 - 4.6 * S, 15.2 * S, 2.2 * S);
+      ctx.beginPath(); ctx.moveTo(-9.6 * S, alto + 5 * S); ctx.quadraticCurveTo(-9.4 * S, alto - 2.4 * S, 0, alto - 2.6 * S);
+      ctx.quadraticCurveTo(9.4 * S, alto - 2.4 * S, 9.6 * S, alto + 5 * S); ctx.quadraticCurveTo(0, alto + 2 * S, -9.6 * S, alto + 5 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = bordo; ctx.lineWidth = 1 * S; ctx.beginPath(); ctx.moveTo(-8.4 * S, alto + 3.8 * S); ctx.quadraticCurveTo(0, alto + 1.2 * S, 8.4 * S, alto + 3.8 * S); ctx.stroke();
+      for (const x of [-5.5, 0, 5.5]) tondo(x * S, alto - 0.4 * S, 0.7 * S, "#c9cfda");
     }
     disegnaSegni(f, "busto");
     ctx.restore();
@@ -7909,8 +8469,16 @@
     if (!sup) capoUmano(f, A, bordo, true);                        // trasformato, i capelli sono la cresta
     else crestaSuper(f, crine, d);
     ctx.fillStyle = A.pelle; ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
-    ctx.beginPath(); ctx.arc(0, 0, 8 * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 8 * S, 0, Math.PI * 2); ctx.fill();
+    // un'ombra sulla nuca e sotto il mento, e il naso che sporge appena
+    const om = ctx.createRadialGradient(d * 2.5 * S, -2.5 * S, 2 * S, 0, 0, 8.4 * S);
+    om.addColorStop(0, "rgba(0,0,0,0)"); om.addColorStop(1, "rgba(0,0,0,.18)");
+    ctx.fillStyle = om; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = A.pelle; ctx.beginPath(); ctx.arc(d * 7.4 * S, 1.4 * S, 1.5 * S, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(d * 7.4 * S, 1.4 * S, 1.5 * S, d > 0 ? -Math.PI / 2 : Math.PI / 2, d > 0 ? Math.PI / 2 : Math.PI * 1.5); ctx.stroke();
     facciaUmana(f, A, acceso ? coloreAnime(f) : null);
+    // l'orecchio (i capelli davanti lo coprono, se ci arrivano)
+    ctx.fillStyle = mix(A.pelle, "#000000", 0.06); ctx.beginPath(); ctx.ellipse(-d * 1.6 * S, 0.8 * S, 1.6 * S, 2.3 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     disegnaSegni(f, "testa");
     if (!sup) capoUmano(f, A, bordo, false);
     if (cavaliere) {
@@ -7933,8 +8501,10 @@
     ctx.restore();
     // Il braccio vicino.
     if (!st.A) {
-      arto(p.collo, p.gomitoA, p.manoA, (sup ? 6 : 4.2) * S, A.maniche);
+      artoBordato(p.collo, p.gomitoA, p.manoA, (sup ? 6 : 4.2) * S, A.maniche);
       if (sup) linea(p.gomitoA, p.manoA, 7 * S, mix(A.pelle, "#ffffff", 0.1));
+      if (A.veste) manicaLarga(p.gomitoA, p.manoA, A.tuta, bordo);
+      if (stile === "lame" && !cavaliere) bracciale(p.gomitoA, p.manoA, scuro(A.tuta), bordo);
       pugno(p.gomitoA, p.manoA, A, bordo, false, sup);
     }
     if (f.palla && !st.A) tondo(p.manoA.x, p.manoA.y - 3 * S, 3 * S, "#ffffff");
@@ -7944,7 +8514,7 @@
   function cambiaCorpi() {
     if (!lottatori.length) return;
     for (const t of telefoni) if (t.stato !== "libero") { t.stato = "libero"; t.da = null; t.ox = t.x; t.oy = t.y; }
-    proiettili = []; arti = []; pezzi = []; scie = []; fulmini = []; duello = 0; sfida = null;
+    proiettili = []; arti = []; pezzi = []; scie = []; fulmini = []; rune = []; cadute = []; duello = 0; sfida = null;
     presa.f = null; radiceHtml("remove", "ring-trascina");
     lottatori = lottatori.map((v) => {
       const x = Math.max(30 * S, Math.min(W - 30 * S, Number.isFinite(v.cx) ? v.cx : W / 2));
@@ -7984,7 +8554,7 @@
     if (stile === "maghi" && f.volo && f.jet > 0) disegnaScopa(f);
     if (stile === "lame") sciarpa(f);
     (stile ? disegnaUmano : f.tipo === "robot" ? disegnaRobot : disegnaMela)(f);
-    if (stile === "maghi") disegnaBacchetta(f);
+    if (stile === "maghi") { disegnaBacchetta(f); scintilleMago(f); }
     if (stile === "lame") disegnaLama(f);
     if (stile === "guerrieri" && f.forma > 0 && f.potenziato > 0) disegnaForma(f);
     if (stretto) ctx.restore();
@@ -8053,13 +8623,14 @@
   //   schiacciata   gli salta sopra da molto in alto: resta piatto come una frittella
   //   onda finale   (super guerrieri) un'onda a bruciapelo lo porta fino al bordo
   //   statua        (maghi) lo gela, poi una saetta e il ghiaccio va in pezzi
+  //   smeraldo      (maghi) la maledizione di smeraldo a bruciapelo: il raggio verde lo solleva e lo lascia giù
   //   taglio netto  (duellanti) uno scatto attraverso, un attimo fermi, poi cade
   // Quale round tocca lo decide un sacchetto di tre (uno sì, due no) mescolato:
   // se il round scelto finisce prima che la mossa si possa fare, vale per il
   // round dopo. Niente colpo finale sul punto che chiude la partita a dieci
   // (quello ha già la sua uscita di scena), né durante orda, scontro di
   // energie, terremoto o buco nero. Vale un K.O. come gli altri.
-  const FATALE = { ogni: 3, buio: 0.44, dove: { orbita: 27, flipper: 30, schiacciata: 62, onda: 92, statua: 110, taglio: 74, sferona: 150, meteora: 30, vortice: 96, crepa: 150 } };
+  const FATALE = { ogni: 3, buio: 0.44, dove: { orbita: 27, flipper: 30, schiacciata: 62, onda: 92, statua: 110, smeraldo: 150, taglio: 74, sferona: 150, meteora: 30, vortice: 96, crepa: 150 } };
   let fatale = null, fataleSacco = [], fataleRound = false, fataliFatti = 0, fataleBuio = 0, fataleDebito = 0, fataleVoluto = 0;
   function prossimoRoundFatale() {
     if (!fataleSacco.length) {
@@ -8094,7 +8665,7 @@
   function avviaFatale(da, a, tipo) {
     const scelte = [[2, "orbita"], [2, "flipper"], [2, "schiacciata"], [2.4, "sferona"], [2, "meteora"], [2.2, "vortice"], [2.2, "crepa"]];
     if (stile === "guerrieri") scelte.push([4, "onda"]);
-    if (stile === "maghi") scelte.push([4, "statua"]);
+    if (stile === "maghi") scelte.push([4, "statua"], [4, "smeraldo"]);
     if (lame() && lamaPronta(da)) scelte.push([4, "taglio"]);
     if (!tipo || !FATALE.dove[tipo]) tipo = scegli(scelte);
     fataleRound = false;
@@ -8665,6 +9236,25 @@
         if (m % 2 === 0) scintille(a.p.collo.x, a.p.collo.y, 3, COLORI_ANIME[da.tipo]);
       }
       if (m === parte + dura) { D.raggio = 0; da.azione = null; lasciaAndare(a, -dir * 2 * S, 0); F.fase = "fine"; F.m = 0; }
+    } else if (F.tipo === "smeraldo") {
+      const parte = 54, arriva = 64;
+      if (m === 0) { inizia(da, "smeraldo"); da.durata = 999; da.t = 2; D.base = a.base; scrivi("MALEDIZIONE DI SMERALDO!", da.p.bacino.x, da.p.testa.y - 46 * S, true); }
+      if (m < parte) { da.t = Math.round(SMERALDO.parte * m / parte); D.carica = m / parte; }
+      if (m === parte) { da.t = SMERALDO.parte; D.raggio = 1; scintille(puntaBacchetta(da).x, puntaBacchetta(da).y, 16, VERDE); scossa = Math.max(scossa, 10); }
+      if (m >= parte && m <= arriva) D.verso = (m - parte) / (arriva - parte);
+      if (m === arriva) {
+        colpo("SMERALDO!");
+        a.verde = 150; a.fatVola = true; a.fantasma = true; D.vy = -7 * S;
+        for (let i = 0; i < 2 && particelle.length < MAX_PARTICELLE; i++) particelle.push({ tipo: "onda", x: a.p.collo.x, y: a.p.collo.y, vx: 0, vy: 0, vita: 18 + i * 8, max: 18 + i * 8, colore: VERDE });
+        scintille(a.p.collo.x, a.p.collo.y, 20, VERDE);
+      }
+      if (m > arriva && D.raggio > 0) D.raggio = Math.max(0, D.raggio - 0.08);
+      if (a.fatVola) {
+        muoviTutto(a, dir * 1.4 * S, D.vy); ruotaTutto(a, 0.05 * dir); D.vy += 0.42 * S;
+        if (D.vy > 0 && a.p.bacino.y >= D.base - 14 * S) { a.fatVola = false; lasciaAndare(a, dir * 1.5 * S, 2 * S); a.ko = Math.max(a.ko, 140); scossa = Math.max(scossa, 10); polvere(a.cx, D.base - 1, 8); }
+      }
+      if (m === arriva + 8) da.azione = null;
+      if (m > arriva + 60 || (m > arriva + 10 && !a.fatVola && D.raggio <= 0 && m > arriva + 40)) { F.fase = "fine"; F.m = 0; }
     } else if (F.tipo === "statua") {
       if (m === 0) inizia(da, "gelo");
       if (m === 14) { a.azione = null; congela(a, da, a.p.collo.x, a.p.collo.y); if (!(a.gelato > 0)) { fineFatale(true); return; } a.gelato = 400; }
@@ -8789,6 +9379,20 @@
         ctx.beginPath(); ctx.moveTo(D.x0, y); ctx.lineTo(x1, a.p.collo.y); ctx.stroke();
       }
       ctx.globalAlpha = 0.8 * D.raggio; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(x1, a.p.collo.y, Math.max(0.5, spesso * 0.95), 0, Math.PI * 2); ctx.fill();
+    }
+    if (F.tipo === "smeraldo") {
+      const q = puntaBacchetta(da);
+      if (F.m < 54 && D.carica !== undefined) disegnaCaricaVerde(da, D.carica);
+      if (D.raggio > 0 && D.verso !== undefined) {
+        // Il raggio: dalla bacchetta fino a lui, a strati, con il cuore bianco.
+        const c = a.p.collo, ex = q.x + (c.x - q.x) * D.verso, ey = q.y + (c.y - q.y) * D.verso;
+        for (const [w, col, al] of [[16, VERDE, 0.25], [8, VERDE, 0.55], [3, "#f0fff5", 1]]) {
+          ctx.globalAlpha = al * D.raggio; ctx.strokeStyle = col; ctx.lineWidth = w * S;
+          ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(ex, ey); ctx.stroke();
+        }
+        ctx.globalAlpha = D.raggio; tondo(ex, ey, 9 * S, "rgba(61,255,138,.6)");
+        ctx.globalAlpha = 1;
+      }
     }
     if (F.tipo === "statua" && D.saetta > 0) {
       // La saetta che manda in pezzi la statua.
@@ -9549,7 +10153,7 @@
     if (lame()) controllaLame(a, b);
     controllaColpo(a, b); controllaColpo(b, a);
     colpoDaMano(a, b); colpoDaMano(b, a);
-    aggiornaLame(); aggiornaFulmini();
+    aggiornaLame(); aggiornaFulmini(); aggiornaMagie();
     aggiornaTelefoni(); aggiornaCreature(); aggiornaNubi(); aggiornaFinale(); aggiornaProiettili(); aggiornaParticelle(); aggiornaEventi(); aggiornaDanni();
     aggiornaArti(); aggiornaMeteo(); aggiornaSisma(); aggiornaMeteore(); aggiornaBuco(); aggiornaFatale(); aggiornaMira(); aggiornaCorsa(); aggiornaAudio(); aggiornaOrda(); aggiornaOnde(); aggiornaVite();
     if (anime) controllaScontro();
@@ -9628,7 +10232,8 @@
     return g;
   }
   function mix(c1, c2, k) {
-    const n = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+    // (anche un «rgb(…)» già mescolato: così `scuro(scuro(x))` funziona)
+    const n = (c) => c.charAt(0) === "#" ? [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)) : (c.match(/\d+(\.\d+)?/g) || [0, 0, 0]).slice(0, 3).map(Number);
     const A = n(c1), B = n(c2);
     return "rgb(" + A.map((v, i) => Math.round(v + (B[i] - v) * k)).join(",") + ")";
   }
@@ -10420,6 +11025,7 @@
       ctx.restore();
       return;
     }
+    if (disegnaMagia(b)) return;
     if (b.grande) { disegnaSferaGrande(b.x, b.y, b.r, b.colore); return; }
     if (b.disco) { if (b.lamaDi) disegnaLamaVolante(b); else disegnaDisco(b.x, b.y, 11 * S, b.colore); return; }
     if (b.incanto || b.stella) {
@@ -10739,6 +11345,7 @@
     for (const c of creature) disegnaCreatura(c);
     for (const t of telefoni) if (t.stato === "impugnato") disegnaTelefono(t);
     for (const a of arti) disegnaArto(a);
+    disegnaMagie();
     for (const b of proiettili) disegnaProiettile(b);
     disegnaLapilli(); disegnaMeteore(); disegnaBuco(); disegnaFatale();
     for (const z of fulmini) disegnaFulmine(z);
@@ -10916,6 +11523,7 @@
   const MOSSE_STILE = { trasforma: ["guerrieri", "trasforma"],
                         dardi: ["maghi", "raffica"], gelo: ["maghi", "gelo"], rimpicciolisci: ["maghi", "rimpicciolisci"], fulmine: ["maghi", "fulmine"],
                         levita: ["maghi", "levita"], scudo: ["maghi", "barriera"], raggio: ["maghi", "onda"], sparizione: ["maghi", "teletrasporto"],
+                        falene: ["maghi", "falene"], catene: ["maghi", "catene"], stelle: ["maghi", "stelle"], smeraldo: ["maghi", "smeraldo"],
                         "scatto-lama": ["lame", "scattoLama"], "lancio-lama": ["lame", "lancioLama"], duello: ["lame", "duello"] };
   const MOSSE_TENDINA = { sfera: "sfera", disco: "disco", lampo: "lampo", barriera: "barriera", autodistruzione: "avvinghia", telecinesi: "telecinesi" };
   const comandi = {
@@ -13301,6 +13909,8 @@
     stato: () => ({ telefoni: telefoni.map((t) => ({ x: t.x, y: t.y, stato: t.stato, tipo: t.tipo })),
     danniBordi: danniBordi.map((d) => d.lato), verso, barreVita, anime, stile, fulmini: fulmini.length, duello,
     tempo, pezzi: pezzi.length, proiettili: proiettili.length,
+    falene: proiettili.filter((b) => b.falena).length, comete: proiettili.filter((b) => b.cometa).length,
+    smeraldi: proiettili.filter((b) => b.incanto === "smeraldo").length, rune: rune.length,
     sfereGrandi: proiettili.filter((b) => b.grande && !b.razzo).length, razzi: proiettili.filter((b) => b.razzo).length, dischi: proiettili.filter((b) => b.disco).length, gettoni, scommessa: scommessa ? Object.assign({}, scommessa) : null,
     fatale: fatale ? { tipo: fatale.tipo, fase: fatale.fase, t: fatale.t, da: fatale.da.tipo, a: fatale.a.tipo, contato: fatale.contato,
                        r: fatale.d && fatale.d.r ? fatale.d.r : 0 } : null,
@@ -13347,7 +13957,7 @@
     arma: f.arma ? f.arma.tipo : null, tiene: !!f.tiene, tenuto: !!f.tenuto, paracadute: !!f.paracadute,
     ballo: f.azione === "balla" ? f.ballo : null, esploso: !!f.esploso,
     segni: f.segni ? f.segni.length : 0, staccati: Object.keys(f.staccati || {}).filter((k) => f.staccati[k]),
-    ki: f.ki, potenziato: f.potenziato > 0, onda: !!f.onda, vita: vitaVera(f),
+    ki: f.ki, potenziato: f.potenziato > 0, onda: !!f.onda, vita: vitaVera(f), legato: f.legato > 0, verde: f.verde > 0,
     forma: f.potenziato > 0 ? f.forma : 0, gelato: f.gelato > 0, piccolo: f.piccolo > 0, scala: f.scala,
     lama: lamaPronta(f), lamaLanciata: !!(f.lama && f.lama.lanciata), soglia: f.soglia,
     morsi: f.morsi ? f.morsi.length : 0, tagliata: !!f.taglio, volo: !!(f.volo && f.jet > 0),

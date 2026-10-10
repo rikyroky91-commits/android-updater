@@ -35,7 +35,11 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
   const contesto2d = new Proxy({}, {
     get(obj, nome) {
       if (nome in obj) return obj[nome];
-      if (nome === "createRadialGradient" || nome === "createLinearGradient") return () => ({ addColorStop() {} });
+      // Come un canvas vero, una sfumatura con un colore che non è un colore ferma il disegno
+      // (10/10/2026: «rgb(NaN,NaN,56)» da un colore mescolato due volte bloccava tutto il ring).
+      if (nome === "createRadialGradient" || nome === "createLinearGradient") {
+        return () => ({ addColorStop(k, colore) { if (typeof colore !== "string" || /NaN|undefined/.test(colore)) throw new Error("addColorStop(" + k + ", " + colore + "): un canvas vero qui si ferma"); } });
+      }
       // Un canvas vero rifiuta un arco col raggio negativo (o che non è un numero) e l'eccezione
       // ferma il disegno di tutta la pagina: qui deve succedere lo stesso, sennò non ce ne accorgiamo.
       if (nome === "arc") return (x, y, r) => { if (!(r >= 0) || !Number.isFinite(x + y + r)) throw new Error("arc(" + x + ", " + y + ", " + r + "): un canvas vero qui si ferma"); };
@@ -2183,8 +2187,8 @@ test("controller ad angolo: sta nell'angolo in basso a destra, comanda il person
 
 test("controller: le mosse sono quelle dei personaggi scelti, quelle a energia si spengono se l'energia non basta", () => {
   // Ci sono tutte le mosse della tendina: la presa a distanza, il lampo e l'autodistruzione
-  // dei guerrieri, la sparizione dei maghi, l'incrocio di lame dei duellanti.
-  const attese = { guerrieri: 12, maghi: 9, lame: 9 }, devono = { guerrieri: ["telecinesi", "lampo", "avvinghia"], maghi: ["teletrasporto"], lame: ["duello"] };
+  // dei guerrieri, la sparizione e le magie del 10/10/2026 dei maghi, l'incrocio di lame dei duellanti.
+  const attese = { guerrieri: 12, maghi: 13, lame: 9 }, devono = { guerrieri: ["telecinesi", "lampo", "avvinghia"], maghi: ["teletrasporto", "falene", "catene", "stelle", "smeraldo"], lame: ["duello"] };
   for (const stile of Object.keys(attese)) {
     const amb = ambiente({ memoria: { "mut-ring-stile": stile, "mut-ring-radiale": "on" } });
     amb.avanza(60);
@@ -2643,7 +2647,7 @@ test("buco nero: arriva anche da solo, la prima volta poco dopo il primo minuto"
 // quando l'avversario ha poca vita, casuale una volta ogni 3 round».
 test("colpo finale: ogni scena fa buio, conta un K.O. solo e lascia tutti nella finestra", () => {
   for (const [stile, tipo] of [["", "orbita"], ["", "flipper"], ["", "schiacciata"], ["", "sferona"], ["", "meteora"],
-                               ["guerrieri", "onda"], ["maghi", "statua"], ["lame", "taglio"]]) {
+                               ["guerrieri", "onda"], ["maghi", "statua"], ["maghi", "smeraldo"], ["lame", "taglio"]]) {
     let fatte = 0;
     for (let k = 0; k < 4 && fatte < 2; k++) {
       const amb = ambiente({ memoria: stile ? { "mut-ring-stile": stile } : {} });
@@ -3966,4 +3970,71 @@ test("l'audio: la lotta suona, la mira canta, la corsa ha i suoi suoni, e nessun
   r.corsa.finisci();
   assert.strictEqual(Finto.conto.cattivi, 0, "nessuna frequenza o volume che un browser vero rifiuterebbe");
   dentro(amb);
+});
+
+// --- Le magie nuove dei maghi (10/10/2026) ---------------------------------------
+// Riccardo: «i maghi nello specifico crea magie diverse e intriganti e come mossa finale una
+// magia verde che se ti prende ti toglie tutta la vita».
+test("maghi: sciame di falene e pioggia di stelle partono e pungono", () => {
+  const amb = ambiente({ memoria: { "mut-ring-stile": "maghi" } });
+  const r = amb.finestra.__ring;
+  r.comandi.sorprese(false); amb.avanza(60);
+  r.sposta("robot", 300); r.sposta("mela", 800);
+  r.mossa("robot", "falene");
+  let falene = 0;
+  amb.avanza(30, (s) => { falene = Math.max(falene, s.falene); });
+  assert.ok(falene >= 5, "lo sciame di falene non parte: " + falene);
+  amb.avanza(120);
+  r.sposta("robot", 300); r.sposta("mela", 800);
+  r.mossa("robot", "stelle");
+  let comete = 0;
+  amb.avanza(90, (s) => { comete = Math.max(comete, s.comete); });
+  assert.ok(comete >= 1, "le stelle non cadono");
+  dentro(amb);
+});
+
+test("maghi: il cerchio di rune lega chi resta dentro; chi non c'è più, lo manca", () => {
+  let legati = 0;
+  for (let giro = 0; giro < 4 && !legati; giro++) {
+    const amb = ambiente({ memoria: { "mut-ring-stile": "maghi" } });
+    const r = amb.finestra.__ring;
+    r.comandi.sorprese(false); amb.avanza(60);
+    r.sposta("robot", 300); r.sposta("mela", 700);
+    r.incanta("mela", "gelo");                       // ferma lì: non può uscire dal cerchio
+    r.mossa("robot", "catene");
+    amb.avanza(70, (s) => { if (s.lottatori.find((f) => f.tipo === "mela").legato) { legati++; return false; } });
+  }
+  assert.ok(legati >= 1, "le catene non legano chi resta nel cerchio");
+});
+
+test("maghi: la maledizione di smeraldo toglie tutta la vita in un colpo, e lo scudo non la ferma", () => {
+  for (const scudo of [false, true]) {
+    let ko = 0;
+    for (let giro = 0; giro < 5 && !ko; giro++) {
+      const amb = ambiente({ memoria: { "mut-ring-stile": "maghi" } });
+      const r = amb.finestra.__ring;
+      r.comandi.sorprese(false); r.roundFatale(false); amb.avanza(60);
+      r.sposta("robot", 300); r.sposta("mela", 760);
+      if (scudo) r.mossa("mela", "barriera"); else r.incanta("mela", "gelo");
+      const p0 = amb.stato().punteggio.robot;
+      assert.ok(amb.lottatore("mela").vita > 0.99, "la mela non parte con la vita piena");
+      r.mossa("robot", "smeraldo");
+      let verde = false;
+      amb.avanza(260, (s) => {
+        r.roundFatale(false);
+        if (s.smeraldi) verde = true;
+        if (s.punteggio.robot > p0) { ko++; return false; }
+      });
+      assert.ok(verde, "il raggio verde non parte");
+      dentro(amb);
+    }
+    assert.ok(ko >= 1, scudo ? "lo scudo ferma la maledizione" : "la maledizione non manda K.O. in un colpo");
+  }
+  // Senza energia piena non parte.
+  const amb = ambiente({ memoria: { "mut-ring-stile": "maghi", "mut-ring-radiale": "on" } });
+  const r = amb.finestra.__ring;
+  r.comandi.sorprese(false); amb.avanza(60);
+  r.energia("robot", 99);
+  const s = amb.stato();
+  assert.strictEqual(s.radiale.accese[s.radiale.voci.indexOf("smeraldo")], false, "a energia non piena la maledizione deve restare spenta");
 });
