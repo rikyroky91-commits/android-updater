@@ -2857,3 +2857,57 @@ class TestParcoImpaginato(_SitoConLogin):
         quante ne hai, ed era proprio quello che il titolo diceva."""
         pagina = self.client.get("/parco").text
         self.assertIn(f"di {self.QUANTI}", pagina)
+
+
+class TestScansioneManuale(_SitoConLogin):
+    """`POST /scansione` (10/10/2026): dietro login come la pagina che ha
+    il tasto, e mai due scansioni a mano a meno di dieci minuti. Prima
+    chiunque poteva chiamarla a ripetizione, e ogni chiamata era una
+    raffica di richieste ai siti dei produttori."""
+
+    def setUp(self):
+        super().setUp()
+        import web.main as M
+
+        M._scansione_manuale["avviata"] = 0.0
+        self.partite = threading.Event()
+        self.chiamate = []
+
+        def finta(auto_notify=True):
+            self.chiamate.append(auto_notify)
+            self.partite.set()
+            return {"skipped": False}
+
+        from unittest.mock import patch
+
+        for bersaglio, valore in (("core.scan.run_scan_isolata", finta),
+                                  ("core.storage.last_scan", lambda: None)):
+            p = patch(bersaglio, valore)
+            p.start()
+            self.addCleanup(p.stop)
+
+    def test_senza_login_non_parte(self):
+        self.client.cookies.clear()
+        risposta = self.client.post("/scansione", follow_redirects=False)
+        self.assertEqual(risposta.status_code, 303)
+        self.assertTrue(risposta.headers["location"].startswith("/login"))
+        self.assertFalse(self.partite.wait(0.3))
+
+    def test_con_login_parte_una_volta_sola(self):
+        prima = self.client.post("/scansione", follow_redirects=False)
+        self.assertEqual(prima.headers["location"], "/dispositivi?scansione=avviata")
+        self.assertTrue(self.partite.wait(5))
+        seconda = self.client.post("/scansione", follow_redirects=False)
+        self.assertEqual(seconda.headers["location"], "/dispositivi?scansione=recente")
+        self.assertEqual(len(self.chiamate), 1)
+        self.assertIn("da pochi minuti", self.client.get("/dispositivi?scansione=recente").text)
+
+    def test_una_scansione_appena_finita_basta(self):
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+
+        adesso = datetime.now(timezone.utc).isoformat()
+        with patch("core.storage.last_scan", lambda: {"finished_at": adesso}):
+            risposta = self.client.post("/scansione", follow_redirects=False)
+        self.assertEqual(risposta.headers["location"], "/dispositivi?scansione=recente")
+        self.assertFalse(self.partite.wait(0.3))

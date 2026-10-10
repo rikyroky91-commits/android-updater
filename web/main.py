@@ -1009,6 +1009,7 @@ def pagina_dispositivi(request: Request,
         righe=righe, marche=sorted({d["brand"] for d in devices if d.get("brand")}),
         totale=len(devices), in_pagina=IN_PAGINA, stats=stats,
         scansione_avviata=(scansione == "avviata"),
+        scansione_recente=(scansione == "recente"),
         archivio_vuoto=not stats.get("devices"),
     ))
 
@@ -2030,8 +2031,37 @@ def modello_correggi(codice: str = Form(...), nome: str = Form(""),
     return RedirectResponse(f"/?q={quote(query or codice)}", status_code=303)
 
 
+# Fra due scansioni a mano, almeno questo. Vedi `scansione`.
+PAUSA_SCANSIONE_MANUALE_SECONDI = 10 * 60
+_scansione_manuale = {"avviata": 0.0}
+
+
+def _scansione_troppo_recente() -> bool:
+    """Vero se una scansione è partita o finita da meno della pausa minima.
+
+    Si guardano due orologi: l'avvio a mano ricordato qui (che copre la
+    scansione ancora in corso, che in archivio non ha ancora una fine) e la
+    fine dell'ultima scansione registrata, che copre anche quella oraria.
+    """
+    import time
+
+    avviata = _scansione_manuale["avviata"]
+    if avviata and time.monotonic() - avviata < PAUSA_SCANSIONE_MANUALE_SECONDI:
+        return True
+    ultima = (storage.last_scan() or {}).get("finished_at")
+    try:
+        fine = datetime.fromisoformat(ultima) if ultima else None
+    except ValueError:
+        return False
+    if fine is None:
+        return False
+    if fine.tzinfo is None:
+        fine = fine.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - fine).total_seconds() < PAUSA_SCANSIONE_MANUALE_SECONDI
+
+
 @app.post("/scansione")
-def scansione():
+def scansione(request: Request):
     """Lancia una scansione e torna subito all'elenco.
 
     NON SI ASPETTA LA FINE. Una scansione completa dura una trentina di
@@ -2039,8 +2069,23 @@ def scansione():
     espone al timeout dell'host, e a quel punto l'utente vede un errore
     mentre in realtà la scansione sta andando a buon fine. Parte in un
     thread e la pagina lo dice.
+
+    DIETRO LOGIN E CON UNA PAUSA (10/10/2026). Il tasto sta in
+    `/dispositivi`, che è dietro login dal 16/08/2026, ma una POST non ha
+    bisogno della pagina per essere chiamata: chiunque poteva lanciare
+    scansioni a ripetizione, ognuna una raffica di richieste ai siti dei
+    produttori — il modo più rapido per farsi bloccare l'IP. Il lucchetto
+    di `core/scan` impediva solo due scansioni INSIEME, non cento di fila.
     """
     import threading
+    import time
+
+    _, redirect = _accesso_catalogo_richiesto(request)
+    if redirect:
+        return redirect
+    if _scansione_troppo_recente():
+        return RedirectResponse("/dispositivi?scansione=recente", status_code=303)
+    _scansione_manuale["avviata"] = time.monotonic()
 
     def scansiona_e_dimentica():
         try:

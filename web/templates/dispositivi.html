@@ -11,6 +11,10 @@
 <p class="avviso">Scansione avviata. Dura una trentina di secondi: ricarica
   la pagina fra poco per vedere i risultati.</p>
 {% endif %}
+{% if scansione_recente %}
+<p class="avviso">Una scansione è partita o finita da pochi minuti: la
+  prossima si può lanciare fra un po'. I risultati dell'ultima sono già qui sotto.</p>
+{% endif %}
 
 <div class="cifre">
   <div><strong>{{ stats.devices }}</strong> dispositivi</div>
