@@ -12,7 +12,7 @@ const SORGENTE = fs.readFileSync(path.join(__dirname, "..", "web", "static", "ha
 
 function finto({ memoria = {}, cerca = "", ridotto = false, larghezza = 1280, altezza = 800 } = {}) {
   const ascolta = {}, fotogrammi = [], classi = new Set();
-  const nulla = new Proxy({}, { get: (o, k) => (k === "createRadialGradient" ? () => ({ addColorStop() {} }) : () => {}), set: () => true });
+  const nulla = new Proxy({}, { get: (o, k) => (k === "createRadialGradient" || k === "createLinearGradient" ? () => ({ addColorStop() {} }) : () => {}), set: () => true });
   const riquadro = (l, t, r, b) => ({ left: l, top: t, right: r, bottom: b, width: r - l, height: b - t });
   const tasto = { attr: {}, setAttribute(k, v) { this.attr[k] = v; }, closest: (sel) => (sel === "[data-halloween-tasto]" ? tasto : null) };
   const campo = { getBoundingClientRect: () => riquadro(200, 300, 900, 340), closest: () => null };
@@ -90,4 +90,25 @@ test("con «meno movimento» restano zucche e lucine, senza mani né zombie", ()
   const s = f.h.stato();
   assert.ok(s.zucche >= 3);
   assert.strictEqual(s.mani.length, 0);
+});
+
+test("al passaggio del mouse: la lucina toccata si spegne e si riaccende, la zucca si sveglia", () => {
+  const f = finto({ cerca: "?halloween=1" });
+  f.avanza(3);
+  let s = f.h.stato();
+  assert.strictEqual(s.lucineSpente, 0);
+  const l = s.lampadine[4];
+  f.h.puntatore(l.x, l.y + 7);
+  f.avanza(2);
+  assert.strictEqual(f.h.stato().lucineSpente, 1, "la lucina sotto il puntatore si spegne");
+  f.h.puntatore(-999, -999);
+  f.avanza(200);
+  assert.strictEqual(f.h.stato().lucineSpente, 0, "e dopo un po' si riaccende da sola");
+  const z = f.h.stato().posZucche[0];
+  f.h.puntatore(z.x, z.y);
+  f.avanza(20);
+  assert.ok(f.h.stato().zuccheSveglie >= 1, "la zucca sotto il puntatore si sveglia");
+  f.h.puntatore(-999, -999);
+  f.avanza(150);
+  assert.strictEqual(f.h.stato().zuccheSveglie, 0, "e si riaddormenta");
 });

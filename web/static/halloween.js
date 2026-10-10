@@ -23,6 +23,10 @@
  *   - mani senza braccio che zampettano sulle dita sul fondo e sugli elementi:
  *     si fermano a tamburellare, saltano da un elemento all'altro e scappano
  *     dal puntatore;
+ *   - AL PASSAGGIO DEL MOUSE (10/10/2026): le zucche si svegliano (un saltello,
+ *     la candela che divampa, gli occhi che seguono il puntatore, la bocca che
+ *     ride) e le lucine toccate si spengono con uno sbuffo di fumo, oscillano
+ *     e si riaccendono da sole dopo un paio di secondi, tremolando;
  *   - pipistrelli ogni tanto, nebbia bassa sul fondo, ragnatele negli angoli.
  * Con «meno movimento» restano zucche, lucine e ragnatele, ferme.
  *
@@ -52,6 +56,7 @@
   var tela = null, ctx = null, W = 0, H = 0, richiesta = null, passi = 0;
   var pavimento = 0, sottoTestata = 0, superfici = [];
   var zucche = [], zombie = [], mani = [], pipistrelli = [], nebbia = [];
+  var lucine = []; // per lampadina: { spenta: fotogrammi, dondola: ampiezza }
   var prossimoZombie = 240, prossimoPipistrello = 300;
   var puntatore = { x: -999, y: -999 };
 
@@ -116,13 +121,14 @@
     var stretto = W < 640;
     zucche = [];
     // Sul fondo: due o tre zucche agli angoli, di misure diverse.
-    zucche.push({ el: "fondo", u: stretto ? 0.06 : 0.035, r: stretto ? 15 : 22, fase: caso(0, 6), faccia: 0 });
-    zucche.push({ el: "fondo", u: stretto ? 0.16 : 0.08, r: stretto ? 10 : 14, fase: caso(0, 6), faccia: 1 });
-    if (!stretto) zucche.push({ el: "fondo", u: 0.955, r: 19, fase: caso(0, 6), faccia: 2 });
+    zucche.push(nuovaZucca("fondo", stretto ? 0.06 : 0.035, stretto ? 15 : 22, 0));
+    zucche.push(nuovaZucca("fondo", stretto ? 0.16 : 0.08, stretto ? 10 : 14, 1));
+    if (!stretto) zucche.push(nuovaZucca("fondo", 0.955, 19, 2));
     // Sopra gli elementi: qualche zucchetta.
     for (var i = 1, n = 0; i < superfici.length && n < (stretto ? 2 : 4); i += 2, n++) {
-      zucche.push({ el: superfici[i].el, u: caso(0.75, 0.92), r: caso(8, 11), fase: caso(0, 6), faccia: n % 3 });
+      zucche.push(nuovaZucca(superfici[i].el, caso(0.75, 0.92), caso(8, 11), n % 3));
     }
+    lucine = [];
     mani = [];
     var quante = ridotto ? 0 : stretto ? 2 : 4;
     for (i = 0; i < quante; i++) {
@@ -134,9 +140,16 @@
     for (i = 0; i < (stretto ? 4 : 7); i++) nebbia.push({ x: caso(0, W), r: caso(60, 140), v: caso(0.1, 0.35) * (Math.random() < 0.5 ? -1 : 1), a: caso(0.05, 0.11) });
     prossimoZombie = passi + 120;
   }
+  function nuovaZucca(el, u, r, faccia) {
+    // `sveglia` va da 0 a 1 col puntatore vicino; `salta` conta il saltello.
+    return { el: el, u: u, r: r, fase: caso(0, 6), faccia: faccia, sveglia: 0, salta: 0, x: 0, y: 0 };
+  }
+  // Tre carnagioni da non morto: [chiara, media, ombra].
+  var PELLI = [["#c9d6b4", "#9fb38f", "#6e8463"], ["#d3cfc0", "#aaa596", "#77725f"], ["#bfc0d6", "#9597b4", "#666884"]];
   function nuovaMano(s, u) {
     return { el: s.el, x: s.l + (s.r - s.l) * u, y: s.t, dir: Math.random() < 0.5 ? -1 : 1, v: caso(0.7, 1.3), passo: caso(0, 6),
-             ferma: 0, tamburo: 0, scappa: 0, salto: null, pelle: ["#9fb59a", "#b7c4a8", "#a6a3b8"][Math.floor(Math.random() * 3)], s: caso(1.5, 1.9) * (W < 640 ? 0.8 : 1) };
+             ferma: 0, tamburo: 0, scappa: 0, salto: null, carica: 0, pronto: null, atterra: 0,
+             pelle: PELLI[Math.floor(Math.random() * PELLI.length)], s: caso(1.25, 1.55) * (W < 640 ? 0.8 : 1) };
   }
   function nuovoZombie() {
     var da = Math.random() < 0.5 ? -1 : 1, stretto = W < 640;
@@ -163,6 +176,9 @@
     }
     // Le mani.
     for (i = 0; i < mani.length; i++) muoviMano(mani[i]);
+    // Le zucche e le lucine sentono il puntatore.
+    for (i = 0; i < zucche.length; i++) svegliaZucca(zucche[i]);
+    tocca(Lampadine(), true);
     // I pipistrelli.
     if (passi >= prossimoPipistrello) {
       var n = 1 + Math.floor(Math.random() * 3);
@@ -177,12 +193,20 @@
     for (i = 0; i < nebbia.length; i++) { var q = nebbia[i]; q.x += q.v; if (q.x < -q.r) q.x = W + q.r; if (q.x > W + q.r) q.x = -q.r; }
   }
   function muoviMano(m) {
+    if (m.carica > 0) {
+      // La rincorsa: si accuccia sulle dita, poi parte.
+      if (--m.carica === 0) { m.salto = m.pronto; m.pronto = null; }
+      return;
+    }
+    if (m.atterra > 0) m.atterra--;
     if (m.salto) {
       // In volo da un elemento all'altro: una parabola.
       var S = m.salto; S.t++;
       var u = Math.min(1, S.t / S.dur);
       m.x = S.x0 + (S.x1 - S.x0) * u; m.y = S.y0 + (S.y1 - S.y0) * u - Math.sin(Math.PI * u) * S.h;
-      if (u >= 1) { m.salto = null; m.el = S.el; m.y = S.y1; m.ferma = 20; }
+      // L'inclinazione segue la traiettoria: muso in su alla partenza, in giù all'arrivo.
+      m.pendenza = Math.max(-0.6, Math.min(0.6, (S.y1 - S.y0) / Math.max(1, Math.abs(S.x1 - S.x0)) * 0.3 - Math.cos(Math.PI * u) * 0.5));
+      if (u >= 1) { m.salto = null; m.el = S.el; m.y = S.y1; m.ferma = 20; m.atterra = 14; m.pendenza = 0; }
       return;
     }
     var s = superficie(m.el) || superfici[0];
@@ -191,7 +215,8 @@
     m.y = s.t;
     // Il puntatore vicino: scappa di corsa dall'altra parte.
     var dx = m.x - puntatore.x, dy = m.y - puntatore.y;
-    if (Math.abs(dx) < 70 && Math.abs(dy) < 50 && m.scappa <= 0) { m.scappa = 50; m.dir = dx >= 0 ? 1 : -1; m.ferma = 0; m.tamburo = 0; }
+    if (Math.abs(dx) < 70 && Math.abs(dy) < 50 && m.scappa <= 0) { m.scappa = 50; m.dir = dx >= 0 ? 1 : -1; m.ferma = 0; m.tamburo = 0; m.sobbalzo = 10; }
+    if (m.sobbalzo > 0) m.sobbalzo--;
     if (m.scappa > 0) m.scappa--;
     if (m.ferma > 0) { m.ferma--; if (m.tamburo > 0) m.tamburo--; return; }
     var v = m.v * (m.scappa > 0 ? 3 : 1);
@@ -205,7 +230,8 @@
         var meta = s.el === "fondo" ? superfici[1 + Math.floor(Math.random() * (superfici.length - 1))] : (Math.random() < 0.6 ? superfici[0] : superfici[Math.floor(Math.random() * superfici.length)]);
         if (meta && meta !== s) {
           var x1 = Math.max(meta.l + 12, Math.min(meta.r - 12, m.x + m.dir * caso(20, 120)));
-          m.salto = { t: 0, dur: Math.round(caso(40, 60)), x0: m.x, y0: m.y, x1: x1, y1: meta.t, h: Math.max(40, (m.y - meta.t) + 50), el: meta.el };
+          m.pronto = { t: 0, dur: Math.round(caso(40, 60)), x0: m.x, y0: m.y, x1: x1, y1: meta.t, h: Math.max(40, (m.y - meta.t) + 50), el: meta.el };
+          m.carica = 12;
           m.dir = x1 >= m.x ? 1 : -1;
           return;
         }
@@ -214,60 +240,123 @@
     }
   }
 
+  // --- Il puntatore su zucche e lucine ---------------------------------
+  function vicinoA(x, y, raggio) { var dx = puntatore.x - x, dy = puntatore.y - y; return dx * dx + dy * dy < raggio * raggio; }
+  function svegliaZucca(z) {
+    var s = superficie(z.el);
+    if (!s) return;
+    var cx = s.l + (s.r - s.l) * z.u, cy = s.t - z.r * 0.82, vicino = vicinoA(cx, cy, z.r * 1.7 + 10);
+    // Appena la si sfiora fa un saltello; poi resta sveglia finché il puntatore è lì.
+    if (vicino && z.sveglia < 0.3 && z.salta <= 0 && !ridotto) z.salta = 26;
+    z.sveglia += vicino ? (1 - z.sveglia) * 0.15 : -z.sveglia * 0.05;
+    if (z.salta > 0) z.salta--;
+  }
+  // Dove stanno le lampadine: una ogni `passoL` pixel, appese al filo che fa le campate.
+  function Lampadine() {
+    var y0 = sottoTestata + 2, passoL = W < 640 ? 28 : 34, campata = W < 640 ? 140 : 200, pos = [];
+    for (var xb = passoL / 2; xb < W; xb += passoL) pos.push({ x: xb, y: y0 + Math.sin(Math.PI * ((xb % campata) / campata)) * 14 });
+    return pos;
+  }
+  // Una lampadina toccata si spegne (con uno sbuffo e un dondolio) e resta spenta finché
+  // il puntatore le sta addosso, più un paio di secondi; poi si riaccende tremolando.
+  function tocca(pos, conTempo) {
+    for (var i = 0; i < pos.length; i++) {
+      var l = lucine[i] || (lucine[i] = { spenta: 0, dondola: 0 });
+      if (vicinoA(pos[i].x, pos[i].y + 7, 16)) {
+        if (l.spenta <= 0) l.dondola = 1;
+        l.spenta = 150;
+      } else if (conTempo && l.spenta > 0) l.spenta--;
+      if (conTempo) l.dondola *= 0.965;
+    }
+  }
+
   // --- I disegni --------------------------------------------------------
-  function disegnaZucca(x, y, r, fase, faccia) {
-    var fiamma = 0.75 + 0.25 * Math.sin(passi * 0.21 + fase) * Math.sin(passi * 0.13 + fase * 2) + (ridotto ? 0.2 : Math.random() * 0.08);
-    // Il bagliore a terra.
-    var g = ctx.createRadialGradient(x, y - r * 0.6, r * 0.2, x, y - r * 0.6, r * 3);
-    g.addColorStop(0, "rgba(255,150,40," + (0.28 * fiamma).toFixed(3) + ")"); g.addColorStop(1, "rgba(255,150,40,0)");
-    ctx.fillStyle = g; ctx.fillRect(x - r * 3, y - r * 3.6, r * 6, r * 4);
-    var cy = y - r * 0.82;
+  function disegnaZucca(z, x, y) {
+    var r = z.r, sv = ridotto ? (vicinoA(x, y - r * 0.82, r * 1.7 + 10) ? 1 : 0) : z.sveglia;
+    var fiamma = 0.75 + 0.25 * Math.sin(passi * 0.21 + z.fase) * Math.sin(passi * 0.13 + z.fase * 2) + (ridotto ? 0.2 : Math.random() * 0.08);
+    fiamma += 0.35 * sv;
+    // Il bagliore a terra: sveglia, la candela divampa.
+    var g = ctx.createRadialGradient(x, y - r * 0.6, r * 0.2, x, y - r * 0.6, r * (3 + 1.2 * sv));
+    g.addColorStop(0, "rgba(255,150,40," + Math.min(0.6, 0.28 * fiamma * (1 + sv)).toFixed(3) + ")"); g.addColorStop(1, "rgba(255,150,40,0)");
+    ctx.fillStyle = g; ctx.fillRect(x - r * 4.2, y - r * 4.8, r * 8.4, r * 5.2);
+    // Il saltello: su e giù con un po' di elastico, schiacciata alla partenza e all'arrivo.
+    var t = z.salta > 0 ? 1 - z.salta / 26 : 0, k = z.salta > 0 ? Math.sin(Math.PI * t) : 0;
+    var schiaccia = z.salta > 0 && (t < 0.15 || t > 0.85) ? 0.1 : 0, cresce = 1 + 0.1 * sv;
+    ctx.save();
+    ctx.translate(x, y - k * r * 0.7);
+    ctx.scale(cresce * (1 - 0.06 * k + schiaccia), cresce * (1 + 0.1 * k - schiaccia));
+    if (z.salta > 0) ctx.rotate(Math.sin(t * Math.PI * 2) * 0.12);
+    var cy = -r * 0.82;
     ctx.lineWidth = Math.max(1, r * 0.07); ctx.strokeStyle = "#3a1d07";
     // Gli spicchi: quelli di lato prima, poi quello davanti.
     var spicchi = [[-0.45, 0.62, "#d8621a"], [0.45, 0.62, "#d8621a"], [-0.2, 0.75, "#ee7a22"], [0.2, 0.75, "#ee7a22"], [0, 0.6, "#f58a2a"]];
     for (var i = 0; i < spicchi.length; i++) {
       ctx.fillStyle = spicchi[i][2];
-      ctx.beginPath(); ctx.ellipse(x + spicchi[i][0] * r, cy, r * spicchi[i][1], r * 0.82, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(spicchi[i][0] * r, cy, r * spicchi[i][1], r * 0.82, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
     // Il picciolo.
     ctx.fillStyle = "#5b6b2a"; ctx.beginPath();
-    ctx.moveTo(x - r * 0.1, cy - r * 0.75); ctx.quadraticCurveTo(x - r * 0.05, cy - r * 1.15, x + r * 0.22, cy - r * 1.2);
-    ctx.lineTo(x + r * 0.16, cy - r * 1.02); ctx.lineTo(x + r * 0.1, cy - r * 0.75); ctx.closePath(); ctx.fill(); ctx.stroke();
-    // La faccia intagliata, accesa dalla candela.
-    var luce = "rgba(255," + Math.round(200 + 40 * fiamma) + "," + Math.round(60 + 60 * fiamma) + "," + (0.75 + 0.25 * fiamma).toFixed(3) + ")";
+    ctx.moveTo(-r * 0.1, cy - r * 0.75); ctx.quadraticCurveTo(-r * 0.05, cy - r * 1.15, r * 0.22, cy - r * 1.2);
+    ctx.lineTo(r * 0.16, cy - r * 1.02); ctx.lineTo(r * 0.1, cy - r * 0.75); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // La faccia intagliata, accesa dalla candela. Sveglia, gli occhi guardano il puntatore.
+    var luce = "rgba(255," + Math.round(Math.min(255, 200 + 40 * fiamma)) + "," + Math.round(Math.min(200, 60 + 60 * fiamma)) + "," + Math.min(1, 0.75 + 0.25 * fiamma).toFixed(3) + ")";
+    var gx = Math.max(-1, Math.min(1, (puntatore.x - x) / 150)) * r * 0.08 * sv, gy = Math.max(-1, Math.min(1, (puntatore.y - y) / 150)) * r * 0.06 * sv;
     ctx.fillStyle = luce; ctx.beginPath();
-    var oy = cy - r * 0.2;
-    if (faccia === 1) {
+    var oy = cy - r * 0.2 + gy, ox = gx;
+    if (z.faccia === 1) {
       // occhi tondi
-      ctx.arc(x - r * 0.3, oy, r * 0.14, 0, Math.PI * 2); ctx.moveTo(x + r * 0.44, oy); ctx.arc(x + r * 0.3, oy, r * 0.14, 0, Math.PI * 2);
+      ctx.arc(ox - r * 0.3, oy, r * (0.14 + 0.03 * sv), 0, Math.PI * 2); ctx.moveTo(ox + r * 0.44, oy); ctx.arc(ox + r * 0.3, oy, r * (0.14 + 0.03 * sv), 0, Math.PI * 2);
     } else {
-      ctx.moveTo(x - r * 0.45, oy + r * 0.1); ctx.lineTo(x - r * 0.3, oy - r * 0.18); ctx.lineTo(x - r * 0.15, oy + r * 0.1);
-      ctx.moveTo(x + r * 0.15, oy + r * 0.1); ctx.lineTo(x + r * 0.3, oy - r * 0.18); ctx.lineTo(x + r * 0.45, oy + r * 0.1);
+      var su = r * (0.18 + 0.06 * sv);
+      ctx.moveTo(ox - r * 0.45, oy + r * 0.1); ctx.lineTo(ox - r * 0.3, oy - su); ctx.lineTo(ox - r * 0.15, oy + r * 0.1);
+      ctx.moveTo(ox + r * 0.15, oy + r * 0.1); ctx.lineTo(ox + r * 0.3, oy - su); ctx.lineTo(ox + r * 0.45, oy + r * 0.1);
     }
     ctx.fill();
-    // Il naso e la bocca a denti.
-    ctx.beginPath(); ctx.moveTo(x - r * 0.07, cy + r * 0.05); ctx.lineTo(x, cy - r * 0.08); ctx.lineTo(x + r * 0.07, cy + r * 0.05); ctx.fill();
+    // Il naso e la bocca a denti: sveglia, ride a bocca aperta.
+    ctx.beginPath(); ctx.moveTo(-r * 0.07, cy + r * 0.05); ctx.lineTo(0, cy - r * 0.08); ctx.lineTo(r * 0.07, cy + r * 0.05); ctx.fill();
     ctx.beginPath();
-    var my = cy + r * 0.25, mw = r * (faccia === 2 ? 0.5 : 0.6);
-    ctx.moveTo(x - mw, my); ctx.quadraticCurveTo(x, my + r * 0.45, x + mw, my);
-    var denti = faccia === 2 ? 3 : 4;
-    for (var k = denti; k >= 0; k--) { var px = x - mw + (2 * mw) * k / denti; ctx.lineTo(px, my + (k % 2 ? r * 0.12 : r * 0.02)); }
+    var my = cy + r * 0.25, mw = r * (z.faccia === 2 ? 0.5 : 0.6) * (1 + 0.1 * sv);
+    ctx.moveTo(-mw, my); ctx.quadraticCurveTo(0, my + r * (0.45 + 0.3 * sv), mw, my);
+    var denti = z.faccia === 2 ? 3 : 4;
+    for (var q = denti; q >= 0; q--) { var px = -mw + (2 * mw) * q / denti; ctx.lineTo(px, my + (q % 2 ? r * 0.12 : r * 0.02)); }
     ctx.closePath(); ctx.fill();
+    ctx.restore();
   }
   function disegnaLucine() {
-    var y0 = sottoTestata + 2, passoL = W < 640 ? 28 : 34, campata = W < 640 ? 140 : 200;
+    var y0 = sottoTestata + 2, campata = W < 640 ? 140 : 200, pos = Lampadine(), i;
+    if (ridotto) tocca(pos, false);
     ctx.strokeStyle = "rgba(30,24,20,.85)"; ctx.lineWidth = 1.3;
     ctx.beginPath();
     for (var x = 0; x <= W; x += 6) { var u = (x % campata) / campata; var y = y0 + Math.sin(Math.PI * u) * 14; if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
     ctx.stroke();
     var colori = ["#ff8a1a", "#a64dff", "#7dff4a"];
-    for (var i = 0, xb = passoL / 2; xb < W; xb += passoL, i++) {
-      var ub = (xb % campata) / campata, yb = y0 + Math.sin(Math.PI * ub) * 14;
-      var acceso = ridotto ? 1 : 0.35 + 0.65 * Math.max(0, Math.sin(passi * 0.05 - i * 0.55));
-      var c = colori[i % 3];
-      ctx.globalAlpha = 0.3 * acceso; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(xb, yb + 7, 9, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 0.45 + 0.55 * acceso; ctx.beginPath(); ctx.ellipse(xb, yb + 7, 3.2, 4.6, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 1; ctx.fillStyle = "#2a2420"; ctx.fillRect(xb - 2, yb + 1, 4, 3);
+    for (i = 0; i < pos.length; i++) {
+      var xb = pos[i].x, yb = pos[i].y, l = lucine[i] || { spenta: 0, dondola: 0 }, c = colori[i % 3];
+      var onda = ridotto ? 1 : 0.35 + 0.65 * Math.max(0, Math.sin(passi * 0.05 - i * 0.55));
+      // Spenta; negli ultimi istanti prima di riaccendersi, tremola.
+      var spenta = l.spenta > 0 && !(l.spenta < 26 && !ridotto && Math.random() < 0.45);
+      ctx.save(); ctx.translate(xb, yb + 1);
+      if (l.dondola > 0.02) ctx.rotate(Math.sin(passi * 0.22 + i) * 0.7 * l.dondola);
+      if (spenta) {
+        ctx.fillStyle = "#3b3632"; ctx.strokeStyle = "rgba(0,0,0,.5)"; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.ellipse(0, 6, 3.2, 4.6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,.18)"; ctx.beginPath(); ctx.ellipse(-1.1, 4.6, 0.9, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.fillStyle = c;
+        ctx.globalAlpha = 0.3 * onda; ctx.beginPath(); ctx.arc(0, 6, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 0.45 + 0.55 * onda; ctx.beginPath(); ctx.ellipse(0, 6, 3.2, 4.6, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      ctx.fillStyle = "#2a2420"; ctx.fillRect(-2, 0, 4, 3);
+      ctx.restore();
+      // Lo sbuffo di fumo appena spenta.
+      if (l.spenta > 112 && !ridotto) {
+        var f = (150 - l.spenta) / 38;
+        ctx.strokeStyle = "rgba(190,185,200," + (0.55 * (1 - f)).toFixed(3) + ")"; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(xb, yb + 3);
+        for (var k = 1; k <= 6; k++) ctx.lineTo(xb + Math.sin(k * 1.3 + f * 4) * 2.5 * f, yb + 3 - k * (2 + 6 * f));
+        ctx.stroke();
+      }
     }
   }
   function disegnaRagnatela(x, y, sx, r) {
@@ -333,37 +422,130 @@
     }
     ctx.restore();
   }
-  // La mano che cammina: vista di lato, il palmo in giù, quattro dita per zampe e il pollice in fuori;
-  // dietro il polso, un polsino cucito (niente braccio, niente sangue).
+  // LA MANO CHE CAMMINA (rifatta il 10/10/2026: «troppo brutte»). Vista di lato, il dorso
+  // in su: quattro dita a tre falangi per zampe, che si muovono a coppie alternate come un
+  // ragno (indice e anulare, medio e mignolo), il pollice che aiuta, il dorso che ondeggia a
+  // ogni passo. Prima di saltare si accuccia, in volo raccoglie le dita, atterrando si
+  // schiaccia; ferma, tamburella dal mignolo all'indice. Pelle da non morto con le unghie,
+  // una cicatrice cucita, e al polso la manica strappata (niente braccio, niente sangue).
+  var FALANGI = [6.2, 4.8, 3.6];
+  function dito(P0, T, larga, pelle, chiara) {
+    var dx = T.x - P0.x, dy = T.y - P0.y, dist = Math.max(0.01, Math.sqrt(dx * dx + dy * dy));
+    // Arcuato verso l'alto, tanto più quanto il dito è raccolto.
+    var nx = dy / dist, ny = -dx / dist, arco = 1.6 + Math.max(0, FALANGI[0] + FALANGI[1] + FALANGI[2] - dist) * 0.55;
+    var P1 = { x: P0.x + dx * 0.4 + nx * arco, y: P0.y + dy * 0.4 + ny * arco };
+    var P2 = { x: P0.x + dx * 0.76 + nx * arco * 0.6, y: P0.y + dy * 0.76 + ny * arco * 0.6 };
+    var tratti = [[P0, P1, 1], [P1, P2, 0.84], [P2, T, 0.68]], i;
+    ctx.strokeStyle = "#17171c";
+    for (i = 0; i < 3; i++) { ctx.lineWidth = larga * tratti[i][2] + 1.3; ctx.beginPath(); ctx.moveTo(tratti[i][0].x, tratti[i][0].y); ctx.lineTo(tratti[i][1].x, tratti[i][1].y); ctx.stroke(); }
+    ctx.strokeStyle = pelle;
+    for (i = 0; i < 3; i++) { ctx.lineWidth = larga * tratti[i][2]; ctx.beginPath(); ctx.moveTo(tratti[i][0].x, tratti[i][0].y); ctx.lineTo(tratti[i][1].x, tratti[i][1].y); ctx.stroke(); }
+    // Il riflesso sul dorso del dito e le nocche.
+    if (chiara) {
+      ctx.strokeStyle = chiara; ctx.lineWidth = larga * 0.3; ctx.beginPath();
+      ctx.moveTo(P0.x + nx * larga * 0.25, P0.y + ny * larga * 0.25); ctx.lineTo(P1.x + nx * larga * 0.25, P1.y + ny * larga * 0.25); ctx.lineTo(P2.x + nx * larga * 0.2, P2.y + ny * larga * 0.2); ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(23,23,28,.35)";
+    ctx.beginPath(); ctx.arc(P1.x, P1.y, larga * 0.22, 0, Math.PI * 2); ctx.arc(P2.x, P2.y, larga * 0.18, 0, Math.PI * 2); ctx.fill();
+    // L'unghia, giallastra, sull'ultima falange.
+    var ux = P2.x + (T.x - P2.x) * 0.62 + nx * larga * 0.22, uy = P2.y + (T.y - P2.y) * 0.62 + ny * larga * 0.22;
+    ctx.fillStyle = "#e6dcaa"; ctx.strokeStyle = "rgba(23,23,28,.6)"; ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.ellipse(ux, uy, larga * 0.36, larga * 0.2, Math.atan2(T.y - P2.y, T.x - P2.x), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
   function disegnaMano(m) {
-    var s = m.s, d = m.dir, nero = "#17171c";
+    var s = m.s, d = m.dir, nero = "#17171c", pelle = m.pelle;
+    var inAria = !!m.salto, accucciata = m.carica > 0 ? 1 - m.carica / 12 : 0;
+    var tamburella = m.tamburo > 0 && !inAria, scappa = m.scappa > 0 && !inAria;
+    var cammina = !inAria && !accucciata && m.ferma <= 0;
+    var f = m.passo, k;
+    // L'altezza del dorso e la sua inclinazione.
+    var h = 8.5 + (scappa ? 1.8 : 0);
+    if (cammina) h += 0.9 * Math.cos(2 * f);
+    h -= 4 * accucciata + (m.atterra > 0 ? 3.5 * m.atterra / 14 : 0);
+    if (m.sobbalzo > 0) h += 5 * Math.sin(Math.PI * (1 - m.sobbalzo / 10));
+    var incl = inAria ? (m.pendenza || 0) : cammina ? 0.05 * Math.sin(2 * f) : -0.14 * accucciata;
+    var co = Math.cos(incl), si = Math.sin(incl);
+    function corpo(px, py) { return { x: px * co - py * si, y: -h + px * si + py * co }; }
+
     ctx.save(); ctx.translate(m.x, m.y); ctx.scale(d * s, s);
     ctx.lineCap = "round"; ctx.lineJoin = "round";
-    var inAria = !!m.salto, alto = inAria ? 8 : 10;
-    // Le dita: due segmenti ciascuna; camminando si alternano, ferme tamburellano.
-    for (var k = 0; k < 4; k++) {
-      var base = { x: 6 - k * 3.2, y: -alto + 1 }, fase = m.passo + k * 1.6;
-      var alza = m.tamburo > 0 ? Math.max(0, Math.sin(passi * 0.6 + k * 1.3)) * 3 : inAria ? 2 : Math.max(0, Math.sin(fase)) * 2.5;
-      var avanti = m.tamburo > 0 || inAria ? 0 : Math.cos(fase) * 2.2;
-      var nocca = { x: base.x + 4 + avanti * 0.5, y: base.y - 2 - alza * 0.5 }, punta = { x: base.x + 5 + avanti, y: inAria ? base.y + 6 : -alza };
-      ctx.strokeStyle = nero; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(base.x, base.y); ctx.lineTo(nocca.x, nocca.y); ctx.lineTo(punta.x, punta.y); ctx.stroke();
-      ctx.strokeStyle = m.pelle; ctx.lineWidth = 2.4; ctx.stroke();
+    // L'ombra a terra.
+    if (!inAria) { ctx.fillStyle = "rgba(0,0,0,.32)"; ctx.beginPath(); ctx.ellipse(1, 0.6, 13, 2.1, 0, 0, Math.PI * 2); ctx.fill(); }
+    // Le righe della fuga.
+    if (scappa) {
+      ctx.strokeStyle = "rgba(220,215,235,.5)"; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (k = 0; k < 3; k++) { var ry = -h - 2 + k * 3.2, ox = (passi * 1.7 + k * 5) % 6; ctx.moveTo(-17 - ox, ry); ctx.lineTo(-23 - ox - k, ry); }
+      ctx.stroke();
     }
-    // Il dorso della mano.
-    ctx.fillStyle = m.pelle; ctx.strokeStyle = nero; ctx.lineWidth = 1.1;
-    ctx.beginPath(); ctx.ellipse(1, -alto - 1, 9, 4.6, -0.08, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    // Le nocche e il pollice in fuori.
-    ctx.strokeStyle = "rgba(23,23,28,.45)"; ctx.lineWidth = 0.8; ctx.beginPath();
-    for (k = 0; k < 3; k++) { ctx.moveTo(5 - k * 3.2, -alto - 3.5); ctx.lineTo(5.6 - k * 3.2, -alto - 2.2); }
+    // Dove sta la punta di ogni dito: [radice sul dorso, appoggio a riposo].
+    var radici = [[7.8, -2.6], [7.3, -3.5], [6.5, -4.3], [5.4, -4.9]], riposo = [17, 14.4, 11.8, 9.2];
+    function punta(i) {
+      var r = corpo(radici[i][0], radici[i][1]);
+      if (inAria) {
+        var rq = corpo(radici[i][0] + 3.5, radici[i][1] + 3.8 + Math.sin(passi * 0.5 + i) * 0.7);
+        return rq;
+      }
+      if (tamburella) {
+        var alza = Math.pow(Math.max(0, Math.sin(passi * 0.33 - (3 - i) * 0.85)), 3) * 4.5;
+        return { x: riposo[i] - 1, y: -alza };
+      }
+      if (accucciata) return { x: riposo[i] + 1.2 * accucciata, y: 0 };
+      if (m.atterra > 0) return { x: riposo[i] + (i % 2 ? -1.6 : 1.6) * m.atterra / 14, y: 0 };
+      if (!cammina) return { x: riposo[i], y: 0 };
+      var fk = f + (i % 2) * Math.PI;
+      return { x: riposo[i] - 5 * Math.cos(fk), y: -Math.max(0, Math.sin(fk)) * 3.4 };
+    }
+    // Prima le dita lontane (medio e mignolo), più in ombra.
+    for (k = 3; k >= 1; k -= 2) dito(corpo(radici[k][0], radici[k][1]), punta(k), k === 3 ? 2 : 2.3, pelle[2], null);
+    // La manica strappata al polso, dietro il dorso.
+    var p1 = corpo(-10, -7.6), p2 = corpo(-15.5, -8.6), p3 = corpo(-16.5, 1), p4 = corpo(-10, 0.8);
+    ctx.fillStyle = "#3d3350"; ctx.strokeStyle = nero; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y);
+    // l'orlo strappato verso la mano
+    var denti = [[-8.6, -0.8], [-10.2, -2.4], [-8.4, -3.8], [-10, -5.4], [-8.8, -6.8]];
+    for (k = 0; k < denti.length; k++) { var q = corpo(denti[k][0], denti[k][1]); ctx.lineTo(q.x, q.y); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    var b1 = corpo(-14.2, -8.2), b2 = corpo(-15, 0.9);
+    ctx.strokeStyle = "#6a5a86"; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(b1.x, b1.y); ctx.lineTo(b2.x, b2.y); ctx.stroke();
+    // Un filo che penzola dalla manica.
+    var fl = corpo(-15.8, -1), fl2 = corpo(-19 - Math.sin(passi * 0.15) * 1.5, 2.5 + Math.cos(passi * 0.15));
+    ctx.strokeStyle = "#5c4f75"; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(fl.x, fl.y); ctx.quadraticCurveTo(fl.x - 1.5, fl.y + 2, fl2.x, fl2.y); ctx.stroke();
+    // Il dorso: dal polso alle nocche, con le nocche in rilievo.
+    var forma = [[-10.6, -0.3, "m"], [-2, 1.2, 6.6, -0.3, "q"], [9.4, -1.4, 8.3, -4.2, "q"], [6.9, -6.9, 4.9, -6.3, "q"], [3.6, -7.4, 2.1, -6.7, "q"],
+                 [0.4, -7.5, -1.6, -6.9, "q"], [-6.5, -7.6, -10.6, -6.3, "q"]];
+    var alto = corpo(0, -7.5), basso = corpo(0, 1);
+    var sfuma = ctx.createLinearGradient(alto.x, alto.y, basso.x, basso.y);
+    sfuma.addColorStop(0, pelle[0]); sfuma.addColorStop(0.55, pelle[1]); sfuma.addColorStop(1, pelle[2]);
+    ctx.fillStyle = sfuma; ctx.strokeStyle = nero; ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    for (k = 0; k < forma.length; k++) {
+      var v = forma[k];
+      if (v[v.length - 1] === "m") { var mm = corpo(v[0], v[1]); ctx.moveTo(mm.x, mm.y); }
+      else { var c1 = corpo(v[0], v[1]), c2 = corpo(v[2], v[3]); ctx.quadraticCurveTo(c1.x, c1.y, c2.x, c2.y); }
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // I tendini sul dorso e le grinze delle nocche.
+    ctx.strokeStyle = "rgba(23,23,28,.22)"; ctx.lineWidth = 0.6; ctx.beginPath();
+    for (k = 0; k < 3; k++) { var t0 = corpo(-7.5, -4.4 + k * 1.1), t1 = corpo(5 - k * 1.3, -5.6 + k * 0.9); ctx.moveTo(t0.x, t0.y); ctx.lineTo(t1.x, t1.y); }
+    for (k = 0; k < 3; k++) { var g0 = corpo(5.4 - k * 1.5, -6.2), g1 = corpo(5.9 - k * 1.5, -5); ctx.moveTo(g0.x, g0.y); ctx.lineTo(g1.x, g1.y); }
     ctx.stroke();
-    ctx.strokeStyle = nero; ctx.lineWidth = 3.8; ctx.beginPath(); ctx.moveTo(-1, -alto + 1); ctx.lineTo(3, -alto + 4.5); ctx.stroke();
-    ctx.strokeStyle = m.pelle; ctx.lineWidth = 2.2; ctx.stroke();
-    // Il polsino cucito.
-    ctx.fillStyle = "#4b4258"; ctx.strokeStyle = nero; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.ellipse(-8.5, -alto - 1, 2.6, 4.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = "#d9d3c5"; ctx.lineWidth = 0.7; ctx.beginPath();
-    for (k = -1; k <= 1; k++) { ctx.moveTo(-9.6, -alto - 1 + k * 2.4); ctx.lineTo(-7.4, -alto - 0.2 + k * 2.4); }
+    // La cicatrice cucita.
+    var cA = corpo(-6.2, -6.6), cB = corpo(-1.2, -2.4);
+    ctx.strokeStyle = "#5a3848"; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.moveTo(cA.x, cA.y); ctx.lineTo(cB.x, cB.y); ctx.stroke();
+    ctx.strokeStyle = "#2b1d26"; ctx.lineWidth = 0.6; ctx.beginPath();
+    for (k = 1; k <= 4; k++) {
+      var tq = k / 5, px = -6.2 + 5 * tq, py = -6.6 + 4.2 * tq, a1 = corpo(px - 0.9, py + 0.9), a2 = corpo(px + 0.9, py - 0.9);
+      ctx.moveTo(a1.x, a1.y); ctx.lineTo(a2.x, a2.y);
+    }
     ctx.stroke();
+    // Le dita vicine (indice e anulare), poi il pollice che aiuta a spingere.
+    for (k = 2; k >= 0; k -= 2) dito(corpo(radici[k][0], radici[k][1]), punta(k), 2.4, pelle[1], pelle[0]);
+    var radiceP = corpo(-0.5, -0.4), puntaP;
+    if (inAria) puntaP = corpo(2, 3);
+    else if (cammina) { var fp = f + Math.PI / 2; puntaP = { x: 4 - 2.5 * Math.cos(fp), y: -Math.max(0, Math.sin(fp)) * 2 }; }
+    else puntaP = { x: 4, y: 0 };
+    dito(radiceP, puntaP, 2.6, pelle[1], pelle[0]);
     ctx.restore();
   }
   function disegnaPipistrello(p) {
@@ -402,7 +584,7 @@
     for (i = 0; i < zucche.length; i++) {
       var z = zucche[i], s = superficie(z.el);
       if (!s) continue;
-      disegnaZucca(s.l + (s.r - s.l) * z.u, s.t, z.r, z.fase, z.faccia);
+      disegnaZucca(z, s.l + (s.r - s.l) * z.u, s.t);
     }
     for (i = 0; i < mani.length; i++) disegnaMano(mani[i]);
     disegnaLucine();
@@ -410,6 +592,9 @@
   function ciclo() {
     richiesta = null;
     if (!acceso || document.hidden) return;
+    // Partito con la finestra ancora senza misure (una scheda aperta dietro, un
+    // pannello nascosto): appena le misure arrivano si rifà tutto.
+    if (window.innerWidth !== W || window.innerHeight !== H) { var larga = W; dimensiona(); rileva(); if (Math.abs(larga - W) > 40) popola(); }
     passo();
     disegna();
     if (!ridotto) richiesta = window.requestAnimationFrame(ciclo);
@@ -434,7 +619,12 @@
     zucche = []; zombie = []; mani = []; pipistrelli = []; nebbia = [];
   }
 
-  window.addEventListener("pointermove", function (e) { puntatore.x = e.clientX; puntatore.y = e.clientY; }, { passive: true });
+  window.addEventListener("pointermove", function (e) {
+    puntatore.x = e.clientX; puntatore.y = e.clientY;
+    // Con «meno movimento» non c'è un ciclo che ridisegna: lo si fa qui, così
+    // le lucine si spengono e le zucche si illuminano lo stesso (senza saltelli).
+    if (ridotto && acceso && tela) riparti();
+  }, { passive: true });
   var attesa = null;
   window.addEventListener("resize", function () {
     if (!acceso || !tela) return;
@@ -464,10 +654,15 @@
     zombie: function () { nuovoZombie(); },
     pipistrelli: function () { nuovoPipistrello(); },
     puntatore: function (x, y) { puntatore.x = x; puntatore.y = y; },
+    mani: function () { return mani; },
     passi: function (n) { for (var i = 0; i < n; i++) passo(); disegna(); },
     stato: function () {
-      return { acceso: acceso, zucche: zucche.length, zombie: zombie.map(function (z) { return { x: z.x, dir: z.dir }; }), pipistrelli: pipistrelli.length,
-               mani: mani.map(function (m) { return { x: m.x, y: m.y, dir: m.dir, scappa: m.scappa, salta: !!m.salto }; }),
+      return { acceso: acceso, zucche: zucche.length,
+               zuccheSveglie: zucche.filter(function (z) { return z.sveglia > 0.5; }).length,
+               lucineSpente: lucine.filter(function (l) { return l && l.spenta > 0; }).length,
+               lampadine: Lampadine(), zombie: zombie.map(function (z) { return { x: z.x, dir: z.dir }; }), pipistrelli: pipistrelli.length,
+               mani: mani.map(function (m) { return { x: m.x, y: m.y, dir: m.dir, scappa: m.scappa, salta: !!m.salto || m.carica > 0 }; }),
+               posZucche: zucche.map(function (z) { var s = superficie(z.el); return s ? { x: s.l + (s.r - s.l) * z.u, y: s.t - z.r * 0.82 } : null; }),
                superfici: superfici.length, pavimento: pavimento, sottoTestata: sottoTestata };
     },
   };

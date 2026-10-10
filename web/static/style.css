@@ -1449,6 +1449,71 @@ html.natale .testata::after {
 html.halloween .marchio .iniziale, html.halloween .pieduccio .sigla .iniziale:first-child { color: #ff8a1a; text-shadow: 0 0 10px rgba(255,138,26,.45); }
 @media print { .halloween-tela { display: none; } }
 
+/* La faccina della home in versione Halloween (10/10/2026): zucca che annuisce,
+   fantasma che ride al passaggio del mouse, teschio quando il ring la stordisce.
+   Stesse animazioni della faccina normale, che intanto resta nascosta. */
+.faccia-hw { display: none; }
+html.halloween .faccia-hw { display: inline-block; opacity: 0; transform: scale(.6); }
+html.halloween .furbetto .faccia:not(.faccia-hw) { visibility: hidden; animation: none; }
+html.halloween .faccia-hw-furba { opacity: 1; transform: none; animation: cenno 3.2s ease-in-out infinite; }
+html.halloween .furbetto:hover .faccia-hw-furba, html.halloween .furbetto:active .faccia-hw-furba,
+html.halloween .furbetto.stordito .faccia-hw-furba { opacity: 0; animation: none; }
+html.halloween .furbetto:hover .faccia-hw-ride, html.halloween .furbetto:active .faccia-hw-ride {
+  opacity: 1; animation: fantasma .9s ease-in-out infinite;
+}
+html.halloween .furbetto.stordito .faccia-hw-ride { opacity: 0; animation: none; }
+html.halloween .furbetto.stordito .faccia-hw-stordita { opacity: 1; animation: stordita .7s ease-in-out infinite; }
+@keyframes fantasma {
+  0%, 100% { transform: scale(1.15) translate(0, 0) rotate(-8deg); filter: drop-shadow(0 0 6px rgba(200,190,255,.6)); }
+  50%      { transform: scale(1.25) translate(2px, -7px) rotate(8deg); filter: drop-shadow(0 0 12px rgba(200,190,255,.9)); }
+}
+
+/* AL PASSAGGIO DEL MOUSE, col tema acceso: i tasti tremano e si accendono di
+   arancio, i collegamenti brillano come una candela, i riquadri si alzano con un
+   alone viola, il campo di ricerca prende l'anello di zucca. */
+html.halloween main button:hover, html.halloween .tema-tasto:hover, html.halloween .proposta:hover {
+  animation: brivido .35s ease-in-out; box-shadow: 0 0 0 2px rgba(255,138,26,.5), 0 0 14px rgba(255,138,26,.45);
+}
+html.halloween .halloween-tasto:hover svg { animation: dondola-zucca .6s ease-in-out infinite; transform-origin: 50% 90%; }
+html.halloween .nav a:hover, html.halloween main a:hover, html.halloween .conto:hover, html.halloween .stato-fonti:hover {
+  color: #ff9a3c; animation: candela 1.2s ease-in-out infinite;
+}
+html.halloween .esito, html.halloween .scheda, html.halloween .tabella tbody tr {
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+html.halloween .esito:hover, html.halloween .scheda:hover {
+  transform: translateY(-2px); box-shadow: 0 6px 22px rgba(140,80,220,.28), 0 0 0 1px rgba(166,77,255,.35);
+}
+html.halloween .tabella tbody tr:hover { box-shadow: inset 3px 0 0 #ff8a1a; background: rgba(255,138,26,.06); }
+html.halloween main input:not([type=hidden]):focus, html.halloween main input:not([type=hidden]):hover {
+  box-shadow: 0 0 0 3px rgba(255,138,26,.35), 0 0 18px rgba(255,138,26,.25);
+}
+html.halloween .marchio:hover .iniziale { animation: candela .9s ease-in-out infinite; }
+@keyframes brivido {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  20% { transform: translateX(-1.5px) rotate(-1.5deg); }
+  40% { transform: translateX(1.5px) rotate(1.5deg); }
+  60% { transform: translateX(-1px) rotate(-1deg); }
+  80% { transform: translateX(1px) rotate(.5deg); }
+}
+@keyframes candela {
+  0%, 100% { text-shadow: 0 0 6px rgba(255,138,26,.55); }
+  35%      { text-shadow: 0 0 12px rgba(255,170,60,.9), 0 0 2px rgba(255,220,150,.9); }
+  60%      { text-shadow: 0 0 4px rgba(255,138,26,.4); }
+}
+@keyframes dondola-zucca {
+  0%, 100% { transform: rotate(-10deg); }
+  50%      { transform: rotate(10deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.halloween .faccia-hw-furba, html.halloween .furbetto:hover .faccia-hw-ride,
+  html.halloween .furbetto.stordito .faccia-hw-stordita, html.halloween main button:hover,
+  html.halloween .tema-tasto:hover, html.halloween .proposta:hover, html.halloween .halloween-tasto:hover svg,
+  html.halloween .nav a:hover, html.halloween main a:hover, html.halloween .conto:hover,
+  html.halloween .stato-fonti:hover, html.halloween .marchio:hover .iniziale { animation: none; }
+  html.halloween .esito:hover, html.halloween .scheda:hover { transform: none; }
+}
+
 /* ======================================================================
    CODICE MODELLO ACCANTO AL NOME (30/09/2026)
    ====================================================================== */
