@@ -34,7 +34,7 @@ from pathlib import Path
 RADICE = Path(__file__).resolve().parent.parent
 QUI = Path(__file__).resolve().parent
 VARIANTI = {"pacchetto": {"premium_di_prova": True}, "store": {"premium_di_prova": False}}
-VERSIONE = "0.9.0"
+VERSIONE = "1.0.0"
 NOME = "Page Brawl"
 
 MANIFEST = {

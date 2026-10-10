@@ -8,11 +8,13 @@ Controllato sulla documentazione di Chrome il 02/10/2026 e ricontrollato il 05/1
 
 **Un punto da verificare nella console: il video.** La pagina `cws-dashboard-listing` elenca fra le cose da fornire anche il link a un video YouTube che mostra l'estensione, e dichiara facoltativo solo il riquadro grande (1400×560). Non ho potuto aprire la console per vedere se il campo blocca davvero l'invio. Se lo blocca, basta mezzo minuto di schermo registrato con la lotta, il controller e l'orda, caricato su YouTube come «non in elenco».
 
-## In breve, per questa uscita (0.9.0, Premium sbloccabile gratis)
+## In breve, per questa uscita (1.0.0, tutto gratis)
 
-1. `python3 estensione/costruisci.py --zip` e si carica `estensione/zip/page-brawl-0.9.0-store.zip`.
-2. `premium.json` è già a posto: `premium_attivo: true`, `sblocco_gratis: true`, `url_acquisto` vuoto. Chi installa vede i lucchetti e, in cima alla tendina, il tasto **Sblocca Premium gratis**.
-3. Nella scheda dello store si incollano le descrizioni di questa pagina (dicono che Premium per ora è gratis) e, nelle istruzioni per la verifica, il testo del passo 8: spiega al revisore come aprire tutto.
+Decisione di Riccardo del 10/10/2026: «metterlo totalmente gratuito per questa versione».
+
+1. `python3 estensione/costruisci.py --zip` e si carica `estensione/zip/page-brawl-1.0.0-store.zip`.
+2. `premium.json`: `premium_attivo: false`. Niente lucchetti, niente riquadro Premium, niente tasto di sblocco: tutto aperto dal primo clic.
+3. Nella scheda dello store si incollano le descrizioni di questa pagina (non parlano più di Premium) e, nelle istruzioni per la verifica, il testo del passo 8.
 4. In «Distribuzione» l'estensione resta **gratis** e senza acquisti in-app.
 5. Niente informativa sulla privacy da aggiungere: non si raccoglie niente e non si vende niente.
 
@@ -30,7 +32,7 @@ Controllato sulla documentazione di Chrome il 02/10/2026 e ricontrollato il 05/1
    ```
    Open any web page and click the toolbar icon: two characters start fighting. The power button in the bottom right corner turns everything off.
    The gamepad button opens a corner controller: click a slice to trigger a move, click the portrait to switch fighter.
-   The glove button opens the options panel. Items marked with a padlock are "Premium": during this release Premium is free. Press "Unlock Premium for free" at the top of the panel and every padlock opens. No account, no payment, no network request.
+   The glove button opens the options panel: every feature is free and unlocked, there is nothing to buy. "Endless run" in the panel starts the single-player mode. No account, no payment, no network request.
    ```
 9. **Invia.** «Invia per la revisione». Se togli la spunta «Pubblica automaticamente», dopo l'approvazione hai 30 giorni per pubblicare a mano; scaduti, va reinviata.
 10. **Attesa.** Di solito pochi giorni, a volte qualche settimana. Il permesso facoltativo su tutti i siti (`<all_urls>`) è fra quelli che allungano la revisione: la giustificazione qui sotto serve a quello. Oltre tre settimane si scrive all'assistenza.
@@ -46,7 +48,7 @@ Zip: `page-brawl-<versione>-store.zip`.
 
 ## Prima di premere «Invia»
 
-1. **Premium.** Scelta del 05/10/2026: si esce con `sblocco_gratis: true`. Chi installa vede i tasti col lucchetto (i tre stili di personaggi con le loro mosse, le armi, il meteo, i meteoriti, il buco nero, l'orda) e, in cima alla tendina, il tasto **Sblocca Premium gratis** che li apre tutti. Da controllare prima di inviare: `python3 estensione/costruisci.py` deve stampare «Premium si sblocca gratis anche in store/». Se invece avvisa che manca l'indirizzo di acquisto, `premium.json` non è quello giusto e i lucchetti resterebbero chiusi senza rimedio.
+1. **Premium.** Per la 1.0.0 (10/10/2026) `premium_attivo: false`: tutto gratis, niente lucchetti; `python3 estensione/costruisci.py` non stampa niente su Premium. Quella che segue era la scelta del 05/10, superata: si esce con `sblocco_gratis: true`. Chi installa vede i tasti col lucchetto (i tre stili di personaggi con le loro mosse, le armi, il meteo, i meteoriti, il buco nero, l'orda) e, in cima alla tendina, il tasto **Sblocca Premium gratis** che li apre tutti. Da controllare prima di inviare: `python3 estensione/costruisci.py` deve stampare «Premium si sblocca gratis anche in store/». Se invece avvisa che manca l'indirizzo di acquisto, `premium.json` non è quello giusto e i lucchetti resterebbero chiusi senza rimedio.
 2. **Nome.** «Page Brawl» è provvisorio: va cercato nello store e tra i marchi registrati prima di usarlo.
 3. **Marchi.** I personaggi a pagamento sono inventati (nomi, facce, vestiti) e scheda e schermate non nominano prodotti o personaggi di altri: tenerlo così. Restano il robot e la mela della lotta gratis, che a qualcuno ricordano due marchi: se si vuole togliere ogni dubbio, anche loro si possono sostituire con due personaggi inventati. Un parere legale prima di vendere resta da chiedere.
 4. **Effetti cruenti.** Lo store vieta la violenza gratuita. Partono spenti e le schermate non li mostrano, ma l'interruttore c'è: non so dire come lo giudica un revisore. La scelta più prudente è toglierlo dalla variante `store`.
@@ -81,11 +83,12 @@ Join in:
 • Transformations: the robot turns into a steel colossus and the apple into a towering tree when one of them is one hit away from a K.O.
 • Optional sound: off until you switch it on. Every punch, explosion, zombie and jingle is synthesized on the spot (nothing is downloaded) and comes from the side of the screen where it happens.
 • Endless run that keeps escalating: pick a fighter and play alone, round after round, each one bigger than the last. Every round brings a new enemy, including little dragons shooting fire, lightning or venom. Enemies drop gems, every level offers three cards with weapons that strike on their own and evolve, bosses drop chests, coins stay between runs and buy permanent upgrades. Three lives that don't come back, and an aimed final move. Your best score stays on your device.
+• Keyboard controls: Q W E R T Y trigger the controller's moves, A and D walk, F flies, Z fires the final move, X C V use the run's items. Every key can be remapped in the panel.
 • The fighters learn: the more they fight, the more varied their moves get.
 
 The power button in the corner turns everything off and on again. The page itself is never changed. A short "How it works" page opens after installation and can be reopened from the panel.
 
-Premium is free for now: press "Unlock Premium for free" at the top of the panel. It adds:
+Everything is free, with nothing to unlock or buy. Also included:
 • Three sets of original characters, each with its own moves and its own transformed body (blazing crests and torn jackets, hooded knights). Super warriors fly, fire energy waves and transform. Wizards cast freezing, shrinking and lightning spells and ride brooms. Duelists fight with energy blades.
 • Energy clashes: when one fighter charges an energy attack the other answers with the same one, the two beams meet and it becomes a tug of war. Two buttons pop up: hammer the one on your fighter's side to win it.
 • A zombie horde that shows up on its own: the two stop fighting each other, stand back to back and hold out, with three lives, against waves that are never the same twice. They team up too: leapfrog over the partner, side swap, double strike, cannonball.
@@ -93,7 +96,7 @@ Premium is free for now: press "Unlock Premium for free" at the top of the panel
 • Weapons and bombs, bazooka and flamethrower included.
 • Weather and gravity: rain and thunderstorms, a hurricane, meteorites, slow motion, Moon, space and upside-down gravity.
 
-Privacy: Page Brawl collects nothing and sends nothing. It only runs on the tab where you click its icon, and it has no access to any other tab. Your settings and tokens are stored on your device.
+Privacy: Page Brawl collects nothing and sends nothing. It only runs on the tab where you click its icon, and it has no access to any other tab. Your settings, tokens and coins are stored on your device.
 
 Cartoon violence only. Stronger effects are off by default and can be enabled in the options.
 
@@ -116,11 +119,12 @@ Partecipa anche tu:
 • Trasformazioni: il robot diventa un colosso d'acciaio e la mela un albero enorme quando a uno dei due manca un colpo al K.O.
 • Audio facoltativo: spento finché non lo accendi. Pugni, esplosioni, zombie e fanfare sono sintetizzati al momento (non si scarica niente) e arrivano dal lato dello schermo dove succede la cosa.
 • Corsa infinita che cresce senza sosta: scegli un personaggio e gioca da solo, un round dopo l'altro, ognuno più grande del precedente. Ogni round porta un nemico nuovo, compresi draghetti che tirano fuoco, fulmini o veleno. I nemici lasciano gemme, a ogni livello tre carte con armi che colpiscono da sole e si evolvono, i capi lasciano forzieri, le monete restano fra una corsa e l'altra e comprano potenziamenti permanenti. Tre vite che non tornano, e un colpo finale da mirare. Il tuo record resta sul tuo dispositivo.
+• Comandi da tastiera: Q W E R T Y fanno le mosse del controller, A e D camminano, F vola, Z il colpo finale, X C V gli oggetti della corsa. Ogni tasto si cambia dalla tendina.
 • I lottatori imparano: più combattono, più le mosse diventano varie.
 
 Il tasto di accensione nell'angolo spegne e riaccende tutto. La pagina non viene mai modificata. Dopo l'installazione si apre una breve pagina «Come funziona», che si riapre dalla tendina.
 
-Premium per ora è gratis: premi «Sblocca Premium gratis» in cima alla tendina. Aggiunge:
+È tutto gratis, senza niente da sbloccare o comprare. C'è anche:
 • Tre coppie di personaggi originali, ognuna con le sue mosse e la sua trasformazione (cresta accesa e casacca a brandelli, cavalieri incappucciati). I super guerrieri volano, lanciano onde di energia e si trasformano. I maghi congelano, rimpiccioliscono, scagliano fulmini e volano sulla scopa. I duellanti combattono con lame di energia.
 • Gli scontri di energie: quando uno carica un colpo d'energia l'altro risponde con lo stesso, i due raggi si incontrano e diventa un tiro alla fune. Spuntano due tasti: martella quello dalla parte del tuo lottatore per farlo vincere.
 • L'orda di zombie, che arriva da sola: i due smettono di picchiarsi, si mettono spalle a spalla e resistono, con tre vite, a ondate mai due volte uguali. E si danno una mano: cavallina sopra il compagno, cambio di lato, colpo insieme, palla di cannone.
@@ -128,7 +132,7 @@ Premium per ora è gratis: premi «Sblocca Premium gratis» in cima alla tendina
 • Armi e bombe, bazooka e lanciafiamme compresi.
 • Meteo e gravità: pioggia e temporali, uragano, meteoriti, rallentatore, Luna, spazio e gravità sottosopra.
 
-Privacy: Page Brawl non raccoglie e non invia niente. Funziona solo sulla scheda in cui clicchi la sua icona e non ha accesso alle altre. Opzioni e gettoni restano sul tuo dispositivo.
+Privacy: Page Brawl non raccoglie e non invia niente. Funziona solo sulla scheda in cui clicchi la sua icona e non ha accesso alle altre. Opzioni, gettoni e monete restano sul tuo dispositivo.
 
 Solo violenza da cartone animato. Gli effetti più forti sono spenti e si accendono dalle opzioni.
 
@@ -149,19 +153,21 @@ Page Brawl shows an animated cartoon fight on top of the page the user is viewin
 | --- | --- |
 | `activeTab` | The animation is drawn on the current tab only after the user clicks the extension icon. activeTab gives access to that single tab for that click, so no host permissions are needed. |
 | `scripting` | Used to inject the extension's own bundled scripts and one small style rule into the tab the user clicked on. No remote code is loaded. |
-| `storage` | Saves the user's options, the in-game tokens, what the fighters have learned and the Premium state locally, so they are the same on every site. Nothing is sent anywhere. |
+| `storage` | Saves the user's options, the in-game tokens and coins, the keyboard mapping and what the fighters have learned locally, so they are the same on every site. Nothing is sent anywhere. |
 | Host facoltativo (`<all_urls>`) | Optional and off by default. It is requested only when the user turns on "Show the power button on every site" in the options page; it is used to place that one button on each page so the animation can be started without the toolbar icon. No page content is read or transmitted. Turning the option off removes the permission. |
 
 **Codice remoto:** No, I am not using remote code.
 
 **Uso dei dati:** nessuna casella spuntata (l'estensione non raccoglie dati). Spuntare le tre dichiarazioni finali: i dati non vengono venduti, non vengono usati per scopi estranei, non servono a valutare l'affidabilità creditizia.
 
-**Informativa sulla privacy:** per un'estensione che non raccoglie dati l'indirizzo non è obbligatorio, e con Premium sbloccabile gratis resta così: lo sblocco è un valore scritto nella memoria dell'estensione, non parte nessuna richiesta di rete. Quando si aggiunge l'acquisto di Premium diventa necessario, perché il servizio di pagamento tratta l'email di chi compra.
+**Informativa sulla privacy:** per un'estensione che non raccoglie dati l'indirizzo non è obbligatorio, e con la 1.0.0 tutta gratis resta così: non parte nessuna richiesta di rete. Quando si aggiunge l'acquisto di Premium diventa necessario, perché il servizio di pagamento tratta l'email di chi compra.
 
 ## Immagini
 
 - **Icona 128×128:** `store/icone/128.png`.
-- **Schermate 1280×800** (cartella `scheda/`, su una pagina dimostrativa inventata, senza marchi; effetti cruenti spenti). Lo store ne accetta al massimo cinque. **Le cinque da caricare per questa uscita**, in quest'ordine:
+- **Schermate 1280×800** (cartella `scheda/`, su una pagina dimostrativa inventata, senza marchi; effetti cruenti spenti). Lo store ne accetta al massimo cinque. **Le cinque da caricare per la 1.0.0**, in quest'ordine: `12-corsa.png` (la corsa infinita: draghetti, corvacci, zombie nuovi, fulmini, il cruscotto), `13-livello.png` (le tre carte di un livello), `11-colpo-finale.png`, `7-orda.png`, `8-scontro.png`. Niente lucchetti in nessuna (`9-sblocco.png` non va più caricata: mostra il riquadro Premium).
+
+Elenco della 0.9.0, superato:
   1. `6-controller.png`: il controller ad angolo coi super guerrieri, una mossa appena comandata.
   2. `7-orda.png`: il robot e la mela spalle a spalla contro l'orda, con l'ondata in corso e le tre vite in alto.
   3. `8-scontro.png`: lo scontro di energie, col tiro alla fune sopra i due raggi e i due tasti da martellare.

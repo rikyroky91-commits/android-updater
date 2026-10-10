@@ -132,6 +132,14 @@ class TestEstensione(unittest.TestCase):
         gratis = bool(scelte.get("premium_attivo", True)) and bool(scelte.get("sblocco_gratis", False))
         prova = (VARIANTI["pacchetto"] / "prepara.js").read_text(encoding="utf-8")
         store = (VARIANTI["store"] / "prepara.js").read_text(encoding="utf-8")
+        # 1.0.0 (10/10/2026): «totalmente gratuito per questa versione» → `premium_attivo: false`.
+        # Allora niente riquadro e niente interruttore in nessuna delle due varianti, e niente lucchetti.
+        if not scelte.get("premium_attivo", True):
+            for testo in (prova, store):
+                self.assertIn('"premium": false', testo)
+                self.assertNotIn("data-premio-prova aria-pressed", testo)
+                self.assertNotIn("Sblocca Premium gratis", testo)
+            return
         # Nella variante di prova l'interruttore c'è sempre.
         self.assertIn("data-premio-prova aria-pressed", prova)
         # In quella da pubblicare c'è solo quando Premium si regala: allora è lo stesso della prova.

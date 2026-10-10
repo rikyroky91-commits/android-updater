@@ -44,7 +44,7 @@ Di suo l'estensione entra in una pagina solo quando clicchi l'icona (`activeTab`
 | `pacchetto/` | Provarla caricandola a mano | Chiuso, con l'interruttore in cima alla tendina per vederla aperta e chiusa |
 | `store/` | Quella da pubblicare | Dipende da `premium.json`. Oggi (`sblocco_gratis: true`) ha lo stesso interruttore della prova, col nome **Sblocca Premium gratis**: un clic e si apre tutto |
 
-Con `sblocco_gratis: true` le due cartelle sono uguali. La scelta è stata presa il 05/10/2026: si esce con Premium apribile da chiunque, in attesa dei pareri di chi la usa.
+**Dalla 1.0.0 (10/10/2026) tutto gratis:** `premium_attivo: false` in `premium.json`, su richiesta di Riccardo («totalmente gratuito per questa versione»). Niente lucchetti, niente riquadro, niente interruttore, in tutte e due le cartelle; quello che sotto è detto «Premium» è aperto a tutti dal primo clic. Prima (dal 05/10) si usciva con `sblocco_gratis: true`, Premium apribile da chiunque con un tasto.
 
 ### Cosa è gratis e cosa è Premium
 

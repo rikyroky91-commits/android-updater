@@ -1,5 +1,5 @@
 {
-  "premium_attivo": true,
-  "sblocco_gratis": true,
+  "premium_attivo": false,
+  "sblocco_gratis": false,
   "url_acquisto": ""
 }
