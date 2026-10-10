@@ -7,13 +7,14 @@ i test.
 
 La revisione firmware aggiunge archivi per OPPO, realme e Honor e corregge
 la selezione delle versioni stabili Redmi/Xiaomi. Limiti e verifiche in
-[passaggio-consegne-firmware.md](passaggio-consegne-firmware.md).
+[passaggio-consegne-firmware.md](docs/consegne/passaggio-consegne-firmware.md).
 
 La revisione v76 sposta l'indice TAC su SQLite, aggiunge il registro
 amministratore dei TAC da verificare e rende visibili i metadati del rilascio.
-Configurazione e verifiche in [passaggio-consegne-v76.md](passaggio-consegne-v76.md).
+Configurazione e verifiche in [passaggio-consegne-v76.md](docs/consegne/passaggio-consegne-v76.md).
 
 ```bash
+pip install -r requirements-web.txt     # NON requirements.txt: è quello di app.py (Streamlit)
 uvicorn web.main:app --reload           # il sito, su http://127.0.0.1:8000
 python worker.py --once                 # una scansione sola (cron / GitHub Actions)
 python worker.py                        # ciclo continuo, senza sito
@@ -41,7 +42,7 @@ diventa la scheda di un modello quando le si dà qualcosa da cercare;
   `strumenti-analisi-identita.py`, che confronta l'identità di 4300 modelli
   marca per marca e classifica le divergenze per causa: Samsung 100%,
   Pixel 100%, POCO 92%, Xiaomi 84%. Le marche più basse e il perché stanno
-  in [`passaggio-consegne-v43.md`](passaggio-consegne-v43.md). «samsung s24» e
+  in [`passaggio-consegne-v43.md`](docs/consegne/passaggio-consegne-v43.md). «samsung s24» e
   «SM-S921B» danno la stessa versione, la stessa build e la stessa CPU: la
   ricerca prova le forme equivalenti in tutti e due i versi. Quando una
   fonte risponde per una variante precisa, l'app **dice quale**
@@ -162,7 +163,13 @@ tests/             1300+ test, nessuno tocca la rete — verificato, non
 
 Il core non sa che il sito esiste: gli stessi moduli girano nel sito, nel
 worker e nei test. La dashboard Streamlit (`app.py`) è stata tolta il
-2026-08-10, quando il sito è andato in produzione.
+2026-08-10, quando il sito è andato in produzione, ed è tornata l'11/08 su
+richiesta, da tenere IN PARALLELO al sito: per questo ci sono due file di
+dipendenze. `requirements.txt` è quello di `app.py` (lo legge Streamlit
+Cloud), `requirements-web.txt` quello del sito e del worker (lo legge il
+Dockerfile): per lavorare in locale sul sito si installa il secondo.
+
+I passaggi di consegne dei giri passati stanno in `docs/consegne/`.
 
 ### I test non toccano la rete, e non è una promessa
 

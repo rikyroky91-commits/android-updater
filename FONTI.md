@@ -7,7 +7,7 @@ La ricerca per dispositivo ora include GBFirmware per OPPO/realme e
 HalabTech per Honor. Sono metadati pubblici di archivi tecnici, classificati
 `REPORTED`, non una verifica OTA. Codici sconosciuti o ambigui non vengono
 associati a un modello per tentativi. Dettagli e collaudi nel
-[passaggio di consegne firmware](passaggio-consegne-firmware.md).
+[passaggio di consegne firmware](docs/consegne/passaggio-consegne-firmware.md).
 
 Il catalogo Xiaomi esistente viene filtrato sulle sole release `Stable`,
 con rami regionali separati: `Stable Beta` e `Public Beta` sono esclusi.

@@ -40,7 +40,7 @@ Il cambio di User-Agent delle precedenti modifiche non ha risolto il blocco.
 
 ## Consegna e documentazione
 
-- Nuova [guida servizi TAC](guida-servizi-tac.md), con configurazione,
+- Nuova [guida servizi TAC](../../guida-servizi-tac.md), con configurazione,
   fonti ufficiali, criteri di accettazione e limiti ancora aperti.
 - README corretto: non suggerisce più il workflow rimosso `scan.yml` che
   pubblicava il database; distingue Gist non elencato e cifratura.
