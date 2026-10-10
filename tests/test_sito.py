@@ -714,7 +714,7 @@ class TestSchedaDispositivo(_Sito):
         self.assertEqual(risposta.status_code, 303)
 
 
-class TestRicercaRicordata(_Sito):
+class TestRicercaRicordata(_SitoConLogin):
     """DODICI SECONDI, E NESSUNA MEMORIA FRA DUE RICERCHE UGUALI.
 
     Misurato sul sito vero il 2026-08-10: `GET /?q=SM-S928B` impiegava
@@ -1317,7 +1317,7 @@ class TestConfronto(_Sito):
                 lambda q: {"items": [], "error": None})
 
 
-class TestCorrezioneNomeModello(_Sito):
+class TestCorrezioneNomeModello(_SitoConLogin):
     """Il nome commerciale scelto a mano per un codice — vedi il
     commento in `web.main._cerca_davvero` per il bug reale che l'ha
     motivato: un codice con più nomi veri (misurato su `RMX3933`: C61,
@@ -1333,6 +1333,7 @@ class TestCorrezioneNomeModello(_Sito):
     """
 
     def setUp(self):
+        super().setUp()
         from core import modelcodes
 
         from web.main import RICERCHE
@@ -1434,7 +1435,7 @@ class TestCorrezioneNomeModello(_Sito):
         self.assertEqual(RICERCHE.leggi("realme zz5555")["nome"], "Test Beta")
 
 
-class TestCorrezioneNomeModelloConMarcaSintetica(_Sito):
+class TestCorrezioneNomeModelloConMarcaSintetica(_SitoConLogin):
     """Il caso reale che ha motivato `_opzioni_correzione`: RMX3933.
 
     Nel dataset vero nessuno dei nomi di quel codice scrive «realme» per
@@ -1449,6 +1450,7 @@ class TestCorrezioneNomeModelloConMarcaSintetica(_Sito):
     """
 
     def setUp(self):
+        super().setUp()
         from core import aer_catalog, modelcodes
 
         from web.main import RICERCHE
@@ -1505,7 +1507,7 @@ class TestCorrezioneNomeModelloConMarcaSintetica(_Sito):
         self.assertIn("Nome corretto a mano", pagina)
 
 
-class TestCorrezioneNomeScrittaAMano(_Sito):
+class TestCorrezioneNomeScrittaAMano(_SitoConLogin):
     """Il testo libero, ultima via d'uscita per chi non riconosce il
     proprio telefono in NESSUNA delle forme proposte — segnalato
     dall'utente, che chiedeva la stessa cosa già disponibile per un TAC
@@ -1517,6 +1519,7 @@ class TestCorrezioneNomeScrittaAMano(_Sito):
     """
 
     def setUp(self):
+        super().setUp()
         from core import modelcodes
 
         from web.main import RICERCHE
@@ -1634,7 +1637,7 @@ class TestNomeDallaSchedaSenzaFirmware(_Sito):
         self.assertIn("Nessun firmware per «ZZNONESISTE999»", pagina)
 
 
-class TestCorrezioneAvviaSubitoIlBackup(_Sito):
+class TestCorrezioneAvviaSubitoIlBackup(_SitoConLogin):
     """Segnalato dall'utente: «assicurati che quando correggo il nome il
     risultato si salvi perché sembra che non lo faccia».
 
@@ -1663,6 +1666,7 @@ class TestCorrezioneAvviaSubitoIlBackup(_Sito):
     """
 
     def setUp(self):
+        super().setUp()
         from core import backup, modelcodes
 
         from web.main import RICERCHE
@@ -2637,7 +2641,7 @@ class TestEsportazioneDeiTacInseriti(_Sito):
         self.assertIn("/tac/esporta", riga)
 
 
-class TestSalvaIncollando(_Sito):
+class TestSalvaIncollando(_SitoConLogin):
     """Il campo unico: si incolla quello che si è letto altrove.
 
     L'app non va a leggere quei siti da sola — bloccano l'accesso

@@ -2,6 +2,30 @@
 {% block titolo %}TAC da verificare · {{ titolo_sito }}{% endblock %}
 {% block corpo %}
 <h1>TAC da verificare</h1>
+{# PROPOSTE DEI VISITATORI (10/10/2026): chi non ha un account non applica
+   più una correzione, la propone. Si approvano o si scartano qui. #}
+<h2>Correzioni proposte</h2>
+<p class="nota">Inviate da chi non ha fatto l’accesso. Approvarne una la applica
+  a tutti, con la precedenza sulle fonti; le altre proposte per lo stesso TAC o
+  codice spariscono. Non si conserva chi le ha inviate.</p>
+{% for p in proposte %}
+<section class="esito">
+  <h3>{{ tipi_proposta.get(p.tipo, p.tipo) }} · <a href="/?q={{ p.chiave | urlencode }}"><code>{{ p.chiave }}</code></a></h3>
+  <p>{% if p.tipo == 'tac' %}<strong>{{ p.marca }} {{ p.valore }}</strong>
+     {% elif p.valore %}<strong>{{ p.valore }}</strong>
+     {% else %}<strong>tornare alla scelta automatica</strong>{% endif %}
+     · {{ p.conteggio }} {{ "volta" if p.conteggio == 1 else "volte" }} · ultima {{ fmt_date(p.ultima) }}</p>
+  <form method="post" action="/admin/proposte/{{ p.id }}/approva" class="in-riga">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit">Approva</button>
+  </form>
+  <form method="post" action="/admin/proposte/{{ p.id }}/scarta" class="in-riga">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="secondario">Scarta</button>
+  </form>
+</section>
+{% else %}<p>Nessuna correzione proposta.</p>{% endfor %}
+<h2>TAC cercati e non riconosciuti</h2>
 <p class="nota">Conteggi aggregati per TAC, conservati fino a 90 giorni dall’ultima ricerca (massimo 1.000 TAC). Non vengono conservati IMEI completi, indirizzi IP o account dei visitatori. Una ricerca completata in sottofondo non aumenta il conteggio.</p>
 {% for voce in voci %}
 <section class="esito">

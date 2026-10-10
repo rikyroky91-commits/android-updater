@@ -12,6 +12,15 @@
   in cui si guardano.
 #}
 {% block corpo %}
+{# PROPOSTE DI CORREZIONE (10/10/2026): senza account una correzione non si
+   applica subito, va in coda per un amministratore — vedi `tac_salva`. #}
+{% if proposta == "1" %}
+<p class="avviso" role="status">Grazie: la correzione è stata inviata. Comparirà
+  qui dopo la verifica di un amministratore.</p>
+{% elif proposta == "0" %}
+<p class="avviso" role="status">La correzione non è stata inviata: controlla
+  di aver scritto marca e modello.</p>
+{% endif %}
 {# TUTTO IL RISULTATO STA IN UN CONTENITORE SOLO, e ha un nome: è quello
    che il secondo tempo della ricerca sostituisce per intero (vedi
    `frammento_firmware` in web/main.py e `firmware-in-arrivo.js`). Il
@@ -205,7 +214,7 @@
         <option value="{{ voce }}">{{ voce }}</option>
         {% endfor %}
       </select>
-      <button type="submit">Salva come nome principale</button>
+      <button type="submit">{{ "Salva come nome principale" if utente else "Proponi come nome principale" }}</button>
     </form>
     {% endif %}
     {# LA VIA D'USCITA QUANDO NEMMENO QUESTE FORME VANNO BENE — stessa
@@ -229,7 +238,7 @@
         <label class="sr-only" for="correzione-nome-libero">Nome commerciale, scritto a mano</label>
         <input id="correzione-nome-libero" type="text" name="nome"
                placeholder="Nome commerciale, es. realme Note 60">
-        <button type="submit" class="secondario">Salva questo nome</button>
+        <button type="submit" class="secondario">{{ "Salva questo nome" if utente else "Proponi questo nome" }}</button>
       </form>
     </details>
     {% if risultato.corretto_a_mano %}
@@ -241,7 +250,9 @@
     </form>
     {% endif %}
     <p class="nota">Vale per ogni ricerca futura di questo codice, con
-      qualsiasi dei suoi nomi — non solo con quello scritto ora.</p>
+      qualsiasi dei suoi nomi — non solo con quello scritto ora.{% if not utente %}
+      Senza accesso la correzione è una proposta: si applica dopo la verifica
+      di un amministratore.{% endif %}</p>
   </details>
   {% endif %}
 

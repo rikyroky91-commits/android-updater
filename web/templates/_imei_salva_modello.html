@@ -13,7 +13,9 @@
    un clic di distanza, e il modo di riportarla dentro l'app era chiuso
    in un riquadro che nessuno apre. #}
 <p class="nota">{{ introduzione }} Vale per tutti gli IMEI con TAC
-  <code>{{ imei.tac }}</code> e ha la precedenza sui database scaricati.</p>
+  <code>{{ imei.tac }}</code> e ha la precedenza sui database scaricati.{% if not utente %}
+  Senza accesso è una proposta: si applica dopo la verifica di un
+  amministratore.{% endif %}</p>
 {# UN CAMPO SOLO, perché è così che arriva la risposta. Chi ha appena
    letto «SAMSUNG GALAXY A56 5G» su uno dei siti qui sopra lo seleziona e
    lo copia in un gesto; con due caselle doveva spezzarlo in testa e
@@ -29,7 +31,7 @@
   <label class="sr-only" for="tac-incollato">Marca e modello, incollati</label>
   <input id="tac-incollato" type="text" name="incollato"
          placeholder="Incolla qui — es. Samsung Galaxy A54 5G">
-  <button type="submit" class="secondario">Salva questo modello</button>
+  <button type="submit" class="secondario">{{ "Salva questo modello" if utente else "Proponi questo modello" }}</button>
 </form>
 <details class="correzione-libera">
   <summary>Preferisci separarli tu?</summary>
@@ -41,7 +43,7 @@
     <input type="hidden" name="imei" value="{{ imei.imei }}">
     <input type="text" name="marca" placeholder="Marca — es. Samsung">
     <input type="text" name="modello" placeholder="Modello — es. Galaxy A54 5G">
-    <button type="submit" class="secondario">Salva questo modello</button>
+    <button type="submit" class="secondario">{{ "Salva questo modello" if utente else "Proponi questo modello" }}</button>
   </form>
 </details>
 {# Il salvataggio vive nell'archivio, quindi sopravvive ai riavvii ma non

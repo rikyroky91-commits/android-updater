@@ -146,6 +146,23 @@ CREATE TABLE IF NOT EXISTS tac_da_verificare (
 );
 CREATE INDEX IF NOT EXISTS idx_tac_da_verificare_ultima ON tac_da_verificare(ultima);
 
+-- Correzioni proposte da chi non ha un account (10/10/2026): un modello per
+-- un TAC o un nome per un codice, in attesa che un amministratore le
+-- approvi. Prima si applicavano subito, con la precedenza su ogni fonte, da
+-- chiunque. Come `tac_da_verificare`, niente IMEI, IP o altri dati di chi
+-- propone: solo cosa propone e quante volte. Vedi core/proposte.py.
+CREATE TABLE IF NOT EXISTS proposte_correzione (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    tipo      TEXT NOT NULL CHECK(tipo IN ('tac', 'nome')),
+    chiave    TEXT NOT NULL,
+    marca     TEXT NOT NULL DEFAULT '',
+    valore    TEXT NOT NULL DEFAULT '',
+    conteggio INTEGER NOT NULL DEFAULT 1,
+    prima     TEXT NOT NULL,
+    ultima    TEXT NOT NULL,
+    UNIQUE(tipo, chiave, marca, valore)
+);
+
 -- Cronologia delle ricerche di modello: un rigo per ogni ricerca live che ha
 -- trovato qualcosa, condensato a modello + firmware, per un riepilogo veloce
 -- senza dover riaprire la scheda dispositivo completa.

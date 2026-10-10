@@ -433,7 +433,8 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
                     verifica_ai: str = Query(default=""),
                     parco: int = Query(default=0),
                     saved: int = Query(default=0),
-                    completo: int = Query(default=0)):
+                    completo: int = Query(default=0),
+                    proposta: str = Query(default="")):
     """La home, e la pagina di un modello cercato.
 
     SENZA DOMANDA È LA SOLA BARRA DI RICERCA. Prima qui c'era anche
@@ -507,9 +508,13 @@ def pagina_ricerca(request: Request, q: str = Query(default=""),
     if (risultato.get("trovato") and not imei and not saved and not completo
             and not _e_un_crawler(request)):
         storage.registra_ricerca_recente(risultato.get("nome") or "")
-    return _rendi(request, "ricerca.html", _contesto_ricerca(
+    contesto = _contesto_ricerca(
         request, q, risultato, imei, ai=ai, alt=alt, perche=perche,
-        verifica_ai=verifica_ai, parco=parco, stats=stats))
+        verifica_ai=verifica_ai, parco=parco, stats=stats)
+    # «1» la proposta di correzione è in coda, «0» non era valida: vedi
+    # `tac_salva` e `modello_correggi`.
+    contesto["proposta"] = proposta if proposta in ("0", "1") else ""
+    return _rendi(request, "ricerca.html", contesto)
 
 
 def _contesto_ricerca(request: Request, q: str, risultato: dict, imei: dict | None,
@@ -1969,7 +1974,7 @@ def _backup_subito() -> None:
 
 
 @app.post("/tac/salva")
-def tac_salva(tac: str = Form(...), marca: str = Form(""),
+def tac_salva(request: Request, tac: str = Form(...), marca: str = Form(""),
               modello: str = Form(""), imei: str = Form(""),
               incollato: str = Form("")):
     """Il modello verificato a mano, salvato dentro l'app.
@@ -1988,12 +1993,36 @@ def tac_salva(tac: str = Form(...), marca: str = Form(""),
 
     I due campi espliciti restano e VINCONO su quello incollato: chi
     scrive a mano sta correggendo, e una correzione non si reinterpreta.
+
+    SENZA ACCOUNT È UNA PROPOSTA (10/10/2026). La correzione vince su ogni
+    fonte e vale per tutti: chiunque poteva riscrivere il modello di un
+    TAC con una POST. Chi ha un account approvato salva come prima; chi
+    non ce l'ha lascia una proposta che un amministratore approva da
+    `/admin/tac` — vedi `core/proposte.py`.
     """
     if incollato.strip() and not (marca.strip() and modello.strip()):
         letta_marca, letto_modello = imeicheck.interpreta_incollato(incollato)
         marca = marca.strip() or letta_marca
         modello = modello.strip() or letto_modello
-    imeicheck.aggiungi_tac(tac, marca, modello)
+    if not auth_web.utente_da_richiesta(request):
+        from core import proposte
+
+        tac_pulito = "".join(c for c in tac if c.isdigit())[:8]
+        esito = "1" if proposte.registra("tac", tac_pulito, marca, modello) else "0"
+        return RedirectResponse(f"/?q={quote(imei or tac)}&proposta={esito}", status_code=303)
+    applica_correzione_tac(tac, marca, modello)
+    return RedirectResponse(f"/?q={quote(imei or tac)}&saved=1", status_code=303)
+
+
+def applica_correzione_tac(tac: str, marca: str, modello: str) -> bool:
+    """Scrive il modello di un TAC e fa tutto quello che ne segue. Usata dal
+    salvataggio diretto e dall'approvazione di una proposta in `/admin/tac`."""
+    from core import proposte
+
+    if not imeicheck.aggiungi_tac(tac, marca, modello):
+        return False
+    tac = "".join(c for c in tac if c.isdigit())[:8]
+    proposte.risolte("tac", tac)
     # E ANCHE IL «NO» DELL'ARCHIVIO ESTERNO va tolto: era vero finche'
     # nessuno sapeva che telefono fosse, adesso lo sappiamo. Lasciarlo
     # non cambierebbe la risposta — la tabella scritta a mano ha la
@@ -2008,11 +2037,11 @@ def tac_salva(tac: str = Form(...), marca: str = Form(""),
     RICERCHE.svuota()
     # E VA MESSA AL SICURO SUBITO — vedi il docstring di `_backup_subito`.
     _backup_subito()
-    return RedirectResponse(f"/?q={quote(imei or tac)}&saved=1", status_code=303)
+    return True
 
 
 @app.post("/modello/correggi")
-def modello_correggi(codice: str = Form(...), nome: str = Form(""),
+def modello_correggi(request: Request, codice: str = Form(...), nome: str = Form(""),
                      query: str = Form("")):
     """Il nome commerciale scelto a mano per un codice, salvato dentro l'app.
 
@@ -2020,15 +2049,32 @@ def modello_correggi(codice: str = Form(...), nome: str = Form(""),
     di un TAC: vedi il commento in `_cerca_davvero` per il perché esiste.
     Un `nome` vuoto cancella la correzione — `storage.set_nome_modello`
     torna alla scelta automatica invece di salvarne una vuota.
+
+    Senza account è una proposta, come in `tac_salva`.
     """
+    if not auth_web.utente_da_richiesta(request):
+        from core import proposte
+
+        esito = "1" if proposte.registra("nome", codice, "", nome) else "0"
+        return RedirectResponse(f"/?q={quote(query or codice)}&proposta={esito}",
+                                status_code=303)
+    applica_correzione_nome(codice, nome)
+    return RedirectResponse(f"/?q={quote(query or codice)}", status_code=303)
+
+
+def applica_correzione_nome(codice: str, nome: str) -> None:
+    """Scrive (o, con un nome vuoto, toglie) il nome di un codice. Usata dal
+    salvataggio diretto e dall'approvazione di una proposta."""
+    from core import proposte
+
     storage.set_nome_modello(codice, nome)
+    proposte.risolte("nome", codice)
     # STESSA RAGIONE DI `tac_salva`: senza svuotare la memoria corta la
     # ricerca risponderebbe dalla cache col nome di prima, e sembrerebbe
     # che il salvataggio non abbia funzionato.
     RICERCHE.svuota()
     # E VA MESSA AL SICURO SUBITO — vedi il docstring di `_backup_subito`.
     _backup_subito()
-    return RedirectResponse(f"/?q={quote(query or codice)}", status_code=303)
 
 
 # Fra due scansioni a mano, almeno questo. Vedi `scansione`.
