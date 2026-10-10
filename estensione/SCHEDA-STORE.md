@@ -10,7 +10,9 @@ Controllato sulla documentazione di Chrome il 02/10/2026 e ricontrollato il 05/1
 
 ## In breve, per questa uscita (1.0.0, tutto gratis)
 
-Decisione di Riccardo del 10/10/2026: «metterlo totalmente gratuito per questa versione».
+Decisione di Riccardo del 10/10/2026: «metterlo totalmente gratuito per questa versione». Iscrizione da sviluppatore pagata da Riccardo il 10/10. Effetti cruenti lasciati come sono (decisione sua: se la revisione li contesta si tolgono dalla variante `store`).
+
+**Chi può compilare la console.** Chrome non lascia comandare da un'estensione le pagine del Web Store (`chrome.google.com/webstore`: «The extensions gallery cannot be scripted»), e il browser integrato dell'app Claude non le apre. Quindi caricamento e compilazione li fa Riccardo a mano. Il 10/10 gli è stata messa in `Download\Page Brawl store\` la cartella pronta: lo zip, le cinque schermate già numerate nell'ordine, il riquadro 440×280, l'icona e `TESTI-DA-INCOLLARE.txt` con ogni campo nell'ordine della console.
 
 1. `python3 estensione/costruisci.py --zip` e si carica `estensione/zip/page-brawl-1.0.0-store.zip`.
 2. `premium.json`: `premium_attivo: false`. Niente lucchetti, niente riquadro Premium, niente tasto di sblocco: tutto aperto dal primo clic.
