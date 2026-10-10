@@ -3,7 +3,10 @@
     "message": "Page Brawl"
   },
   "descrizione": {
-    "message": "A robot and an apple brawl on the page you are viewing. Grab them, throw them, bet on the winner."
+    "message": "An endless roguelike survivor on any web page: every site is a new arena. Many fighters, hordes, dragons, auto-weapons. Free."
+  },
+  "linguaEtichetta": {
+    "message": "Game language"
   },
   "titolo": {
     "message": "Start or stop the brawl on this page"

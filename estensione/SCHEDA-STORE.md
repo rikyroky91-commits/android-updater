@@ -60,9 +60,9 @@ Zip: `page-brawl-<versione>-store.zip`.
 Stanno già nel pacchetto (`_locales/`), in cinque lingue.
 
 - **Nome:** Page Brawl
-- **Descrizione breve (EN):** A robot and an apple brawl on the page you are viewing. Grab them, throw them, bet on the winner.
+- **Descrizione breve (EN):** An endless roguelike survivor on any web page: every site is a new arena. Many fighters, hordes, dragons, auto-weapons. Free.
 
-La descrizione breve non cambia con questa uscita.
+Riscritta con la 1.0.0 (Riccardo, 10/10: «la descrizione che parla solo di un robot e una mela non indica la realtà attuale: adesso è un endless roguelike survivor con tanti personaggi e tanti nemici, usabile in ogni pagina web, dove ogni sito è un ring nuovo»). Sta nel pacchetto (`_locales/`), in cinque lingue, come la lunga qui sotto. Con la 1.0.0 il gioco parte in inglese qualunque sia la lingua del browser (le altre quattro si scelgono nelle opzioni), e coi super guerrieri come personaggi di partenza (Riccardo: «come personaggi principali metti i guerrieri, che poi possono essere cambiati nella selezione dei personaggi»).
 
 ## Categoria e lingua
 
@@ -72,35 +72,43 @@ La descrizione breve non cambia con questa uscita.
 ## Descrizione lunga (EN)
 
 ```
-Click the icon and a little robot and an apple start fighting on whatever page you have open. They walk on the page's headings, buttons and images, trade punches, grab and throw each other, and dance when they win.
+Page Brawl turns any web page into an arena. Click the icon and the fight starts right on the site you are reading: the fighters run and jump on its headings, buttons and images, so every site is a new arena with its own platforms.
 
-Join in:
-• Pick a fighter up with the mouse and throw it, or use it to hit the other one.
-• Smoke bombs and glass jars fall into the ring. A thrown smoke bomb blinds whoever is caught in the cloud. A thrown jar breaks and releases a small creature of fire, lightning or water that fights for whoever threw it.
-• Take control: the gamepad button opens a corner controller. Pick a fighter and trigger their moves with one click.
-• Trigger an earthquake with a volcanic eruption, hand out jetpacks, or start an item shower.
-• Turn on health bars and bet tokens on the winner.
-• First to ten wins: the tenth K.O. sends the loser flying out of the ring, then the match starts over.
-• Finishing moves: about one round in three ends with a short scene. The lights go down and the winner launches the other into orbit, bounces them off the edges of the window, flattens them like a pancake, drops a huge energy sphere or a meteor on them, or cracks the floor open — and the page itself ends up cracked and scorched.
-• Transformations: the robot turns into a steel colossus and the apple into a towering tree when one of them is one hit away from a K.O.
-• Optional sound: off until you switch it on. Every punch, explosion, zombie and jingle is synthesized on the spot (nothing is downloaded) and comes from the side of the screen where it happens.
-• Endless run that keeps escalating: pick a fighter and play alone, round after round, each one bigger than the last. Every round brings a new enemy, including little dragons shooting fire, lightning or venom. Enemies drop gems, every level offers three cards with weapons that strike on their own and evolve, bosses drop chests, coins stay between runs and buy permanent upgrades. Three lives that don't come back, and an aimed final move. Your best score stays on your device.
-• Keyboard controls: Q W E R T Y trigger the controller's moves, A and D walk, F flies, Z fires the final move, X C V use the run's items. Every key can be remapped in the panel.
-• The fighters learn: the more they fight, the more varied their moves get.
+TWO MODES
+• Every time you start, choose how to play: Endless run or Free combat. Characters, items and surprises live in the Free combat menu.
 
-The power button in the corner turns everything off and on again. The page itself is never changed. A short "How it works" page opens after installation and can be reopened from the panel.
+ENDLESS RUN: A ROGUELIKE SURVIVOR
+• Pick your fighter and survive round after round, with no menus in between. Every round is bigger, faster and different from the last one.
+• A new enemy in almost every round: shamblers, crawlers, bloaters, armored and enraged zombies, boomers that explode, frosty biters that slow you down, leapers, spitters, brutes, a boss with a health bar, ghoul crows diving from the sky, and little dragons that shoot fire, lightning or venom.
+• Ground and sky at the same time: your fighter takes off to hunt flying enemies and slams back down on the crowd below.
+• Defeated enemies drop gems. Every level up pauses the action and offers three cards: automatic weapons (orbiting phones, shockwave, lightning, fire aura, homing darts, spinning blade), upgrades, and evolutions when a weapon reaches level five with its paired upgrade.
+• Surprises every few seconds: a golden zombie running off with coins, a rain of gems, a chest floating down on a parachute, a frenzy that doubles your weapons.
+• Duels against the other fighter, survival rounds against the clock, boss rounds with chests.
+• Three lives that don't come back, and a last chance: aim your final move along a sweeping line, and if it hits, you get a life back.
+• Coins stay between runs and buy permanent upgrades in the workshop. Your best score stays on your device.
+• Runs are short and intense, a few minutes each, and the better you play, the longer you last.
 
-Everything is free, with nothing to unlock or buy. Also included:
-• Three sets of original characters, each with its own moves and its own transformed body (blazing crests and torn jackets, hooded knights). Super warriors fly, fire energy waves and transform. Wizards cast freezing, shrinking and lightning spells and ride brooms. Duelists fight with energy blades.
-• Energy clashes: when one fighter charges an energy attack the other answers with the same one, the two beams meet and it becomes a tug of war. Two buttons pop up: hammer the one on your fighter's side to win it.
-• A zombie horde that shows up on its own: the two stop fighting each other, stand back to back and hold out, with three lives, against waves that are never the same twice. They team up too: leapfrog over the partner, side swap, double strike, cannonball.
-• A black hole that swallows whatever is nearby (fighters, items, zombies) and spits it out on the other side of the screen.
-• Weapons and bombs, bazooka and flamethrower included.
-• Weather and gravity: rain and thunderstorms, a hurricane, meteorites, slow motion, Moon, space and upside-down gravity.
+MANY FIGHTERS
+• Four families, two fighters each, switchable at the start of every run. You start with the super warriors, who fly, fire energy waves and transform. Then the wizards, who freeze, shrink and ride brooms, the duelists with energy blades, and the classic robot and apple.
 
-Privacy: Page Brawl collects nothing and sends nothing. It only runs on the tab where you click its icon, and it has no access to any other tab. Your settings, tokens and coins are stored on your device.
+FREE COMBAT
+• Two fighters brawl on their own: grab them with the mouse, throw them, hit one with the other.
+• Smoke bombs, jars that release fire, lightning and water creatures, weapons and bombs.
+• Zombie hordes where the two team up back to back, a black hole, meteorites, rain, hurricanes, slow motion and strange gravity.
+• Energy clashes you win by hammering a button, finishing moves with short cinematic scenes, transformations, health bars and token bets.
+• A corner controller to command every move with one click.
 
-Cartoon violence only. Stronger effects are off by default and can be enabled in the options.
+KEYBOARD AND SOUND
+• Play with the keyboard: Q W E R T Y for moves, A and D to walk, F to fly, Z for the final move, X C V for items. Every key can be remapped.
+• Optional sound, synthesized on the spot, coming from the side of the screen where things happen.
+
+Everything is free: nothing to unlock, nothing to buy, no account.
+
+The power button in the corner turns everything off. The page itself is never changed. Game language: English by default, Italian, Spanish, French and German in the options.
+
+Privacy: Page Brawl collects nothing and sends nothing. It only runs on the tab where you click its icon. Your settings, coins and records stay on your device.
+
+Cartoon violence only. Stronger effects are off by default and can be enabled in the panel.
 
 Does not run on browser pages (chrome://), the Chrome Web Store or PDF files.
 ```
@@ -108,35 +116,43 @@ Does not run on browser pages (chrome://), the Chrome Web Store or PDF files.
 ## Descrizione lunga (IT)
 
 ```
-Clicca l'icona e un robottino e una mela cominciano a picchiarsi sulla pagina che hai aperto. Camminano su titoli, tasti e immagini della pagina, si prendono a pugni, si afferrano, si lanciano e ballano quando vincono.
+Page Brawl trasforma qualsiasi pagina web in un'arena. Clicca l'icona e la lotta parte sul sito che stai leggendo: i lottatori corrono e saltano su titoli, tasti e immagini della pagina, quindi ogni sito è un ring nuovo, con le sue piattaforme.
 
-Partecipa anche tu:
-• Prendi un lottatore col mouse e lancialo, oppure usalo per colpire l'altro.
-• Nel ring cadono fumogeni e barattoli di vetro. Il fumogeno lanciato acceca chi finisce nella nube. Il barattolo lanciato si rompe e libera una piccola creatura di fuoco, di fulmini o d'acqua, che combatte per chi l'ha lanciato.
-• Prendi il comando: il tasto col joypad apre un controller nell'angolo. Scegli un lottatore e fagli fare le sue mosse con un clic.
-• Scatena un terremoto con l'eruzione, distribuisci i jetpack o fai piovere oggetti.
-• Accendi le barre della vita e scommetti i gettoni su chi vince.
-• Si gioca a dieci: il decimo K.O. manda lo sconfitto fuori dal ring, poi si ricomincia.
-• Colpi finali: circa un round su tre si chiude con una breve scena. Si abbassano le luci e chi vince manda l'altro in orbita, lo fa rimbalzare fra i bordi della finestra, lo schiaccia come una frittella, gli lascia cadere addosso una sfera enorme o una meteora, o spacca il pavimento: e la pagina resta crepata e bruciata.
-• Trasformazioni: il robot diventa un colosso d'acciaio e la mela un albero enorme quando a uno dei due manca un colpo al K.O.
-• Audio facoltativo: spento finché non lo accendi. Pugni, esplosioni, zombie e fanfare sono sintetizzati al momento (non si scarica niente) e arrivano dal lato dello schermo dove succede la cosa.
-• Corsa infinita che cresce senza sosta: scegli un personaggio e gioca da solo, un round dopo l'altro, ognuno più grande del precedente. Ogni round porta un nemico nuovo, compresi draghetti che tirano fuoco, fulmini o veleno. I nemici lasciano gemme, a ogni livello tre carte con armi che colpiscono da sole e si evolvono, i capi lasciano forzieri, le monete restano fra una corsa e l'altra e comprano potenziamenti permanenti. Tre vite che non tornano, e un colpo finale da mirare. Il tuo record resta sul tuo dispositivo.
-• Comandi da tastiera: Q W E R T Y fanno le mosse del controller, A e D camminano, F vola, Z il colpo finale, X C V gli oggetti della corsa. Ogni tasto si cambia dalla tendina.
-• I lottatori imparano: più combattono, più le mosse diventano varie.
+DUE MODI
+• A ogni accensione scegli come giocare: Corsa infinita o Combattimento libero. Personaggi, oggetti e imprevisti stanno nel menu del Combattimento libero.
 
-Il tasto di accensione nell'angolo spegne e riaccende tutto. La pagina non viene mai modificata. Dopo l'installazione si apre una breve pagina «Come funziona», che si riapre dalla tendina.
+CORSA INFINITA: UN SURVIVOR ROGUELIKE
+• Scegli il tuo lottatore e sopravvivi round dopo round, senza menu in mezzo. Ogni round è più grande, più veloce e diverso dal precedente.
+• Un nemico nuovo quasi a ogni round: zombie lenti, striscianti, gonfi, corazzati e rabbiosi, il botto che esplode, il gelido che ti rallenta, il saltatore, lo sputatore, il bestione, un capo con la sua barra della vita, corvacci che piombano dal cielo e draghetti che tirano fuoco, fulmini o veleno.
+• Terra e cielo insieme: il tuo lottatore decolla per prendere i nemici in volo e ripiomba di schianto sulla folla.
+• I nemici abbattuti lasciano gemme. A ogni livello il gioco si ferma e offre tre carte: armi automatiche (telefoni in orbita, onda d'urto, fulmine, aura di fuoco, dardi a ricerca, lama rotante), potenziamenti, ed evoluzioni quando un'arma arriva al quinto livello col suo potenziamento.
+• Sorprese ogni pochi secondi: lo zombie d'oro che scappa con le monete, una pioggia di gemme, un forziere col paracadute, la frenesia che raddoppia le armi.
+• Duelli contro l'altro lottatore, round di sopravvivenza a tempo, round col capo e i forzieri.
+• Tre vite che non tornano, e un'ultima possibilità: mira il colpo finale lungo una linea che oscilla, e se va a segno ti ridà una vita.
+• Le monete restano fra una corsa e l'altra e comprano potenziamenti permanenti nella bottega. Il tuo record resta sul tuo dispositivo.
+• Partite corte e intense, pochi minuti l'una; più giochi bene, più duri.
 
-È tutto gratis, senza niente da sbloccare o comprare. C'è anche:
-• Tre coppie di personaggi originali, ognuna con le sue mosse e la sua trasformazione (cresta accesa e casacca a brandelli, cavalieri incappucciati). I super guerrieri volano, lanciano onde di energia e si trasformano. I maghi congelano, rimpiccioliscono, scagliano fulmini e volano sulla scopa. I duellanti combattono con lame di energia.
-• Gli scontri di energie: quando uno carica un colpo d'energia l'altro risponde con lo stesso, i due raggi si incontrano e diventa un tiro alla fune. Spuntano due tasti: martella quello dalla parte del tuo lottatore per farlo vincere.
-• L'orda di zombie, che arriva da sola: i due smettono di picchiarsi, si mettono spalle a spalla e resistono, con tre vite, a ondate mai due volte uguali. E si danno una mano: cavallina sopra il compagno, cambio di lato, colpo insieme, palla di cannone.
-• Il buco nero, che risucchia quello che ha intorno (lottatori, oggetti, zombie) e lo risputa dall'altra parte dello schermo.
-• Armi e bombe, bazooka e lanciafiamme compresi.
-• Meteo e gravità: pioggia e temporali, uragano, meteoriti, rallentatore, Luna, spazio e gravità sottosopra.
+TANTI PERSONAGGI
+• Quattro famiglie, due lottatori ciascuna, da cambiare all'inizio di ogni corsa. Si parte coi super guerrieri, che volano, lanciano onde di energia e si trasformano. Poi i maghi, che congelano, rimpiccioliscono e volano sulla scopa, i duellanti con le lame di energia, e il robot e la mela classici.
 
-Privacy: Page Brawl non raccoglie e non invia niente. Funziona solo sulla scheda in cui clicchi la sua icona e non ha accesso alle altre. Opzioni, gettoni e monete restano sul tuo dispositivo.
+COMBATTIMENTO LIBERO
+• Due lottatori si picchiano da soli: prendili col mouse, lanciali, usa l'uno per colpire l'altro.
+• Fumogeni, barattoli che liberano creature di fuoco, fulmini e acqua, armi e bombe.
+• Orde di zombie in cui i due si alleano spalle a spalla, il buco nero, meteoriti, pioggia, uragani, rallentatore e gravità strane.
+• Scontri di energie da vincere martellando un tasto, colpi finali con brevi scene, trasformazioni, barre della vita e scommesse coi gettoni.
+• Un controller nell'angolo per comandare ogni mossa con un clic.
 
-Solo violenza da cartone animato. Gli effetti più forti sono spenti e si accendono dalle opzioni.
+TASTIERA E AUDIO
+• Si gioca anche da tastiera: Q W E R T Y le mosse, A e D per camminare, F per volare, Z il colpo finale, X C V gli oggetti. Ogni tasto si cambia.
+• Audio facoltativo, sintetizzato al momento, che arriva dal lato dello schermo dove succede la cosa.
+
+È tutto gratis: niente da sbloccare, niente da comprare, nessun account.
+
+Il tasto di accensione nell'angolo spegne tutto. La pagina non viene mai modificata. Lingua del gioco: inglese di serie, italiano, spagnolo, francese e tedesco nelle opzioni.
+
+Privacy: Page Brawl non raccoglie e non invia niente. Funziona solo sulla scheda in cui clicchi la sua icona. Opzioni, monete e record restano sul tuo dispositivo.
+
+Solo violenza da cartone animato. Gli effetti più forti sono spenti e si accendono dalla tendina.
 
 Non funziona sulle pagine del browser (chrome://), sul Chrome Web Store e sui PDF.
 ```
@@ -146,7 +162,7 @@ Non funziona sulle pagine del browser (chrome://), sul Chrome Web Store e sui PD
 **Scopo unico (single purpose):**
 
 ```
-Page Brawl shows an animated cartoon fight on top of the page the user is viewing, started and stopped by clicking the extension icon.
+Page Brawl is a cartoon fighting game (an endless roguelike survivor plus a free-for-all brawl) played on top of the page the user is viewing, started and stopped by clicking the extension icon.
 ```
 
 **Giustificazione dei permessi:**

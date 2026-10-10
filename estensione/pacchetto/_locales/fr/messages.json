@@ -3,7 +3,10 @@
     "message": "Page Brawl"
   },
   "descrizione": {
-    "message": "Un robot et une pomme se battent sur la page que vous regardez. Attrapez-les, lancez-les, pariez sur le vainqueur."
+    "message": "Un survivor roguelike sans fin sur n'importe quelle page web : chaque site est une nouvelle arène. Combattants, hordes, dragons."
+  },
+  "linguaEtichetta": {
+    "message": "Langue du jeu"
   },
   "titolo": {
     "message": "Lancer ou arrêter le combat sur cette page"

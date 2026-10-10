@@ -11,6 +11,12 @@
   var m = function (chiave) { return chrome.i18n.getMessage(chiave) || chiave; };
   document.querySelectorAll("[data-msg]").forEach(function (el) { el.textContent = m(el.getAttribute("data-msg")); });
   document.title = m("opzioniTitolo");
+  // La lingua del gioco (10/10/2026): inglese di serie, qualunque sia quella del browser; qui si cambia.
+  var scelta = document.getElementById("lingua");
+  if (scelta) {
+    chrome.storage.local.get("pb-lingua").then(function (o) { scelta.value = (o && o["pb-lingua"]) || "en"; });
+    scelta.addEventListener("change", function () { chrome.storage.local.set({ "pb-lingua": scelta.value }); });
+  }
   async function registrato() { return (await chrome.scripting.getRegisteredContentScripts({ ids: [ID] })).length > 0; }
   async function leggi() { casella.checked = (await chrome.permissions.contains(TUTTI)) && (await registrato()); }
   casella.addEventListener("change", async function () {

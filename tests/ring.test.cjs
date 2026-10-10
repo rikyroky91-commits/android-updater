@@ -55,7 +55,8 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
   // Il pannello del ring, ridotto ai tasti della corsa: basta a far girare il codice che li collega
   // mentre lo script si avvia (lì il 09/10/2026 si leggeva lo stato della corsa prima che esistesse).
   const tastoPannello = (attr) => ({ attr, hidden: false, ascolta: {}, addEventListener(t, fn) { this.ascolta[t] = fn; }, setAttribute() {}, getAttribute: () => null });
-  const tastiPannello = { "[data-corsa]": [tastoPannello("data-corsa")], "[data-classifica]": [tastoPannello("data-classifica")], "[data-audio]": [tastoPannello("data-audio")] };
+  const tastiPannello = { "[data-corsa]": [tastoPannello("data-corsa")], "[data-classifica]": [tastoPannello("data-classifica")], "[data-audio]": [tastoPannello("data-audio")],
+                          "[data-libero]": [tastoPannello("data-libero")], "[data-solo-libero]": [tastoPannello("data-solo-libero"), tastoPannello("data-solo-libero")] };
   const tastoOpzioni = { hidden: true, addEventListener() {}, setAttribute() {}, focus() {} };
   const finto = pannello ? { hidden: true, querySelectorAll: (sel) => tastiPannello[sel] || [], querySelector: () => null, setAttribute() {}, addEventListener() {},
                              classList: { contains: () => false, add() {}, remove() {}, toggle() {} } } : null;
@@ -3861,6 +3862,28 @@ test("la tastiera nella corsa: A sceglie il robot, Q W E le carte, X C V gli ogg
   let partito = false;
   for (let i = 0; i < 60 && !partito; i++) { partito = r.tastoGiu("KeyZ"); if (!partito) avanzaCorsa(amb, r, 5); }
   assert.ok(partito && amb.stato().mira, "Z: il colpo finale parte con la mira");
+});
+
+test("la scelta del modo: A apre la corsa e nasconde personaggi e imprevisti, D o il tasto tornano al combattimento libero", () => {
+  const amb = ambiente({ pannello: true });
+  const r = amb.finestra.__ring;
+  amb.avanza(30);
+  const sezioni = amb.tastiPannello["[data-solo-libero]"];
+  assert.ok(sezioni.every((x) => !x.hidden), "di serie si lotta liberi: tutto il pannello");
+  r.sceltaModo(true); amb.avanza(5);
+  assert.ok(sezioni.every((x) => x.hidden), "mentre si sceglie, niente personaggi né imprevisti");
+  assert.ok(r.tastoGiu("KeyA"), "A sceglie la corsa (il riquadro a sinistra)");
+  assert.strictEqual(r.sceltaModo(), false);
+  assert.strictEqual(amb.stato().corsa.fase, "scelta", "la corsa parte dalla scelta dell'eroe");
+  assert.ok(sezioni.every((x) => x.hidden), "nella corsa il pannello tiene solo modalità e tastiera");
+  amb.tastiPannello["[data-libero]"][0].ascolta.click();
+  assert.strictEqual(amb.stato().corsa, null, "il combattimento libero chiude la corsa");
+  assert.ok(sezioni.every((x) => !x.hidden), "e riapre personaggi e imprevisti");
+  r.sceltaModo(true); amb.avanza(5);
+  assert.ok(r.tastoGiu("KeyD"), "D: il combattimento libero");
+  assert.strictEqual(r.sceltaModo(), false);
+  assert.strictEqual(amb.stato().corsa, null);
+  assert.ok(sezioni.every((x) => !x.hidden));
 });
 
 test("la tastiera si rimappa: il tasto nuovo si scambia col vecchio, e resta nel browser", () => {

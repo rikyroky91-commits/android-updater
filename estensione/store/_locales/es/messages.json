@@ -3,7 +3,10 @@
     "message": "Page Brawl"
   },
   "descrizione": {
-    "message": "Un robot y una manzana se pelean en la página que estás viendo. Agárralos, lánzalos y apuesta por el ganador."
+    "message": "Un survivor roguelike infinito en cualquier página web: cada sitio es un ring nuevo. Muchos luchadores, hordas, dragones y armas."
+  },
+  "linguaEtichetta": {
+    "message": "Idioma del juego"
   },
   "titolo": {
     "message": "Enciende o apaga la pelea en esta página"

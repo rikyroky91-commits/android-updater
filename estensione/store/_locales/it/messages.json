@@ -3,7 +3,10 @@
     "message": "Page Brawl"
   },
   "descrizione": {
-    "message": "Un robot e una mela si picchiano sulla pagina che stai guardando. Prendili, lanciali, scommetti su chi vince."
+    "message": "Un survivor roguelike infinito su qualsiasi pagina web: ogni sito è un ring nuovo. Tanti personaggi, orde, draghi, armi automatiche."
+  },
+  "linguaEtichetta": {
+    "message": "Lingua del gioco"
   },
   "titolo": {
     "message": "Accendi o spegni la lotta su questa pagina"

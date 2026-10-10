@@ -55,7 +55,7 @@ class TestEstensione(unittest.TestCase):
                 for lingua in LINGUE:
                     messaggi = json.loads((cartella / "_locales" / lingua / "messages.json").read_text(encoding="utf-8"))
                     self.assertEqual({k for k in messaggi if not k.startswith("guida")},
-                                     {"nome", "descrizione", "titolo", "opzioniTitolo", "sempreEtichetta", "sempreSpiega", "sempreNegato"})
+                                     {"nome", "descrizione", "titolo", "opzioniTitolo", "sempreEtichetta", "sempreSpiega", "sempreNegato", "linguaEtichetta"})
                     self.assertLessEqual(len(messaggi["nome"]["message"]), 45)          # limite del Chrome Web Store
                     self.assertLessEqual(len(messaggi["descrizione"]["message"]), 132)  # idem
 
@@ -88,7 +88,9 @@ class TestEstensione(unittest.TestCase):
             with self.subTest(variante=nome):
                 prepara = (cartella / "prepara.js").read_text(encoding="utf-8")
                 sfondo = (cartella / "sfondo.js").read_text(encoding="utf-8")
-                self.assertIn("chrome.i18n.getUILanguage()", prepara)
+                # (dal 10/10/2026 il gioco è in inglese di serie; l'altra lingua si sceglie nelle opzioni)
+                self.assertIn('memoria["pb-lingua"] || "en"', prepara)
+                self.assertIn('id="lingua"', (cartella / "opzioni.html").read_text(encoding="utf-8"))
                 self.assertIn("__lingue.copri(radice", prepara)
                 self.assertIn("__lingueSoloDizionario = true", sfondo)      # il dizionario non tocca la pagina
                 self.assertLess(sfondo.index('"lingue.js"'), sfondo.index('"prepara.js"'))
@@ -120,6 +122,7 @@ class TestEstensione(unittest.TestCase):
             with self.subTest(variante=nome):
                 testo = (cartella / "prepara.js").read_text(encoding="utf-8")
                 self.assertIn('memoria["mut-ring-cruento"] = "off"', testo)
+                self.assertIn('memoria["mut-ring-stile"] = "guerrieri"', testo)   # 1.0.0: si parte coi super guerrieri
 
     def test_premium_e_predisposto_e_nello_store_si_sblocca_gratis_solo_se_lo_dice_premium_json(self):
         for nome, cartella in VARIANTI.items():

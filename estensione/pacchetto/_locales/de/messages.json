@@ -3,7 +3,10 @@
     "message": "Page Brawl"
   },
   "descrizione": {
-    "message": "Ein Roboter und ein Apfel prügeln sich auf der Seite, die du gerade ansiehst. Pack sie, wirf sie, wette auf den Sieger."
+    "message": "Ein endloser Roguelike-Survivor auf jeder Webseite: Jede Seite ist eine neue Arena. Viele Kämpfer, Horden, Drachen, Auto-Waffen."
+  },
+  "linguaEtichetta": {
+    "message": "Spielsprache"
   },
   "titolo": {
     "message": "Kampf auf dieser Seite starten oder stoppen"

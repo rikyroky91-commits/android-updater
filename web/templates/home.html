@@ -87,11 +87,15 @@
         <button type="button" class="ring-tasto" data-audio aria-pressed="false">&#128266; Audio</button>
       </div>
       <div class="ring-griglia">
-        <button type="button" class="ring-tasto ring-largo" data-corsa>&#127939; Corsa infinita</button>
-        <button type="button" class="ring-tasto" data-classifica>&#127942; Classifica</button>
+        <button type="button" class="ring-tasto" data-corsa aria-pressed="false">&#127939; Corsa infinita</button>
+        <button type="button" class="ring-tasto" data-libero aria-pressed="true">&#129354; Combattimento libero</button>
       </div>
+      <div class="ring-griglia">
+        <button type="button" class="ring-tasto ring-largo" data-classifica>&#127942; Classifica</button>
+      </div>
+      <p class="ring-nota" data-nota-modo hidden>Personaggi, oggetti e imprevisti sono del combattimento libero.</p>
     </section>
-    <section class="ring-sezione">
+    <section class="ring-sezione" data-solo-libero>
       <h3>Personaggi</h3>
       <div class="ring-griglia">
         <button type="button" class="ring-tasto" data-anime aria-pressed="false">&#9889; Super guerrieri</button>
@@ -129,7 +133,7 @@
         <button type="button" class="ring-tasto" data-colpo="duello">&#9876; Incrocio di lame</button>
       </div>
     </section>
-    <section class="ring-sezione">
+    <section class="ring-sezione" data-solo-libero>
       <h3>Scommetti</h3>
       <p class="ring-gettoni">Gettoni: <b data-gettoni>100</b>
         <button type="button" class="ring-tasto ring-piccolo" data-ricarica hidden>Ricarica 100</button></p>
@@ -147,7 +151,7 @@
       </div>
       <p class="ring-esito" data-esito aria-live="polite">Punta su chi vince il prossimo K.O.</p>
     </section>
-    <section class="ring-sezione">
+    <section class="ring-sezione" data-solo-libero>
       <h3>Metti in campo</h3>
       <div class="ring-griglia">
         <button type="button" class="ring-tasto" data-metti="classico">&#128241; Telefono</button>
@@ -166,7 +170,7 @@
         <button type="button" class="ring-tasto" data-metti="barattolo-acqua">&#128167; Barattolo d'acqua</button>
       </div>
     </section>
-    <section class="ring-sezione">
+    <section class="ring-sezione" data-solo-libero>
       <h3>Imprevisti</h3>
       <div class="ring-riga">
         <label class="ring-etichetta">Gravità

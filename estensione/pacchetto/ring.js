@@ -155,6 +155,9 @@
   // il pannello e il primo disegno lo leggono mentre lo script si avvia.
   const sulSito = !window.__ringRadice;                        // l'estensione non parla con nessun server
   let corsa = null, recordCorsa = 0, tastiUI = [], campoNome = null;
+  // La scelta del modo (10/10/2026, estensione): all'accensione «Corsa infinita» o «Combattimento libero».
+  // La chiede chi carica il ring con `window.__ringSceltaModo` (l'estensione); il sito parte libero.
+  let sceltaModo = false;
   const classifica = { aperta: false, voci: null, letta: -1e9, stato: "", mia: -1 };
   // Le monete in banca e i potenziamenti permanenti della bottega: restano fra una corsa e l'altra.
   let banca = 0, bottega = {};
@@ -2011,7 +2014,7 @@
       return;
     }
     // La corsa: i suoi tasti, e nei menu ogni tocco è suo.
-    if (corsa || classifica.aperta) {
+    if (corsa || classifica.aperta || sceltaModo) {
       const t = tastoCorsa(evento.clientX, evento.clientY);
       if (t) { suona("clic"); t.fa(); }
       else if (corsa && corsa.fase === "scelta") {
@@ -2211,7 +2214,7 @@
   window.addEventListener("touchstart", (e) => {
     const t = e.touches && e.touches[0];
     raggioPresa = 30;
-    if (t && !fermo && (mira || ((corsa || classifica.aperta) && (corsaModale() || tastoCorsa(t.clientX, t.clientY))) || qualcosaSotto(t.clientX, t.clientY) || sottoRadiale(t.clientX, t.clientY) > -2 || sottoTastoSfida(t.clientX, t.clientY) >= 0)) e.preventDefault();
+    if (t && !fermo && (mira || ((corsa || classifica.aperta || sceltaModo) && (corsaModale() || tastoCorsa(t.clientX, t.clientY))) || qualcosaSotto(t.clientX, t.clientY) || sottoRadiale(t.clientX, t.clientY) > -2 || sottoTastoSfida(t.clientX, t.clientY) >= 0)) e.preventDefault();
   }, { passive: false });
   // Finché si tiene qualcosa col dito la pagina non deve scorrere.
   window.addEventListener("touchmove", (e) => {
@@ -11143,6 +11146,13 @@
     const nota = pannello.querySelector("[data-mosse-nota]");
     if (nota) nota.hidden = !!stile;
     if (statoTastiera.pronta) disegnaListaTasti();                  // le mosse sui tasti cambiano coi personaggi
+    // I due modi (10/10/2026): personaggi, scommesse, oggetti e imprevisti sono del combattimento libero.
+    const libero = !corsa && !sceltaModo;
+    for (const sez of dentroPannello("[data-solo-libero]")) sez.hidden = !libero;
+    for (const t of dentroPannello("[data-libero]")) t.setAttribute("aria-pressed", String(libero));
+    for (const t of dentroPannello("[data-corsa]")) t.setAttribute("aria-pressed", String(!!corsa));
+    const notaModo = pannello.querySelector("[data-nota-modo]");
+    if (notaModo) notaModo.hidden = libero;
   }
   function apriPannello(apri) {
     if (!pannello || !tastoOpzioni) return;
@@ -11160,7 +11170,9 @@
     for (const b of dentroPannello("[data-metti]")) b.addEventListener("click", () => comandi.metti(b.getAttribute("data-metti")));
     for (const b of dentroPannello("[data-colpo]")) b.addEventListener("click", () => comandi.colpo(b.getAttribute("data-colpo")));
     // La corsa si gioca sul canvas: il pannello si chiude, sennò la copre.
-    for (const b of dentroPannello("[data-corsa]")) b.addEventListener("click", () => { apriPannello(false); comandi.corsa(); });
+    for (const b of dentroPannello("[data-corsa]")) b.addEventListener("click", () => { apriPannello(false); sceltaModo = false; if (!corsa) comandi.corsa(); aggiornaInterruttori(); });
+    // Il combattimento libero: si esce dalla corsa (o dalla scelta del modo) e si torna al ring di sempre.
+    for (const b of dentroPannello("[data-libero]")) b.addEventListener("click", () => { if (corsa) chiudiCorsa(); sceltaModo = false; aggiornaInterruttori(); riparti(); });
     for (const b of dentroPannello("[data-audio]")) { b.setAttribute("aria-pressed", audio.acceso ? "true" : "false"); b.addEventListener("click", () => comandi.audio()); }
     for (const b of dentroPannello("[data-classifica]")) {
       if (!sulSito) b.hidden = true;                             // l'estensione non manda e non chiede niente a nessuno
@@ -11280,6 +11292,11 @@
   // Che cosa fa un'azione adesso (true: fatta, e il tasto non va alla pagina).
   function eseguiTasto(id) {
     const c = corsa;
+    if (sceltaModo && !c) {
+      if (id === "sinistra" || id === "mossa1") return scegliModo("corsa");
+      if (id === "destra" || id === "mossa2") return scegliModo("libero");
+      return false;
+    }
     if (c && c.fase === "scelta") {
       if (c.bottega) return false;
       if (id === "sinistra") return scegliEroe("robot");
@@ -12761,9 +12778,39 @@
       ctx.fillStyle = v; ctx.fillRect(0, 0, W, H); ctx.restore();
     }
   }
+  // La scelta del modo, all'accensione nell'estensione: due riquadri grandi, a sinistra la corsa e a
+  // destra il combattimento libero (A e D dalla tastiera, come nella scelta del personaggio).
+  function scegliModo(modo) {
+    sceltaModo = false;
+    if (modo === "corsa") apriCorsa();
+    aggiornaInterruttori();
+    riparti();
+    return true;
+  }
+  function disegnaSceltaModo() {
+    ctx.fillStyle = "rgba(10,8,22,.66)"; ctx.fillRect(0, 0, W, H);
+    const stretto = W < 600 * S, top = Math.max(testataBasso + 24 * S, H * (stretto ? 0.12 : 0.2));
+    caratteri(36 * S, 900); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineWidth = 6 * S; ctx.lineJoin = "round"; ctx.strokeStyle = "#17171c"; ctx.fillStyle = ORO;
+    ctx.strokeText("Page Brawl", W / 2, top); ctx.fillText("Page Brawl", W / 2, top);
+    scriviUI(dici("Scegli come giocare"), W / 2, top + 34 * S, 14 * S, "#ffffff", "center", 700);
+    const voci = [["corsa", "\u{1F3C3}", dici("Corsa infinita"), dici("Sopravvivi a ondate sempre più grandi: armi, livelli, draghetti, capi."), "sinistra"],
+                  ["libero", "\u{1F94A}", dici("Combattimento libero"), dici("Due lottatori, i personaggi che vuoi, oggetti e imprevisti dalla tendina."), "destra"]];
+    const w = stretto ? Math.min(320 * S, W - 32) : Math.min(280 * S, (W - 48) / 2), h = 170 * S, gap = 16 * S;
+    voci.forEach(([modo, icona, nome, testo, tasto], i) => {
+      const x = stretto ? W / 2 - w / 2 : W / 2 - w - gap / 2 + i * (w + gap), y = top + 64 * S + (stretto ? i * (h + gap) : 0);
+      ctx.save(); ctx.shadowColor = ORO; ctx.shadowBlur = 12 * S; pannelloUI(x, y, w, h, 14 * S, i ? "#56e1ff" : ORO); ctx.restore();
+      scriviUI(icona, x + w / 2, y + 34 * S, 30 * S, "#ffffff", "center");
+      scriviUI(nome, x + w / 2, y + 74 * S, 20 * S, i ? "#56e1ff" : ORO, "center", 900);
+      righeUI(testo, w - 32 * S, 12 * S).forEach((r, k) => scriviUI(r, x + w / 2, y + 102 * S + k * 16 * S, 12 * S, "#ffffff", "center", 600));
+      const k = tastoDi(tasto);
+      if (k) scriviUI(k, x + w - 18 * S, y + 18 * S, 11 * S, GRIGIO_UI, "center", 900);
+      tastiUI.push({ x, y, w, h, fa: () => scegliModo(modo) });
+    });
+  }
   // Sopra a tutto: l'interfaccia della corsa, i menu, la classifica.
   function disegnaCorsa() {
     tastiUI = [];
+    if (sceltaModo && !corsa) { ctx.save(); disegnaSceltaModo(); ctx.restore(); return; }
     const c = corsa;
     if (c) {
       ctx.save(); ctx.lineJoin = "round"; ctx.lineCap = "round";
@@ -12974,7 +13021,7 @@
     const yb = pavimento - 34 * S;
     if (recordCorsa) scriviUI(dici("Il tuo record") + ": " + cifre(recordCorsa), W / 2, yb - 26 * S, 12 * S, ORO, "center");
     const tasti = [[dici("Bottega") + " \u{1FA99} " + cifre(banca), () => { c.bottega = true; }]]
-      .concat(sulSito ? [[dici("Classifica"), () => apriClassifica(true)]] : [], [[dici("Esci"), () => chiudiCorsa()]]);
+      .concat(sulSito ? [[dici("Classifica"), () => apriClassifica(true)]] : [], [[dici("Chiudi"), () => chiudiCorsa()]]);
     const wb = Math.min(140 * S, (W - 32 - (tasti.length - 1) * 10) / tasti.length), xb = W / 2 - (tasti.length * wb + (tasti.length - 1) * 10) / 2;
     tasti.forEach(([t, fa], i) => tastoUI(xb + i * (wb + 10), yb - 14 * S, wb, 30 * S, t, fa, { colore: "#2a2735", scritta: "#ffffff", bordo: "rgba(255,255,255,.3)", px: 12 * S }));
     if (c.bottega) { tastiUI = []; disegnaBottega(); }            // la bottega copre tutto: sotto non si tocca niente
@@ -13084,7 +13131,7 @@
       yy += 30 * S;
     }
     tastoUI(W / 2 - 130 * S, yy, 120 * S, 34 * S, dici("Ancora"), () => ricominciaCorsa(), { brilla: true, px: 14 * S });
-    tastoUI(W / 2 + 10 * S, yy, 120 * S, 34 * S, dici("Esci"), () => chiudiCorsa(), { colore: "#2a2735", scritta: "#ffffff", bordo: "rgba(255,255,255,.3)", px: 14 * S });
+    tastoUI(W / 2 + 10 * S, yy, 120 * S, 34 * S, dici("Chiudi"), () => chiudiCorsa(), { colore: "#2a2735", scritta: "#ffffff", bordo: "rgba(255,255,255,.3)", px: 14 * S });
   }
   // La classifica: i primi dieci, aggiornati da soli ogni dieci secondi.
   function disegnaClassifica(cx, y, w, finestra) {
@@ -13113,9 +13160,11 @@
     return null;
   }
   // I menu prendono tutti i tocchi: sotto non si afferra nessuno.
-  const corsaModale = () => !!(classifica.aperta || (corsa && (corsa.fase === "scelta" || corsa.fase === "fine" || corsa.scelta || corsa.forziere)));
+  const corsaModale = () => !!(classifica.aperta || (sceltaModo && !corsa) || (corsa && (corsa.fase === "scelta" || corsa.fase === "fine" || corsa.scelta || corsa.forziere)));
 
+  if (window.__ringSceltaModo) { sceltaModo = true; assicuraAcceso(); }
   window.__ring = {
+    sceltaModo: (si) => { if (si !== undefined) { sceltaModo = !!si; aggiornaInterruttori(); } return sceltaModo; },
     // Solo per i test: un tasto premuto (il codice fisico, come `e.code`), e la mappa dei tasti.
     tastoGiu: (code, opz) => { let fermato = false; premiTasto(Object.assign({ code, repeat: false, target: null, preventDefault() {}, stopPropagation() { fermato = true; } }, opz || {})); return fermato; },
     mappaTasti: () => Object.assign({}, mappaTasti),

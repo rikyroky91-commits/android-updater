@@ -57,7 +57,8 @@ MANIFEST = {
 # titolo del tasto e i testi della pagina delle opzioni, nelle lingue dell'estensione.
 MESSAGGI = {
     "en": {
-        "descrizione": "A robot and an apple brawl on the page you are viewing. Grab them, throw them, bet on the winner.",
+        "descrizione": "An endless roguelike survivor on any web page: every site is a new arena. Many fighters, hordes, dragons, auto-weapons. Free.",
+        "linguaEtichetta": "Game language",
         "titolo": "Start or stop the brawl on this page",
         "opzioniTitolo": "Page Brawl options",
         "sempreEtichetta": "Show the power button on every site",
@@ -65,7 +66,8 @@ MESSAGGI = {
         "sempreNegato": "Permission not granted: the button stays off.",
     },
     "it": {
-        "descrizione": "Un robot e una mela si picchiano sulla pagina che stai guardando. Prendili, lanciali, scommetti su chi vince.",
+        "descrizione": "Un survivor roguelike infinito su qualsiasi pagina web: ogni sito è un ring nuovo. Tanti personaggi, orde, draghi, armi automatiche.",
+        "linguaEtichetta": "Lingua del gioco",
         "titolo": "Accendi o spegni la lotta su questa pagina",
         "opzioniTitolo": "Opzioni di Page Brawl",
         "sempreEtichetta": "Mostra il tasto di accensione su tutti i siti",
@@ -73,7 +75,8 @@ MESSAGGI = {
         "sempreNegato": "Permesso non concesso: il tasto resta spento.",
     },
     "es": {
-        "descrizione": "Un robot y una manzana se pelean en la página que estás viendo. Agárralos, lánzalos y apuesta por el ganador.",
+        "descrizione": "Un survivor roguelike infinito en cualquier página web: cada sitio es un ring nuevo. Muchos luchadores, hordas, dragones y armas.",
+        "linguaEtichetta": "Idioma del juego",
         "titolo": "Enciende o apaga la pelea en esta página",
         "opzioniTitolo": "Opciones de Page Brawl",
         "sempreEtichetta": "Mostrar el botón de encendido en todos los sitios",
@@ -81,7 +84,8 @@ MESSAGGI = {
         "sempreNegato": "Permiso no concedido: el botón sigue apagado.",
     },
     "fr": {
-        "descrizione": "Un robot et une pomme se battent sur la page que vous regardez. Attrapez-les, lancez-les, pariez sur le vainqueur.",
+        "descrizione": "Un survivor roguelike sans fin sur n'importe quelle page web : chaque site est une nouvelle arène. Combattants, hordes, dragons.",
+        "linguaEtichetta": "Langue du jeu",
         "titolo": "Lancer ou arrêter le combat sur cette page",
         "opzioniTitolo": "Options de Page Brawl",
         "sempreEtichetta": "Afficher le bouton de mise en marche sur tous les sites",
@@ -89,7 +93,8 @@ MESSAGGI = {
         "sempreNegato": "Autorisation refusée : le bouton reste désactivé.",
     },
     "de": {
-        "descrizione": "Ein Roboter und ein Apfel prügeln sich auf der Seite, die du gerade ansiehst. Pack sie, wirf sie, wette auf den Sieger.",
+        "descrizione": "Ein endloser Roguelike-Survivor auf jeder Webseite: Jede Seite ist eine neue Arena. Viele Kämpfer, Horden, Drachen, Auto-Waffen.",
+        "linguaEtichetta": "Spielsprache",
         "titolo": "Kampf auf dieser Seite starten oder stoppen",
         "opzioniTitolo": "Optionen von Page Brawl",
         "sempreEtichetta": "Einschaltknopf auf allen Websites anzeigen",
@@ -512,6 +517,8 @@ OPZIONI_HTML = """<!doctype html>
 </head>
 <body>
 <h1 data-msg="opzioniTitolo"></h1>
+<!--LINGUA--><label class="lingua"><span data-msg="linguaEtichetta"></span>
+<select id="lingua"><option value="en">English</option><option value="it">Italiano</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option></select></label><!--/LINGUA-->
 <label><input type="checkbox" id="sempre"> <span data-msg="sempreEtichetta"></span></label>
 <p data-msg="sempreSpiega"></p>
 <p id="esito" role="status"></p>
@@ -523,6 +530,8 @@ OPZIONI_HTML = """<!doctype html>
 OPZIONI_CSS = """body { font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 16px 18px; min-width: 320px; max-width: 520px; color: #201e1d; }
 h1 { font-size: 18px; margin: 0 0 12px; }
 label { display: flex; gap: 8px; align-items: flex-start; font-weight: 600; }
+label.lingua { align-items: center; justify-content: space-between; margin: 0 0 14px; }
+select { font: inherit; padding: 4px 6px; border-radius: 6px; }
 p { margin: 10px 0 0; color: #4a4744; }
 #esito { color: #b3261e; min-height: 1.4em; }
 a { color: #1f7a5a; font-weight: 600; }
@@ -541,6 +550,12 @@ OPZIONI_JS = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
   var m = function (chiave) { return chrome.i18n.getMessage(chiave) || chiave; };
   document.querySelectorAll("[data-msg]").forEach(function (el) { el.textContent = m(el.getAttribute("data-msg")); });
   document.title = m("opzioniTitolo");
+  // La lingua del gioco (10/10/2026): inglese di serie, qualunque sia quella del browser; qui si cambia.
+  var scelta = document.getElementById("lingua");
+  if (scelta) {
+    chrome.storage.local.get("pb-lingua").then(function (o) { scelta.value = (o && o["pb-lingua"]) || "en"; });
+    scelta.addEventListener("change", function () { chrome.storage.local.set({ "pb-lingua": scelta.value }); });
+  }
   async function registrato() { return (await chrome.scripting.getRegisteredContentScripts({ ids: [ID] })).length > 0; }
   async function leggi() { casella.checked = (await chrome.permissions.contains(TUTTI)) && (await registrato()); }
   casella.addEventListener("change", async function () {
@@ -583,6 +598,12 @@ PREPARA = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
   memoria["mut-ring"] = "on";                    // chi clicca l'icona vuole la lotta accesa
   // Schizzi e arti staccati partono spenti: si accendono dalla tendina.
   if (!Object.prototype.hasOwnProperty.call(memoria, "mut-ring-cruento")) memoria["mut-ring-cruento"] = "off";
+  // I personaggi di partenza (10/10/2026, Riccardo: «come personaggi principali metti i guerrieri»):
+  // i super guerrieri, finché non se ne scelgono altri (dalla tendina o nella scelta della corsa).
+  if (!Object.prototype.hasOwnProperty.call(memoria, "mut-ring-stile")) memoria["mut-ring-stile"] = "guerrieri";
+  // All'accensione si sceglie il modo (10/10/2026, Riccardo: «endless run e free combat»):
+  // la corsa infinita o il combattimento libero, con personaggi e imprevisti nella tendina.
+  window.__ringSceltaModo = true;
   function ricorda(k, v) {
     memoria[k] = String(v);
     try { var o = {}; o[k] = String(v); chrome.storage.local.set(o); } catch (e) { /* resta in memoria */ }
@@ -687,10 +708,11 @@ PREPARA = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
     aggiornaRiquadro(false);
   })();
 
-  // La lingua: quella del browser, se è una delle cinque; altrimenti inglese.
+  // La lingua del gioco: inglese di serie (10/10/2026, Riccardo: «cambia la lingua in game in
+  // inglese»), qualunque sia quella del browser; nelle opzioni si sceglie un'altra delle cinque.
   // Il dizionario è lo stesso del sito (`lingue.js`), applicato solo qui dentro.
   try {
-    var lingua = (memoria["pb-lingua"] || (chrome.i18n && chrome.i18n.getUILanguage()) || navigator.language || "en").slice(0, 2).toLowerCase();
+    var lingua = String(memoria["pb-lingua"] || "en").slice(0, 2).toLowerCase();
     if (window.__lingue) window.__lingue.copri(radice, window.__lingue.codici.indexOf(lingua) >= 0 ? lingua : "en");
   } catch (e) { /* resta in italiano */ }
   window.__ringEstensione = {
@@ -823,7 +845,7 @@ def file_attesi(variante: str) -> dict:
         "lingue.js": (RADICE / "web/static/lingue.js").read_text(encoding="utf-8"),
         "tasto.js": (TASTO.replace("__HTML__", json.dumps('<button type="button">' + ICONA_ACCENSIONE + "</button>"))
                           .replace("__STILE__", json.dumps(STILE_TASTO))),
-        "opzioni.html": OPZIONI_HTML, "opzioni.css": OPZIONI_CSS, "opzioni.js": OPZIONI_JS,
+        "opzioni.html": OPZIONI_HTML.replace("<!--LINGUA-->", "").replace("<!--/LINGUA-->", ""), "opzioni.css": OPZIONI_CSS, "opzioni.js": OPZIONI_JS,
     }
     for lingua, testi in MESSAGGI.items():
         if set(testi) != set(MESSAGGI["en"]):
@@ -1139,7 +1161,7 @@ def file_natale() -> dict:
         "prepara.js": (NATALE_PREPARA.replace("__HTML__", json.dumps(html)).replace("__STILE__", json.dumps(NATALE_STILE))),
         "natale.js": (RADICE / "web/static/natale.js").read_text(encoding="utf-8"),
         "pagina.css": NATALE_PAGINA_CSS,
-        "opzioni.html": OPZIONI_HTML.replace("<title>Page Brawl</title>", "<title>Page Snow</title>"),
+        "opzioni.html": re.sub(r"<!--LINGUA-->.*?<!--/LINGUA-->\n", "", OPZIONI_HTML, flags=re.S).replace("<title>Page Brawl</title>", "<title>Page Snow</title>"),
         "opzioni.css": OPZIONI_CSS, "opzioni.js": NATALE_OPZIONI_JS,
     }
     for lingua, testi in NATALE_MESSAGGI.items():
