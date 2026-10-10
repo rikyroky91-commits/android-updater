@@ -206,6 +206,29 @@ def marche_coperte(candidati: list[dict]) -> set[str]:
     return {marca_di(r["nome"]) for r in candidati}
 
 
+_RE_RETE_IN_CODA = re.compile(r"\s+(5G|4G|LTE)$", re.IGNORECASE)
+
+
+def forme_stesso_telefono(nome: str | None) -> set[str]:
+    """Il nome, e il nome senza «5G»/«4G» in coda, in minuscolo.
+
+    Da SM-A556B la ricerca e la scheda dicono «Samsung Galaxy A55 5G», il
+    catalogo «Samsung Galaxy A55»: lo stesso telefono, che in produzione
+    compariva ancora fra i propri simili (verificato il 25/09/2026 dopo il
+    primo correttivo, che confrontava solo i nomi interi). Si toglie il
+    suffisso solo dal nome di PARTENZA: un candidato «A55 4G» resta un
+    telefono diverso da un «A55 5G».
+    """
+    testo = (nome or "").strip()
+    if not testo:
+        return set()
+    forme = {testo.lower()}
+    senza = _RE_RETE_IN_CODA.sub("", testo).strip()
+    if senza:
+        forme.add(senza.lower())
+    return forme
+
+
 def trova(*, nome: str, chip: str | None, marca: str = "",
           android_archivio: int | None = None,
           android_lancio: int | None = None,
@@ -256,7 +279,7 @@ def trova(*, nome: str, chip: str | None, marca: str = "",
     # catalogo («Samsung Galaxy A55») sono due grafie dello stesso modello:
     # confrontando solo il primo, il telefono cercato compariva in cima
     # alla lista dei propri simili (visto in produzione il 25/09/2026).
-    stessi = {n.strip().lower() for n in (nome, *altri_nomi) if n and n.strip()}
+    stessi = {forma for n in (nome, *altri_nomi) for forma in forme_stesso_telefono(n)}
     anno_rif = anno_di(rilascio)
     simili, altre = [], []
     for riga in candidati:
