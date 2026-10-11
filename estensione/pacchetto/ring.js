@@ -8023,8 +8023,13 @@
   // richiamano né il robot né la mela, né personaggi di altri.
   const ASPETTI = {
     guerrieri: {
-      robot: { nome: "ZEFIR", pelle: "#e8b98a", capelli: "#22324f", tuta: "#1f8f8a", bordo: "#f4f1e6", maniche: "#e8b98a", gambe: "#22324f", scarpe: "#3a3f4a", testa: "onda" },
-      mela: { nome: "BRASA", pelle: "#9a623c", capelli: "#d43d7a", tuta: "#7a1f2b", bordo: "#f0b23a", maniche: "#9a623c", gambe: "#1d1d24", scarpe: "#f0b23a", testa: "treccia" },
+      // Zefir rifatto l'11/10/2026 sul pupazzo disegnato da Riccardo: capelli argento a punte,
+      // torso nudo, pantaloni arancioni, fascia, polsini e stivali blu col risvolto rosso.
+      robot: { nome: "ZEFIR", pelle: "#f2c9a0", capelli: "#a9bbdc", tuta: "#f08a24", bordo: "#2f5fb8", maniche: "#f2c9a0", gambe: "#f08a24", scarpe: "#2f5fb8", risvolto: "#e0482a", testa: "punte", nudo: true, fiero: true, testaGrande: true },
+      // Brasa rifatto l'11/10/2026 su richiesta di Riccardo: capelli neri a fiamma con la punta
+      // sulla fronte, tuta blu, corazza bianca con spalline e ventre dorati, guanti e stivali bianchi.
+      mela: { nome: "BRASA", pelle: "#e6b58c", capelli: "#17171c", tuta: "#2b3596", bordo: "#f2f2ee", maniche: "#2b3596", gambe: "#2b3596", scarpe: "#f2f2ee", risvolto: "#f2f2ee",
+              testa: "fiamma", armatura: "#b8952a", guanti: "#f2f2ee", fiero: true, iride: "#17171c" },
     },
     maghi: {
       robot: { nome: "MERLO", pelle: "#f0c9a4", capelli: "#e3e6ea", tuta: "#4b2f8f", bordo: "#ffd84a", maniche: "#4b2f8f", gambe: "#4b2f8f", scarpe: "#5a3a1e", testa: "cappello", cappello: "#4b2f8f", veste: true, barba: true },
@@ -8095,7 +8100,8 @@
     const L = Math.hypot(mano.x - gomito.x, mano.y - gomito.y) || 1, ux = (mano.x - gomito.x) / L, uy = (mano.y - gomito.y) / L;
     // Il polsino, poi la mano.
     linea({ x: mano.x - ux * 5 * S, y: mano.y - uy * 5 * S }, { x: mano.x - ux * 2.4 * S, y: mano.y - uy * 2.4 * S }, (grande ? 6.4 : 4.6) * S, colore);
-    ctx.fillStyle = lontano ? scuro(A.pelle) : A.pelle; ctx.strokeStyle = "#17171c"; ctx.lineWidth = 1 * S;
+    const guanto = A.guanti || A.pelle;
+    ctx.fillStyle = lontano ? scuro(guanto) : guanto; ctx.strokeStyle = "#17171c"; ctx.lineWidth = 1 * S;
     ctx.beginPath(); ctx.arc(mano.x, mano.y, (grande ? 4.6 : 3.2) * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   }
   // La faccia, nel riferimento della testa (su = -y): cambia con quello che succede.
@@ -8119,6 +8125,20 @@
       const batte = Math.floor(passi / 3) % 80 === 0 ? 0.3 : 1;
       for (const lato of [-1, 1]) {
         const x0 = lato * 2.8 * S + d * 1.2 * S;
+        if (A.fiero) {
+          // Zefir guarda come il pupazzo: occhi grandi a mandorla, iride grigio-azzurra (accesa da
+          // trasformato) e sopracciglia spesse che scendono verso il naso.
+          ctx.fillStyle = "#ffffff"; ctx.strokeStyle = nero; ctx.lineWidth = 0.9 * S;
+          ctx.beginPath(); ctx.ellipse(x0, ey, 2.25 * S, 2 * S * batte, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          if (batte === 1) {
+            tondo(x0 + d * 0.7 * S, ey + 0.2 * S, (A.iride ? 0.8 : 1.05) * S, luce || A.iride || "#7f93b0");
+            tondo(x0 + d * 0.75 * S, ey + 0.2 * S, 0.5 * S, nero);
+            tondo(x0 + d * 0.25 * S, ey - 0.45 * S, 0.38 * S, "#ffffff");
+          }
+          ctx.strokeStyle = nero; ctx.lineWidth = 1.7 * S; ctx.lineCap = "round"; ctx.beginPath();
+          ctx.moveTo(x0 + lato * 2.5 * S, ey - 4.3 * S); ctx.lineTo(x0 - lato * 1.8 * S, ey - 2.7 * S); ctx.stroke();
+          continue;
+        }
         ctx.fillStyle = luce || nero; ctx.beginPath(); ctx.ellipse(x0, ey, 1.25 * S, 1.6 * S * batte, 0, 0, Math.PI * 2); ctx.fill();
         if (!luce) tondo(x0 + d * 0.4 * S, ey - 0.5 * S, 0.45 * S, "#ffffff");
         if (attacca || urla || luce) {
@@ -8135,7 +8155,49 @@
     else if (urla) { ctx.ellipse(bx, by + 0.3 * S, 2 * S, 2.3 * S, 0, 0, Math.PI * 2); ctx.fill(); }
     else if (attacca) { ctx.ellipse(bx, by, 1.8 * S, 1.3 * S, 0, 0, Math.PI * 2); ctx.fill(); }
     else if (festa) { ctx.moveTo(bx - 2.4 * S, by - 0.6 * S); ctx.quadraticCurveTo(bx, by + 2.6 * S, bx + 2.4 * S, by - 0.6 * S); ctx.closePath(); ctx.fill(); }
+    else if (A.fiero) { ctx.moveTo(bx - 1.6 * S, by + 0.4 * S); ctx.quadraticCurveTo(bx, by - 0.5 * S, bx + 1.6 * S, by + 0.4 * S); ctx.stroke(); }
     else { ctx.moveTo(bx - 1.8 * S, by); ctx.quadraticCurveTo(bx, by + 1.2 * S, bx + 1.8 * S, by); ctx.stroke(); }
+  }
+  // I capelli a punte di Zefir, nel riferimento della testa: dietro le punte che si aprono a
+  // raggiera (in alto, ai lati e un po' all'indietro), davanti la calotta con la frangia a punte.
+  function capelliAPunte(f, A, lag, dietro) {
+    const d = f.dir, chiaro = mix(A.capelli, "#ffffff", 0.35);
+    ctx.strokeStyle = NERO; ctx.lineWidth = 1.1 * S; ctx.lineJoin = "round";
+    if (dietro) {
+      // [quanto gira dalla verticale (in più = all'indietro), lunghezza, larghezza, chiara]
+      // (a fiamma: tutte ritte verso l'alto, lunghe, appena piegate all'indietro)
+      const punte = A.testa === "fiamma"
+        ? [[-0.7, 12, 0.42, 0], [-0.38, 19, 0.36, 1], [-0.08, 23, 0.34, 0], [0.24, 21, 0.36, 1], [0.56, 17, 0.4, 0], [0.9, 12, 0.44, 1], [1.25, 8, 0.46, 0]]
+        : [[-1.3, 7, 0.5, 0], [-0.72, 11, 0.48, 1], [-0.12, 14, 0.46, 0], [0.48, 14, 0.46, 1],
+           [1.08, 12, 0.48, 0], [1.68, 10, 0.5, 1], [2.25, 7, 0.5, 0]];
+      const base = 7 * S;
+      for (const [giro, lun, larg, luce] of punte) {
+        const a = -Math.PI / 2 - d * giro, r = base + lun * S;
+        const px = Math.cos(a) * r + lag * 0.35 * (lun / 17), py = Math.sin(a) * r;
+        ctx.fillStyle = luce ? chiaro : A.capelli;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a - larg) * base, Math.sin(a - larg) * base);
+        ctx.quadraticCurveTo(Math.cos(a - larg * 0.4) * (base + lun * 0.6 * S), Math.sin(a - larg * 0.4) * (base + lun * 0.6 * S), px, py);
+        ctx.quadraticCurveTo(Math.cos(a + larg * 0.4) * (base + lun * 0.5 * S), Math.sin(a + larg * 0.4) * (base + lun * 0.5 * S),
+                             Math.cos(a + larg) * base, Math.sin(a + larg) * base);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+      return;
+    }
+    // La calotta sopra la testa e la frangia a punte che scende sulla fronte, fino alle basette.
+    ctx.fillStyle = A.capelli;
+    ctx.beginPath();
+    ctx.moveTo(-d * 8.4 * S, -0.6 * S);
+    ctx.quadraticCurveTo(-d * 9.4 * S, -9.8 * S, 0, -10 * S);
+    ctx.quadraticCurveTo(d * 9 * S, -9.8 * S, d * 8.6 * S, -2.4 * S);
+    const frangia = A.testa === "fiamma"
+      ? [[7.6, -4.2], [5.8, -7.4], [3.4, -6.6], [1.2, -3.4], [-1, -6.6], [-3.8, -7.4], [-6.4, -5.4], [-7.2, -0.4]]   // l'attaccatura a punta, stempiata ai lati
+      : [[7.4, 0.2], [5.8, -5.6], [4, -4.6], [2.2, -6.8], [0.4, -4.8], [-1.6, -6.8], [-3.6, -4.8], [-5.4, -6.2], [-7, -0.4]];
+    for (const [x, y] of frangia) ctx.lineTo(d * x * S, y * S);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // un filo di luce sui capelli
+    ctx.strokeStyle = chiaro; ctx.lineWidth = 1.5 * S; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-d * 5 * S, -7.6 * S); ctx.quadraticCurveTo(0, -9 * S, d * 4 * S, -7.8 * S); ctx.stroke();
   }
   // Capelli e cappelli, sempre nel riferimento della testa.
   function capoUmano(f, A, bordo, dietro) {
@@ -8152,6 +8214,8 @@
         tondo(-d * 11.4 * S + lag, 14.6 * S + sv, 1.5 * S, bordo);
       } else if (A.codini) {
         for (const k of [0, 1]) tondo(-d * (8 + 2.5 * k) * S + lag * 0.6, (1 + 4 * k) * S + sv * 0.5, (4 - 0.8 * k) * S, A.capelli);
+      } else if (A.testa === "punte" || A.testa === "fiamma") {
+        capelliAPunte(f, A, lag, true);
       } else if (A.testa === "onda") {
         ctx.strokeStyle = bordo; ctx.lineWidth = 1.8 * S;
         for (const k of [0, 1]) {
@@ -8198,6 +8262,8 @@
         for (const [x, y] of [[4.2, 2.4], [5.6, 1.6], [5.2, 3.4]]) tondo(d * x * S, y * S, 0.45 * S, "rgba(140,70,40,.55)");
       }
       cappelloMago(f, A, bordo, lag, sv);
+    } else if (A.testa === "punte" || A.testa === "fiamma") {
+      capelliAPunte(f, A, lag, false);
     } else if (A.testa === "visiera") {
       // Capelli corti e scuri, tirati su.
       ctx.beginPath(); ctx.moveTo(d * 7.6 * S, -4.4 * S); ctx.quadraticCurveTo(d * 5 * S, -11.4 * S, -d * 3 * S, -10.4 * S);
@@ -8247,7 +8313,7 @@
       ctx.strokeStyle = bordo; ctx.lineWidth = 1.1 * S; ctx.beginPath(); ctx.moveTo(-3.4 * S, -1.6 * S); ctx.lineTo(4 * S, -1.6 * S); ctx.stroke();
     } else {
       ctx.beginPath(); ctx.ellipse(0.6 * S, 0, 4.8 * S, 2.7 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = bordo; rettangoloTondo(-3.6 * S, -4.6 * S, 6 * S, 2.6 * S, 1 * S); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = A.risvolto ? (lontano ? scuro(A.risvolto) : A.risvolto) : bordo; rettangoloTondo(-3.6 * S, -4.6 * S, 6 * S, 2.6 * S, 1 * S); ctx.fill(); ctx.stroke();
     }
     ctx.restore();
   }
@@ -8360,17 +8426,18 @@
     const lung = Math.hypot(p.bacino.x - p.collo.x, p.bacino.y - p.collo.y);
     ctx.save();
     ctx.translate((p.collo.x + p.bacino.x) / 2, (p.collo.y + p.bacino.y) / 2); ctx.rotate(ang);
-    if (sup) {
+    if (sup || A.nudo) {
       // Trasformato: spalle larghe, vita stretta, pettorali in vista e la casacca strappata.
-      const alto = -lung / 2 - 5 * S, basso = lung / 2 + 5 * S;
+      // (chi lotta a torso nudo, come Zefir, ha lo stesso busto, solo più asciutto e senza casacca)
+      const w = sup ? 1 : 0.74, alto = -lung / 2 - (sup ? 5 : 3) * S, basso = lung / 2 + (sup ? 5 : 4) * S;
       ctx.lineJoin = "round";
       ctx.beginPath();
-      ctx.moveTo(-6 * S, basso);
-      ctx.quadraticCurveTo(-12.5 * S, (alto + basso) / 2, -12 * S, alto + 4 * S);
-      ctx.quadraticCurveTo(-11.5 * S, alto - 2 * S, -5 * S, alto - 2.5 * S);
-      ctx.quadraticCurveTo(0, alto - 3.5 * S, 5 * S, alto - 2.5 * S);
-      ctx.quadraticCurveTo(11.5 * S, alto - 2 * S, 12 * S, alto + 4 * S);
-      ctx.quadraticCurveTo(12.5 * S, (alto + basso) / 2, 6 * S, basso);
+      ctx.moveTo(-6 * w * S, basso);
+      ctx.quadraticCurveTo(-12.5 * w * S, (alto + basso) / 2, -12 * w * S, alto + 4 * S);
+      ctx.quadraticCurveTo(-11.5 * w * S, alto - 2 * S, -5 * w * S, alto - 2.5 * S);
+      ctx.quadraticCurveTo(0, alto - 3.5 * S, 5 * w * S, alto - 2.5 * S);
+      ctx.quadraticCurveTo(11.5 * w * S, alto - 2 * S, 12 * w * S, alto + 4 * S);
+      ctx.quadraticCurveTo(12.5 * w * S, (alto + basso) / 2, 6 * w * S, basso);
       ctx.closePath();
       const g = ctx.createLinearGradient(0, alto, 0, basso);
       g.addColorStop(0, mix(A.pelle, "#ffffff", 0.2)); g.addColorStop(1, scuro(A.pelle));
@@ -8379,14 +8446,14 @@
       // Pettorali e ventre, segnati appena.
       ctx.strokeStyle = scuro(A.pelle); ctx.lineWidth = 1.3 * S; ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.moveTo(-8 * S, alto + 11 * S); ctx.quadraticCurveTo(0, alto + 15 * S, 8 * S, alto + 11 * S);
+      ctx.moveTo(-8 * w * S, alto + 11 * S); ctx.quadraticCurveTo(0, alto + 15 * S, 8 * w * S, alto + 11 * S);
       ctx.moveTo(0, alto + 4 * S); ctx.lineTo(0, alto + 24 * S);
-      ctx.moveTo(-5.5 * S, alto + 18 * S); ctx.lineTo(-5 * S, alto + 23 * S);
-      ctx.moveTo(5.5 * S, alto + 18 * S); ctx.lineTo(5 * S, alto + 23 * S);
+      ctx.moveTo(-5.5 * w * S, alto + 18 * S); ctx.lineTo(-5 * w * S, alto + 23 * S);
+      ctx.moveTo(5.5 * w * S, alto + 18 * S); ctx.lineTo(5 * w * S, alto + 23 * S);
       ctx.stroke();
       // La casacca strappata: due lembi sulle spalle, con lo strappo frastagliato.
       ctx.fillStyle = A.tuta; ctx.strokeStyle = nero; ctx.lineWidth = 1.2 * S;
-      for (const lato of [-1, 1]) {
+      if (!A.nudo) for (const lato of [-1, 1]) {
         ctx.beginPath();
         ctx.moveTo(lato * 12.4 * S, alto + 3 * S);
         ctx.quadraticCurveTo(lato * 11 * S, alto - 2.4 * S, lato * 4.6 * S, alto - 2 * S);
@@ -8399,15 +8466,40 @@
       }
       // La fascia in vita, annodata.
       ctx.fillStyle = bordo; ctx.strokeStyle = nero; ctx.lineWidth = 1 * S;
-      ctx.beginPath(); rettangoloTondo(-8 * S, basso - 9 * S, 16 * S, 5 * S, 1.8 * S); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); rettangoloTondo(-8 * Math.max(w, 0.95) * S, basso - 9 * S, 16 * Math.max(w, 0.95) * S, 5 * S, 1.8 * S); ctx.fill(); ctx.stroke();
       ctx.beginPath(); rettangoloTondo(-d * 5.6 * S - 1.4 * S, basso - 8 * S, 2.8 * S, 9 * S, 1.2 * S); ctx.fill(); ctx.stroke();
     } else {
       ctx.fillStyle = sfumatura(0, 0, lung, mix(A.tuta, "#ffffff", 0.18), A.tuta); ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
       rettangoloTondo(-7.6 * S, -lung / 2 - 3 * S, 15.2 * S, lung + 7 * S, 5 * S); ctx.fill(); ctx.stroke();
     }
     ctx.strokeStyle = bordo; ctx.lineCap = "round"; ctx.lineWidth = 1.6 * S; ctx.beginPath();
-    if (sup) { /* la casacca strappata se l'è già disegnata */ }
-    else if (stile === "guerrieri") {
+    if (sup || A.nudo) { /* la casacca strappata (o il torso nudo) se l'è già disegnata */ }
+    else if (A.armatura) {
+      // La corazza di Brasa: il pettorale bianco, il ventre dorato a fasce e le spalline larghe
+      // che si alzano a ventaglio; sotto, la tuta blu.
+      const alto = -lung / 2 - 3 * S, basso = lung / 2 + 4 * S, oro = A.armatura;
+      ctx.fillStyle = A.bordo; ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S; ctx.lineJoin = "round";
+      ctx.beginPath(); ctx.moveTo(-8.6 * S, alto + 2 * S); ctx.quadraticCurveTo(0, alto - 0.6 * S, 8.6 * S, alto + 2 * S);
+      ctx.lineTo(7.8 * S, basso - 4 * S); ctx.quadraticCurveTo(0, basso - 2 * S, -7.8 * S, basso - 4 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = "rgba(0,0,0,.25)"; ctx.beginPath();
+      ctx.moveTo(-7 * S, alto + 10 * S); ctx.quadraticCurveTo(0, alto + 12.5 * S, 7 * S, alto + 10 * S); ctx.moveTo(0, alto + 3 * S); ctx.lineTo(0, alto + 11.5 * S); ctx.stroke();
+      ctx.fillStyle = oro; ctx.strokeStyle = nero; ctx.beginPath();
+      ctx.moveTo(-5 * S, basso - 12 * S); ctx.quadraticCurveTo(0, basso - 14 * S, 5 * S, basso - 12 * S);
+      ctx.lineTo(4.4 * S, basso - 4.6 * S); ctx.quadraticCurveTo(0, basso - 3 * S, -4.4 * S, basso - 4.6 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = scuro(oro); ctx.lineWidth = 0.8 * S; ctx.beginPath();
+      for (const k of [0.33, 0.66]) { const y = basso - 12 * S + 7.4 * S * k; ctx.moveTo(-4.6 * S, y); ctx.quadraticCurveTo(0, y - 1.2 * S, 4.6 * S, y); }
+      ctx.stroke();
+      for (const lato of [-1, 1]) {
+        ctx.fillStyle = oro; ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
+        ctx.beginPath(); ctx.moveTo(lato * 5 * S, alto + 1.5 * S);
+        ctx.quadraticCurveTo(lato * 8 * S, alto - 7.5 * S, lato * 15.5 * S, alto - 6 * S);
+        ctx.quadraticCurveTo(lato * 16 * S, alto + 1 * S, lato * 12.4 * S, alto + 6 * S);
+        ctx.quadraticCurveTo(lato * 9 * S, alto + 3 * S, lato * 5 * S, alto + 1.5 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = scuro(oro); ctx.lineWidth = 0.9 * S; ctx.beginPath();
+        for (const k of [0.3, 0.55, 0.8]) { ctx.moveTo(lato * (6 + 8 * k) * S, alto - (1 + 5.4 * k) * S); ctx.lineTo(lato * (6.6 + 5.4 * k) * S, alto + (2 + 3 * k) * S); }
+        ctx.stroke();
+      }
+    } else if (stile === "guerrieri") {
       // La casacca: la maglia scura sotto lo scollo a V, il risvolto incrociato, lo stemma e la
       // cintura annodata, con le due code che sventolano dietro.
       const alto = -lung / 2 - 3 * S, basso = lung / 2 + 4 * S;
@@ -8466,7 +8558,8 @@
     // La testa.
     const angT = Math.atan2(p.testa.y - p.collo.y, p.testa.x - p.collo.x) + Math.PI / 2;
     ctx.save(); ctx.translate(p.testa.x, p.testa.y); ctx.rotate(angT);
-    if (!sup) capoUmano(f, A, bordo, true);                        // trasformato, i capelli sono la cresta
+    if (A.testaGrande) ctx.scale(1.18, 1.18);                         // testone da pupazzo
+    if (!sup) capoUmano(f, A, bordo, true);                       // trasformato, i capelli sono la cresta
     else crestaSuper(f, crine, d);
     ctx.fillStyle = A.pelle; ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
     ctx.beginPath(); ctx.arc(0, 0, 8 * S, 0, Math.PI * 2); ctx.fill();
@@ -8478,7 +8571,8 @@
     ctx.beginPath(); ctx.arc(d * 7.4 * S, 1.4 * S, 1.5 * S, d > 0 ? -Math.PI / 2 : Math.PI / 2, d > 0 ? Math.PI / 2 : Math.PI * 1.5); ctx.stroke();
     facciaUmana(f, A, acceso ? coloreAnime(f) : null);
     // l'orecchio (i capelli davanti lo coprono, se ci arrivano)
-    ctx.fillStyle = mix(A.pelle, "#000000", 0.06); ctx.beginPath(); ctx.ellipse(-d * 1.6 * S, 0.8 * S, 1.6 * S, 2.3 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // (Zefir guarda dritto davanti, come il pupazzo: l'orecchio in mezzo alla faccia sembrava un terzo occhio)
+    if (!A.fiero) { ctx.fillStyle = mix(A.pelle, "#000000", 0.06); ctx.beginPath(); ctx.ellipse(-d * 1.6 * S, 0.8 * S, 1.6 * S, 2.3 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
     disegnaSegni(f, "testa");
     if (!sup) capoUmano(f, A, bordo, false);
     if (cavaliere) {
