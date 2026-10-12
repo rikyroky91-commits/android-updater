@@ -2,5 +2,5 @@
 <resources>
     <string name="nome">Page Brawl</string>
     <string name="nome_browser">Page Brawl: brawl on this page</string>
-    <string name="descrizione_servizio">Turns your screen into a ring: icons, text, buttons and notifications become the ground the fighters fight on, lock screen included. Page Brawl only uses where things are on screen, and only while the ring is on: it reads no text, stores nothing and sends nothing.</string>
+    <string name="descrizione_servizio">Turns your screen into a ring: icons, text, buttons and notifications become the ground the fighters fight on, lock screen included. Page Brawl reads where things are on screen only while the ring is on, checks whether they have text only to treat them as solid, and stores or sends nothing. It never acts inside your apps. Page Brawl is a game, not an accessibility tool.</string>
 </resources>

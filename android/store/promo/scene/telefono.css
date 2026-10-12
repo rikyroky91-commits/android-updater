@@ -1,0 +1,8 @@
+/* Lo schermo finto di un telefono generico per foto e video dello store (360x640 dp). */
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body { position: relative; -webkit-font-smoothing: antialiased; }
+.barra-stato { position: absolute; top: 0; left: 0; right: 0; height: 30px; padding: 0 18px; display: flex; align-items: center;
+  justify-content: space-between; color: #fff; font: 500 13px Roboto, system-ui, sans-serif; z-index: 5; }
+.barra-stato.scura { color: #1b1b1b; }
+.barra-stato .icone { letter-spacing: 3px; font-size: 11px; }

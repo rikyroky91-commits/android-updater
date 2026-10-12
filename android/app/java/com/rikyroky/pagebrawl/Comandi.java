@@ -311,6 +311,13 @@ final class Comandi {
         for (int i = 0; i < 4; i++) tastoMesso[i] = false;
     }
 
+    /** Rimette tutto al suo posto, per esempio quando cambiano i margini (tacca della fotocamera). */
+    void ridisponi() {
+        if (!attivo) return;
+        togliTutto();
+        dispone();
+    }
+
     private void apriMenu(boolean si) { menuAperto = si; dispone(); }
 
     private void riduci(boolean si) {

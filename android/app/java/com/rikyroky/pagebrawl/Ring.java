@@ -123,7 +123,7 @@ public class Ring extends AccessibilityService {
                 String a = i.getAction();
                 if (Intent.ACTION_SCREEN_ON.equals(a)) {
                     // Modalità «solo blocco schermo»: il ring compare appena si accende lo schermo.
-                    if ("blocco".equals(Memoria.modo(Ring.this)) && bloccato() && arena == null) {
+                    if ("blocco".equals(Memoria.modo(Ring.this)) && bloccato() && arena == null && Memoria.consenso(Ring.this)) {
                         apertoDaBlocco = true;
                         avvia(650);
                     } else aggiornaBolla();
@@ -171,7 +171,7 @@ public class Ring extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent e) {
-        if (e == null) return;
+        if (e == null || !Memoria.consenso(this)) return;     // senza consenso nell'app non si guarda niente
         CharSequence p = e.getPackageName();
         if (p != null && getPackageName().contentEquals(p)) return;
         // Quale app è in primo piano (per la modalità «solo Chrome»): la tendina e la tastiera non contano.
@@ -206,6 +206,11 @@ public class Ring extends AccessibilityService {
     /** Accende il ring sullo schermo che c'è adesso. */
     void avvia(long ritardo) {
         if (arena != null || inAvvio || wm == null) return;
+        if (!Memoria.consenso(this)) {
+            // Servizio acceso dalle impostazioni senza passare dall'avviso: prima l'avviso, nell'app.
+            startActivity(new Intent(this, Principale.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            return;
+        }
         inAvvio = true;
         nascondiBolla();
         h.postDelayed(new Runnable() {
@@ -543,7 +548,8 @@ public class Ring extends AccessibilityService {
     void aggiornaBolla() {
         if (wm == null) return;
         modo = Memoria.modo(this);
-        boolean serve = "sistema".equals(modo) || ("chrome".equals(modo) && inChrome) || ("blocco".equals(modo) && bloccato());
+        boolean serve = Memoria.consenso(this)
+                && ("sistema".equals(modo) || ("chrome".equals(modo) && inChrome) || ("blocco".equals(modo) && bloccato()));
         if (serve && !bollaNascosta && arena == null && !inAvvio) mostraBolla();
         else nascondiBolla();
     }

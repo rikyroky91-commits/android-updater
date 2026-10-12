@@ -18,8 +18,15 @@ si indicano uno per uno: AAPT2, ANDROID_JAR, D8 (eseguibile) o DX_JAR, APKSIGNER
 Senza SDK, ~/tools con aapt2, android.jar, dx.jar e apksigner.jar va bene uguale.
 
 Uso:
-    python3 android/costruisci.py              # scrive android/build/PageBrawl.apk
+    python3 android/costruisci.py              # scrive android/build/PageBrawl.apk (chiave di prova)
+    python3 android/costruisci.py --aab        # anche android/build/PageBrawl.aab per il Play Store
+    python3 android/costruisci.py --leggera    # variante senza accessibilità (piano B per il Play Store)
     python3 android/costruisci.py --solo-asset # solo android/build/assets (per provare l'arena nel browser)
+
+Per il Play Store (12/10/2026): target API 36 (obbligatorio dal 31/08/2026), android.jar della
+piattaforma 36 (`android-36.jar` in ~/tools va bene), AAB fatto con bundletool (`bundletool.jar` in
+~/tools) e firmato con la chiave di caricamento `firma/pagebrawl-upload.jks`, che resta fuori dal repo
+(password in `firma/pagebrawl-upload.txt`, o in $PB_FIRMA_PASSWORD). Se la chiave manca la crea.
 """
 import glob
 import json
@@ -38,10 +45,17 @@ ESTENSIONE = RADICE / "estensione" / "store"
 COSTRUZIONE = QUI / "build"
 APP = QUI / "app"
 
-VERSIONE = "1.4.0"
-CODICE_VERSIONE = 6
+VERSIONE = "1.5.0"
+CODICE_VERSIONE = 7          # la variante leggera prende CODICE_VERSIONE + 1 (vedi LEGGIMI, piano B)
 MIN_SDK = 26
-TARGET_SDK = 34
+TARGET_SDK = 36
+
+LEGGERA = "--leggera" in sys.argv
+NOME = "PageBrawl-lite" if LEGGERA else "PageBrawl"
+
+CARICAMENTO = QUI / "firma" / "pagebrawl-upload.jks"
+CARICAMENTO_PASSWORD = QUI / "firma" / "pagebrawl-upload.txt"
+CARICAMENTO_ALIAS = "upload"
 
 FIRMA = QUI / "firma" / "pagebrawl-debug.jks"
 FIRMA_PASSWORD = "pagebrawl"          # chiave di prova (come la debug.keystore di Android): non per lo store
@@ -66,6 +80,14 @@ SOSTITUZIONI_PREPARA = [
     # Sopra lo schermo si entra subito nel combattimento libero (la corsa è nelle arene dell'app).
     ("window.__ringSceltaModo = true;", "window.__ringSceltaModo = window.__pbSceltaModo !== false;"),
 ]
+
+
+# Per il Play Store (--aab) i personaggi di partenza sono robot e mela invece dei super guerrieri: Zefir
+# (capelli a punte, casacca arancione, onda di energia, capelli dorati alla trasformazione) richiama troppo
+# Dragon Ball per la prima schermata che vede un revisore. I guerrieri restano sceglibili nel menu.
+# Per tenere i guerrieri di serie anche nello store: --guerrieri.
+if "--aab" in sys.argv and "--guerrieri" not in sys.argv:
+    SOSTITUZIONI_PREPARA.append(('memoria["mut-ring-stile"] = "guerrieri";', 'memoria["mut-ring-stile"] = "";'))
 
 
 # ring.js: la misura dei lottatori la decide l'app (ponte.js, `window.__pbScala`).
@@ -129,7 +151,9 @@ def attrezzi():
 
     t = {
         "aapt2": primo(os.environ.get("AAPT2"), bt and bt / "aapt2", casa / "aapt2", shutil.which("aapt2")),
-        "android_jar": primo(os.environ.get("ANDROID_JAR"), sdk and Path(sdk) / "platforms" / f"android-{TARGET_SDK}" / "android.jar", casa / "android.jar"),
+        "android_jar": primo(os.environ.get("ANDROID_JAR"), sdk and Path(sdk) / "platforms" / f"android-{TARGET_SDK}" / "android.jar",
+                             casa / f"android-{TARGET_SDK}.jar", casa / "android.jar"),
+        "bundletool": primo(os.environ.get("BUNDLETOOL_JAR"), casa / "bundletool.jar"),
         "d8": primo(os.environ.get("D8"), bt and bt / "d8", shutil.which("d8")),
         "dx_jar": primo(os.environ.get("DX_JAR"), casa / "dx.jar"),
         "apksigner_jar": primo(os.environ.get("APKSIGNER_JAR"), bt and bt / "lib" / "apksigner.jar", casa / "apksigner.jar"),
@@ -177,6 +201,30 @@ def allinea_e_aggiungi(base_apk, dex, uscita):
 # --------------------------------------------------------------------------
 # L'APK
 # --------------------------------------------------------------------------
+def manifesto():
+    """Il manifest. Nella variante leggera senza i due servizi: niente accessibilità, niente riquadro."""
+    testo = (APP / "AndroidManifest.xml").read_text(encoding="utf-8")
+    if LEGGERA:
+        servizi = re.findall(r"\n\s*<service\b.*?</service>", testo, flags=re.S)
+        if len(servizi) != 2 or "BIND_ACCESSIBILITY_SERVICE" not in testo:
+            raise SystemExit("AndroidManifest.xml è cambiato: attesi 2 servizi, uno di accessibilità")
+        for sv in servizi:
+            testo = testo.replace(sv, "")
+        if "accessibility" in testo.lower():
+            raise SystemExit("la variante leggera parla ancora di accessibilità nel manifest")
+    uscita = COSTRUZIONE / "AndroidManifest.xml"
+    uscita.write_text(testo, encoding="utf-8")
+    return uscita
+
+
+def collega(t, res_zip, cartella_asset, gen, uscita, proto=False):
+    esegui([t["aapt2"], "link", "-I", t["android_jar"], "--manifest", manifesto(),
+            "-A", cartella_asset, "--java", gen, "-o", uscita,
+            "--min-sdk-version", MIN_SDK, "--target-sdk-version", TARGET_SDK,
+            "--version-code", CODICE_VERSIONE + (1 if LEGGERA else 0), "--version-name", VERSIONE + ("-lite" if LEGGERA else ""),
+            "--auto-add-overlay"] + (["--proto-format"] if proto else []) + [res_zip])
+
+
 def apk():
     t = attrezzi()
     cartella_asset = asset()
@@ -191,10 +239,13 @@ def apk():
     print("risorse")
     esegui([t["aapt2"], "compile", "--dir", APP / "res", "-o", res_zip])
     base = COSTRUZIONE / "base.apk"
-    esegui([t["aapt2"], "link", "-I", t["android_jar"], "--manifest", APP / "AndroidManifest.xml",
-            "-A", cartella_asset, "--java", gen, "-o", base,
-            "--min-sdk-version", MIN_SDK, "--target-sdk-version", TARGET_SDK,
-            "--version-code", CODICE_VERSIONE, "--version-name", VERSIONE, "--auto-add-overlay", res_zip])
+    collega(t, res_zip, cartella_asset, gen, base)
+    # La variante si sceglie qui: una costante che Principale legge (nascosti modalità e riquadro).
+    var = gen / "com" / "rikyroky" / "pagebrawl" / "Variante.java"
+    var.parent.mkdir(parents=True, exist_ok=True)
+    var.write_text("package com.rikyroky.pagebrawl;\n\n/** Generato da costruisci.py. */\n"
+                   f"final class Variante {{\n    private Variante() {{}}\n    static final boolean LEGGERA = {'true' if LEGGERA else 'false'};\n}}\n",
+                   encoding="utf-8")
 
     print("java")
     sorgenti = sorted(glob.glob(str(APP / "java" / "**" / "*.java"), recursive=True) + glob.glob(str(gen / "**" / "*.java"), recursive=True))
@@ -221,11 +272,61 @@ def apk():
         esegui(["keytool", "-genkeypair", "-keystore", FIRMA, "-storepass", FIRMA_PASSWORD, "-keypass", FIRMA_PASSWORD,
                 "-alias", FIRMA_ALIAS, "-keyalg", "RSA", "-keysize", "2048", "-validity", "10000",
                 "-dname", "CN=Page Brawl (prova), O=rikyroky91"])
-    finale = COSTRUZIONE / "PageBrawl.apk"
+    finale = COSTRUZIONE / f"{NOME}.apk"
     esegui(["java", "-jar", t["apksigner_jar"], "sign", "--ks", FIRMA, "--ks-pass", f"pass:{FIRMA_PASSWORD}",
             "--ks-key-alias", FIRMA_ALIAS, "--min-sdk-version", MIN_SDK, "--out", finale, allineato])
     esegui(["java", "-jar", t["apksigner_jar"], "verify", "--min-sdk-version", MIN_SDK, finale])
     print(f"\nAPK pronto: {finale} ({finale.stat().st_size // 1024} KB)")
+    if "--aab" in sys.argv:
+        aab(t, res_zip, cartella_asset, dex_dir / "classes.dex")
+    return finale
+
+
+# --------------------------------------------------------------------------
+# L'AAB per il Play Store
+# --------------------------------------------------------------------------
+def chiave_caricamento():
+    """La chiave di caricamento (Play App Signing: Google firma le APK vere, questa prova solo che sei tu)."""
+    pw = os.environ.get("PB_FIRMA_PASSWORD") or (CARICAMENTO_PASSWORD.read_text().strip() if CARICAMENTO_PASSWORD.exists() else "")
+    if not CARICAMENTO.exists():
+        import secrets
+        pw = pw or secrets.token_urlsafe(18)
+        esegui(["keytool", "-genkeypair", "-keystore", CARICAMENTO, "-storetype", "PKCS12", "-storepass", pw, "-keypass", pw,
+                "-alias", CARICAMENTO_ALIAS, "-keyalg", "RSA", "-keysize", "4096", "-validity", "10000",
+                "-dname", "CN=Page Brawl upload key, O=rikyroky91"])
+        CARICAMENTO_PASSWORD.write_text(pw + "\n")
+        print(f"  nuova chiave di caricamento: {CARICAMENTO} (password in {CARICAMENTO_PASSWORD.name}) - tienile al sicuro")
+    if not pw:
+        raise SystemExit(f"manca la password di {CARICAMENTO.name}: $PB_FIRMA_PASSWORD o {CARICAMENTO_PASSWORD.name}")
+    return pw
+
+
+def aab(t, res_zip, cartella_asset, dex):
+    if not t["bundletool"]:
+        raise SystemExit("manca bundletool.jar (github.com/google/bundletool/releases) in ~/tools o $BUNDLETOOL_JAR")
+    print("aab")
+    proto = COSTRUZIONE / "base-proto.apk"
+    collega(t, res_zip, cartella_asset, COSTRUZIONE / "gen-proto", proto, proto=True)
+    modulo = COSTRUZIONE / "base-modulo.zip"
+    with zipfile.ZipFile(proto) as src, zipfile.ZipFile(modulo, "w", zipfile.ZIP_DEFLATED) as dst:
+        for i in src.infolist():
+            nome = "manifest/AndroidManifest.xml" if i.filename == "AndroidManifest.xml" else i.filename
+            dst.writestr(nome, src.read(i.filename))
+        dst.write(dex, "dex/classes.dex")
+    grezzo = COSTRUZIONE / f"{NOME}-non-firmato.aab"
+    finale = COSTRUZIONE / f"{NOME}.aab"
+    for f in (grezzo, finale):
+        if f.exists():
+            f.unlink()
+    esegui(["java", "-jar", t["bundletool"], "build-bundle", f"--modules={modulo}", f"--output={grezzo}"])
+    pw = chiave_caricamento()
+    esegui(["jarsigner", "-sigalg", "SHA256withRSA", "-digestalg", "SHA-256", "-keystore", CARICAMENTO,
+            "-storepass", pw, "-signedjar", finale, grezzo, CARICAMENTO_ALIAS])
+    v = esegui(["jarsigner", "-verify", finale])          # chiave autofirmata: niente -strict, come per ogni chiave Android
+    if "jar verified" not in v.stdout:
+        raise SystemExit("firma dell'AAB non valida")
+    esegui(["java", "-jar", t["bundletool"], "validate", f"--bundle={finale}"])
+    print(f"AAB pronto: {finale} ({finale.stat().st_size // 1024} KB)")
     return finale
 
 

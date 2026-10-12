@@ -40,6 +40,11 @@ final class Memoria {
     static void bolla(Context c, boolean si) { opzioni(c).edit().putBoolean("bolla", si).apply(); }
     static boolean blocco(Context c) { return opzioni(c).getBoolean("blocco", false); }
     static void blocco(Context c, boolean si) { opzioni(c).edit().putBoolean("blocco", si).apply(); }
+    /** L'utente ha letto l'avviso sull'accessibilità e ha toccato «Agree» (norme del Play Store: l'avviso
+     *  dentro l'app e il consenso vengono prima del permesso). Senza, il servizio acceso non fa niente. */
+    static boolean consenso(Context c) { return opzioni(c).getBoolean("consenso_accessibilita", false); }
+    static void consenso(Context c, boolean si) { opzioni(c).edit().putBoolean("consenso_accessibilita", si).apply(); }
+
     static boolean webAuto(Context c) { return opzioni(c).getBoolean("web_auto", true); }
     static void webAuto(Context c, boolean si) { opzioni(c).edit().putBoolean("web_auto", si).apply(); }
     static int[] posBolla(Context c) {

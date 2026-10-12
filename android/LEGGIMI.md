@@ -52,14 +52,26 @@ Su Android 13 e successivi, per un'app installata da file l'interruttore dell'ac
 
 ```
 python3 android/costruisci.py            # → android/build/PageBrawl.apk
+python3 android/costruisci.py --aab      # + PageBrawl.aab per il Play Store
+python3 android/costruisci.py --aab --leggera   # piano B senza accessibilità (PageBrawl-lite.*)
 python3 android/costruisci.py --solo-asset
 ```
 
 Prima di tutto `python3 estensione/costruisci.py`, se il ring del sito è cambiato: l'app prende i file da `estensione/store/`. Ritocchi automatici, che si fermano con un errore se l'originale cambia: `prepara.js` chiama `window.__pbSalva` / `window.__pbMessaggio` al posto di `chrome.storage` / `chrome.runtime` e salta la scelta del modo sopra lo schermo, e in `ring.js` la misura dei lottatori (`S`) la decide `window.__pbScala` (lato corto dello schermo, 400 px = 1, per S/M/L nell'app).
 
-Niente Gradle. Servono `aapt2`, `android.jar` (piattaforma 34), `javac`, `d8` o `dx.jar`, `apksigner.jar`: da `$ANDROID_HOME` se c'è l'SDK, altrimenti dalla cartella `$ATTREZZI_ANDROID` (di serie `~/tools`). Il Java è senza lambda: lo compila anche `dx`.
+Niente Gradle. Servono `aapt2`, `android.jar` (piattaforma 36: `android-36.jar` in `~/tools`, da github.com/Sable/android-platforms), `bundletool.jar` per l'AAB, `javac`, `d8` o `dx.jar`, `apksigner.jar`: da `$ANDROID_HOME` se c'è l'SDK, altrimenti dalla cartella `$ATTREZZI_ANDROID` (di serie `~/tools`). Il Java è senza lambda: lo compila anche `dx`.
 
 La firma è una chiave **di prova** (`firma/pagebrawl-debug.jks`, password `pagebrawl`), come la debug.keystore di Android: serve perché ogni nuova versione si installi sopra la vecchia. Per il Play Store ci vorrà una chiave vera, tenuta fuori dal repo.
+
+## Play Store (1.5.0, 12/10/2026)
+
+Guida, fattibilità, testi e risposte: documento «Page Brawl su Google Play: guida e fattibilità» nel progetto.
+- Target API 36 (obbligatorio dal 31/08/2026): `Bordi.java` gestisce lo schermo da bordo a bordo e il tasto Indietro di Android 16; nelle arene capsula e tasti stanno fuori dalla tacca.
+- Avviso e consenso per l'accessibilità (norme Play per chi non è uno strumento di accessibilità): `Principale.disegnaAvviso()`; senza `Memoria.consenso` il servizio non guarda niente.
+- Con `--aab` i personaggi di partenza sono robot e mela (i guerrieri richiamano Dragon Ball); `--guerrieri` li rimette.
+- `--leggera`: manifest senza servizio di accessibilità né riquadro, `Variante.LEGGERA` nasconde le modalità. Codice versione +1.
+- La chiave di caricamento `firma/pagebrawl-upload.jks` (+ `.txt` con la password) resta fuori da git; con Play App Signing Google firma le APK vere.
+- Foto e video dello store: `store/promo/cattura.py` (riprese del motore vero in Chromium, con `vetrina.js` che ridisegna i comandi nativi) e `store/promo/componi.py` (schermate, grafica, icona, video). Escono in `store/consegna/` (fuori da git). L'informativa sulla privacy è `web/static/pagebrawl/privacy.html`.
 
 ## Installare
 

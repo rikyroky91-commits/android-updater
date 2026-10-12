@@ -43,6 +43,9 @@ public class Principale extends Activity {
 
     private ScrollView scorri;
     private boolean aiutoAperto;
+    /** L'avviso sull'accessibilità a tutta pagina (norme del Play Store: prima del permesso, con consenso). */
+    private boolean avvisoAperto;
+    private Object richiamata;      // il tasto Indietro mentre l'avviso è aperto (Android 13+)
     private float d;
 
     @Override
@@ -55,6 +58,14 @@ public class Principale extends Activity {
         scorri.setBackgroundColor(FONDO);
         scorri.setFillViewport(true);
         setContentView(scorri);
+        Bordi.imbottisci(scorri);
+        if (Variante.LEGGERA) Memoria.modo(this, "app");
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void onBackPressed() {
+        if (avvisoAperto) rifiuta(); else super.onBackPressed();
     }
 
     @Override
@@ -66,7 +77,10 @@ public class Principale extends Activity {
     }
 
     private void disegna() {
-        boolean attivo = servizioAttivo();
+        if (avvisoAperto) { disegnaAvviso(); return; }
+        boolean attivo = !Variante.LEGGERA && servizioAttivo();
+        boolean consenso = Memoria.consenso(this);
+        boolean pronto = attivo && consenso;
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setPadding(px(20), px(28), px(20), px(24));
@@ -88,12 +102,15 @@ public class Principale extends Activity {
         // Il servizio, se la modalità ne ha bisogno e non è acceso.
         final String modo = Memoria.modo(this);
         boolean serveServizio = !"app".equals(modo);
-        if (serveServizio && !attivo) {
+        if (serveServizio && !pronto) {
             LinearLayout blocco = superficie();
-            blocco.addView(stato("Not turned on", 0xFFF2C14E));
+            blocco.addView(stato(attivo ? "Needs your OK" : "Not turned on", 0xFFF2C14E));
             blocco.addView(nota("Page Brawl needs Accessibility to draw over your apps and the lock screen."));
-            blocco.addView(bottone("Turn on", true, new View.OnClickListener() {
-                @Override public void onClick(View v) { apri(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); }
+            blocco.addView(bottone(consenso ? "Turn on" : "Review and turn on", true, new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    if (Memoria.consenso(Principale.this)) apri(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                    else apriAvviso(true);
+                }
             }));
             final TextView aiuto = nota("Open App info, tap ⋮ in the top right → Allow restricted settings, then tap Turn on again. In the list: Installed apps → Page Brawl.");
             aiuto.setVisibility(aiutoAperto ? View.VISIBLE : View.GONE);
@@ -107,25 +124,30 @@ public class Principale extends Activity {
             });
             blocco.addView(link);
             blocco.addView(aiuto);
-            if (Build.VERSION.SDK_INT < 33) link.setVisibility(View.GONE);
+            if (Build.VERSION.SDK_INT < 33 || attivo) link.setVisibility(View.GONE);
             col.addView(blocco);
             col.addView(spazio(22));
         }
 
         // Dove giocare: quattro modalità.
-        col.addView(titoletto("WHERE TO PLAY"));
-        LinearLayout modi = superficie();
-        modi.setPadding(px(6), px(6), px(6), px(6));
-        String[][] voci = {
-                {"blocco", "\uD83D\uDD12", "Lock screen", "The ring appears when you wake the screen"},
-                {"sistema", "\uD83D\uDCF1", "Whole phone", "Tap the bubble on any app"},
-                {"chrome", "\uD83C\uDF10", "Chrome only", "The bubble shows while you browse"},
-                {"app", "\uD83C\uDFDF\uFE0F", "In the app", "Arenas: lava, sky, ring"}};
-        for (final String[] v : voci) modi.addView(rigaModo(v[0], v[1], v[2], v[3], v[0].equals(modo)));
-        col.addView(modi);
+        // Nella variante senza accessibilità (piano B per il Play Store) ci sono solo le arene.
+        if (Variante.LEGGERA) {
+            col.addView(titoletto("ARENAS"));
+        } else {
+            col.addView(titoletto("WHERE TO PLAY"));
+            LinearLayout modi = superficie();
+            modi.setPadding(px(6), px(6), px(6), px(6));
+            String[][] voci = {
+                    {"blocco", "\uD83D\uDD12", "Lock screen", "The ring appears when you wake the screen"},
+                    {"sistema", "\uD83D\uDCF1", "Whole phone", "Tap the bubble on any app"},
+                    {"chrome", "\uD83C\uDF10", "Chrome only", "The bubble shows while you browse"},
+                    {"app", "\uD83C\uDFDF\uFE0F", "In the app", "Arenas: lava, sky, ring"}};
+            for (final String[] v : voci) modi.addView(rigaModo(v[0], v[1], v[2], v[3], v[0].equals(modo)));
+            col.addView(modi);
+            col.addView(spazio(14));
+        }
 
         // Cosa fare adesso, secondo la modalità.
-        col.addView(spazio(14));
         if ("app".equals(modo)) {
             LinearLayout arene = new LinearLayout(this);
             arene.addView(arena("lava", "Lava", new int[]{0xFF5C1608, 0xFF0D0403}, 0xFFFF8A1F), pesoUno());
@@ -134,7 +156,7 @@ public class Principale extends Activity {
             arene.addView(spazio(10, true));
             arene.addView(arena("ring", "Ring", new int[]{0xFF2A2F3A, 0xFF07080B}, 0xFF1F3A8A), pesoUno());
             col.addView(arene);
-        } else if (attivo) {
+        } else if (pronto) {
             if ("sistema".equals(modo)) {
                 col.addView(bottone("Play on the Home screen", true, new View.OnClickListener() {
                     @Override public void onClick(View v) { giocaSullaHome(); }
@@ -172,8 +194,10 @@ public class Principale extends Activity {
         riquadro.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { aggiungiRiquadro(); }
         });
-        lista.addView(riquadro);
-        lista.addView(linea());
+        if (!Variante.LEGGERA) {
+            lista.addView(riquadro);
+            lista.addView(linea());
+        }
         LinearLayout sito = riga("Web page", "The ring inside a real web page");
         sito.addView(testo("Open", 15, VERDE, true));
         sito.setOnClickListener(new View.OnClickListener() {
@@ -215,9 +239,131 @@ public class Principale extends Activity {
         gr.addView(rDet);
         col.addView(gr);
 
-        TextView piede = testo("It only uses where things are on screen, and only while you play. It reads no text and sends nothing.", 12, TENUE, false);
+        TextView piede = testo(Variante.LEGGERA ? "Nothing you do here is collected or sent anywhere."
+                : "Accessibility is used only to find where things are on screen while the ring is on. Nothing is stored or sent.", 12, TENUE, false);
+        if (!Variante.LEGGERA && consenso) {
+            piede.setText(piede.getText() + "  Details");
+            piede.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { apriAvviso(false); }
+            });
+        }
         piede.setPadding(px(4), px(18), px(4), 0);
         col.addView(piede);
+
+        scorri.removeAllViews();
+        scorri.addView(col);
+    }
+
+    // ------------------------------------------------- l'avviso e il consenso
+    /** Testo dell'avviso: dice cosa fa il servizio, una riga per cosa (va tenuto vero: è quello che si dichiara). */
+    private static final String[] COSA_FA = {
+            "Reads the position and size of the elements on your screen (buttons, icons, text boxes) so the fighters can stand on them and bump into them.",
+            "Checks whether an element has text or a label, only to decide if it counts as solid. The text itself is never kept.",
+            "Notices which app is in front, so the bubble can show only on the lock screen or only in Chrome.",
+            "Draws the fighters and their controls over your apps and over the lock screen.",
+            "When you start the ring from the quick settings tile, it closes the notification shade for you.",
+    };
+
+    private boolean chiedePermesso;     // l'avviso porta poi alle impostazioni (no se lo si rilegge e basta)
+
+    private void apriAvviso(boolean permesso) {
+        avvisoAperto = true;
+        chiedePermesso = permesso;
+        if (Build.VERSION.SDK_INT >= 33 && richiamata == null) {
+            android.window.OnBackInvokedCallback cb = new android.window.OnBackInvokedCallback() {
+                @Override public void onBackInvoked() { rifiuta(); }
+            };
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, cb);
+            richiamata = cb;
+        }
+        disegna();
+        scorri.scrollTo(0, 0);
+    }
+
+    private void chiudiAvviso() {
+        avvisoAperto = false;
+        if (Build.VERSION.SDK_INT >= 33 && richiamata != null) {
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback((android.window.OnBackInvokedCallback) richiamata);
+            richiamata = null;
+        }
+    }
+
+    private void accetta() {
+        Memoria.consenso(this, true);
+        boolean vai = chiedePermesso && !servizioAttivo();
+        chiudiAvviso();
+        Ring r = Ring.istanza;
+        if (r != null) r.aggiornaBolla();
+        disegna();
+        if (vai) apri(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+    }
+
+    /** «No thanks»: niente permesso, si gioca nelle arene, che non ne hanno bisogno. */
+    private void rifiuta() {
+        boolean primaVolta = !Memoria.consenso(this);
+        chiudiAvviso();
+        if (primaVolta) {
+            Memoria.modo(this, "app");
+            Toast.makeText(this, "No problem: the arenas work without it.", Toast.LENGTH_LONG).show();
+        }
+        disegna();
+    }
+
+    private void disegnaAvviso() {
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(px(20), px(28), px(20), px(24));
+        col.addView(testo("Accessibility permission", 22, TESTO, true));
+        TextView sotto = nota("To turn your lock screen, apps and web pages into a ring, Page Brawl uses Android's Accessibility Service API. Page Brawl is a game, not an accessibility tool.");
+        sotto.setPadding(0, px(10), 0, px(18));
+        col.addView(sotto);
+
+        LinearLayout cosa = superficie();
+        cosa.addView(testo("While the service is on, Page Brawl:", 15, TESTO, true));
+        for (String r : COSA_FA) {
+            TextView t = testo("•  " + r, 14, TESTO, false);
+            t.setPadding(0, px(10), 0, 0);
+            cosa.addView(t);
+        }
+        col.addView(cosa);
+        col.addView(spazio(14));
+
+        LinearLayout mai = superficie();
+        mai.addView(testo("It never:", 15, TESTO, true));
+        String[] no = {
+                "stores or sends anything it sees: there is no account, no analytics and no server;",
+                "taps, types or acts inside other apps for you;",
+                "reads the screen while the ring is off (positions are read only while you play)."};
+        for (String r : no) {
+            TextView t = testo("•  " + r, 14, TESTO, false);
+            t.setPadding(0, px(10), 0, 0);
+            mai.addView(t);
+        }
+        col.addView(mai);
+
+        TextView via = nota("You can turn it off at any time in Settings › Accessibility › Page Brawl. Without it you can still play in the arenas.");
+        via.setPadding(0, px(16), 0, 0);
+        col.addView(via);
+
+        col.addView(bottone(chiedePermesso ? "Agree and continue" : "OK", true, new View.OnClickListener() {
+            @Override public void onClick(View v) { accetta(); }
+        }));
+        col.addView(bottone(chiedePermesso ? "No thanks" : "Withdraw consent", false, new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (!chiedePermesso) {
+                    // Ritirare il consenso: il servizio resta acceso nelle impostazioni ma non fa più niente.
+                    Memoria.consenso(Principale.this, false);
+                    Ring r = Ring.istanza;
+                    if (r != null) r.aggiornaBolla();
+                    Toast.makeText(Principale.this, "Consent withdrawn. You can also turn the service off in Settings.", Toast.LENGTH_LONG).show();
+                    chiudiAvviso();
+                    Memoria.modo(Principale.this, "app");
+                    disegna();
+                    return;
+                }
+                rifiuta();
+            }
+        }));
 
         scorri.removeAllViews();
         scorri.addView(col);

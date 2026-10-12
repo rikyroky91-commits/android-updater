@@ -74,9 +74,23 @@ public class Arena extends Activity {
         OspiteVista ospite = new OspiteVista(scena, web, new Runnable() {
             @Override public void run() { finish(); }
         });
-        ospite.alto = Math.round(10 * getResources().getDisplayMetrics().density);
+        final int dieci = Math.round(10 * getResources().getDisplayMetrics().density);
+        ospite.alto = dieci;
         comandi = new Comandi(this, ospite, web);
         comandi.avvia();
+        // Con target 35+ l'arena a schermo intero va anche sotto la tacca della fotocamera: la capsula e i
+        // tasti si tengono fuori dalla tacca (i lottatori no, il campo resta tutto lo schermo).
+        if (Build.VERSION.SDK_INT >= 30) {
+            final OspiteVista o = ospite;
+            scena.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+                @Override public WindowInsets onApplyWindowInsets(View v, WindowInsets wi) {
+                    android.graphics.Insets t = wi.getInsets(WindowInsets.Type.displayCutout());
+                    int alto = dieci + t.top, basso = t.bottom;
+                    if (alto != o.alto || basso != o.basso) { o.alto = alto; o.basso = basso; comandi.ridisponi(); }
+                    return wi;
+                }
+            });
+        }
 
         String tipo = getIntent().getStringExtra(EXTRA_TIPO);
         if (tipo == null || !tipo.matches("lava|cielo|ring")) tipo = "lava";

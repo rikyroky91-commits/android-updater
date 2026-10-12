@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Home</title>
+<link rel="stylesheet" href="telefono.css">
+<style>
+  body { background: radial-gradient(120% 70% at 20% 10%, #6b5bd6 0%, #3a2f8f 38%, #14203f 75%, #0c1226 100%); }
+  .orologio { margin: 92px 24px 0; color:#fff; }
+  .orologio b { display:block; font: 300 64px/1 Roboto, system-ui, sans-serif; letter-spacing:-1px; }
+  .orologio span { font: 500 15px/1.4 Roboto, system-ui, sans-serif; opacity:.85; }
+  .meteo { display:inline-flex; gap:8px; align-items:center; margin: 18px 24px 0; padding: 10px 16px; border-radius: 22px;
+           background: rgba(255,255,255,.14); color:#fff; font: 500 14px Roboto, system-ui, sans-serif; }
+  .griglia { position:absolute; left: 20px; right: 20px; top: 318px; display:grid; grid-template-columns: repeat(4, 1fr); row-gap: 22px; }
+  .app { display:flex; flex-direction:column; align-items:center; gap:6px; color:#fff; font: 500 11.5px Roboto, system-ui, sans-serif; }
+  .app button { width: 56px; height: 56px; border-radius: 18px; border:0; font-size: 28px; display:flex; align-items:center; justify-content:center; box-shadow: 0 4px 10px rgba(0,0,0,.18); }
+  .dock { position:absolute; left: 16px; right: 16px; bottom: 74px; display:flex; justify-content:space-around; padding: 10px 6px; border-radius: 28px; background: rgba(255,255,255,.16); }
+  .dock button { width: 54px; height: 54px; border-radius: 18px; border:0; font-size: 27px; }
+  .cerca { position:absolute; left: 24px; right: 24px; bottom: 22px; height: 44px; border-radius: 22px; background: rgba(255,255,255,.92); color:#555;
+           display:flex; align-items:center; padding: 0 18px; font: 500 15px Roboto, system-ui, sans-serif; border:0; }
+</style></head>
+<body>
+  <div class="barra-stato"><span>9:41</span><span class="icone">▴ ◢ ▮</span></div>
+  <div class="orologio"><b>9:41</b><span>Monday, October 12</span></div>
+  <button class="meteo">☀️ 22° Sunny</button>
+  <div class="griglia">
+    <div class="app"><button style="background:#ffffff">📷</button><span>Camera</span></div>
+    <div class="app"><button style="background:#ffe08a">🗒️</button><span>Notes</span></div>
+    <div class="app"><button style="background:#ff8f8f">🎵</button><span>Music</span></div>
+    <div class="app"><button style="background:#8fd3ff">🗺️</button><span>Maps</span></div>
+    <div class="app"><button style="background:#b9f0c4">💬</button><span>Messages</span></div>
+    <div class="app"><button style="background:#ffffff">📅</button><span>Calendar</span></div>
+    <div class="app"><button style="background:#ffd1f0">🖼️</button><span>Gallery</span></div>
+    <div class="app"><button style="background:#d7d2ff">⏰</button><span>Clock</span></div>
+  </div>
+  <div class="dock">
+    <button style="background:#9be7a4">📞</button><button style="background:#fff">✉️</button><button style="background:#8ecbff">🌐</button><button style="background:#ffd27a">⚙️</button>
+  </div>
+  <button class="cerca">🔍&nbsp;&nbsp;Search</button>
+</body></html>

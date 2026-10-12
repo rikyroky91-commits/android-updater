@@ -145,6 +145,10 @@ public class Browser extends Activity {
         scena.addView(web, new android.widget.FrameLayout.LayoutParams(-1, -1));
         col.addView(scena, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
         setContentView(col);
+        Bordi.imbottisci(col);
+        Bordi.indietro(this, new Runnable() {
+            @Override public void run() { if (web.canGoBack()) web.goBack(); else finish(); }
+        });
         // I comandi da telefono (capsula e 4 abilità) sopra la pagina; ✕ spegne il ring sulla pagina.
         OspiteVista ospite = new OspiteVista(scena, web, new Runnable() {
             @Override public void run() {
@@ -176,7 +180,8 @@ public class Browser extends Activity {
     }
 
     @Override
-    public void onBackPressed() {
+    @SuppressWarnings("deprecation")
+    public void onBackPressed() {      // sotto Android 13; sopra c'è Bordi.indietro
         if (web.canGoBack()) web.goBack();
         else super.onBackPressed();
     }

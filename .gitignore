@@ -9,3 +9,5 @@ release.json
 .venv/
 estensione/zip/
 android/build/
+android/firma/pagebrawl-upload.*
+android/store/consegna/
