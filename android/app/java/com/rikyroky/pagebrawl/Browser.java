@@ -118,6 +118,7 @@ public class Browser extends Activity {
         s.setSupportMultipleWindows(false);
         web.setBackgroundColor(Color.WHITE);
         web.addJavascriptInterface(new Ponte(), "PB");
+        Premium.di(this).ascolta(ascoltaPremium);
         web.setWebChromeClient(new WebChromeClient());
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -189,6 +190,7 @@ public class Browser extends Activity {
     @Override
     protected void onDestroy() {
         comandi.ferma();
+        Premium.di(this).smetti(ascoltaPremium);
         web.destroy();
         super.onDestroy();
     }
@@ -281,10 +283,17 @@ public class Browser extends Activity {
 
     private int px(float dp) { return Math.round(dp * d); }
 
+    /** Il Premium comprato (o tolto) mentre la pagina è aperta: lo si dice al ring. */
+    private final Premium.Ascoltatore ascoltaPremium = new Premium.Ascoltatore() {
+        @Override public void cambiato(boolean si) { if (web != null) web.evaluateJavascript(Premium.js(si), null); }
+    };
+
     /** Visibile anche agli script dei siti: solo la memoria del ring, con limiti (Memoria.salva). */
     private final class Ponte {
         @JavascriptInterface public String dati() { return Memoria.dati(Browser.this); }
         @JavascriptInterface public void salva(String json) { Memoria.salva(Browser.this, json); }
+        @JavascriptInterface public String premium() { return Premium.di(Browser.this).stato(); }
+        @JavascriptInterface public void compra(String gruppo) { Acquisto.apri(Browser.this, gruppo); }
         @JavascriptInterface public void messaggio(String json) {
             String tipo = "";
             try { tipo = new JSONObject(json).optString("tipo", ""); } catch (Exception ignorata) { }

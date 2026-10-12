@@ -142,6 +142,7 @@ public class Ring extends AccessibilityService {
         f.addAction(Intent.ACTION_SCREEN_OFF);
         f.addAction(Intent.ACTION_USER_PRESENT);
         registerReceiver(ricevitore, f);
+        Premium.di(this).ascolta(ascoltaPremium);
         Riquadro.aggiorna(this);
     }
 
@@ -158,6 +159,7 @@ public class Ring extends AccessibilityService {
     }
 
     private void spegniTutto() {
+        try { Premium.di(this).smetti(ascoltaPremium); } catch (Exception ignorata) { }
         if (istanza == this) istanza = null;
         try { if (ricevitore != null) unregisterReceiver(ricevitore); } catch (Exception ignorata) { }
         ricevitore = null;
@@ -799,11 +801,18 @@ public class Ring extends AccessibilityService {
         return true;
     }
 
+    /** Il Premium comprato (o tolto) mentre la pagina è aperta: lo si dice al ring. */
+    private final Premium.Ascoltatore ascoltaPremium = new Premium.Ascoltatore() {
+        @Override public void cambiato(boolean si) { if (web != null) web.evaluateJavascript(Premium.js(si), null); }
+    };
+
     // --------------------------------------------------- il ponte con la pagina
     /** Chiamato dal JavaScript della pagina del ring (su un thread suo). */
     private final class Ponte {
         @JavascriptInterface public String dati() { return Memoria.dati(Ring.this); }
         @JavascriptInterface public void salva(String json) { Memoria.salva(Ring.this, json); }
+        @JavascriptInterface public String premium() { return Premium.di(Ring.this).stato(); }
+        @JavascriptInterface public void compra(String gruppo) { Acquisto.apri(Ring.this, gruppo); }
         @JavascriptInterface public String schermo() { return schermo; }
         @JavascriptInterface public void corpi(final String json) {
             h.post(new Runnable() { @Override public void run() { aggiornaZone(json); } });

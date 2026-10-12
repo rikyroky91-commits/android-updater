@@ -51,6 +51,15 @@
             </intent-filter>
         </activity>
 
+        <!-- La scheda del Premium: trasparente, sopra quello che c'è (anche aperta dal servizio). -->
+        <activity
+            android:name=".Acquisto"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleTop" />
+
         <service
             android:name=".Ring"
             android:exported="true"

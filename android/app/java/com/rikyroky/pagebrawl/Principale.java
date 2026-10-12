@@ -68,9 +68,20 @@ public class Principale extends Activity {
         if (avvisoAperto) rifiuta(); else super.onBackPressed();
     }
 
+    private final Premium.Ascoltatore ascoltaPremium = new Premium.Ascoltatore() {
+        @Override public void cambiato(boolean si) { if (!avvisoAperto) disegna(); }
+    };
+
+    @Override
+    protected void onPause() {
+        Premium.di(this).smetti(ascoltaPremium);
+        super.onPause();
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
+        Premium.di(this).ascolta(ascoltaPremium);
         Ring r = Ring.istanza;
         if (r != null) r.riprendiBolla();
         disegna();
@@ -181,6 +192,18 @@ public class Principale extends Activity {
         col.addView(titoletto("SETTINGS"));
         LinearLayout lista = superficie();
         lista.setPadding(px(16), px(4), px(16), px(4));
+        // Il Premium (solo nella build col pagamento di Google Play).
+        final Premium premium = Premium.di(this);
+        if (premium.vero()) {
+            boolean preso = premium.attivo();
+            LinearLayout pr = riga("Premium", preso ? "Unlocked. Thanks!" : "Wizards, duelists, super warriors, weapons, big surprises");
+            pr.addView(testo(preso ? "\u2713" : "Unlock", 15, VERDE, true));
+            pr.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { Acquisto.apri(Principale.this, ""); }
+            });
+            lista.addView(pr);
+            lista.addView(linea());
+        }
         LinearLayout taglia = riga("Fighters", null);
         taglia.addView(segmenti());
         lista.addView(taglia);

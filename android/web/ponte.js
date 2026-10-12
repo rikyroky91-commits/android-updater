@@ -42,6 +42,25 @@
     var lato = Math.min(W, H) || 400;
     return Math.max(0.85, Math.min(1.25, lato / 400)) * taglia;
   };
+  // IL PREMIUM (12/10/2026). Il motore sa già chiudere tre gruppi (`__ringPremium.bloccate`): qui li apre o
+  // li chiude lo stato che dà l'app (Premium.java). "libero" = in questa build non c'è niente da comprare
+  // (APK di prova): niente `__ringPremium`, tutto aperto. Toccare una cosa chiusa apre la scheda del Premium.
+  var statoPremium = "libero";
+  try { statoPremium = pb && pb.premium ? String(pb.premium()) : "libero"; } catch (e) { statoPremium = "libero"; }
+  if (statoPremium !== "libero") {
+    var premiumAttivo = statoPremium === "attivo", inAscolto = [];
+    window.__ringPremium = {
+      bloccate: { guerrieri: true, armi: true, meteo: true },
+      attivo: function () { return premiumAttivo; },
+      chiedi: function (gruppo) { try { pb.compra(String(gruppo || "")); } catch (e) { /* niente scheda */ } },
+      ascolta: function (fn) { inAscolto.push(fn); },
+    };
+    // Chiamata dall'app quando Google Play conferma (o toglie) l'acquisto, a pagina aperta.
+    window.__pbPremium = function (si) {
+      premiumAttivo = !!si;
+      for (var i = 0; i < inAscolto.length; i++) { try { inAscolto[i](); } catch (e) { /* un ascoltatore rotto non ferma gli altri */ } }
+    };
+  }
   window.__pbMessaggio = function (messaggio) {
     if (!pb) return;
     try { pb.messaggio(JSON.stringify(messaggio)); } catch (e) { /* niente */ }

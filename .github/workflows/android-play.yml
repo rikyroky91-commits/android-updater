@@ -1,0 +1,67 @@
+# Page Brawl per il Play Store (12/10/2026): gli AAB con Google Play Billing.
+#
+# La build senza Gradle (android/costruisci.py) resta per le prove sul telefono, ma la libreria di pagamento
+# di Google si porta dietro AndroidX e Play Services: serve Gradle, e serve il Maven di Google, che qui si
+# raggiunge. Esce una pre-release «android-<commit>» con due AAB NON firmati (completa e leggera, il
+# piano B senza accessibilità). La firma si mette dopo, con la chiave di caricamento che non sta nel repo:
+#   python3 android/costruisci.py --firma PageBrawl-completa-nonfirmato.aab
+# Se qualcosa si rompe, gli errori di Gradle compaiono come annotazioni del job.
+name: android-play
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "android/**"
+      - "web/static/ring.js"
+      - "web/static/lingue.js"
+      - "estensione/store/**"
+      - ".github/workflows/android-play.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+
+      - name: AAB completa e leggera
+        run: |
+          set -o pipefail
+          mkdir -p uscita
+          for v in completa leggera; do
+            extra=""
+            if [ "$v" = leggera ]; then extra="--leggera"; fi
+            python3 android/costruisci.py --gradle --aab $extra
+            if ! gradle -p android/gradle-progetto :app:bundleRelease --no-daemon --stacktrace > "gradle-$v.log" 2>&1; then
+              grep -E "error:|^e: |What went wrong|Could not|Execution failed|cannot find symbol|incompatible types|> " -A3 "gradle-$v.log" \
+                | grep -v "^--$" | head -80 | while IFS= read -r riga; do echo "::error title=gradle $v::$riga"; done
+              tail -25 "gradle-$v.log" | while IFS= read -r riga; do echo "::warning title=coda $v::$riga"; done
+              exit 1
+            fi
+            cp android/gradle-progetto/app/build/outputs/bundle/release/app-release.aab "uscita/PageBrawl-$v-nonfirmato.aab"
+          done
+          ( cd uscita && sha256sum *.aab | tee SHA256SUMS )
+          while IFS= read -r riga; do echo "::notice title=AAB::$riga"; done < uscita/SHA256SUMS
+
+      - name: Pre-release con gli AAB
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="android-${GITHUB_SHA::7}"
+          gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$tag" uscita/*.aab uscita/SHA256SUMS --prerelease --target "$GITHUB_SHA" \
+            --title "Page Brawl Android ${GITHUB_SHA::7} (AAB non firmati)" \
+            --notes "Da firmare con la chiave di caricamento: python3 android/costruisci.py --firma PageBrawl-completa-nonfirmato.aab"

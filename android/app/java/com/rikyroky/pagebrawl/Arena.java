@@ -54,6 +54,7 @@ public class Arena extends Activity {
         web.setVerticalScrollBarEnabled(false);
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         web.addJavascriptInterface(new Ponte(), "PB");
+        Premium.di(this).ascolta(ascoltaPremium);
         // Spegnendo lo schermo Android può chiudere il motore della pagina per liberare memoria, e la corsa si
         // perdeva: il motore resta «importante» anche quando l'arena non si vede.
         if (Build.VERSION.SDK_INT >= 26) web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
@@ -129,13 +130,21 @@ public class Arena extends Activity {
     @Override
     protected void onDestroy() {
         comandi.ferma();
+        Premium.di(this).smetti(ascoltaPremium);
         web.destroy();
         super.onDestroy();
     }
 
+    /** Il Premium comprato (o tolto) mentre la pagina è aperta: lo si dice al ring. */
+    private final Premium.Ascoltatore ascoltaPremium = new Premium.Ascoltatore() {
+        @Override public void cambiato(boolean si) { if (web != null) web.evaluateJavascript(Premium.js(si), null); }
+    };
+
     private final class Ponte {
         @JavascriptInterface public String dati() { return Memoria.dati(Arena.this); }
         @JavascriptInterface public void salva(String json) { Memoria.salva(Arena.this, json); }
+        @JavascriptInterface public String premium() { return Premium.di(Arena.this).stato(); }
+        @JavascriptInterface public void compra(String gruppo) { Acquisto.apri(Arena.this, gruppo); }
         @JavascriptInterface public void messaggio(String json) {
             String tipo = "";
             try { tipo = new JSONObject(json).optString("tipo", ""); } catch (Exception ignorata) { }

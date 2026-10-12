@@ -22,6 +22,10 @@ Uso:
     python3 android/costruisci.py --aab        # anche android/build/PageBrawl.aab per il Play Store
     python3 android/costruisci.py --leggera    # variante senza accessibilità (piano B per il Play Store)
     python3 android/costruisci.py --solo-asset # solo android/build/assets (per provare l'arena nel browser)
+    python3 android/costruisci.py --gradle --aab [--leggera]
+                                               # prepara android/build per android/gradle-progetto (build del Play
+                                               # con Google Play Billing, su GitHub Actions); poi si firma l'AAB
+                                               # con `python3 android/costruisci.py --firma file.aab`
 
 Per il Play Store (12/10/2026): target API 36 (obbligatorio dal 31/08/2026), android.jar della
 piattaforma 36 (`android-36.jar` in ~/tools va bene), AAB fatto con bundletool (`bundletool.jar` in
@@ -217,6 +221,35 @@ def manifesto():
     return uscita
 
 
+def variante(gen):
+    """La variante si sceglie qui: una costante che Principale legge (nascosti modalità e riquadro)."""
+    var = gen / "com" / "rikyroky" / "pagebrawl" / "Variante.java"
+    var.parent.mkdir(parents=True, exist_ok=True)
+    var.write_text("package com.rikyroky.pagebrawl;\n\n/** Generato da costruisci.py. */\n"
+                   f"final class Variante {{\n    private Variante() {{}}\n    static final boolean LEGGERA = {'true' if LEGGERA else 'false'};\n}}\n",
+                   encoding="utf-8")
+
+
+def prepara_gradle():
+    """Per la build Gradle (quella del Play, con Google Play Billing): asset, manifest, variante e versione
+    in android/build, dove li legge android/gradle-progetto. Niente aapt2 né javac: li fa Gradle."""
+    asset()
+    dest = COSTRUZIONE / "gradle"
+    if dest.exists():
+        shutil.rmtree(dest)
+    (dest / "gen").mkdir(parents=True)
+    # Con Gradle il pacchetto lo dà `namespace` in build.gradle.kts: nel manifest non ci deve stare.
+    testo = manifesto().read_text(encoding="utf-8")
+    testo2 = re.sub(r'\s+package="[^"]+"', "", testo, count=1)
+    if testo2 == testo:
+        raise SystemExit("AndroidManifest.xml è cambiato: manca package=")
+    (dest / "AndroidManifest.xml").write_text(testo2, encoding="utf-8")
+    variante(dest / "gen")
+    (dest / "config.properties").write_text(
+        f"versionCode={CODICE_VERSIONE + (1 if LEGGERA else 0)}\nversionName={VERSIONE + ('-lite' if LEGGERA else '')}\n", encoding="utf-8")
+    print(f"pronto per Gradle in {dest} ({'leggera' if LEGGERA else 'completa'}, codice {CODICE_VERSIONE + (1 if LEGGERA else 0)})")
+
+
 def collega(t, res_zip, cartella_asset, gen, uscita, proto=False):
     esegui([t["aapt2"], "link", "-I", t["android_jar"], "--manifest", manifesto(),
             "-A", cartella_asset, "--java", gen, "-o", uscita,
@@ -240,12 +273,7 @@ def apk():
     esegui([t["aapt2"], "compile", "--dir", APP / "res", "-o", res_zip])
     base = COSTRUZIONE / "base.apk"
     collega(t, res_zip, cartella_asset, gen, base)
-    # La variante si sceglie qui: una costante che Principale legge (nascosti modalità e riquadro).
-    var = gen / "com" / "rikyroky" / "pagebrawl" / "Variante.java"
-    var.parent.mkdir(parents=True, exist_ok=True)
-    var.write_text("package com.rikyroky.pagebrawl;\n\n/** Generato da costruisci.py. */\n"
-                   f"final class Variante {{\n    private Variante() {{}}\n    static final boolean LEGGERA = {'true' if LEGGERA else 'false'};\n}}\n",
-                   encoding="utf-8")
+    variante(gen)
 
     print("java")
     sorgenti = sorted(glob.glob(str(APP / "java" / "**" / "*.java"), recursive=True) + glob.glob(str(gen / "**" / "*.java"), recursive=True))
@@ -319,6 +347,16 @@ def aab(t, res_zip, cartella_asset, dex):
         if f.exists():
             f.unlink()
     esegui(["java", "-jar", t["bundletool"], "build-bundle", f"--modules={modulo}", f"--output={grezzo}"])
+    firma_aab(t, grezzo, finale)
+    print(f"AAB pronto: {finale} ({finale.stat().st_size // 1024} KB)")
+    return finale
+
+
+def firma_aab(t, grezzo, finale):
+    """Firma un AAB con la chiave di caricamento (anche uno fatto da Gradle su GitHub Actions) e lo controlla."""
+    finale = Path(finale)
+    if finale.exists():
+        finale.unlink()
     pw = chiave_caricamento()
     esegui(["jarsigner", "-sigalg", "SHA256withRSA", "-digestalg", "SHA-256", "-keystore", CARICAMENTO,
             "-storepass", pw, "-signedjar", finale, grezzo, CARICAMENTO_ALIAS])
@@ -326,13 +364,21 @@ def aab(t, res_zip, cartella_asset, dex):
     if "jar verified" not in v.stdout:
         raise SystemExit("firma dell'AAB non valida")
     esegui(["java", "-jar", t["bundletool"], "validate", f"--bundle={finale}"])
-    print(f"AAB pronto: {finale} ({finale.stat().st_size // 1024} KB)")
     return finale
 
 
 if __name__ == "__main__":
     COSTRUZIONE.mkdir(exist_ok=True)
-    if "--solo-asset" in sys.argv:
+    if "--firma" in sys.argv:
+        # python3 android/costruisci.py --firma entrata.aab [uscita.aab]
+        i = sys.argv.index("--firma")
+        entrata = Path(sys.argv[i + 1])
+        uscita = Path(sys.argv[i + 2]) if len(sys.argv) > i + 2 and sys.argv[i + 2].endswith(".aab") else entrata.with_name(entrata.stem.replace("-nonfirmato", "") + ".aab")
+        firma_aab(attrezzi(), entrata, uscita)
+        print(f"AAB firmato: {uscita}")
+    elif "--gradle" in sys.argv:
+        prepara_gradle()
+    elif "--solo-asset" in sys.argv:
         asset()
     else:
         apk()
