@@ -1676,6 +1676,9 @@
       if (f.t >= f.durata || (f.azione === "avanza" && ((vicino && !(f.corsa > 0)) || arrivato))) {
         if (f.azione === "avanza" && f.prendiTel) {
           const t = f.prendiTel; f.prendiTel = null;
+          // Non ci è arrivato (un oggetto contro un bordo, o su un piano che non si raggiunge): lo lascia stare per
+          // sei secondi invece di riprovarci all'infinito, incastrato nell'angolo (12/10/2026, segnalato da Riccardo).
+          if (!(arrivato && t.stato === "libero" && Math.abs(t.x - f.cx) < 16 * S)) t.ignora = tempo + 360;
           if (arrivato && t.stato === "libero" && Math.abs(t.x - f.cx) < 16 * S) {
             if (eArma(t)) {
               // Un'arma si impugna e si tiene: pistola sei colpi, spada cinque fendenti.
@@ -2620,6 +2623,7 @@
     let migliore = null, d0 = 260 * S;
     for (const t of telefoni) {
       if (t.stato !== "libero" || velocitaTel(t) > 2 * S || t.tipo === "duo") continue;
+      if (t.ignora > tempo) continue;                    // ci ha già provato e non ci arrivava: per un po' no
       if (Math.abs(t.y - (f.base - verso * 6 * S)) > 22 * S) continue;
       const d = Math.abs(t.x - f.cx);
       if (d < d0) { d0 = d; migliore = t; }
@@ -2733,6 +2737,18 @@
       t.x += vx; t.y += vy + GRAVITA * S * moltG * verso;
       t.a += t.va;
       const urto = rimbalzaTel(t, vx, vy);
+      // Dentro l'app Android gli oggetti restano almeno a un decimo dai bordi dello schermo (`__ringBordoOggetti`):
+      // contro i bordi i lottatori non riuscivano a prenderli e restavano negli angoli. Dal decimo in alto (le icone
+      // della barra di stato) scivolano giù.
+      const bordo = window.__ringBordoOggetti;
+      if (bordo > 0 && t.stato === "libero" && !(t.entra > 0)) {
+        const mx = W * bordo, passo = 2.5 * S;
+        if (t.x < mx) { t.x += Math.min(passo, mx - t.x); t.ox = t.x - passo * 0.4; }
+        else if (t.x > W - mx) { t.x -= Math.min(passo, t.x - (W - mx)); t.ox = t.x + passo * 0.4; }
+        if (verso > 0 && t.y < H * bordo && Math.abs(vy) < 1 * S && t.y < pavimento - 40 * S) {
+          t.scende = Math.max(t.scende || 0, 20); t.ox = t.x - (t.x < W / 2 ? 1 : -1) * 1.2 * S;
+        }
+      }
       // Un fumogeno o un barattolo lanciato si apre dove sbatte.
       if (t.armato && urto > 3 * S && apri(t)) continue;
       if (urto > 13.5 * S && t.y > pavimento - t.r - 1) danneggiaStriscia(t.x, Math.min(1, urto / (VELOCITA_MAX * S)));

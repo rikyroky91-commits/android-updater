@@ -29,7 +29,7 @@ function riquadro(l, t, r, b) {
   return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
 }
 
-function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false, premio = null, pannello = false, audio = null, arena = null } = {}) {
+function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false, premio = null, pannello = false, audio = null, arena = null, globali = {} } = {}) {
   const richieste = [];
   const ascoltatori = {};
   const contesto2d = new Proxy({}, {
@@ -100,6 +100,7 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
   }
   if (premio) finestra.__ringPremium = premio;
   if (arena) finestra.__ringArena = arena;
+  Object.assign(finestra, globali);
   if (audio) finestra.AudioContext = audio;
   const sandbox = {
     window: finestra, document: documento, Math, Date, Object, JSON, String, Number,
@@ -4141,4 +4142,22 @@ test("sopra la lava l'orda sta sulla piattaforma e gli zombie li cala un elicott
   });
   assert.ok(calati > 0, "gli zombie arrivano calati dall'alto");
   assert.ok(maxAlzo > 100, "e partono ben sopra la piattaforma (" + maxAlzo + ")");
+});
+
+test("nell'app gli oggetti restano a un decimo dai bordi, e un oggetto irraggiungibile non incastra nessuno", () => {
+  // Uno schermo largo: i lottatori partono al centro, lontani dai due sassi posati fermi contro i bordi.
+  const amb = ambiente({ estensione: true, larghezza: 1200, altezza: 800, globali: { __ringBordoOggetti: 0.1 }, memoria: { "mut-ring": "on", "mut-ring-cruento": "off" } });
+  const r = amb.finestra.__ring;
+  amb.avanza(30);
+  const i = r.lanciaTelefono(8, 780, 0, 0, "sasso");
+  const j = r.lanciaTelefono(1192, 780, 0, 0, "sasso");
+  amb.avanza(110);
+  const tel = amb.stato().telefoni;
+  if (process.env.SONDA) console.log("SONDA", JSON.stringify(tel));
+  for (const k of [i, j]) {
+    const t = tel[k];
+    assert.ok(t, "il sasso c'è ancora");
+    assert.ok(t.stato !== "libero" || (t.x >= 1200 * 0.1 - 2 && t.x <= 1200 * 0.9 + 2), "fermo, è rientrato dentro il decimo (x " + Math.round(t.x) + ", " + t.stato + ")");
+    assert.ok(t.stato === "libero" || t.stato === "portato", "si è fermato o è stato raccolto (" + t.stato + ")");
+  }
 });

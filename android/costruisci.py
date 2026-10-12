@@ -38,8 +38,8 @@ ESTENSIONE = RADICE / "estensione" / "store"
 COSTRUZIONE = QUI / "build"
 APP = QUI / "app"
 
-VERSIONE = "1.3.0"
-CODICE_VERSIONE = 4
+VERSIONE = "1.3.1"
+CODICE_VERSIONE = 5
 MIN_SDK = 26
 TARGET_SDK = 34
 

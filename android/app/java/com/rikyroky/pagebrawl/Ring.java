@@ -462,6 +462,7 @@ public class Ring extends AccessibilityService {
         float d = getResources().getDisplayMetrics().density;
         lim.minL = Math.round(10 * d);
         lim.minA = Math.round(8 * d);
+        lim.barraStato = dimensioneDiSistema("status_bar_height") + Math.round(2 * d);
         List<AccessibilityWindowInfo> finestre = null;
         try { finestre = getWindows(); } catch (Exception ignorata) { }
         if (finestre != null && !finestre.isEmpty()) {
@@ -486,7 +487,7 @@ public class Ring extends AccessibilityService {
     }
 
     private static final class Limiti {
-        int larghezza, altezza, altezzaMax, minL, minA;
+        int larghezza, altezza, altezzaMax, minL, minA, barraStato;
         long areaMax;
     }
 
@@ -504,6 +505,9 @@ public class Ring extends AccessibilityService {
             Rect r = new Rect();
             n.getBoundsInScreen(r);
             if (!r.intersect(0, 0, lim.larghezza, lim.altezza)) return false;
+            // La barra di stato (orologio, batteria, icone delle notifiche) non è terreno: sta sotto la capsula
+            // dei comandi, e lassù negli angoli i lottatori restavano incastrati.
+            if (r.bottom <= lim.barraStato) return false;
             if (r.width() < lim.minL || r.height() < lim.minA) return false;
             if ((long) r.width() * r.height() > lim.areaMax || r.height() > lim.altezzaMax) return false;
             if (!utile(n)) return false;

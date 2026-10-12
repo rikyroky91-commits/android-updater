@@ -20,6 +20,8 @@
   window.__lingueSoloDizionario = true;
   // Vita, round, colpo finale e oggetti della corsa li disegna l'app (comandi nativi), non il canvas.
   window.__ringHudEsterno = true;
+  // Gli oggetti restano almeno a un decimo dai bordi dello schermo: negli angoli i lottatori si incastravano.
+  window.__ringBordoOggetti = 0.1;
   window.__pbSalva = function (oggetto) {
     if (!pb) return;
     try { pb.salva(JSON.stringify(oggetto)); } catch (e) { /* resta in memoria per questa volta */ }
