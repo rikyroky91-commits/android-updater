@@ -49,4 +49,7 @@ android {
 dependencies {
     // Dal 31/08/2026 il Play vuole la Billing Library 8 o successiva.
     implementation("com.android.billingclient:billing:9.1.0")
+    // Le dipendenze della libreria tirano dentro kotlin-stdlib 1.8 e i vecchi -jdk7/-jdk8 1.6: classi doppie.
+    // Il BOM allinea tutto alla stessa versione (dalla 1.8 i -jdk7/-jdk8 sono vuoti).
+    implementation(platform("org.jetbrains.kotlin:kotlin-bom:1.8.22"))
 }

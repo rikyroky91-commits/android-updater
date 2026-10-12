@@ -73,6 +73,13 @@ Guida, fattibilità, testi e risposte: documento «Page Brawl su Google Play: gu
 - La chiave di caricamento `firma/pagebrawl-upload.jks` (+ `.txt` con la password) resta fuori da git; con Play App Signing Google firma le APK vere.
 - Foto e video dello store: `store/promo/cattura.py` (riprese del motore vero in Chromium, con `vetrina.js` che ridisegna i comandi nativi) e `store/promo/componi.py` (schermate, grafica, icona, video). Escono in `store/consegna/` (fuori da git). L'informativa sulla privacy è `web/static/pagebrawl/privacy.html`.
 
+## Premium (12/10/2026)
+
+Gratis con sblocco Premium a acquisto unico (Riccardo: «facciamo gratuito con sblocco premium»). Il Premium apre i tre gruppi che il motore sa già chiudere (`window.__ringPremium.bloccate`): `guerrieri` (stili di personaggi), `armi`, `meteo` (imprevisti grossi e gravità).
+- `Premium.java` lo stato (nelle opzioni dell'app, non nella memoria del gioco che le pagine web possono scrivere) e gli ascoltatori; `Acquisto.java` la scheda con prezzo, «Restore purchase», «Not now» (attività trasparente, apribile anche dal servizio); `ponte.js` definisce `__ringPremium` e `__pbPremium(si)`; `PB.premium()` dà "libero", "attivo" o "chiuso", `PB.compra(gruppo)` apre la scheda.
+- `app/java-billing/PremiumGoogle.java` il pagamento vero (Google Play Billing 9.1.0, prodotto `premium` a acquisto unico, conferma entro 3 giorni). Lo compila solo Gradle; senza (APK di prova) vale il Premium finto: tutto aperto.
+- Build del Play: `.github/workflows/android-play.yml` (Gradle 8.14.3, AGP 8.13, progetto in `android/gradle-progetto/` che legge i sorgenti di `android/app` e quello che prepara `costruisci.py --gradle --aab [--leggera]`). Esce una pre-release `android-<commit>` con gli AAB non firmati; si firmano con `python3 android/costruisci.py --firma PageBrawl-completa-nonfirmato.aab`.
+
 ## Installare
 
 1. Se c'è l'APK fatto prima con Capacitor (stesso nome, `com.rikyroky.pagebrawl`, firma diversa): disinstallarlo.
