@@ -459,7 +459,7 @@
   // Con uno stile acceso in campo non ci sono più il robot e la mela, ma due
   // personaggi inventati per quel tema (vedi ASPETTI): hanno un corpo umano
   // sullo scheletro del robot. `tipo` resta il lato: "robot" a sinistra,
-  // "mela" a destra (punteggio, scommesse, quel che hanno imparato).
+  // "mela" a destra (punteggio, quel che hanno imparato).
   const eMela = (f) => f.tipo === "mela" && !stile, eRobot = (f) => f.tipo === "robot" && !stile;
   // Schizzi e arti staccati: si possono spegnere dalla tendina.
   let cruento = true;
@@ -2044,7 +2044,6 @@
     altro.koVero = true;
     for (const l of lottatori) l.mutato = false;                 // il round nuovo: la rimonta torna buona
     if (altro.forma && altro.potenziato > 1) altro.potenziato = 1;
-    risolviScommessa(f.tipo && f !== altro ? f.tipo : (altro.tipo === "robot" ? "mela" : "robot"));
     altro.ko = Math.round(caso(110, 170)); altro.danni = 0; altro.soglia = Math.round(caso(3, 6));
     if (f.tipo) punteggio[f.tipo]++;
     // Chi vince balla (01/10/2026, su richiesta), appena l'altro è giù.
@@ -3160,7 +3159,6 @@
     }
     if (senzaPunto) { salvaCervello(true); return; }
     const vincitore = att && att.tipo && att !== f ? att.tipo : altroTipo(f.tipo);
-    risolviScommessa(vincitore);
     punteggio[vincitore]++;
     controllaFinale(vincitore, null, null);
     const chi = lottatori.find((l) => l.tipo === vincitore);
@@ -4621,8 +4619,7 @@
   // volta ad aiutare l'altro se uno zombie gli è addosso; se l'alleato va a
   // terra lo si raggiunge, lo si difende da tutti e due i lati e lo si aiuta
   // a rialzarsi prima. Finita l'orda si danno il cinque, e si ricomincia.
-  // I morsi degli zombie non contano per i K.O. della partita né per le
-  // scommesse: stordiscono, e al terzo buttano a terra per un po'.
+  // I morsi degli zombie non contano per i K.O. della partita: stordiscono, e al terzo buttano a terra per un po'.
   //
   // LE ONDATE (05/10/2026, su richiesta): l'orda è una serie di ondate, ognuna
   // GENERATA sul momento da una ricetta (`ricettaOndata`): un tema che decide
@@ -11831,46 +11828,9 @@
   window.addEventListener("mut:tema", () => { leggiColori(); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) riparti(); });
 
-  // --- Le scommesse ------------------------------------------------------
-  // Gettoni finti, salvati solo in questo browser. Si punta su chi vince il
-  // prossimo K.O.; la quota segue il punteggio (chi sta perdendo paga di più).
-  let gettoni = 100, scommessa = null, esito = "";
-  try {
-    const g = parseInt(deposito.getItem("mut-ring-gettoni"), 10);
-    if (Number.isFinite(g) && g >= 0 && g < 1e7) gettoni = g;
-  } catch (errore) { /* si parte da 100 */ }
+  // Le scommesse coi gettoni finti sono state tolte il 12/10/2026 (Riccardo: «leva le scommesse dal progetto»):
+  // nei negozi di app contano come gioco d'azzardo simulato.
   const altroTipo = (tipo) => (tipo === "robot" ? "mela" : "robot");
-  const NOMI = { robot: "il robot", mela: "la mela" }, SU = { robot: "sul robot", mela: "sulla mela" };
-  function quota(tipo) {
-    const mio = (punteggio[tipo] || 0) + 1, suo = (punteggio[altroTipo(tipo)] || 0) + 1;
-    return Math.max(1.3, Math.min(4, Math.round((1 + suo / mio) * 10) / 10));
-  }
-  function salvaGettoni() { try { deposito.setItem("mut-ring-gettoni", String(gettoni)); } catch (errore) { /* pazienza */ } }
-  function scommetti(tipo, importo) {
-    importo = Math.floor(Number(importo));
-    if (scommessa || !(tipo in NOMI) || !(importo > 0) || importo > gettoni) return false;
-    gettoni -= importo;
-    scommessa = { su: tipo, importo, quota: quota(tipo) };
-    esito = "Puntati " + importo + " gettoni " + (stile ? "su " + nomeProprio(tipo) : SU[tipo]) + " (×" + scommessa.quota + "): si decide al prossimo K.O.";
-    salvaGettoni(); aggiornaPannello();
-    return true;
-  }
-  function risolviScommessa(vincitore) {
-    if (!scommessa) { aggiornaPannello(); return; }
-    const sc = scommessa;
-    scommessa = null;
-    if (vincitore === sc.su) {
-      const vinti = Math.round(sc.importo * sc.quota);
-      gettoni += vinti;
-      esito = "Vinto! Ha vinto " + (stile ? nomeProprio(vincitore) : NOMI[vincitore]) + ": +" + vinti + " gettoni.";
-      const f = lottatori.find((l) => l.tipo === vincitore);
-      if (f) scrivi("+" + vinti, f.p.testa.x, f.p.testa.y - 30 * S, true);
-    } else {
-      esito = "Perso: ha vinto " + (stile ? nomeProprio(vincitore) : NOMI[vincitore]) + ". Meno " + sc.importo + " gettoni.";
-    }
-    if (gettoni <= 0) esito += " Gettoni finiti: puoi ricaricarli.";
-    salvaGettoni(); aggiornaPannello();
-  }
 
   // --- I comandi della tendina ------------------------------------------
   function assicuraAcceso() {
@@ -12074,7 +12034,6 @@
     // L'audio (09/10/2026): spento finché non lo si accende.
     audio(si) { return accendiAudio(si === undefined ? !audio.acceso : !!si); },
     classifica(si) { apriClassifica(si === undefined ? !classifica.aperta : si); },
-    scommetti, ricarica() { if (!scommessa && gettoni < 10) { gettoni = 100; esito = "Gettoni ricaricati."; salvaGettoni(); aggiornaPannello(); } },
   };
 
   if (tastoRadiale) {
@@ -12086,17 +12045,6 @@
   const pannello = mio.querySelector("[data-pannello]");
   const tastoOpzioni = mio.querySelector("[data-opzioni]");
   const dentroPannello = (sel) => (pannello && pannello.querySelectorAll ? Array.from(pannello.querySelectorAll(sel)) : []);
-  function aggiornaPannello() {
-    if (!pannello || !pannello.querySelector) return;
-    const g = pannello.querySelector("[data-gettoni]");
-    if (g) g.textContent = String(gettoni);
-    for (const b of dentroPannello("[data-quota]")) b.textContent = "×" + quota(b.getAttribute("data-quota"));
-    for (const b of dentroPannello("[data-punta]")) b.disabled = !!scommessa || gettoni <= 0;
-    const e = pannello.querySelector("[data-esito]");
-    if (e) e.textContent = esito || (gettoni > 0 ? "Punta su chi vince il prossimo K.O." : "Gettoni finiti.");
-    const r = pannello.querySelector("[data-ricarica]");
-    if (r) r.hidden = !!scommessa || gettoni >= 10;
-  }
   function aggiornaInterruttori() {
     if (!pannello || !pannello.querySelector) return;
     const b = pannello.querySelector("[data-barre]"), a = pannello.querySelector("[data-anime]");
@@ -12105,16 +12053,10 @@
     for (const t of dentroPannello("[data-stile]")) t.setAttribute("aria-pressed", String(stile === t.getAttribute("data-stile")));
     // Si vedono solo le mosse dei personaggi scelti.
     for (const g of dentroPannello("[data-mosse]")) g.hidden = g.getAttribute("data-mosse") !== stile;
-    // Sui tasti delle scommesse, i nomi di chi è in campo.
-    for (const n of dentroPannello("[data-nome]")) {
-      if (n.vero === undefined) n.vero = n.textContent;
-      const lato = n.getAttribute("data-nome"), nuovo = stile ? (lato === "robot" ? "\uD83D\uDD35 " : "\uD83D\uDFE3 ") + nomeProprio(lato) : n.vero;
-      if (n.textContent !== nuovo) n.textContent = nuovo;
-    }
     const nota = pannello.querySelector("[data-mosse-nota]");
     if (nota) nota.hidden = !!stile;
     if (statoTastiera.pronta) disegnaListaTasti();                  // le mosse sui tasti cambiano coi personaggi
-    // I due modi (10/10/2026): personaggi, scommesse, oggetti e imprevisti sono del combattimento libero.
+    // I due modi (10/10/2026): personaggi, oggetti e imprevisti sono del combattimento libero.
     const libero = !corsa && !sceltaModo;
     for (const sez of dentroPannello("[data-solo-libero]")) sez.hidden = !libero;
     for (const t of dentroPannello("[data-libero]")) t.setAttribute("aria-pressed", String(libero));
@@ -12126,7 +12068,6 @@
     if (!pannello || !tastoOpzioni) return;
     pannello.classList.toggle("aperto", apri);
     tastoOpzioni.setAttribute("aria-expanded", apri ? "true" : "false");
-    if (apri) aggiornaPannello();
   }
   if (pannello && tastoOpzioni) {
     pannello.hidden = false;
@@ -12172,17 +12113,6 @@
     aggiornaInterruttori();
     const ric = pannello.querySelector("[data-ricomincia]");
     if (ric) ric.addEventListener("click", () => comandi.ricomincia());
-    const importo = pannello.querySelector("[data-importo]");
-    for (const b of dentroPannello("[data-punta]")) {
-      b.addEventListener("click", () => {
-        let v = importo ? importo.value : "25";
-        if (v === "tutto") v = gettoni;
-        if (!scommetti(b.getAttribute("data-punta"), Math.min(Number(v), gettoni))) aggiornaPannello();
-      });
-    }
-    const ricarica = pannello.querySelector("[data-ricarica]");
-    if (ricarica) ricarica.addEventListener("click", () => comandi.ricarica());
-    aggiornaPannello();
     segnaBloccati();
     if (premio && premio.ascolta) premio.ascolta(segnaBloccati);
   }
@@ -14325,7 +14255,7 @@
     tempo, pezzi: pezzi.length, proiettili: proiettili.length,
     falene: proiettili.filter((b) => b.falena).length, comete: proiettili.filter((b) => b.cometa).length,
     smeraldi: proiettili.filter((b) => b.incanto === "smeraldo").length, rune: rune.length,
-    sfereGrandi: proiettili.filter((b) => b.grande && !b.razzo).length, razzi: proiettili.filter((b) => b.razzo).length, dischi: proiettili.filter((b) => b.disco).length, gettoni, scommessa: scommessa ? Object.assign({}, scommessa) : null,
+    sfereGrandi: proiettili.filter((b) => b.grande && !b.razzo).length, razzi: proiettili.filter((b) => b.razzo).length, dischi: proiettili.filter((b) => b.disco).length,
     fatale: fatale ? { tipo: fatale.tipo, fase: fatale.fase, t: fatale.t, da: fatale.da.tipo, a: fatale.a.tipo, contato: fatale.contato,
                        r: fatale.d && fatale.d.r ? fatale.d.r : 0 } : null,
     fataleRound, fataliFatti, fataleBuio, fataleVoluto, fataleDebito,

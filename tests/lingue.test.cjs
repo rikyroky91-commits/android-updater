@@ -43,7 +43,7 @@ test("spazi, faccine davanti e frecce in fondo restano dove sono", () => {
   assert.strictEqual(l.traduci("✓ firmware verificato", "fr"), "✓ firmware vérifié");
 });
 
-test("le frasi con numeri: tempi, conteggi, esiti delle scommesse", () => {
+test("le frasi con numeri: tempi e conteggi", () => {
   const l = carica();
   assert.strictEqual(l.traduci("4 mesi fa", "en"), "4 months ago");
   assert.strictEqual(l.traduci("1 ora fa", "en"), "1 hour ago");
@@ -52,8 +52,6 @@ test("le frasi con numeri: tempi, conteggi, esiti delle scommesse", () => {
   assert.strictEqual(l.traduci("3 giorni fa", "de"), "vor 3 Tagen");
   assert.strictEqual(l.traduci("1/1 fonti attive", "en"), "1/1 sources active");
   assert.strictEqual(l.traduci("Aggiornamenti di Galaxy A32", "en"), "Updates for Galaxy A32");
-  assert.ok(/Staked 25 tokens on the robot \(×2\)/.test(l.traduci("Puntati 25 gettoni sul robot (×2): si decide al prossimo K.O.", "en")));
-  assert.ok(/\+50/.test(l.traduci("Vinto! Ha vinto il robot: +50 gettoni.", "de")));
 });
 
 test("i dati non si toccano: nomi di modelli, build e testi sconosciuti restano come sono", () => {

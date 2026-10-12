@@ -647,7 +647,7 @@ class TestRicercheRecentiDiTutti(unittest.TestCase):
 
 class TestTendinaDelRing(unittest.TestCase):
     """01/10/2026: l'omino barrato spegne tutto, il guantone apre la tendina
-    con scommesse, armi da mettere in campo e imprevisti."""
+    con armi da mettere in campo e imprevisti (le scommesse tolte il 12/10/2026)."""
 
     @classmethod
     def setUpClass(cls):
@@ -669,8 +669,9 @@ class TestTendinaDelRing(unittest.TestCase):
     def test_la_tendina_nasce_nascosta_e_ha_tutte_le_sezioni(self):
         i = self.home.index("data-pannello")
         self.assertIn("hidden", self.home[i:i + 30])
-        for marca in ('data-punta="robot"', 'data-punta="mela"', "data-gettoni", "data-esito",
-                      'data-metti="pistola"', 'data-metti="spada"', 'data-metti="bomba"', 'data-metti="tablet"',
+        for vecchia in ("data-punta", "data-gettoni", "data-importo", "data-ricarica", "Scommetti"):
+            self.assertNotIn(vecchia, self.home, "le scommesse sono state tolte")
+        for marca in ('data-metti="pistola"', 'data-metti="spada"', 'data-metti="bomba"', 'data-metti="tablet"',
                       'data-metti="pc"', 'data-metti="orologio"', 'data-metti="duo"', "data-gravita",
                       'data-imprevisto="acquazzone"', 'data-imprevisto="uragano"',
                       "data-sorprese", "data-cruento", "data-ricomincia", "data-barre", "data-anime",

@@ -690,28 +690,6 @@ test("la mela tira fuori il pieghevole dal jetpack e lo lancia", () => {
   assert.ok(esploso, "il pieghevole non ha mai fatto esplodere il robot");
 });
 
-test("scommesse: si punta, si vince al K.O. giusto, si perde a quello sbagliato, e i gettoni restano", () => {
-  const memoria = {};
-  const amb = ambiente({ memoria });
-  amb.avanza(30);
-  const r = amb.finestra.__ring;
-  assert.strictEqual(amb.stato().gettoni, 100);
-  assert.ok(r.comandi.scommetti("robot", 25));
-  assert.ok(!r.comandi.scommetti("mela", 10), "si può puntare due volte insieme");
-  assert.strictEqual(amb.stato().gettoni, 75);
-  const quota = amb.stato().scommessa.quota;
-  r.ko("mela");                               // vince il robot
-  assert.strictEqual(amb.stato().gettoni, 75 + Math.round(25 * quota));
-  assert.strictEqual(amb.stato().scommessa, null);
-  const dopo = amb.stato().gettoni;
-  assert.ok(r.comandi.scommetti("robot", 10));
-  r.ko("robot");                              // vince la mela
-  assert.strictEqual(amb.stato().gettoni, dopo - 10);
-  assert.ok(!r.comandi.scommetti("mela", 1e6), "si può puntare più di quel che si ha");
-  assert.strictEqual(memoria["mut-ring-gettoni"], String(dopo - 10));
-  assert.strictEqual(ambiente({ memoria }).stato().gettoni, dopo - 10, "i gettoni non restano nel browser");
-});
-
 test("un'esplosione vera: fuoco, fumo, detriti e braci, e chi è vicino viene sbalzato", () => {
   const amb = ambiente();
   amb.avanza(30);

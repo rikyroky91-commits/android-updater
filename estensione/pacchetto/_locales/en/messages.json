@@ -60,7 +60,7 @@
     "message": "Open the panel with the glove button"
   },
   "guidaP5": {
-    "message": "There you pick the characters, drop items into the ring, trigger an earthquake or jetpacks, turn on the health bars and bet your tokens on the winner."
+    "message": "There you pick the characters, drop items into the ring, trigger an earthquake or jetpacks and turn on the health bars."
   },
   "guidaSapereT": {
     "message": "Good to know"
@@ -72,7 +72,7 @@
     "message": "A thrown jar releases a creature of fire, lightning or water that fights for whoever threw it. A smoke bomb blinds anyone caught in the cloud."
   },
   "guidaS3": {
-    "message": "The fighters learn: the more they fight, the better they get. What they learn and your tokens stay in your browser."
+    "message": "The fighters learn: the more they fight, the better they get. What they learn stays in your browser."
   },
   "guidaS4": {
     "message": "Gore effects are off: if you want them, turn them on from the panel."

@@ -5,7 +5,7 @@
  * Pausa, vita, punteggio, ✕ e le 4 abilità sono comandi nativi (Comandi.java).
  * Sopra lo schermo, in più:
  *  - spegnere le lotte dalla tendina chiude il ring;
- *  - le due tendine a scelta (`<select>`: puntata e gravità) diventano tasti
+ *  - la tendina a scelta (`<select>` della gravità) diventa tasti
  *    con un elenco disegnato qui: sopra le altre app la pagina vive in un
  *    servizio, e il menu di sistema di una `<select>` lì non si può aprire.
  */

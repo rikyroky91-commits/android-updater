@@ -123,11 +123,11 @@ GUIDA = {
         "guidaP4T": "Grab them with the mouse",
         "guidaP4": "Drag a fighter and let go to throw them. The same goes for the things that fall from above: smoke bombs, jars and weapons.",
         "guidaP5T": "Open the panel with the glove button",
-        "guidaP5": "There you pick the characters, drop items into the ring, trigger an earthquake or jetpacks, turn on the health bars and bet your tokens on the winner.",
+        "guidaP5": "There you pick the characters, drop items into the ring, trigger an earthquake or jetpacks and turn on the health bars.",
         "guidaSapereT": "Good to know",
         "guidaS1": "First to ten: whoever reaches ten K.O.s sends the opponent flying out of the ring, then the score starts again from zero.",
         "guidaS2": "A thrown jar releases a creature of fire, lightning or water that fights for whoever threw it. A smoke bomb blinds anyone caught in the cloud.",
-        "guidaS3": "The fighters learn: the more they fight, the better they get. What they learn and your tokens stay in your browser.",
+        "guidaS3": "The fighters learn: the more they fight, the better they get. What they learn stays in your browser.",
         "guidaS4": "Gore effects are off: if you want them, turn them on from the panel.",
         "guidaS5": "Super warriors, wizards, duelists, weapons, weather and gravity are part of Premium: in the panel they carry a padlock.",
         "guidaS6": "Want the power button on every site, without going through the icon? Turn it on in the options.",
@@ -156,11 +156,11 @@ GUIDA = {
         "guidaP4T": "Prendili col mouse",
         "guidaP4": "Trascina un lottatore e lascialo per lanciarlo. Vale anche per gli oggetti che cadono dall'alto: fumogeni, barattoli e armi.",
         "guidaP5T": "Apri la tendina col guantone",
-        "guidaP5": "Lì scegli i personaggi, metti in campo gli oggetti, scateni terremoto e jetpack, accendi le barre della vita e scommetti i gettoni su chi vince.",
+        "guidaP5": "Lì scegli i personaggi, metti in campo gli oggetti, scateni terremoto e jetpack e accendi le barre della vita.",
         "guidaSapereT": "Cose da sapere",
         "guidaS1": "Si gioca a dieci: chi arriva a dieci K.O. manda l'avversario fuori dal ring, poi si riparte da zero.",
         "guidaS2": "Un barattolo lanciato libera una creatura di fuoco, di fulmini o d'acqua che combatte per chi l'ha lanciato. Un fumogeno acceca chi finisce nella nube.",
-        "guidaS3": "I lottatori imparano: più lottano, più diventano bravi. Quello che imparano e i tuoi gettoni restano nel tuo browser.",
+        "guidaS3": "I lottatori imparano: più lottano, più diventano bravi. Quello che imparano resta nel tuo browser.",
         "guidaS4": "Gli effetti cruenti sono spenti: se li vuoi, si accendono dalla tendina.",
         "guidaS5": "Super guerrieri, maghi, duellanti, armi, meteo e gravità fanno parte di Premium: nella tendina hanno il lucchetto.",
         "guidaS6": "Vuoi il tasto di accensione su ogni sito, senza passare dall'icona? Si accende dalle opzioni.",
@@ -189,11 +189,11 @@ GUIDA = {
         "guidaP4T": "Agárralos con el ratón",
         "guidaP4": "Arrastra a un luchador y suéltalo para lanzarlo. Lo mismo vale para los objetos que caen de arriba: bombas de humo, tarros y armas.",
         "guidaP5T": "Abre el panel con el botón del guante",
-        "guidaP5": "Ahí eliges los personajes, pones objetos en el ring, desatas un terremoto o los jetpacks, enciendes las barras de vida y apuestas tus fichas por el ganador.",
+        "guidaP5": "Ahí eliges los personajes, pones objetos en el ring, desatas un terremoto o los jetpacks y enciendes las barras de vida.",
         "guidaSapereT": "Cosas que conviene saber",
         "guidaS1": "Se juega a diez: quien llega a diez K.O. manda al rival fuera del ring y luego se vuelve a empezar de cero.",
         "guidaS2": "Un tarro lanzado libera una criatura de fuego, de rayos o de agua que lucha por quien lo lanzó. Una bomba de humo ciega a quien queda dentro de la nube.",
-        "guidaS3": "Los luchadores aprenden: cuanto más pelean, mejores son. Lo que aprenden y tus fichas se quedan en tu navegador.",
+        "guidaS3": "Los luchadores aprenden: cuanto más pelean, mejores son. Lo que aprenden se queda en tu navegador.",
         "guidaS4": "Los efectos sangrientos están apagados: si los quieres, se encienden desde el panel.",
         "guidaS5": "Los superguerreros, los magos, los duelistas, las armas, el clima y la gravedad forman parte de Premium: en el panel llevan un candado.",
         "guidaS6": "¿Quieres el botón de encendido en todos los sitios, sin pasar por el icono? Se activa en las opciones.",
@@ -222,11 +222,11 @@ GUIDA = {
         "guidaP4T": "Attrapez-les à la souris",
         "guidaP4": "Faites glisser un combattant et lâchez-le pour le lancer. Pareil pour les objets qui tombent d'en haut : fumigènes, bocaux et armes.",
         "guidaP5T": "Ouvrez le panneau avec le bouton au gant",
-        "guidaP5": "Vous y choisissez les personnages, déposez des objets sur le ring, déclenchez un séisme ou les jetpacks, affichez les barres de vie et pariez vos jetons sur le vainqueur.",
+        "guidaP5": "Vous y choisissez les personnages, déposez des objets sur le ring, déclenchez un séisme ou les jetpacks et affichez les barres de vie.",
         "guidaSapereT": "Bon à savoir",
         "guidaS1": "La partie se joue en dix : celui qui atteint dix K.-O. envoie l'adversaire hors du ring, puis on repart de zéro.",
         "guidaS2": "Un bocal lancé libère une créature de feu, de foudre ou d'eau qui se bat pour celui qui l'a lancé. Un fumigène aveugle quiconque se trouve dans le nuage.",
-        "guidaS3": "Les combattants apprennent : plus ils se battent, meilleurs ils deviennent. Ce qu'ils apprennent et vos jetons restent dans votre navigateur.",
+        "guidaS3": "Les combattants apprennent : plus ils se battent, meilleurs ils deviennent. Ce qu'ils apprennent reste dans votre navigateur.",
         "guidaS4": "Les effets sanglants sont désactivés : si vous les voulez, activez-les depuis le panneau.",
         "guidaS5": "Super guerriers, mages, duellistes, armes, météo et gravité font partie de Premium : dans le panneau, ils portent un cadenas.",
         "guidaS6": "Vous voulez le bouton de mise en marche sur tous les sites, sans passer par l'icône ? Activez-le dans les options.",
@@ -255,11 +255,11 @@ GUIDA = {
         "guidaP4T": "Pack sie mit der Maus",
         "guidaP4": "Zieh einen Kämpfer und lass los, um ihn zu werfen. Das gilt auch für alles, was von oben fällt: Rauchbomben, Gläser und Waffen.",
         "guidaP5T": "Öffne das Menü mit dem Handschuh-Knopf",
-        "guidaP5": "Dort wählst du die Figuren, wirfst Gegenstände in den Ring, löst ein Erdbeben oder Jetpacks aus, schaltest die Lebensbalken ein und setzt deine Jetons auf den Sieger.",
+        "guidaP5": "Dort wählst du die Figuren, wirfst Gegenstände in den Ring, löst ein Erdbeben oder Jetpacks aus und schaltest die Lebensbalken ein.",
         "guidaSapereT": "Gut zu wissen",
         "guidaS1": "Gespielt wird bis zehn: Wer zehn K.o. erreicht, schleudert den Gegner aus dem Ring, dann geht es wieder bei null los.",
         "guidaS2": "Ein geworfenes Glas befreit ein Wesen aus Feuer, Blitz oder Wasser, das für den Werfer kämpft. Eine Rauchbombe blendet jeden, der in der Wolke steht.",
-        "guidaS3": "Die Kämpfer lernen dazu: Je mehr sie kämpfen, desto besser werden sie. Was sie lernen und deine Jetons bleiben in deinem Browser.",
+        "guidaS3": "Die Kämpfer lernen dazu: Je mehr sie kämpfen, desto besser werden sie. Was sie lernen, bleibt in deinem Browser.",
         "guidaS4": "Blutige Effekte sind aus: Wenn du sie willst, schaltest du sie im Menü ein.",
         "guidaS5": "Superkrieger, Magier, Duellanten, Waffen, Wetter und Schwerkraft gehören zu Premium: Im Menü tragen sie ein Schloss.",
         "guidaS6": "Du willst den Einschaltknopf auf jeder Website, ohne über das Symbol zu gehen? Schalte ihn in den Optionen ein.",
@@ -365,7 +365,7 @@ async function avvia(tab) {
       await chrome.scripting.executeScript({ target: dove, func: () => window.__ringEstensione.alterna() });
       return "alternato";
     }
-    // La memoria dei lottatori (quello che hanno imparato, i gettoni, le
+    // La memoria dei lottatori (quello che hanno imparato, le
     // opzioni) è dell'estensione: uguale su tutti i siti.
     const dati = await chrome.storage.local.get(null);
     // `__lingueSoloDizionario`: il dizionario delle lingue serve solo alla tendina, la pagina non si tocca.
@@ -463,7 +463,7 @@ BARRETTA = """
     <button type="button" class="tasto" data-radiale hidden aria-pressed="false"
             title="Controller: scegli il personaggio e fagli fare le sue mosse">&#127918;</button>
     <button type="button" class="tasto" data-opzioni hidden aria-expanded="false"
-            title="Opzioni del combattimento: scommesse, armi, imprevisti">&#129354;</button>
+            title="Opzioni del combattimento: personaggi, armi, imprevisti">&#129354;</button>
     <button type="button" class="tasto" data-gioca hidden aria-pressed="true" aria-label="Lotte accese o spente"
             title="Spegni le lotte">__ICONA__</button>
   </div>

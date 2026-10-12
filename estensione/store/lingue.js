@@ -13,7 +13,7 @@
  * dizionario resta in italiano: meglio una frase non tradotta che una
  * tradotta male.
  *
- * I testi cambiati dopo (l'esito di una scommessa, un titolo aggiornato da
+ * I testi cambiati dopo (un titolo aggiornato da
  * uno script) li segue un MutationObserver.
  */
 (function () {
@@ -78,7 +78,7 @@
     "Firmware verificato": ["Verified firmware", "Firmware verificado", "Firmware vérifié", "Firmware verifiziert"],
     "firmware verificato": ["verified firmware", "firmware verificado", "firmware vérifié", "Firmware verifiziert"],
     "Ferma o riprendi lo scorrimento": ["Pause or resume scrolling", "Pausar o reanudar el desplazamiento", "Mettre en pause ou reprendre le défilement", "Lauftext anhalten oder fortsetzen"],
-    "Opzioni del combattimento: scommesse, armi, imprevisti": ["Fight options: bets, weapons, surprises", "Opciones del combate: apuestas, armas, imprevistos", "Options du combat : paris, armes, imprévus", "Kampfoptionen: Wetten, Waffen, Überraschungen"],
+    "Opzioni del combattimento: personaggi, armi, imprevisti": ["Fight options: characters, weapons, surprises", "Opciones del combate: personajes, armas, imprevistos", "Options du combat : personnages, armes, imprévus", "Kampfoptionen: Figuren, Waffen, Überraschungen"],
     "Opzioni del combattimento": ["Fight options", "Opciones del combate", "Options du combat", "Kampfoptionen"],
     "Controller: scegli il personaggio e fagli fare le sue mosse": ["Controller: pick a fighter and trigger their moves", "Mando: elige el personaje y haz que use sus movimientos",
       "Manette : choisissez le personnage et lancez ses coups", "Controller: Figur wählen und ihre Angriffe auslösen"],
@@ -382,15 +382,7 @@
     "Barriera": ["Barrier", "Barrera", "Barrière", "Barriere"],
     "Autodistruzione": ["Self-destruct", "Autodestrucción", "Autodestruction", "Selbstzerstörung"],
     "Presa a distanza": ["Remote grip", "Agarre a distancia", "Prise à distance", "Ferngriff"],
-    "Scommetti": ["Bet", "Apostar", "Parier", "Wetten"],
-    "Gettoni:": ["Tokens:", "Fichas:", "Jetons :", "Chips:"],
-    "Ricarica 100": ["Refill 100", "Recargar 100", "Recharger 100", "100 aufladen"],
-    "Puntata": ["Stake", "Apuesta", "Mise", "Einsatz"],
-    "Tutto": ["All", "Todo", "Tout", "Alles"],
     "Mela": ["Apple", "Manzana", "Pomme", "Apfel"],
-    "Punta su chi vince il prossimo K.O.": ["Bet on who wins the next K.O.", "Apuesta por quién gana el próximo K.O.", "Pariez sur le vainqueur du prochain K.O.", "Wette, wer den nächsten K.o. gewinnt."],
-    "Gettoni finiti.": ["Out of tokens.", "Sin fichas.", "Plus de jetons.", "Keine Chips mehr."],
-    "Gettoni ricaricati.": ["Tokens refilled.", "Fichas recargadas.", "Jetons rechargés.", "Chips aufgeladen."],
     "Metti in campo": ["Put in play", "Poner en juego", "Mettre en jeu", "Ins Spiel bringen"],
     "Telefono": ["Phone", "Teléfono", "Téléphone", "Telefon"],
     "Tablet": ["Tablet", "Tableta", "Tablette", "Tablet"],
@@ -614,11 +606,6 @@
     var nome = u[li][Number(n) === 1 ? 0 : 1];
     return li === 0 ? n + " " + nome + " ago" : li === 1 ? "hace " + n + " " + nome : li === 2 ? "il y a " + n + " " + nome : "vor " + n + " " + nome;
   }
-  var CHI = { "il robot": ["the robot", "el robot", "le robot", "der Roboter"], "la mela": ["the apple", "la manzana", "la pomme", "der Apfel"] };
-  var SU_CHI = { "sul robot": ["on the robot", "al robot", "sur le robot", "auf den Roboter"], "sulla mela": ["on the apple", "a la manzana", "sur la pomme", "auf den Apfel"] };
-  // I personaggi inventati hanno un nome proprio, uguale in ogni lingua.
-  function suChi(testo, li) { return SU_CHI[testo] ? SU_CHI[testo][li] : ["on ", "por ", "sur ", "auf "][li] + testo.slice(3); }
-  var FINITI = [" Out of tokens: you can refill them.", " Sin fichas: puedes recargarlas.", " Plus de jetons : vous pouvez les recharger.", " Keine Chips mehr: Du kannst sie aufladen."];
 
   var REGOLE = [
     [/^(\d+) (secondo|secondi|min|minuto|minuti|ora|ore|giorno|giorni|settimana|settimane|mese|mesi|anno|anni) fa$/, function (m, li) { return fa(m[1], m[2], li); }],
@@ -630,23 +617,6 @@
     [/^(\d+)\/(\d+) fonti attive$/, function (m, li) { return m[1] + "/" + m[2] + " " + ["sources active", "fuentes activas", "sources actives", "Quellen aktiv"][li]; }],
     [/^Aggiornamenti di (.+)$/, function (m, li) { return ["Updates for ", "Actualizaciones de ", "Mises à jour de ", "Updates für "][li] + m[1]; }],
     [/^e altre (\d+)$/, function (m, li) { return ["and " + m[1] + " more", "y otras " + m[1], "et " + m[1] + " autres", "und " + m[1] + " weitere"][li]; }],
-    [/^Puntati (\d+) gettoni (sul robot|sulla mela|su [A-Z][a-z]+) \(×([\d.]+)\): si decide al prossimo K\.O\.$/, function (m, li) {
-      var su = suChi(m[2], li);
-      return ["Staked " + m[1] + " tokens " + su + " (×" + m[3] + "): decided at the next K.O.",
-              "Apostadas " + m[1] + " fichas " + su + " (×" + m[3] + "): se decide en el próximo K.O.",
-              m[1] + " jetons misés " + su + " (×" + m[3] + ") : décision au prochain K.O.",
-              m[1] + " Chips " + su + " gesetzt (×" + m[3] + "): Entscheidung beim nächsten K.o."][li];
-    }],
-    [/^Vinto! Ha vinto (il robot|la mela|[A-Z][a-z]+): \+(\d+) gettoni\.( Gettoni finiti: puoi ricaricarli\.)?$/, function (m, li) {
-      var chi = CHI[m[1]] ? CHI[m[1]][li] : m[1];
-      return ["You won! Winner: " + chi + ". +" + m[2] + " tokens.", "¡Has ganado! Gana " + chi + ": +" + m[2] + " fichas.",
-              "Gagné ! Vainqueur : " + chi + ". +" + m[2] + " jetons.", "Gewonnen! Sieger: " + chi + ". +" + m[2] + " Chips."][li] + (m[3] ? FINITI[li] : "");
-    }],
-    [/^Perso: ha vinto (il robot|la mela|[A-Z][a-z]+)\. Meno (\d+) gettoni\.( Gettoni finiti: puoi ricaricarli\.)?$/, function (m, li) {
-      var chi = CHI[m[1]] ? CHI[m[1]][li] : m[1];
-      return ["You lost: " + chi + " won. −" + m[2] + " tokens.", "Has perdido: ha ganado " + chi + ". −" + m[2] + " fichas.",
-              "Perdu : " + chi + " a gagné. −" + m[2] + " jetons.", "Verloren: Sieger ist " + chi + ". −" + m[2] + " Chips."][li] + (m[3] ? FINITI[li] : "");
-    }],
   ];
 
   // --- Il motore --------------------------------------------------------
@@ -790,7 +760,7 @@
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") chiudiMenu(); });
     osserva(document.body);
   }
-  // I testi che cambiano dopo: l'esito di una scommessa, un titolo aggiornato, una scheda caricata.
+  // I testi che cambiano dopo: un titolo aggiornato, una scheda caricata.
   function osserva(nodo) {
     if (!window.MutationObserver || !nodo) return;
     new MutationObserver(function (cambi) {

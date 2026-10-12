@@ -95,7 +95,7 @@ FREE COMBAT
 • Two fighters brawl on their own: grab them with the mouse, throw them, hit one with the other.
 • Smoke bombs, jars that release fire, lightning and water creatures, weapons and bombs.
 • Zombie hordes where the two team up back to back, a black hole, meteorites, rain, hurricanes, slow motion and strange gravity.
-• Energy clashes you win by hammering a button, finishing moves with short cinematic scenes, transformations, health bars and token bets.
+• Energy clashes you win by hammering a button, finishing moves with short cinematic scenes, transformations and health bars.
 • A corner controller to command every move with one click.
 
 KEYBOARD AND SOUND
@@ -139,7 +139,7 @@ COMBATTIMENTO LIBERO
 • Due lottatori si picchiano da soli: prendili col mouse, lanciali, usa l'uno per colpire l'altro.
 • Fumogeni, barattoli che liberano creature di fuoco, fulmini e acqua, armi e bombe.
 • Orde di zombie in cui i due si alleano spalle a spalla, il buco nero, meteoriti, pioggia, uragani, rallentatore e gravità strane.
-• Scontri di energie da vincere martellando un tasto, colpi finali con brevi scene, trasformazioni, barre della vita e scommesse coi gettoni.
+• Scontri di energie da vincere martellando un tasto, colpi finali con brevi scene, trasformazioni e barre della vita.
 • Un controller nell'angolo per comandare ogni mossa con un clic.
 
 TASTIERA E AUDIO
@@ -171,7 +171,7 @@ Page Brawl is a cartoon fighting game (an endless roguelike survivor plus a free
 | --- | --- |
 | `activeTab` | The animation is drawn on the current tab only after the user clicks the extension icon. activeTab gives access to that single tab for that click, so no host permissions are needed. |
 | `scripting` | Used to inject the extension's own bundled scripts and one small style rule into the tab the user clicked on. No remote code is loaded. |
-| `storage` | Saves the user's options, the in-game tokens and coins, the keyboard mapping and what the fighters have learned locally, so they are the same on every site. Nothing is sent anywhere. |
+| `storage` | Saves the user's options, the in-game coins, the keyboard mapping and what the fighters have learned locally, so they are the same on every site. Nothing is sent anywhere. |
 | Host facoltativo (`<all_urls>`) | Optional and off by default. It is requested only when the user turns on "Show the power button on every site" in the options page; it is used to place that one button on each page so the animation can be started without the toolbar icon. No page content is read or transmitted. Turning the option off removes the permission. |
 
 **Codice remoto:** No, I am not using remote code.
@@ -192,7 +192,7 @@ Elenco della 0.9.0, superato:
   4. `1-creature.png`: il robot e la mela con le creature dei barattoli (fuoco e acqua).
   5. `9-sblocco.png`: la tendina, col riquadro «Unlock Premium for free» e i lucchetti.
 - Nuove con la 0.6.0, pronte se si vuole cambiarne una: `10-buco-nero.png` (il robot risucchiato dal buco nero, con l'anello dell'uscita dall'altra parte) e `11-colpo-finale.png` (la scena «in orbita», buia, con la scritta FINISHING MOVE!). Il colpo finale è gratis: `11` può prendere il posto di `1-creature.png` se si vuole mostrare la novità a chi non sblocca niente.
-- Restano in cartella, di riserva: `2-opzioni.png` (la tendina con le scommesse), `3-premium-guerrieri.png`, `4-premium-maghi.png`, `5-premium-duellanti.png`. Sono della versione 0.4: mostrano due tasti nell'angolo invece di tre.
+- Restano in cartella, di riserva: `2-opzioni.png` (la tendina con le vecchie scommesse, tolte il 12/10/2026: non usarla), `3-premium-guerrieri.png`, `4-premium-maghi.png`, `5-premium-duellanti.png`. Sono della versione 0.4: mostrano due tasti nell'angolo invece di tre.
 - **Riquadro promozionale 440×280:** `scheda/promo-440x280.png` (la documentazione lo dà per richiesto).
 - **Riquadro grande 1400×560:** facoltativo, non c'è.
 

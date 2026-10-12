@@ -60,7 +60,7 @@
     "message": "Abre el panel con el botón del guante"
   },
   "guidaP5": {
-    "message": "Ahí eliges los personajes, pones objetos en el ring, desatas un terremoto o los jetpacks, enciendes las barras de vida y apuestas tus fichas por el ganador."
+    "message": "Ahí eliges los personajes, pones objetos en el ring, desatas un terremoto o los jetpacks y enciendes las barras de vida."
   },
   "guidaSapereT": {
     "message": "Cosas que conviene saber"
@@ -72,7 +72,7 @@
     "message": "Un tarro lanzado libera una criatura de fuego, de rayos o de agua que lucha por quien lo lanzó. Una bomba de humo ciega a quien queda dentro de la nube."
   },
   "guidaS3": {
-    "message": "Los luchadores aprenden: cuanto más pelean, mejores son. Lo que aprenden y tus fichas se quedan en tu navegador."
+    "message": "Los luchadores aprenden: cuanto más pelean, mejores son. Lo que aprenden se queda en tu navegador."
   },
   "guidaS4": {
     "message": "Los efectos sangrientos están apagados: si los quieres, se encienden desde el panel."

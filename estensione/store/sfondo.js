@@ -9,7 +9,7 @@ async function avvia(tab) {
       await chrome.scripting.executeScript({ target: dove, func: () => window.__ringEstensione.alterna() });
       return "alternato";
     }
-    // La memoria dei lottatori (quello che hanno imparato, i gettoni, le
+    // La memoria dei lottatori (quello che hanno imparato, le
     // opzioni) è dell'estensione: uguale su tutti i siti.
     const dati = await chrome.storage.local.get(null);
     // `__lingueSoloDizionario`: il dizionario delle lingue serve solo alla tendina, la pagina non si tocca.

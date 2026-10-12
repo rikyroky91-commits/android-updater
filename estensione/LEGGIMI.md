@@ -48,7 +48,7 @@ Di suo l'estensione entra in una pagina solo quando clicchi l'icona (`activeTab`
 
 ### Cosa è gratis e cosa è Premium
 
-- **Gratis:** la lotta fra il robot e la mela, prese e lanci col mouse, il controller ad angolo, fumogeni e barattoli con le creature, la pioggia di oggetti, il terremoto con l'eruzione, jetpack, furia, barre della vita, scommesse, la partita a dieci col volo fuori dal ring, il colpo finale, la trasformazione del robot e della mela, quello che i lottatori imparano.
+- **Gratis:** la lotta fra il robot e la mela, prese e lanci col mouse, il controller ad angolo, fumogeni e barattoli con le creature, la pioggia di oggetti, il terremoto con l'eruzione, jetpack, furia, barre della vita, la partita a dieci col volo fuori dal ring, il colpo finale, la trasformazione del robot e della mela, quello che i lottatori imparano.
 - **Premium:** i personaggi (super guerrieri, maghi, duellanti) con le loro mosse, scontro di energie e trasformazioni comprese; pistola, spada, bomba, bazooka, lanciafiamme, pieghevole e le due esplosioni; pioggia, uragano, rallentatore, meteoriti, buco nero, orda di zombie (con le mosse in coppia) e le gravità diverse dalla Terra.
 
 I tasti Premium portano un lucchetto. Cliccandone uno si apre il riquadro in cima alla tendina.
@@ -189,7 +189,7 @@ Nelle opzioni c'è una sola scelta: **accendere da solo il tema su tutti i siti*
 - **Una sola sorgente.** Le cartelle sono generate da `costruisci.py` a partire dai file del sito. Dopo ogni modifica al ring o al tema di Natale: `python3 estensione/costruisci.py`.
 - **Permesso minimo.** `activeTab` + `scripting` + `storage`. Non leggono e non mandano niente: nessuna richiesta di rete.
 - **Isolate dalla pagina.** Canvas, tasti e tendina stanno in uno shadow DOM: lo stile del sito non li deforma, e una Content-Security-Policy severa non li blocca.
-- **Memoria dell'estensione.** Quello che i lottatori imparano, i gettoni, le opzioni e lo stato di Premium stanno in `chrome.storage.local`: sono gli stessi su tutti i siti.
+- **Memoria dell'estensione.** Quello che i lottatori imparano, le opzioni e lo stato di Premium stanno in `chrome.storage.local`: sono gli stessi su tutti i siti.
 
 ## Pubblicare
 

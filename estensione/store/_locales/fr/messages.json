@@ -60,7 +60,7 @@
     "message": "Ouvrez le panneau avec le bouton au gant"
   },
   "guidaP5": {
-    "message": "Vous y choisissez les personnages, déposez des objets sur le ring, déclenchez un séisme ou les jetpacks, affichez les barres de vie et pariez vos jetons sur le vainqueur."
+    "message": "Vous y choisissez les personnages, déposez des objets sur le ring, déclenchez un séisme ou les jetpacks et affichez les barres de vie."
   },
   "guidaSapereT": {
     "message": "Bon à savoir"
@@ -72,7 +72,7 @@
     "message": "Un bocal lancé libère une créature de feu, de foudre ou d'eau qui se bat pour celui qui l'a lancé. Un fumigène aveugle quiconque se trouve dans le nuage."
   },
   "guidaS3": {
-    "message": "Les combattants apprennent : plus ils se battent, meilleurs ils deviennent. Ce qu'ils apprennent et vos jetons restent dans votre navigateur."
+    "message": "Les combattants apprennent : plus ils se battent, meilleurs ils deviennent. Ce qu'ils apprennent reste dans votre navigateur."
   },
   "guidaS4": {
     "message": "Les effets sanglants sont désactivés : si vous les voulez, activez-les depuis le panneau."

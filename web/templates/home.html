@@ -74,8 +74,7 @@
 <div class="ultimora" data-ultimora>
   <canvas class="ultimora-ring" data-ring aria-hidden="true"></canvas>
   {# LA TENDINA DEL RING (01/10/2026, su richiesta): si apre dal tasto col
-     guantone. Scommesse con gettoni finti (restano nel browser), armi e
-     oggetti da mettere in campo a mano, imprevisti da accendere e spegnere.
+     guantone. Armi e oggetti da mettere in campo a mano, imprevisti da accendere e spegnere.
      Senza JavaScript resta nascosta.
      LA CORSA INFINITA (09/10/2026): il tasto «Corsa infinita» la apre (si gioca
      da soli, round dopo round); «Classifica» mostra la classifica globale, che
@@ -141,24 +140,6 @@
         <button type="button" class="ring-tasto" data-colpo="lancio-lama">&#127919; Lama lanciata</button>
         <button type="button" class="ring-tasto" data-colpo="duello">&#9876; Incrocio di lame</button>
       </div>
-    </section>
-    <section class="ring-sezione" data-solo-libero>
-      <h3>Scommetti</h3>
-      <p class="ring-gettoni">Gettoni: <b data-gettoni>100</b>
-        <button type="button" class="ring-tasto ring-piccolo" data-ricarica hidden>Ricarica 100</button></p>
-      <div class="ring-riga">
-        <label class="ring-etichetta">Puntata
-          <select data-importo>
-            <option value="10">10</option><option value="25" selected>25</option>
-            <option value="50">50</option><option value="tutto">Tutto</option>
-          </select>
-        </label>
-      </div>
-      <div class="ring-riga">
-        <button type="button" class="ring-tasto ring-scelta" data-punta="robot"><span data-nome="robot">&#129302; Robot</span> <span data-quota="robot">×2</span></button>
-        <button type="button" class="ring-tasto ring-scelta" data-punta="mela"><span data-nome="mela">&#127822; Mela</span> <span data-quota="mela">×2</span></button>
-      </div>
-      <p class="ring-esito" data-esito aria-live="polite">Punta su chi vince il prossimo K.O.</p>
     </section>
     <section class="ring-sezione" data-solo-libero>
       <h3>Metti in campo</h3>
@@ -260,7 +241,7 @@
             title="Controller: scegli il personaggio e fagli fare le sue mosse">&#127918;</button>
     <button type="button" class="ultimora-tasto ultimora-opzioni" data-opzioni hidden
             aria-expanded="false" aria-controls="ring-pannello"
-            title="Opzioni del combattimento: scommesse, armi, imprevisti">&#129354;</button>
+            title="Opzioni del combattimento: personaggi, armi, imprevisti">&#129354;</button>
     <button type="button" class="ultimora-tasto ultimora-gioca" data-gioca hidden
             aria-pressed="true" aria-label="Lotte accese o spente"
             title="Spegni le lotte e lascia solo le notizie">

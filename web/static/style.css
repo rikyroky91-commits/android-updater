@@ -1707,7 +1707,6 @@ html.ring-trema .pieduccio { animation-duration: .31s; }
 .ring-chiudi:hover { background: var(--verde-tenue); }
 .ring-sezione { border-top: 1px solid var(--bordo, #e3e0d9); padding-top: .55rem; margin-top: .55rem; }
 .ring-sezione h3 { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 .45rem; opacity: .7; }
-.ring-gettoni { margin: 0 0 .45rem; display: flex; align-items: center; gap: .5rem; }
 .ring-riga { display: flex; gap: .45rem; margin-bottom: .45rem; flex-wrap: wrap; }
 .ring-griglia { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; margin-bottom: .45rem; }
 .ring-griglia[hidden], .ring-esito[hidden], .ring-sezione[hidden], .ring-nota[hidden] { display: none; }
@@ -1730,9 +1729,6 @@ html.ring-trema .pieduccio { animation-duration: .31s; }
 .ring-nota { font-size: .78rem; color: var(--testo-nota, #514f4e); margin: 0 0 .4rem; }
 .ring-chiave:hover { border-color: var(--verde); }
 .ring-chiave[aria-pressed="true"] { background: var(--verde); border-color: var(--verde); color: var(--su-tinta, #fff); }
-.ring-scelta { flex: 1; font-weight: 600; display: flex; justify-content: space-between; }
-.ring-scelta span { font-weight: 400; opacity: .75; }
-.ring-piccolo { padding: .2rem .5rem; font-size: .78rem; }
 .ring-largo { width: 100%; text-align: center; }
 .ring-esito { margin: .1rem 0 0; font-size: .82rem; min-height: 2.4em; opacity: .85; }
 @media (prefers-reduced-motion: reduce) { .ring-pannello, .ring-pannello.aperto { transition: none; } }

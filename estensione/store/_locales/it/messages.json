@@ -60,7 +60,7 @@
     "message": "Apri la tendina col guantone"
   },
   "guidaP5": {
-    "message": "Lì scegli i personaggi, metti in campo gli oggetti, scateni terremoto e jetpack, accendi le barre della vita e scommetti i gettoni su chi vince."
+    "message": "Lì scegli i personaggi, metti in campo gli oggetti, scateni terremoto e jetpack e accendi le barre della vita."
   },
   "guidaSapereT": {
     "message": "Cose da sapere"
@@ -72,7 +72,7 @@
     "message": "Un barattolo lanciato libera una creatura di fuoco, di fulmini o d'acqua che combatte per chi l'ha lanciato. Un fumogeno acceca chi finisce nella nube."
   },
   "guidaS3": {
-    "message": "I lottatori imparano: più lottano, più diventano bravi. Quello che imparano e i tuoi gettoni restano nel tuo browser."
+    "message": "I lottatori imparano: più lottano, più diventano bravi. Quello che imparano resta nel tuo browser."
   },
   "guidaS4": {
     "message": "Gli effetti cruenti sono spenti: se li vuoi, si accendono dalla tendina."
