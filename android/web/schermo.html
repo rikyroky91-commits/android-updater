@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Page Brawl</title>
+  <!-- L'arena sopra lo schermo del telefono (12/10/2026).
+       La pagina è trasparente: sotto si vede l'app vera, o il blocco schermo.
+       Ogni elemento che il servizio di accessibilità ha trovato sullo schermo
+       (icone, testi, tasti, notifiche) diventa qui un'immagine invisibile
+       grande uguale e messa nello stesso punto: per ring.js sono corpi solidi,
+       come i tasti e le immagini di una pagina web. -->
+  <style>
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+      background: transparent; touch-action: none;
+      -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+    }
+    #solidi { position: fixed; inset: 0; pointer-events: none; }
+    #solidi img { position: absolute; display: block; opacity: 0; border: 0; margin: 0; padding: 0; }
+    .pb-tasto {
+      position: fixed; z-index: 2147483647; width: 36px; height: 36px; border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, .14); background: rgba(20, 24, 22, .6); color: rgba(255, 255, 255, .9);
+      font: 500 15px/1 system-ui, sans-serif; display: grid; place-items: center; padding: 0;
+      -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); touch-action: manipulation;
+    }
+  </style>
+</head>
+<body>
+  <div id="solidi" aria-hidden="true"></div>
+  <script>window.__pbModo = "schermo";</script>
+  <script src="ponte.js"></script>
+  <script src="schermo.js"></script>
+  <script src="lingue.js"></script>
+  <script src="prepara.js"></script>
+  <script src="ring.js"></script>
+  <script src="comandi.js"></script>
+</body>
+</html>

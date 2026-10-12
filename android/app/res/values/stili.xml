@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="verde_fondo">#FF183D30</color>
+    <style name="Tema" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">#FF0E1311</item>
+        <item name="android:statusBarColor">#FF0E1311</item>
+        <item name="android:navigationBarColor">#FF0E1311</item>
+        <item name="android:colorAccent">#FF3CCF91</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nome">Page Brawl</string>
+    <string name="nome_browser">Page Brawl: ring sulla pagina</string>
+    <string name="descrizione_servizio">Trasforma lo schermo in un ring: icone, testi, tasti e notifiche diventano il terreno su cui combattono i lottatori, anche sul blocco schermo. Page Brawl usa solo la posizione degli elementi sullo schermo e solo mentre il ring è acceso: non legge i testi, non salva e non invia niente.</string>
+</resources>

@@ -1,0 +1,60 @@
+/* Page Brawl su telefono (12/10/2026, Riccardo: «più pulito e minimale possibile»).
+ * Si aggiunge allo stile dell'estensione dentro lo shadow DOM del ring
+ * (comandi.js lo carica) e ne cambia solo l'aspetto:
+ *  - un solo tema scuro e semitrasparente, uguale sopra qualsiasi schermo;
+ *  - i tasti in basso a destra in colonna, grandi quanto un dito;
+ *  - la tendina come foglio che sale dal basso, a tutta larghezza;
+ *  - via quello che su un telefono non serve (tastiera, opzioni del browser). */
+:host {
+  --carta: rgba(20, 24, 22, .94); --ink: #f1f3f1; --bordo: rgba(255, 255, 255, .12);
+  --filo: rgba(255, 255, 255, .10); --verde: #3ccf91; --verde-tenue: rgba(60, 207, 145, .18);
+  --fondo-firmware: rgba(255, 255, 255, .06); --su-tinta: #0d1411; --testo-nota: rgba(241, 243, 241, .6);
+}
+.barretta, .ring-pannello { font: 15px/1.35 system-ui, -apple-system, Roboto, sans-serif; }
+
+/* I tasti: una colonna discreta sul bordo destro. */
+.barretta {
+  right: 10px; bottom: 14px; flex-direction: column; gap: 8px; padding: 0;
+  background: none; border: 0; box-shadow: none;
+}
+.tasto {
+  width: 46px; height: 46px; font-size: 20px; border: 1px solid var(--bordo);
+  background: rgba(20, 24, 22, .72); color: var(--ink);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .28);
+}
+.tasto[aria-expanded="true"], .tasto[data-radiale][aria-pressed="true"] { background: var(--verde); color: var(--su-tinta); border-color: transparent; }
+/* Accensione: sopra lo schermo c'è ✕, nel browser il guantone nella barra in alto. */
+.tasto[data-gioca] { display: none !important; }
+
+/* La tendina: un foglio dal basso. */
+.ancora { bottom: 0; }
+.ring-pannello, .ring-pannello.con-controller {
+  position: fixed; left: 0; right: 0; bottom: 0; width: auto; max-height: 68vh;
+  border-radius: 20px 20px 0 0; border: 0; border-top: 1px solid var(--bordo);
+  padding: 8px 16px calc(18px + env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, .45);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  transform: translateY(100%);
+}
+.ring-pannello.aperto { transform: none; }
+.ring-pannello::before {
+  content: ""; display: block; width: 38px; height: 4px; border-radius: 2px;
+  background: rgba(255, 255, 255, .28); margin: 0 auto 10px;
+}
+.ring-pannello-testa strong { font-size: 17px; }
+.ring-chiudi { font-size: 18px; padding: 6px 10px; }
+.ring-sezione { border-top-color: var(--filo); padding-top: 12px; margin-top: 12px; }
+.ring-sezione h3 { font-size: 11px; opacity: .55; margin-bottom: 8px; }
+.ring-griglia { gap: 8px; margin-bottom: 8px; }
+.ring-tasto { font-size: 14px; padding: 11px 12px; border-radius: 12px; border-color: transparent; }
+.ring-tasto[aria-pressed="true"] { color: var(--su-tinta); }
+.ring-esito, .ring-nota { color: var(--testo-nota); }
+
+/* Su telefono non servono: la tastiera, il tasto per tutti i siti, la guida dell'estensione. */
+[data-tasti-lista], [data-tastiera], [data-tasti-ripristina], [data-opzioni-estensione], [data-guida] { display: none !important; }
+.ring-sezione:has([data-tasti-lista]), .ring-sezione:has([data-opzioni-estensione]) { display: none !important; }
+
+/* Col foglio aperto i tasti flottanti spariscono: il foglio ha la sua ✕. */
+.ancora:has(.ring-pannello.aperto) ~ .barretta { opacity: 0; pointer-events: none; }
+.barretta { transition: opacity .15s ease; }

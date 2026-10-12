@@ -8,3 +8,4 @@ __pycache__/
 release.json
 .venv/
 estensione/zip/
+android/build/
