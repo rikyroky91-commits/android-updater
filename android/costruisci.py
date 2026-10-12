@@ -349,6 +349,8 @@ def aab(t, res_zip, cartella_asset, dex):
     esegui(["java", "-jar", t["bundletool"], "build-bundle", f"--modules={modulo}", f"--output={grezzo}"])
     firma_aab(t, grezzo, finale)
     print(f"AAB pronto: {finale} ({finale.stat().st_size // 1024} KB)")
+    print("  ATTENZIONE: questo AAB non ha Google Play Billing (Premium sempre aperto). Per il Play usa quello di\n"
+          "  GitHub Actions (workflow android-play), firmato con: python3 android/costruisci.py --firma <file>.aab")
     return finale
 
 
