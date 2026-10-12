@@ -137,7 +137,7 @@ final class Comandi {
         g.setStroke(Math.max(1, px(1)), Disegni.FILO);
         capsula.setBackground(g);
 
-        tastoPausa = icona(Disegni.PAUSA, "Pausa", new View.OnClickListener() {
+        tastoPausa = icona(Disegni.PAUSA, "Pause", new View.OnClickListener() {
             @Override public void onClick(View v) { pausa(!inPausa); }
         });
         capsula.addView(tastoPausa, new LinearLayout.LayoutParams(px(40), px(40)));
@@ -158,18 +158,18 @@ final class Comandi {
             @Override public void onClick(View v) { comanda(tipoB); }
         });
         capsula.addView(avatarB, new LinearLayout.LayoutParams(px(36), px(40)));
-        tastoAltro = icona(Disegni.ALTRO, "Altro", new View.OnClickListener() {
+        tastoAltro = icona(Disegni.ALTRO, "More", new View.OnClickListener() {
             @Override public void onClick(View v) { apriMenu(!menuAperto); }
         });
         capsula.addView(tastoAltro, new LinearLayout.LayoutParams(px(40), px(40)));
-        tastoChiudi = icona(Disegni.CHIUDI, "Togli il gioco dallo schermo", new View.OnClickListener() {
+        tastoChiudi = icona(Disegni.CHIUDI, "Remove the game from the screen", new View.OnClickListener() {
             @Override public void onClick(View v) { tocco(v); ospite.chiudiGioco(); }
         });
         capsula.addView(tastoChiudi, new LinearLayout.LayoutParams(px(40), px(40)));
 
         // Ridotto a icona: un puntino col guantone; un tocco e torna tutto.
         puntino = new Disegni.Icona(ctx, Disegni.GUANTO, true);
-        puntino.setContentDescription("Mostra i comandi di Page Brawl");
+        puntino.setContentDescription("Show Page Brawl controls");
         puntino.setAlpha(0.8f);
         puntino.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { tocco(v); riduci(false); }
@@ -199,10 +199,10 @@ final class Comandi {
                 aggiornaMenu();
             }
         });
-        voceMenu("Riduci a icona", new View.OnClickListener() {
+        voceMenu("Minimise", new View.OnClickListener() {
             @Override public void onClick(View v) { riduci(true); }
         });
-        voceMenu("Opzioni del ring", new View.OnClickListener() {
+        voceMenu("Game options", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 apriMenu(false);
                 pannello = true;
@@ -210,7 +210,7 @@ final class Comandi {
                 web.evaluateJavascript("window.__ring&&__ring.pannello(true)", null);
             }
         });
-        voceMenu("Apri Page Brawl", new View.OnClickListener() {
+        voceMenu("Open Page Brawl", new View.OnClickListener() {
             @Override public void onClick(View v) { apriMenu(false); ospite.apriApp(); }
         });
         menu.setOnTouchListener(new View.OnTouchListener() {
@@ -250,8 +250,8 @@ final class Comandi {
     }
 
     private void aggiornaMenu() {
-        vTasti.setText((mostraTasti ? "✓  " : "     ") + "Tasti abilità");
-        vLottatori.setText((mostraLottatori ? "✓  " : "     ") + "Lottatori");
+        vTasti.setText((mostraTasti ? "✓  " : "     ") + "Ability buttons");
+        vLottatori.setText((mostraLottatori ? "✓  " : "     ") + "Fighters");
     }
 
     // --------------------------------------------------------- disposizione
@@ -331,7 +331,7 @@ final class Comandi {
     private void pausa(boolean si) {
         inPausa = si;
         tastoPausa.tipo(si ? Disegni.GIOCA : Disegni.PAUSA);
-        tastoPausa.setContentDescription(si ? "Riprendi" : "Pausa");
+        tastoPausa.setContentDescription(si ? "Resume" : "Pause");
         tocco(tastoPausa);
         web.evaluateJavascript("window.__ring&&__ring.pausa(" + si + ")", null);
         aggiornaPunti(null);
@@ -486,7 +486,7 @@ final class Comandi {
     private String ultimiPunti = "0 – 0";
     private void aggiornaPunti(String s) {
         if (s != null) ultimiPunti = s;
-        punti.setText(inPausa ? "Pausa" : ultimiPunti);
+        punti.setText(inPausa ? "Paused" : ultimiPunti);
     }
 
     private static int colore(String s) {

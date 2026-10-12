@@ -81,7 +81,7 @@ public class Principale extends Activity {
         nome.setPadding(px(12), 0, 0, 0);
         testa.addView(nome);
         col.addView(testa);
-        TextView motto = testo("Ogni schermo è un ring.", 15, TENUE, false);
+        TextView motto = testo("Every screen is a ring.", 15, TENUE, false);
         motto.setPadding(0, px(14), 0, px(18));
         col.addView(motto);
 
@@ -90,14 +90,14 @@ public class Principale extends Activity {
         boolean serveServizio = !"app".equals(modo);
         if (serveServizio && !attivo) {
             LinearLayout blocco = superficie();
-            blocco.addView(stato("Da attivare", 0xFFF2C14E));
-            blocco.addView(nota("Serve l'Accessibilità per disegnare sopra le app e il blocco schermo."));
-            blocco.addView(bottone("Attiva", true, new View.OnClickListener() {
+            blocco.addView(stato("Not turned on", 0xFFF2C14E));
+            blocco.addView(nota("Page Brawl needs Accessibility to draw over your apps and the lock screen."));
+            blocco.addView(bottone("Turn on", true, new View.OnClickListener() {
                 @Override public void onClick(View v) { apri(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); }
             }));
-            final TextView aiuto = nota("Apri «Info app», tocca ⋮ in alto a destra → «Consenti impostazioni con restrizioni», poi riprova «Attiva». Nell'elenco: App installate → Page Brawl.");
+            final TextView aiuto = nota("Open App info, tap ⋮ in the top right → Allow restricted settings, then tap Turn on again. In the list: Installed apps → Page Brawl.");
             aiuto.setVisibility(aiutoAperto ? View.VISIBLE : View.GONE);
-            TextView link = testo("Interruttore grigio?", 14, VERDE, false);
+            TextView link = testo("Switch greyed out?", 14, VERDE, false);
             link.setPadding(0, px(14), 0, px(2));
             link.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) {
@@ -113,14 +113,14 @@ public class Principale extends Activity {
         }
 
         // Dove giocare: quattro modalità.
-        col.addView(titoletto("DOVE GIOCARE"));
+        col.addView(titoletto("WHERE TO PLAY"));
         LinearLayout modi = superficie();
         modi.setPadding(px(6), px(6), px(6), px(6));
         String[][] voci = {
-                {"blocco", "\uD83D\uDD12", "Blocco schermo", "Il ring compare quando accendi lo schermo"},
-                {"sistema", "\uD83D\uDCF1", "Tutto il telefono", "Tocca la bolla su qualsiasi app"},
-                {"chrome", "\uD83C\uDF10", "Solo Chrome", "La bolla compare mentre navighi"},
-                {"app", "\uD83C\uDFDF\uFE0F", "Nell'app", "Arene: lava, cielo, ring"}};
+                {"blocco", "\uD83D\uDD12", "Lock screen", "The ring appears when you wake the screen"},
+                {"sistema", "\uD83D\uDCF1", "Whole phone", "Tap the bubble on any app"},
+                {"chrome", "\uD83C\uDF10", "Chrome only", "The bubble shows while you browse"},
+                {"app", "\uD83C\uDFDF\uFE0F", "In the app", "Arenas: lava, sky, ring"}};
         for (final String[] v : voci) modi.addView(rigaModo(v[0], v[1], v[2], v[3], v[0].equals(modo)));
         col.addView(modi);
 
@@ -130,25 +130,25 @@ public class Principale extends Activity {
             LinearLayout arene = new LinearLayout(this);
             arene.addView(arena("lava", "Lava", new int[]{0xFF5C1608, 0xFF0D0403}, 0xFFFF8A1F), pesoUno());
             arene.addView(spazio(10, true));
-            arene.addView(arena("cielo", "Cielo", new int[]{0xFF5AA9E6, 0xFFDFF1FF}, 0xFF5BB04C), pesoUno());
+            arene.addView(arena("cielo", "Sky", new int[]{0xFF5AA9E6, 0xFFDFF1FF}, 0xFF5BB04C), pesoUno());
             arene.addView(spazio(10, true));
             arene.addView(arena("ring", "Ring", new int[]{0xFF2A2F3A, 0xFF07080B}, 0xFF1F3A8A), pesoUno());
             col.addView(arene);
         } else if (attivo) {
             if ("sistema".equals(modo)) {
-                col.addView(bottone("Gioca sulla Home", true, new View.OnClickListener() {
+                col.addView(bottone("Play on the Home screen", true, new View.OnClickListener() {
                     @Override public void onClick(View v) { giocaSullaHome(); }
                 }));
             } else if ("chrome".equals(modo)) {
-                col.addView(bottone("Apri Chrome", true, new View.OnClickListener() {
+                col.addView(bottone("Open Chrome", true, new View.OnClickListener() {
                     @Override public void onClick(View v) {
                         Intent i = getPackageManager().getLaunchIntentForPackage("com.android.chrome");
                         if (i != null) startActivity(i);
-                        else Toast.makeText(Principale.this, "Chrome non è installato", Toast.LENGTH_SHORT).show();
+                        else Toast.makeText(Principale.this, "Chrome is not installed", Toast.LENGTH_SHORT).show();
                     }
                 }));
             } else {
-                TextView n = nota("Spegni lo schermo e riaccendilo: il blocco schermo diventa il ring. Sbloccando il telefono sparisce.");
+                TextView n = nota("Turn the screen off and on: the lock screen becomes the ring. It disappears when you unlock.");
                 n.setPadding(px(4), 0, px(4), 0);
                 col.addView(n);
             }
@@ -156,29 +156,33 @@ public class Principale extends Activity {
 
         // Le impostazioni.
         col.addView(spazio(22));
-        col.addView(titoletto("IMPOSTAZIONI"));
+        col.addView(titoletto("SETTINGS"));
         LinearLayout lista = superficie();
         lista.setPadding(px(16), px(4), px(16), px(4));
-        LinearLayout taglia = riga("Lottatori", null);
+        LinearLayout taglia = riga("Fighters", null);
         taglia.addView(segmenti());
         lista.addView(taglia);
         lista.addView(linea());
-        LinearLayout riquadro = riga("Riquadro rapido", "Il ring dalla tendina delle notifiche");
-        riquadro.addView(testo("Aggiungi", 15, VERDE, true));
+        LinearLayout lingua = riga("Language", "In-game text");
+        lingua.addView(lingue());
+        lista.addView(lingua);
+        lista.addView(linea());
+        LinearLayout riquadro = riga("Quick settings tile", "Start the ring from quick settings");
+        riquadro.addView(testo("Add", 15, VERDE, true));
         riquadro.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { aggiungiRiquadro(); }
         });
         lista.addView(riquadro);
         lista.addView(linea());
-        LinearLayout sito = riga("Pagina web", "Il ring dentro una pagina vera");
-        sito.addView(testo("Apri", 15, VERDE, true));
+        LinearLayout sito = riga("Web page", "The ring inside a real web page");
+        sito.addView(testo("Open", 15, VERDE, true));
         sito.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { startActivity(new Intent(Principale.this, Browser.class)); }
         });
         lista.addView(sito);
         col.addView(lista);
 
-        TextView piede = testo("Dello schermo usa solo la posizione degli elementi, solo mentre giochi. Non legge testi e non invia niente.", 12, TENUE, false);
+        TextView piede = testo("It only uses where things are on screen, and only while you play. It reads no text and sends nothing.", 12, TENUE, false);
         piede.setPadding(px(4), px(18), px(4), 0);
         col.addView(piede);
 
@@ -213,19 +217,19 @@ public class Principale extends Activity {
                         new Consumer<Integer>() {
                             @Override public void accept(Integer esito) {
                                 if (esito != null && esito == StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED) {
-                                    Toast.makeText(Principale.this, "C'è già", Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(Principale.this, "Already added", Toast.LENGTH_SHORT).show();
                                 }
                             }
                         });
                 return;
             }
         }
-        Toast.makeText(this, "Abbassa la tendina, tocca la matita e trascina Page Brawl fra i riquadri.", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Pull down the quick settings, tap the pencil and drag Page Brawl into your tiles.", Toast.LENGTH_LONG).show();
     }
 
     private void apri(Intent i) {
         try { startActivity(i); } catch (Exception e) {
-            Toast.makeText(this, "Apri le Impostazioni a mano", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Open Settings manually", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -382,6 +386,25 @@ public class Principale extends Activity {
         return r;
     }
 
+    /** La lingua del gioco (chiave del ring `pb-lingua`): inglese di serie. */
+    private LinearLayout lingue() {
+        final String[] codici = {"en", "it", "es", "fr", "de"};
+        String scelta = Memoria.lingua(this);
+        LinearLayout box = new LinearLayout(this);
+        box.setBackground(tondo(0xFF212A25, 10));
+        box.setPadding(px(3), px(3), px(3), px(3));
+        for (final String c : codici) {
+            TextView t = testo(c.toUpperCase(), 13, c.equals(scelta) ? SU_VERDE : TESTO, true);
+            t.setGravity(Gravity.CENTER);
+            if (c.equals(scelta)) t.setBackground(tondo(VERDE, 8));
+            t.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View x) { Memoria.lingua(Principale.this, c); disegna(); }
+            });
+            box.addView(t, new LinearLayout.LayoutParams(px(34), px(30)));
+        }
+        return box;
+    }
+
     /** Piccoli · Medi · Grandi: la misura dei lottatori (chiave del ring `pb-taglia`). */
     private LinearLayout segmenti() {
         final String[] valori = {"piccoli", "medi", "grandi"};
@@ -394,7 +417,7 @@ public class Principale extends Activity {
             final String v = valori[i];
             TextView t = testo(nomi[i], 14, v.equals(scelta) ? SU_VERDE : TESTO, true);
             t.setGravity(Gravity.CENTER);
-            t.setContentDescription("Lottatori " + v);
+            t.setContentDescription("Fighters " + v);
             if (v.equals(scelta)) t.setBackground(tondo(VERDE, 8));
             t.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View x) {

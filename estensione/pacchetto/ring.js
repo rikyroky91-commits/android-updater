@@ -815,6 +815,19 @@
     sparisci(f);
   }
 
+  // Il volo di salvataggio: breve, dritto verso la piattaforma; atterra sopra (vedi «Il volo non finisce sopra la lava»).
+  function salvaInVolo(f, pd) {
+    f.ko = 0; f.inVolo = false; f.rialzo = 0; f.stordito = 0; f.koDove = null; f.fantasma = false;
+    f.azione = null; f.ordine = null; f.scalata = null; f.paracadute = 0; f.fuga = null;
+    decolla(f, false);
+    if (!(f.jet > 0)) return;                                  // sottosopra: niente volo
+    f.caos = 0; f.jet = 75; f.pensa = 45;
+    f.meta = Math.max(pd.l + 30 * S, Math.min(pd.r - 30 * S, f.p.bacino.x < (pd.l + pd.r) / 2 ? pd.l + (pd.r - pd.l) * 0.3 : pd.r - (pd.r - pd.l) * 0.3));
+    f.volaY = pd.t - 64 * S;
+    f.salvato = 120;                                           // un salvataggio per caduta
+    scrivi(dici("SALVO!"), f.p.bacino.x, f.p.bacino.y - 34 * S, false);
+  }
+
   // Nella corsa la lava toglie un quinto della vita all'eroe (l'avversario del duello va K.O.), poi si rientra.
   function lavaCorsa(f) {
     const x = f.p.bacino.x;
@@ -9712,6 +9725,12 @@
   // l'uscita cadrebbe dentro la sua presa, e si rientrerebbe subito: in quel
   // caso si esce al bordo più lontano.
   function doveEsce(x, y) {
+    const pd = lava ? piattaforma() : null;
+    if (pd) {
+      // Sopra la lava si esce sopra la piattaforma, mai sopra la lava.
+      const u = Math.max(pd.l + 24 * S, Math.min(pd.r - 24 * S, pd.l + pd.r - x));
+      return { x: u, y: Math.max(testataBasso + 30 * S, pd.t - 70 * S) };
+    }
     let u = W - x;
     if (Math.abs(u - x) < BUCO.raggio * 1.25 * S) u = x < W / 2 ? W - 40 * S : 40 * S;
     return { x: Math.max(26 * S, Math.min(W - 26 * S, u)), y: Math.max(testataBasso + 30 * S, Math.min(pavimento - 40 * S, y)) };
@@ -10209,18 +10228,14 @@
             ((f.cx < o.l + m && !sottoCe(o.l - 20 * S, o.t + 1)) || (f.cx > o.r - m && !sottoCe(o.r + 20 * S, o.t + 1)))) {
           f.cx = Math.max(o.l + m, Math.min(o.r - m, f.cx)); f.azione = null; f.ordine = null; f.pensa = Math.min(f.pensa, 6);
         }
-        // Volato giù senza essere K.O. davvero: un ultimo balzo verso il centro, una volta per caduta.
+        // Volato giù dalla piattaforma: chi ha ancora più di un quarto di vita accende il volo in tempo e torna
+        // sopra (12/10/2026, Riccardo: «se hanno più di un quarto di vita riescono a usare il volo prima di cadere»).
+        // Chi è K.O. davvero, o è agli sgoccioli, cade.
         const b = f.p.bacino, pd = piattaforma();
-        if (f.supporto) f.salvato = false;
-        else if (f.inVolo && !f.koVero && !f.fuori && !f.salvato && pd && b.y > pd.t + 10 * S && b.y > b.oy && !sottoCe(b.x, b.y)) {
-          f.salvato = true;
-          if (Math.random() < 0.5) {
-            const d = (pd.l + pd.r) / 2 >= b.x ? 1 : -1;
-            for (const n in f.p) { f.p[n].oy = f.p[n].y + 11 * S; f.p[n].ox = f.p[n].x - d * 4.5 * S; }
-            scrivi("HOP!", b.x, b.y - 30 * S, false);
-            suona("salto", b.x, 1);
-          }
-        }
+        if (f.supporto) f.salvato = 0;
+        else if (pd && !f.koVero && !f.fuori && !f.tenuto && !f.preso && !(f.jet > 0) && !(f.salvato > 0) &&
+                 b.y > pd.t + 4 * S && b.y >= b.oy && !sottoCe(b.x, b.y) && vitaVera(f) > 0.25) salvaInVolo(f, pd);
+        if (f.salvato > 0) f.salvato--;
       }
       if (f.specchio > 0) f.specchio--;
       rispondeUguale(f, altro);
@@ -14081,6 +14096,8 @@
       };
     },
     cambia: () => eseguiTasto("cambia"),
+    // Solo per i test: i danni di un lottatore (la vita è 1 − danni/soglia).
+    ferisci: (tipo, quota) => { const f = lottatori.find((l) => l.tipo === tipo); if (f) f.danni = Math.max(0, Math.min(0.99, quota)) * f.soglia; },
     corsaFinale: () => !!tastoFinale(),
     corsaOggetto: (i) => !!usaOggetto(i),
     // Dove stanno i corpi dei lottatori (per le zone toccabili che li seguono sopra lo schermo del telefono).

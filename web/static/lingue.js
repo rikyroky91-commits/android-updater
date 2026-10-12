@@ -325,6 +325,9 @@
     "SALVO!": ["SAVED!", "¡A SALVO!", "SAUVÉ !", "GERETTET!"],
     "ULTIMA POSSIBILITÀ!": ["LAST CHANCE!", "¡ÚLTIMA OPORTUNIDAD!", "DERNIÈRE CHANCE !", "LETZTE CHANCE!"],
     "K.O.!": ["K.O.!", "¡K.O.!", "K.-O. !", "K.O.!"],
+    // L'arena di lava dell'app Android (12/10/2026)
+    "LAVA!": ["LAVA!", "¡LAVA!", "LAVE !", "LAVA!"],
+    "SALVO!": ["SAVED!", "¡A SALVO!", "SAUVÉ !", "GERETTET!"],
     "Non ancora carico": ["Not charged yet", "Aún no está cargado", "Pas encore chargé", "Noch nicht geladen"],
     "BOOM!": ["BOOM!", "¡BUM!", "BOUM !", "BUMM!"],
     "Cuore d'acciaio": ["Steel heart", "Corazón de acero", "Cœur d'acier", "Stahlherz"],

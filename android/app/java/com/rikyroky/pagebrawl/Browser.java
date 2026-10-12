@@ -75,7 +75,7 @@ public class Browser extends Activity {
         barra.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         barra.setTextColor(0xFFEDEFEC);
         barra.setHintTextColor(0xFF6F7B73);
-        barra.setHint("Cerca o scrivi un indirizzo");
+        barra.setHint("Search or type an address");
         barra.setSelectAllOnFocus(true);
         barra.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         barra.setImeOptions(EditorInfo.IME_ACTION_GO);
@@ -99,7 +99,7 @@ public class Browser extends Activity {
         guantone.setText("🥊");
         guantone.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
         guantone.setGravity(Gravity.CENTER);
-        guantone.setContentDescription("Accendi o spegni il ring su questa pagina");
+        guantone.setContentDescription("Turn the brawl on or off on this page");
         guantone.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { alterna(); }
         });

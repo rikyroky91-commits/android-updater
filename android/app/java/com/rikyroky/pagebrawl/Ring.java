@@ -559,7 +559,7 @@ public class Ring extends AccessibilityService {
         bolla.setBackground(fondo);
         bolla.setElevation(8 * d);
         bolla.setAlpha(0.88f);
-        bolla.setContentDescription("Page Brawl: tocca per il ring su questo schermo, tieni premuto per nascondere");
+        bolla.setContentDescription("Page Brawl: tap to start the ring on this screen, hold to hide");
 
         lpBolla = new WindowManager.LayoutParams(lato, lato,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
@@ -585,7 +585,7 @@ public class Ring extends AccessibilityService {
                     if (bolla != null) bolla.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
                     bollaNascosta = true;
                     nascondiBolla();
-                    Toast.makeText(Ring.this, "Bolla nascosta: torna riaprendo Page Brawl", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(Ring.this, "Bubble hidden: it comes back when you open Page Brawl", Toast.LENGTH_SHORT).show();
                 }
             };
 
@@ -657,7 +657,7 @@ public class Ring extends AccessibilityService {
         Intent i = new Intent(this, Principale.class);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
         try { startActivity(i); } catch (Exception e) {
-            Toast.makeText(this, "Apri Page Brawl dalle app", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Open Page Brawl from your apps", Toast.LENGTH_SHORT).show();
         }
     }
 

@@ -54,9 +54,17 @@ public class Arena extends Activity {
         web.setVerticalScrollBarEnabled(false);
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         web.addJavascriptInterface(new Ponte(), "PB");
+        // Spegnendo lo schermo Android può chiudere il motore della pagina per liberare memoria, e la corsa si
+        // perdeva: il motore resta «importante» anche quando l'arena non si vede.
+        if (Build.VERSION.SDK_INT >= 26) web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
         web.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
                 return !r.getUrl().toString().startsWith("file:///android_asset/");
+            }
+            @Override public boolean onRenderProcessGone(WebView v, android.webkit.RenderProcessGoneDetail d) {
+                // Se il motore della pagina cade comunque, si riapre l'arena invece di chiudere l'app.
+                recreate();
+                return true;
             }
         });
         scena.addView(web, new FrameLayout.LayoutParams(-1, -1));

@@ -6,7 +6,6 @@ import android.content.SharedPreferences;
 import org.json.JSONObject;
 
 import java.util.Iterator;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -82,9 +81,13 @@ final class Memoria {
         } catch (Exception ignorata) { /* JSON rotto: niente */ }
     }
 
-    static String linguaDiSistema() {
-        String l = Locale.getDefault().getLanguage();
+    /** Inglese di serie, qualunque sia la lingua del telefono (12/10/2026, Riccardo: «metti l'inglese come lingua
+     *  principale»; come l'estensione). Le altre quattro si scelgono nelle impostazioni dell'app. */
+    static String linguaDiSistema() { return "en"; }
+    static String lingua(Context c) {
+        String l = gioco(c).getString("pb-lingua", "en");
         for (String x : LINGUE) if (x.equals(l)) return x;
         return "en";
     }
+    static void lingua(Context c, String l) { gioco(c).edit().putString("pb-lingua", l).apply(); }
 }

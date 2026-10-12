@@ -28,7 +28,7 @@ public class Riquadro extends TileService {
         // Sempre toccabile: da spento apre l'app che spiega come accenderlo.
         t.setState(Tile.STATE_INACTIVE);
         t.setLabel("Page Brawl");
-        if (Build.VERSION.SDK_INT >= 29) t.setSubtitle(pronto ? "Ring qui" : "Da attivare");
+        if (Build.VERSION.SDK_INT >= 29) t.setSubtitle(pronto ? "Ring here" : "Turn on first");
         t.updateTile();
     }
 

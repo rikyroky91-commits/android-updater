@@ -4079,14 +4079,24 @@ test("l'arena di lava: si parte sulla piattaforma, chi cade nella lava dà il pu
     assert.ok(Math.abs(f.base - pedana[1]) < 4, `${f.tipo} poggia sulla piattaforma (base ${f.base})`);
   }
   assert.strictEqual(r.mosse().lava, true);
-  // La mela spinta di peso oltre il bordo: cade, brucia, il punto va al robot.
+  // La mela spinta di peso oltre il bordo con la vita piena: vola in tempo e torna sulla piattaforma.
   r.sposta("mela", 20);
-  let bruciata = false;
-  amb.avanza(240, (st) => { if (st.lottatori.find((f) => f.tipo === "mela").esploso) bruciata = true; });
-  assert.ok(bruciata, "chi tocca la lava sparisce");
-  assert.strictEqual(amb.stato().punteggio.robot, 1, "il punto è dell'altro");
+  let salvata = false, bruciata = false;
+  amb.avanza(300, (st) => { const m = st.lottatori.find((f) => f.tipo === "mela"); if (m.esploso) bruciata = true; if (m.vola) salvata = true; });
+  assert.ok(salvata && !bruciata, "con più di un quarto di vita si salva in volo (volata " + salvata + ", bruciata " + bruciata + ")");
+  let mela = amb.lottatore("mela");
+  assert.ok(mela.cx > pedana[0] && mela.cx < pedana[2], `torna sopra la piattaforma (x ${mela.cx})`);
+  // Agli sgoccioli (un quarto di vita o meno) non ce la fa: cade, brucia, e il punto (o il K.O.) è del robot.
+  amb.avanza(60);
+  r.ferisci("mela", 0.8);
+  assert.ok(r.mosse().lottatori[1].vita <= 0.25, "un quinto di vita");
+  r.sposta("mela", 20);
+  bruciata = false;
+  amb.avanza(300, (st) => { if (st.lottatori.find((f) => f.tipo === "mela").esploso) bruciata = true; });
+  assert.ok(bruciata, "chi ha poca vita e tocca la lava sparisce");
+  assert.ok(amb.stato().punteggio.robot >= 1, "il punto è dell'altro: " + JSON.stringify(amb.stato().punteggio) + " finale " + JSON.stringify(amb.stato().finale) + " fatale " + JSON.stringify(amb.stato().fatale || null));
   amb.avanza(260);
-  const mela = amb.lottatore("mela");
+  mela = amb.lottatore("mela");
   assert.ok(!mela.esploso && mela.cx > pedana[0] && mela.cx < pedana[2], `rientra sulla piattaforma (x ${mela.cx})`);
   // Un minuto e mezzo di lotta, anche coi super guerrieri che volano: nessuno resta nella lava (nemmeno
   // volando a filo), nessuna coordinata impazzita.
