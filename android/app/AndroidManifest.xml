@@ -24,6 +24,12 @@
         </activity>
 
         <activity
+            android:name=".Arena"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
+
+        <activity
             android:name=".Browser"
             android:exported="true"
             android:label="@string/nome_browser"

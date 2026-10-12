@@ -12,7 +12,10 @@
 }
 .barretta, .ring-pannello { font: 15px/1.35 system-ui, -apple-system, Roboto, sans-serif; }
 
-/* I tasti: una colonna discreta sul bordo destro. */
+/* I tasti del motore (controller, tendina, accensione) li sostituiscono i comandi nativi dell'app:
+   la capsula in alto e i quattro tasti abilità. La tendina si apre dal menu ⋯ della capsula. */
+.barretta { display: none !important; }
+/* (stile rimasto per quando la barretta torna visibile) */
 .barretta {
   right: 10px; bottom: 14px; flex-direction: column; gap: 8px; padding: 0;
   background: none; border: 0; box-shadow: none;

@@ -159,6 +159,18 @@
   // La scelta del modo (10/10/2026, estensione): all'accensione «Corsa infinita» o «Combattimento libero».
   // La chiede chi carica il ring con `window.__ringSceltaModo` (l'estensione); il sito parte libero.
   let sceltaModo = false;
+  // L'ARENA DI LAVA (12/10/2026, app Android; Riccardo: «una piattaforma figa a mezz'aria e a terra lava dove i
+  // personaggi cercano in tutti i modi di non cadere e buttare l'avversario sulla lava»). La accende chi ospita il
+  // ring con `window.__ringArena = { lava: altezza }` (pixel della pagina): il pavimento diventa la superficie della
+  // lava, chi la tocca va K.O. (il punto è dell'altro) e rientra dall'alto sulla piattaforma; i lottatori non
+  // scendono dai bordi da soli, provano a spingere giù l'avversario, e chi vola giù ha un ultimo balzo per salvarsi.
+  // Sul sito e nell'estensione `__ringArena` non c'è: tutto come prima.
+  let lava = 0;
+  // Un'arena qualunque (`__ringArena` presente, con o senza lava): si parte e si rientra sulla pedana più larga.
+  let inArena = false;
+  // LA PAUSA (12/10/2026, app Android: «in qualsiasi momento mettere in pausa il gioco»): `__ring.pausa(true)`
+  // ferma il tempo; il ring resta disegnato com'è e il ciclo si addormenta finché non si riprende.
+  let inPausa = false;
   const classifica = { aperta: false, voci: null, letta: -1e9, stato: "", mia: -1 };
   // Le monete in banca e i potenziamenti permanenti della bottega: restano fra una corsa e l'altra.
   let banca = 0, bottega = {};
@@ -600,6 +612,10 @@
     pavimento = barra && barra.getBoundingClientRect ? barra.getBoundingClientRect().top : H;
     if (barra && barra.getBoundingClientRect) barraAlta = barra.getBoundingClientRect().height || 44;
     if (!(pavimento > 0)) pavimento = H;
+    const arena = window.__ringArena;
+    inArena = !!arena;
+    lava = arena && arena.lava > 0 ? Math.min(H * 0.4, arena.lava) : 0;
+    if (lava) pavimento = H - lava;
   }
 
   // --- Il corpo --------------------------------------------------------
@@ -704,7 +720,11 @@
     if (rc && rc.width > 200 && rc.top > 60 && rc.top < pavimento - 90 && rc.left < W) {
       cx0 = (rc.left + rc.right) / 2; base0 = rc.top;
     }
-    lottatori = [crea("robot", cx0 - scarto, 1, base0), crea("mela", cx0 + scarto, -1, base0)];
+    // Nelle arene si parte sulla pedana più larga (in quella di lava, non nella lava).
+    const pedana = inArena ? piattaforma() : null;
+    if (pedana) { cx0 = (pedana.l + pedana.r) / 2; base0 = pedana.t; }
+    const scarto0 = pedana ? Math.min(scarto, (pedana.r - pedana.l) * 0.28) : scarto;
+    lottatori = [crea("robot", cx0 - scarto0, 1, base0), crea("mela", cx0 + scarto0, -1, base0)];
     if (lame()) for (const f of lottatori) accendiLama(f);
     fulmini = []; rune = []; cadute = []; duello = 0; sfida = null; sfidaPausa = 0; orda = null;
     danni = [];
@@ -754,6 +774,40 @@
       if (o.t < y) { y = o.t; chi = o; }
     }
     return [y, chi];
+  }
+
+  // --- L'arena di lava ----------------------------------------------------
+  // La piattaforma principale: l'elemento più largo.
+  function piattaforma() {
+    let m = null;
+    for (const o of ostacoli) if (!m || o.r - o.l > m.r - m.l) m = o;
+    return m;
+  }
+  // C'è qualcosa su cui posarsi sotto `x`, all'altezza `da` o più giù? (se no, lì sotto c'è la lava)
+  function sottoCe(x, da) {
+    for (const o of ostacoli) if (x >= o.l + 4 * S && x <= o.r - 4 * S && o.t >= da - 6 * S) return true;
+    return false;
+  }
+  // Dove si rientra dopo essere spariti: dal proprio lato, o sulla piattaforma se sotto c'è la lava.
+  function xRientro(tipo) {
+    const m = inArena ? piattaforma() : null;
+    if (!m) return W * (tipo === "robot" ? 0.3 : 0.7);
+    const c = (m.l + m.r) / 2, q = Math.min(90 * S, (m.r - m.l) * 0.28);
+    return tipo === "robot" ? c - q : c + q;
+  }
+  function nellaLava(f, altro) {
+    const x = f.p.bacino.x;
+    if (f.tel) lasciaCadere(f);
+    if (f.arma) lasciaArma(f);
+    if (f.tiene) molla(f);
+    scintille(x, pavimento - 4 * S, 24, "#ff5a1f"); scintille(x, pavimento - 12 * S, 14, "#ffd23f");
+    scrivi(dici("LAVA!"), x, pavimento - 70 * S, true);
+    suona("fiamma", x, 1.2);
+    scossa = Math.max(scossa, 14);
+    // Il punto è dell'altro, se non l'aveva già mandato K.O. con l'ultimo colpo.
+    if (!f.koVero && altro && altro.p) segnaKO(altro, f);
+    if (f.fuori || f.esploso) return;                          // il gran finale se l'è già preso
+    sparisci(f);
   }
 
   // --- Le pose ---------------------------------------------------------
@@ -1656,7 +1710,7 @@
     const lv = livelloDi(f.tipo);
     // Chi ha imparato (livello 4) si alza in volo di proposito per inseguire
     // un avversario che sta volando.
-    if (tempo >= CALMA && !f.tel && Math.random() < 0.045 * f.furbo * (lv >= 4 && altro.jet > 0 ? 5 : 1)) { decolla(f, altro.jet > 0 ? false : Math.random() < 0.3); return; }
+    if (tempo >= CALMA && !lava && !f.tel && Math.random() < 0.045 * f.furbo * (lv >= 4 && altro.jet > 0 ? 5 : 1)) { decolla(f, altro.jet > 0 ? false : Math.random() < 0.3); return; }
     // L'avversario sta per colpire: ci si para o si schiva.
     if (altro.azione && COLPI[altro.azione] && Math.abs(altro.cx - f.cx) < 34 * S &&
         Math.abs(altro.base - f.base) <= 18 * S &&
@@ -1702,6 +1756,24 @@
       ? (tempo < CALMA ? 3 : 10) * pesoMossa(f, "presa") : 0;
 
     const dy = altro.base - f.base;
+    if (lava && !corsa && verso > 0 && Math.abs(dy) <= 18 * S && altro.supporto && !altro.ko) {
+      const o = altro.supporto, dist = Math.abs(altro.cx - f.cx) / S, lato = altro.cx >= f.cx ? 1 : -1;
+      const spazio = lato > 0 ? o.r - altro.cx : altro.cx - o.l;              // quanto manca al bordo dietro di lui
+      if (dist < 42 && spazio < 70 * S && !sottoCe(altro.cx + lato * (spazio + 20 * S), o.t + 1)) {
+        // È col vuoto alle spalle: colpi che spingono, o lo si prende e lo si butta.
+        f.dir = lato;
+        inizia(f, scegli([[40 * f.aggr, "calcio"], [30 * f.aggr, "diretto"], [pesoPresa * 3 + 10, "presa"], [15, "montante"]]));
+        return;
+      }
+      const mio = f.supporto;
+      if (mio) {
+        const dietro = lato > 0 ? f.cx - mio.l : mio.r - f.cx;               // quanto manca al bordo dietro di me
+        if (dietro < 45 * S && dist > 26 && Math.random() < 0.6) {
+          const centro = (mio.l + mio.r) / 2;
+          f.dir = centro >= f.cx ? 1 : -1; inizia(f, "avanza", centro); return;
+        }
+      }
+    }
     // Sottosopra niente arrampicate: si va verso l'altro e si «cade» su.
     if (verso < 0 && Math.abs(dy) > 18 * S) { f.dir = altro.cx >= f.cx ? 1 : -1; inizia(f, "avanza", altro.cx); return; }
     if (Math.abs(dy) <= 18 * S) {
@@ -1738,6 +1810,11 @@
         meta = (f.cx - o.l < o.r - f.cx) ? o.l - 14 * S : o.r + 14 * S;
       }
       f.dir = meta >= f.cx ? 1 : -1;
+      // Sopra la lava non si scende dove sotto non c'è niente: si aspetta che risalga lui.
+      if (lava && !corsa && verso > 0 && !sottoCe(meta, f.base + 1)) {
+        f.dir = altro.cx >= f.cx ? 1 : -1;
+        inizia(f, scegli([[55, "provoca"], [25, "para"], [20, "salto"]])); return;
+      }
       // Scende apposta da dove sta: se il salto è alto, apre il paracadute.
       if (o) f.scendeApposta = 300;
       inizia(f, "avanza", Math.max(10 * S, Math.min(W - 10 * S, meta)));
@@ -3144,13 +3221,16 @@
                         va: caso(-0.4, 0.4), lato: caso(2.2, 4.6) * S, colore: CORIANDOLI[i % CORIANDOLI.length] });
     }
     if (x <= 1) danneggiaBordo("sinistra", y, 1); else if (x >= W - 1) danneggiaBordo("destra", y, 1); else if (y <= 1) danneggiaBordo("tetto", x, 1);
-    // Sparisce (come chi va in pezzi) e rientra fra poco dal suo lato.
+    sparisci(f);
+  }
+  // Sparisce (come chi va in pezzi) e rientra fra poco dal suo lato (sulla piattaforma, se sotto c'è la lava).
+  function sparisci(f) {
     for (const n in f.p) {
       const pt = f.p[n];
       pt.x = pt.ox = Math.max(8, Math.min(W - 8, pt.x)); pt.y = pt.oy = Math.max(8, Math.min(pavimento - 8, pt.y));
     }
     arti = arti.filter((a) => a.f !== f);
-    f.esploso = { t: 0, dir: f.tipo === "robot" ? 1 : -1, nuovo: null, x: W * (f.tipo === "robot" ? 0.3 : 0.7), base: pavimento, rientro: true };
+    f.esploso = { t: 0, dir: f.tipo === "robot" ? 1 : -1, nuovo: null, x: xRientro(f.tipo), base: pavimento, rientro: true };
     f.fuori = 0; f.inVolo = false; f.fantasma = false; f.dolore = 0; f.stordito = 0; f.segni = []; f.staccati = {}; f.morsi = [];
     f.taglio = null; f.accecato = 0; f.sfera = null; f.cratere = null;
   }
@@ -10041,6 +10121,31 @@
       }
       // In volo la «base» è il corpo stesso: il busto resta dritto da solo.
       if (f.jet > 0) { f.base = f.p.bacino.y + 30 * S; f.supporto = null; }
+      if (lava && !corsa && verso > 0 && !inScena) {
+        if (!(f.jet > 0) && !f.fuori && !f.supporto) {
+          let giu = 0;
+          for (const n in f.p) giu = Math.max(giu, f.p[n].y + f.p[n].r);
+          if (giu >= pavimento - 2 * S) { nellaLava(f, altro); continue; }
+        }
+        // Sul bordo ci si ferma: nessuno si butta da solo.
+        const o = f.supporto, m = 8 * S;
+        if (o && !f.ko && !f.inVolo && (f.azione === "avanza" || f.azione === "indietro" || f.azione === "schiva") &&
+            ((f.cx < o.l + m && !sottoCe(o.l - 20 * S, o.t + 1)) || (f.cx > o.r - m && !sottoCe(o.r + 20 * S, o.t + 1)))) {
+          f.cx = Math.max(o.l + m, Math.min(o.r - m, f.cx)); f.azione = null; f.ordine = null; f.pensa = Math.min(f.pensa, 6);
+        }
+        // Volato giù senza essere K.O. davvero: un ultimo balzo verso il centro, una volta per caduta.
+        const b = f.p.bacino, pd = piattaforma();
+        if (f.supporto) f.salvato = false;
+        else if (f.inVolo && !f.koVero && !f.fuori && !f.salvato && pd && b.y > pd.t + 10 * S && b.y > b.oy && !sottoCe(b.x, b.y)) {
+          f.salvato = true;
+          if (Math.random() < 0.5) {
+            const d = (pd.l + pd.r) / 2 >= b.x ? 1 : -1;
+            for (const n in f.p) { f.p[n].oy = f.p[n].y + 11 * S; f.p[n].ox = f.p[n].x - d * 4.5 * S; }
+            scrivi("HOP!", b.x, b.y - 30 * S, false);
+            suona("salto", b.x, 1);
+          }
+        }
+      }
       if (f.specchio > 0) f.specchio--;
       rispondeUguale(f, altro);
       pensa(f, altro);
@@ -11505,14 +11610,15 @@
     let giri = 0;
     // Un colpo secco ferma l'azione per qualche fotogramma: si sente di più.
     // Nella corsa, mentre si sceglie una carta o si apre un forziere, il tempo è fermo.
-    if (corsa && corsa.pausa) riserva = 0;
+    if (inPausa || (corsa && corsa.pausa)) riserva = 0;
     else if (fermoColpo > 0) { fermoColpo--; riserva = 0; }
     else {
       while (riserva >= PASSO_MS && giri < 4) { passo(); riserva -= PASSO_MS; giri++; }
       if (giri === 4) riserva = 0;
     }
     // Un disegno ogni due (30 fps); mentre se ne tiene uno in mano, tutti.
-    if (presa.f || presa.tel || (fotogramma++ & 1) === 0) disegna();
+    if (presa.f || presa.tel || (fotogramma++ & 1) === 0 || inPausa) disegna();
+    if (inPausa) return;                                         // in pausa: un ultimo disegno, poi niente
     richiesta = requestAnimationFrame(ciclo);
   }
   function riparti() {
@@ -13866,6 +13972,29 @@
 
   if (window.__ringSceltaModo) { sceltaModo = true; assicuraAcceso(); }
   window.__ring = {
+    // I comandi da telefono dell'app Android (12/10/2026): le mosse del personaggio comandato (icona, energia che
+    // serve, se si possono fare adesso), vita, energia e nome dei due, il punteggio. Leggero: si legge spesso.
+    mosse: () => {
+      const f = comandato();
+      return {
+        chi: radiale.chi, acceso: !fermo, scelta: !!(sceltaModo && !corsa), corsa: !!corsa, lava: !!lava,
+        voci: vociRadiale().map((v) => ({ id: v[0], icona: v[1], nome: dici(v[2]), costo: v[3] || 0, pronta: !!(f && puoFare(f, v)) })),
+        lottatori: lottatori.map((l) => ({
+          tipo: l.tipo, nome: stile && ASPETTI[stile] ? ASPETTI[stile][l.tipo].nome : dici(l.tipo === "robot" ? "Robot" : "Mela"),
+          colore: COLORI_ANIME[l.tipo], vita: l.p ? vitaVera(l) : 0, ki: l.ki || 0, ko: !!(l.ko > 0 || l.esploso || l.fuori) })),
+        punteggio: Object.assign({}, punteggio),
+      };
+    },
+    cambia: () => eseguiTasto("cambia"),
+    pausa: (si) => {
+      if (si !== undefined && !!si !== inPausa) { inPausa = !!si; ultimo = 0; riserva = 0; if (!inPausa) riparti(); }
+      return inPausa;
+    },
+    pannello: (apri) => {
+      if (!pannello || !pannello.classList) return false;
+      if (apri !== undefined) apriPannello(!!apri);
+      return pannello.classList.contains("aperto");
+    },
     sceltaModo: (si) => { if (si !== undefined) { sceltaModo = !!si; aggiornaInterruttori(); } return sceltaModo; },
     // Solo per i test: un tasto premuto (il codice fisico, come `e.code`), e la mappa dei tasti.
     tastoGiu: (code, opz) => { let fermato = false; premiTasto(Object.assign({ code, repeat: false, target: null, preventDefault() {}, stopPropagation() { fermato = true; } }, opz || {})); return fermato; },

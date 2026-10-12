@@ -74,6 +74,19 @@ public class Ring extends AccessibilityService {
     private static final int VISITE_MAX = 6000;
 
     static volatile Ring istanza;
+    private static final int FINESTRA_PASSA = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+            | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+            | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+            | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+            | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+    private static final java.util.Set<String> CHROME = new java.util.HashSet<String>(java.util.Arrays.asList(
+            "com.android.chrome", "com.chrome.beta", "com.chrome.dev", "com.chrome.canary"));
+
+    private Comandi comandi;
+    private int bassoPx;
+    private boolean inChrome;
+    private String modo = "sistema";
+    private boolean bollaNascosta;      // tolta con una pressione lunga: torna riaprendo l'app o riaccendendo lo schermo
 
     private WindowManager wm;
     private Handler h;
@@ -99,20 +112,28 @@ public class Ring extends AccessibilityService {
         istanza = this;
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
         h = new Handler(Looper.getMainLooper());
+        try {
+            AccessibilityNodeInfo r = getRootInActiveWindow();
+            inChrome = r != null && r.getPackageName() != null && CHROME.contains(r.getPackageName().toString());
+        } catch (Exception ignorata) { }
         aggiornaBolla();
         ricevitore = new BroadcastReceiver() {
             @Override
             public void onReceive(Context c, Intent i) {
                 String a = i.getAction();
                 if (Intent.ACTION_SCREEN_ON.equals(a)) {
-                    if (Memoria.blocco(Ring.this) && bloccato() && arena == null) {
+                    // Modalità «solo blocco schermo»: il ring compare appena si accende lo schermo.
+                    if ("blocco".equals(Memoria.modo(Ring.this)) && bloccato() && arena == null) {
                         apertoDaBlocco = true;
                         avvia(650);
-                    }
+                    } else aggiornaBolla();
                 } else if (Intent.ACTION_USER_PRESENT.equals(a)) {
-                    if (apertoDaBlocco) chiudi();
+                    if (apertoDaBlocco || ("blocco".equals(Memoria.modo(Ring.this)) && arena != null)) chiudi();
+                    aggiornaBolla();
                 } else if (Intent.ACTION_SCREEN_OFF.equals(a)) {
+                    bollaNascosta = false;
                     if (arena != null) chiudi();
+                    aggiornaBolla();
                 }
             }
         };
@@ -150,11 +171,26 @@ public class Ring extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent e) {
-        // Lo schermo sotto è cambiato (una notifica, l'orologio, un'altra app):
-        // i solidi si rileggono, al massimo una volta ogni 1,2 secondi.
-        if (arena == null || web == null || e == null) return;
+        if (e == null) return;
         CharSequence p = e.getPackageName();
         if (p != null && getPackageName().contentEquals(p)) return;
+        // Quale app è in primo piano (per la modalità «solo Chrome»): la tendina e la tastiera non contano.
+        if (e.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && p != null) {
+            String pk = p.toString();
+            CharSequence cl = e.getClassName();
+            boolean tastiera = cl != null && (cl.toString().contains("inputmethod") || cl.toString().contains("SoftInputWindow"));
+            if (!tastiera && !"com.android.systemui".equals(pk)) {
+                boolean era = inChrome;
+                inChrome = CHROME.contains(pk);
+                if (era != inChrome) {
+                    if ("chrome".equals(modo) && !inChrome && arena != null) chiudi();
+                    else aggiornaBolla();
+                }
+            }
+        }
+        // Lo schermo sotto è cambiato (una notifica, l'orologio, un'altra app):
+        // i solidi si rileggono, al massimo una volta ogni 1,2 secondi.
+        if (arena == null || web == null) return;
         if (scansioneProgrammata) return;
         scansioneProgrammata = true;
         h.postDelayed(riscansiona, 1200);
@@ -201,19 +237,13 @@ public class Ring extends AccessibilityService {
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     private void apriArena() {
         if (arena != null) return;
+        modo = Memoria.modo(this);
         // Prima si legge lo schermo, poi si mette il ring sopra.
         ultimiNodi = raccogli();
         Context tema = new ContextThemeWrapper(this, android.R.style.Theme_DeviceDefault_NoActionBar);
-        arena = new FrameLayout(tema) {
-            @Override
-            public boolean dispatchKeyEvent(KeyEvent ev) {
-                if (ev.getKeyCode() == KeyEvent.KEYCODE_BACK) {
-                    if (ev.getAction() == KeyEvent.ACTION_UP) chiudi();
-                    return true;
-                }
-                return super.dispatchKeyEvent(ev);
-            }
-        };
+        // Il telefono resta usabile: la finestra dei lottatori non prende né tocchi né tastiera
+        // (tutto passa all'app sotto). I comandi stanno in finestre loro, piccole (Comandi.java).
+        arena = new FrameLayout(tema);
         // Il ring non si fa leggere dall'accessibilità: non è un contenuto, ed è pesante.
         arena.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
 
@@ -239,6 +269,13 @@ public class Ring extends AccessibilityService {
             }
 
             @Override
+            public void onPageFinished(WebView v, String url) {
+                if (v != web || comandi != null) return;
+                comandi = new Comandi(Ring.this, new OspiteFinestre(), web);
+                comandi.avvia();
+            }
+
+            @Override
             public boolean onRenderProcessGone(WebView v, RenderProcessGoneDetail d) {
                 // Il motore della pagina è caduto: si chiude il ring, non l'app.
                 if (v == web) { web = null; chiudi(); }
@@ -259,9 +296,7 @@ public class Ring extends AccessibilityService {
 
         lpArena = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                        | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                FINESTRA_PASSA,
                 PixelFormat.TRANSLUCENT);
         Point schermoReale = schermoReale();
         lpArena.width = schermoReale.x;
@@ -336,6 +371,7 @@ public class Ring extends AccessibilityService {
             lp.leftMargin = sx; lp.rightMargin = dx; lp.bottomMargin = giu;
             web.setLayoutParams(lp);
         }
+        bassoPx = giu;
         int[] pos = new int[2];
         arena.getLocationOnScreen(pos);
         ox = pos[0] + sx;
@@ -390,6 +426,7 @@ public class Ring extends AccessibilityService {
         scansioneProgrammata = false;
         inAvvio = false;
         apertoDaBlocco = false;
+        if (comandi != null) { comandi.ferma(); comandi = null; }
         if (arena != null) {
             try { wm.removeView(arena); } catch (Exception ignorata) { }
         }
@@ -431,6 +468,10 @@ public class Ring extends AccessibilityService {
                 AccessibilityNodeInfo radice;
                 try { radice = w.getRoot(); } catch (Exception e) { radice = null; }
                 if (radice == null) continue;
+                if ("chrome".equals(modo)) {
+                    CharSequence pk = radice.getPackageName();
+                    if (pk == null || !CHROME.contains(pk.toString())) continue;
+                }
                 // La bolla e il ring stesso sono finestre di accessibilità: già escluse sopra.
                 visita(radice, out, 0, lim);
             }
@@ -495,7 +536,9 @@ public class Ring extends AccessibilityService {
     // ------------------------------------------------------------- la bolla
     void aggiornaBolla() {
         if (wm == null) return;
-        if (Memoria.bolla(this) && arena == null && !inAvvio) mostraBolla();
+        modo = Memoria.modo(this);
+        boolean serve = "sistema".equals(modo) || ("chrome".equals(modo) && inChrome) || ("blocco".equals(modo) && bloccato());
+        if (serve && !bollaNascosta && arena == null && !inAvvio) mostraBolla();
         else nascondiBolla();
     }
 
@@ -514,7 +557,7 @@ public class Ring extends AccessibilityService {
         bolla.setBackground(fondo);
         bolla.setElevation(8 * d);
         bolla.setAlpha(0.88f);
-        bolla.setContentDescription("Page Brawl: accendi il ring su questo schermo");
+        bolla.setContentDescription("Page Brawl: tocca per il ring su questo schermo, tieni premuto per nascondere");
 
         lpBolla = new WindowManager.LayoutParams(lato, lato,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
@@ -535,8 +578,12 @@ public class Ring extends AccessibilityService {
             boolean trascina, lungo;
             final Runnable pressioneLunga = new Runnable() {
                 @Override public void run() {
+                    // Pressione lunga: la bolla sparisce (si riprende dall'app o riaccendendo lo schermo).
                     lungo = true;
-                    apriApp();
+                    if (bolla != null) bolla.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                    bollaNascosta = true;
+                    nascondiBolla();
+                    Toast.makeText(Ring.this, "Bolla nascosta: torna riaprendo Page Brawl", Toast.LENGTH_SHORT).show();
                 }
             };
 
@@ -591,6 +638,12 @@ public class Ring extends AccessibilityService {
         }
     }
 
+    /** L'app è stata riaperta: la bolla tolta con la pressione lunga torna. */
+    void riprendiBolla() {
+        bollaNascosta = false;
+        aggiornaBolla();
+    }
+
     void nascondiBolla() {
         if (bolla != null) {
             try { wm.removeView(bolla); } catch (Exception ignorata) { }
@@ -604,6 +657,42 @@ public class Ring extends AccessibilityService {
         try { startActivity(i); } catch (Exception e) {
             Toast.makeText(this, "Apri Page Brawl dalle app", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    // ---------------------------------------------- i comandi in finestre loro
+    /** Ogni pezzo dei comandi è una finestra di accessibilità piccola quanto lui: il resto dello schermo resta del telefono. */
+    private final class OspiteFinestre implements Comandi.Ospite {
+        @Override public void metti(View v, int gravita, int x, int y, int w, int hh, boolean tocchiFuori) {
+            WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
+                    w == -2 ? WindowManager.LayoutParams.WRAP_CONTENT : w, hh == -2 ? WindowManager.LayoutParams.WRAP_CONTENT : hh,
+                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                            | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                            | (tocchiFuori ? WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH : 0),
+                    PixelFormat.TRANSLUCENT);
+            lp.gravity = gravita; lp.x = x; lp.y = y;
+            if (Build.VERSION.SDK_INT >= 28) lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            v.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+            try { wm.addView(v, lp); } catch (Exception e) { Log.w(TAG, "comandi", e); }
+        }
+        @Override public void sposta(View v, int gravita, int x, int y, int w, int hh) {
+            try {
+                WindowManager.LayoutParams lp = (WindowManager.LayoutParams) v.getLayoutParams();
+                lp.gravity = gravita; lp.x = x; lp.y = y;
+                wm.updateViewLayout(v, lp);
+            } catch (Exception ignorata) { }
+        }
+        @Override public void togli(View v) { try { wm.removeView(v); } catch (Exception ignorata) { } }
+        @Override public void superficieToccabile(boolean si) {
+            // La tendina del ring aperta: la finestra dei lottatori prende i tocchi finché si chiude.
+            if (arena == null || lpArena == null) return;
+            lpArena.flags = si ? (FINESTRA_PASSA & ~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE) : FINESTRA_PASSA;
+            try { wm.updateViewLayout(arena, lpArena); } catch (Exception ignorata) { }
+        }
+        @Override public void mostraLottatori(boolean si) { if (web != null) web.setVisibility(si ? View.VISIBLE : View.INVISIBLE); }
+        @Override public void chiudiGioco() { chiudi(); }
+        @Override public int margineAlto() { return Math.max(alto, dimensioneDiSistema("status_bar_height")); }
+        @Override public int margineBasso() { return bassoPx; }
     }
 
     // --------------------------------------------------- il ponte con la pagina

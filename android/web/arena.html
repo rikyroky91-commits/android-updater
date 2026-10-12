@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Page Brawl · Arena</title>
+  <!-- Le arene dell'app (12/10/2026). Ogni pedana è un <img> trasparente
+       grande quanto il suo piano di appoggio (ring.js lo legge come solido);
+       quello che si vede è disegnato a parte, nei .pietra.
+       ?tipo=lava   vulcano: piattaforma sospesa, due pedane, lava che uccide
+       ?tipo=cielo  tre pedane nel cielo sopra un prato
+       ?tipo=ring   il ring classico sotto i riflettori -->
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none;
+                 -webkit-tap-highlight-color: transparent; background: #050304; }
+    .scena { position: fixed; inset: 0; overflow: hidden; }
+    img.solido { position: absolute; display: block; opacity: 0; pointer-events: none; }
+    .pietra { position: absolute; pointer-events: none; }
+
+    /* ---------------- LAVA ---------------- */
+    .lava .scena { background: radial-gradient(120% 80% at 50% 110%, #5c1608 0%, #2a0905 38%, #0d0403 70%, #050203 100%); }
+    .monti { position: absolute; left: -10%; right: -10%; bottom: 0; height: 46%;
+             background: #120605; clip-path: polygon(0 100%, 0 62%, 12% 38%, 20% 52%, 31% 20%, 38% 34%, 46% 26%, 55% 46%, 63% 18%, 72% 40%, 80% 30%, 90% 50%, 100% 36%, 100% 100%);
+             opacity: .85; }
+    .monti.dietro { height: 58%; background: #0b0404; opacity: .9; clip-path: polygon(0 100%, 0 50%, 9% 30%, 18% 44%, 27% 14%, 36% 30%, 48% 8%, 57% 28%, 68% 16%, 78% 36%, 88% 22%, 100% 40%, 100% 100%); }
+    .pietra.lastra {
+      background: linear-gradient(#6b5a52 0, #4a3c36 5px, #2e2522 14px, #1c1614 100%);
+      clip-path: polygon(0 0, 100% 0, 100% 40%, 94% 58%, 86% 52%, 78% 78%, 66% 64%, 57% 100%, 46% 72%, 36% 88%, 25% 62%, 15% 80%, 6% 56%, 0 40%);
+      filter: drop-shadow(0 18px 24px rgba(255, 80, 20, .35));
+    }
+    .pietra.lastra::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+                             background: linear-gradient(90deg, transparent, rgba(255, 200, 150, .55), transparent); }
+    .pietra.lastra::after { content: ""; position: absolute; left: 10%; right: 10%; bottom: 0; height: 40%;
+                            background: radial-gradient(60% 100% at 50% 100%, rgba(255, 110, 30, .55), transparent 70%); mix-blend-mode: screen; }
+    #lava { position: absolute; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(#ffd05a 0, #ff8a1f 10%, #f04a12 38%, #a8200b 75%, #5a0e06 100%);
+            box-shadow: 0 -24px 70px rgba(255, 96, 24, .55), 0 -4px 18px rgba(255, 170, 60, .6); }
+    #lava::before { content: ""; position: absolute; left: -160px; right: -160px; top: -10px; height: 14px;
+                    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 14'%3E%3Cpath d='M0 8 Q20 3 40 8 T80 8 T120 8 T160 8 V14 H0Z' fill='%23ff9a2a'/%3E%3C/svg%3E") 0 0 / 160px 14px repeat-x, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 14'%3E%3Cpath d='M0 7 Q15 1 30 7 T60 7 T90 7 T120 7 V14 H0Z' fill='%23ffcf5a'/%3E%3C/svg%3E") 0 3px / 120px 14px repeat-x;
+                    filter: drop-shadow(0 0 6px rgba(255, 190, 80, .8)); animation: onda 5s linear infinite; }
+    #lava::after { content: ""; position: absolute; inset: 0; opacity: .45; mix-blend-mode: screen;
+                   background: repeating-linear-gradient(100deg, transparent 0 22px, rgba(255, 230, 140, .35) 24px, transparent 30px);
+                   animation: scorre 9s linear infinite; }
+    @keyframes onda { to { transform: translateX(480px); } }
+    @keyframes scorre { to { background-position: 300px 0; } }
+    .bolla { position: absolute; bottom: 10%; width: 10px; height: 10px; border-radius: 50%;
+             background: radial-gradient(circle at 35% 35%, #fff2b0, #ff8a1f 60%, #c2300d);
+             animation: bolla 2.6s ease-in infinite; opacity: 0; }
+    @keyframes bolla { 0% { transform: translateY(0) scale(.3); opacity: 0; } 20% { opacity: 1; }
+                       80% { transform: translateY(-60%) scale(1); opacity: 1; } 100% { transform: translateY(-70%) scale(1.6); opacity: 0; } }
+    .lapillo { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #ffb347; box-shadow: 0 0 6px #ff7a1a;
+               animation: sale linear infinite; opacity: 0; }
+    @keyframes sale { 0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: .9; } 100% { transform: translate(var(--dx), -70vh); opacity: 0; } }
+
+    /* ---------------- CIELO ---------------- */
+    .cielo .scena { background: linear-gradient(#5aa9e6 0%, #9ed2f5 55%, #dff1ff 100%); }
+    .nuvola { position: absolute; height: 34px; border-radius: 40px; background: rgba(255, 255, 255, .85); filter: blur(1px);
+              animation: vento linear infinite; }
+    .nuvola::before, .nuvola::after { content: ""; position: absolute; background: inherit; border-radius: 50%; }
+    .nuvola::before { width: 44%; height: 150%; left: 14%; top: -60%; }
+    .nuvola::after { width: 36%; height: 120%; left: 46%; top: -40%; }
+    @keyframes vento { from { transform: translateX(-30vw); } to { transform: translateX(130vw); } }
+    .pietra.isola { background: linear-gradient(#7bd36a 0, #5bb04c 7px, #8a5a3a 8px, #6b4329 60%, #4e2f1c 100%);
+                    border-radius: 6px 6px 40% 40% / 6px 6px 100% 100%; box-shadow: 0 14px 22px rgba(30, 60, 90, .25); }
+    .prato { position: absolute; left: 0; right: 0; bottom: 0; height: 14px; background: linear-gradient(#6cc35a, #3f8f33); }
+
+    /* ---------------- RING ---------------- */
+    .ring .scena { background: radial-gradient(70% 55% at 50% 30%, #2a2f3a 0%, #12151b 55%, #07080b 100%); }
+    .faro { position: absolute; top: -10%; width: 60%; height: 90%; left: 20%;
+            background: radial-gradient(50% 100% at 50% 0, rgba(255, 245, 220, .16), transparent 70%); }
+    .pietra.tappeto { background: linear-gradient(#e9e4da 0, #d8d1c4 10px, #1f3a8a 11px, #17306f 100%); border-radius: 4px; }
+    .corda { position: absolute; height: 3px; border-radius: 2px; background: linear-gradient(#ff6b6b, #c0392b); box-shadow: 0 1px 2px rgba(0, 0, 0, .4); }
+    .palo { position: absolute; width: 8px; border-radius: 3px; background: linear-gradient(90deg, #9aa3b5, #e6e9f0, #8a93a5); }
+    .pavimento-ring { position: absolute; left: 0; right: 0; bottom: 0; height: 10px; background: #0d0f14; }
+  </style>
+</head>
+<body>
+  <div class="scena" id="scena"></div>
+  <script>
+  (function () {
+    "use strict";
+    var tipo = (/[?&]tipo=(\w+)/.exec(location.search) || [])[1] || "lava";
+    if (["lava", "cielo", "ring"].indexOf(tipo) < 0) tipo = "lava";
+    document.documentElement.className = tipo;
+    var scena = document.getElementById("scena");
+    var VUOTA = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+    function el(tag, cls, stile) { var e = document.createElement(tag); if (cls) e.className = cls; if (stile) e.style.cssText = stile; scena.appendChild(e); return e; }
+    // Una pedana: la parte che si vede (alta `vista`) e il solido (alto 16 px) sul suo piano.
+    function pedana(cls, l, t, w, vista) {
+      var v = el("div", "pietra " + cls, "left:" + l + "px;top:" + t + "px;width:" + w + "px;height:" + vista + "px");
+      var s = new Image(); s.src = VUOTA; s.alt = ""; s.className = "solido";
+      s.style.cssText = "left:" + l + "px;top:" + t + "px;width:" + w + "px;height:16px";
+      scena.appendChild(s);
+      return v;
+    }
+    var fisso = [];   // gli addobbi che non dipendono dalle misure (si creano una volta)
+
+    function costruisci() {
+      var W = window.innerWidth, H = window.innerHeight, largo = W > H;
+      scena.textContent = "";
+      if (tipo === "lava") {
+        el("div", "monti dietro"); el("div", "monti");
+        var lava = Math.round(H * (largo ? 0.16 : 0.13));
+        window.__ringArena = { lava: lava };
+        var mw = Math.min(largo ? W * 0.56 : W * 0.8, 620), ml = (W - mw) / 2, mt = H * (largo ? 0.6 : 0.6);
+        pedana("lastra", ml, mt, mw, Math.round(Math.min(90, H * 0.1)));
+        var sw = mw * (largo ? 0.3 : 0.32), st = mt - Math.max(110, H * (largo ? 0.24 : 0.17));
+        pedana("lastra", ml + mw * 0.04, st, sw, 34);
+        pedana("lastra", ml + mw * 0.96 - sw, st, sw, 34);
+        var l = el("div", "", ""); l.id = "lava"; l.style.height = lava + "px";
+        for (var i = 0; i < 7; i++) {
+          var b = document.createElement("span"); b.className = "bolla";
+          b.style.left = (8 + i * 13 + Math.random() * 6) + "%"; b.style.animationDelay = (Math.random() * 2.6) + "s";
+          var z = 6 + Math.random() * 8; b.style.width = b.style.height = z + "px";
+          l.appendChild(b);
+        }
+        for (var k = 0; k < 14; k++) {
+          var p = el("span", "lapillo", "left:" + (Math.random() * 100) + "%;bottom:" + lava + "px;animation-duration:" + (4 + Math.random() * 5) + "s;animation-delay:" + (Math.random() * 6) + "s");
+          p.style.setProperty("--dx", (Math.random() * 60 - 30) + "px");
+        }
+      } else if (tipo === "cielo") {
+        window.__ringArena = { lava: 0 };
+        for (var n = 0; n < 4; n++) el("div", "nuvola", "top:" + (6 + n * 13) + "%;width:" + (90 + Math.random() * 80) + "px;animation-duration:" + (40 + Math.random() * 40) + "s;animation-delay:-" + (Math.random() * 40) + "s");
+        el("div", "prato");
+        var cw = Math.min(largo ? W * 0.5 : W * 0.74, 560), cl = (W - cw) / 2, ct = H * 0.66;
+        pedana("isola", cl, ct, cw, 60);
+        var pw = cw * 0.36, pt = ct - Math.max(120, H * 0.18);
+        pedana("isola", cl - cw * 0.08, pt, pw, 40);
+        pedana("isola", cl + cw * 1.08 - pw, pt, pw, 40);
+        pedana("isola", (W - pw * 0.9) / 2, pt - Math.max(110, H * 0.15), pw * 0.9, 36);
+      } else {
+        window.__ringArena = { lava: 0 };
+        el("div", "faro");
+        el("div", "pavimento-ring");
+        var rw = Math.min(largo ? W * 0.7 : W * 0.92, 760), rl = (W - rw) / 2, rt = H * 0.72;
+        pedana("tappeto", rl, rt, rw, Math.round(H * 0.28));
+        var pali = [rl - 2, rl + rw - 6];
+        for (var q = 0; q < 2; q++) el("div", "palo", "left:" + pali[q] + "px;top:" + (rt - 110) + "px;height:110px");
+        for (var c = 0; c < 3; c++) el("div", "corda", "left:" + rl + "px;width:" + rw + "px;top:" + (rt - 96 + c * 30) + "px");
+      }
+    }
+    costruisci();
+    var attesa = 0;
+    window.addEventListener("resize", function () { clearTimeout(attesa); attesa = setTimeout(costruisci, 120); });
+  })();
+  </script>
+  <script>window.__pbModo = "arena";</script>
+  <script src="ponte.js"></script>
+  <script src="lingue.js"></script>
+  <script src="prepara.js"></script>
+  <script src="ring.js"></script>
+  <script src="comandi.js"></script>
+</body>
+</html>

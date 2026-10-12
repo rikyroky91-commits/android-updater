@@ -1,15 +1,32 @@
 # Page Brawl per Android
 
-Lo stesso ring dell'estensione (`estensione/store/ring.js`), ma sul telefono vero:
+Lo stesso ring dell'estensione (`web/static/ring.js` → `estensione/store/ring.js`), sul telefono vero, in **quattro modalità** scelte nell'app:
 
-| Dove | Come |
+| Modalità | Cosa succede |
 | --- | --- |
-| **Qualsiasi app, la Home, il blocco schermo** | Un servizio di accessibilità (`Ring.java`) legge dove stanno gli elementi sullo schermo (icone, testi, tasti, notifiche, l'orologio del blocco schermo) e ci mette sopra una pagina trasparente col ring: ogni elemento diventa un corpo solido, i lottatori ci atterrano, camminano e si arrampicano. |
-| **Pagine web** | In Chrome basta la bolla. In più c'è il browser dell'app (`Browser.java`), anche da «Condividi → Page Brawl» o «Apri con»: mette il ring dentro la pagina vera, come l'estensione per computer. |
+| **Blocco schermo** | Accendi lo schermo col telefono bloccato e il blocco schermo diventa il ring (la bolla c'è solo lì). Sbloccando sparisce. |
+| **Tutto il telefono** | La bolla col guantone su qualsiasi app: un tocco e quella schermata diventa il ring. |
+| **Solo Chrome** | La bolla compare solo mentre Chrome è in primo piano, e i solidi sono solo gli elementi della pagina. Uscendo da Chrome il ring si chiude. |
+| **Nell'app** | Arene a schermo intero: **lava** (piattaforma sospesa, due pedane, chi cade nella lava va K.O.), **cielo** (pedane sopra un prato), **ring** classico. C'è anche la corsa infinita. |
 
-Il ring parte da: la bolla col guantone (sopra tutto, anche sul blocco schermo), il riquadro nelle impostazioni rapide, «Gioca sulla Home» nell'app, o da solo quando si accende lo schermo (interruttore «Blocco schermo», spento di serie). Si chiude con ✕, col tasto Indietro, spegnendo lo schermo, o sbloccando il telefono se era partito da solo.
+In più: riquadro nelle impostazioni rapide (ring sullo schermo di adesso, in ogni modalità) e browser interno («Pagina web», anche da Condividi → Page Brawl).
+
+**Il telefono resta usabile mentre giocano**: sopra lo schermo la finestra dei lottatori lascia passare tutti i tocchi all'app sotto; sono toccabili solo i comandi, ognuno in una finestra grande quanto lui. Per questo lì i lottatori non si prendono col dito (nelle arene sì).
+
+**I comandi** (`Comandi.java`, nativi, uguali in tutte le modalità):
+- capsula in alto: pausa · i due lottatori (anello = vita, tocco = lo comandi tu) e il punteggio · ⋯ · ✕ (toglie il gioco);
+- menu ⋯: tasti sì/no, lottatori sì/no, riduci a icona (resta un puntino), opzioni del ring (la tendina del motore);
+- 4 tasti nell'angolo in basso a destra: la mossa base grande nell'angolo, tre abilità attorno. Scariche sono in bianco e nero e si colorano man mano che si ricaricano (energia del lottatore e attesa dopo l'uso); quando un'abilità non in vista è pronta prende il posto della più scarica. Vibrano al tocco, al rifiuto e quando una si ricarica;
+- la bolla: tocco = ring, pressione lunga = sparisce (torna riaprendo l'app o riaccendendo lo schermo).
 
 Dello schermo si leggono **solo le posizioni** dei riquadri, solo mentre il ring è acceso: nessun testo, niente salvato, niente inviato.
+
+## Cosa serve al motore
+
+Tre cose opzionali in `ring.js` (12/10/2026), che sito ed estensione non usano:
+- `window.__ringArena = { lava: altezza }`: pavimento = superficie della lava, chi la tocca va K.O. (punto all'altro) e rientra sulla piattaforma; i lottatori non scendono dai bordi da soli, provano a spingere giù l'avversario, chi vola giù ha un ultimo balzo. Con `lava: 0` è un'arena normale: si parte e si rientra sulla pedana più larga;
+- `__ring.mosse()`, `__ring.cambia()`, `__ring.pannello(apri)`: quello che leggono i comandi nativi;
+- `__ring.pausa(si)`: ferma il tempo e addormenta il ciclo.
 
 ## Perché l'accessibilità
 
@@ -25,7 +42,9 @@ Su Android 13 e successivi, per un'app installata da file l'interruttore dell'ac
   - `Principale.java` la schermata dell'app (in codice, niente layout XML)
   - `Browser.java` il browser col ring nella pagina
   - `Memoria.java` la memoria del ring (le chiavi di `chrome.storage.local` dell'estensione) e le opzioni
-- `web/` le pagine dell'app: `schermo.html` + `schermo.js` (gli elementi dello schermo come `<img>` trasparenti, che ring.js conta fra i solidi), `ponte.js` (memoria e messaggi verso Java, misura dei lottatori), `comandi.js` + `mobile.css` (✕, stile da telefono, `<select>` rifatte: sopra le altre app il menu di sistema non si apre)
+  - `Comandi.java`, `Disegni.java`, `OspiteVista.java` i comandi nativi (capsula, menu, 4 tasti) e dove si appoggiano
+  - `Arena.java` le arene a schermo intero
+- `web/` le pagine dell'app: `schermo.html` + `schermo.js` (gli elementi dello schermo come `<img>` trasparenti, che ring.js conta fra i solidi), `arena.html` (le tre arene), `ponte.js` (memoria e messaggi verso Java, misura dei lottatori), `comandi.js` + `mobile.css` (stile da telefono, tendina a foglio, `<select>` rifatte: sopra le altre app il menu di sistema non si apre)
 - `costruisci.py` costruisce l'APK
 
 ## Costruire
@@ -35,7 +54,7 @@ python3 android/costruisci.py            # → android/build/PageBrawl.apk
 python3 android/costruisci.py --solo-asset
 ```
 
-Prima di tutto `python3 estensione/costruisci.py`, se il ring del sito è cambiato: l'app prende i file da `estensione/store/`. Due ritocchi automatici, che si fermano con un errore se l'originale cambia: `prepara.js` chiama `window.__pbSalva` / `window.__pbMessaggio` al posto di `chrome.storage` / `chrome.runtime`, e in `ring.js` la misura dei lottatori (`S`) la decide `window.__pbScala` (lato corto dello schermo, 400 px = 1, per S/M/L nell'app).
+Prima di tutto `python3 estensione/costruisci.py`, se il ring del sito è cambiato: l'app prende i file da `estensione/store/`. Ritocchi automatici, che si fermano con un errore se l'originale cambia: `prepara.js` chiama `window.__pbSalva` / `window.__pbMessaggio` al posto di `chrome.storage` / `chrome.runtime` e salta la scelta del modo sopra lo schermo, e in `ring.js` la misura dei lottatori (`S`) la decide `window.__pbScala` (lato corto dello schermo, 400 px = 1, per S/M/L nell'app).
 
 Niente Gradle. Servono `aapt2`, `android.jar` (piattaforma 34), `javac`, `d8` o `dx.jar`, `apksigner.jar`: da `$ANDROID_HOME` se c'è l'SDK, altrimenti dalla cartella `$ATTREZZI_ANDROID` (di serie `~/tools`). Il Java è senza lambda: lo compila anche `dx`.
 

@@ -63,6 +63,8 @@ def esegui(comando, **kw):
 SOSTITUZIONI_PREPARA = [
     ("chrome.storage.local.set(o)", "window.__pbSalva(o)"),
     ("chrome.runtime.sendMessage(", "window.__pbMessaggio("),
+    # Sopra lo schermo si entra subito nel combattimento libero (la corsa è nelle arene dell'app).
+    ("window.__ringSceltaModo = true;", "window.__ringSceltaModo = window.__pbSceltaModo !== false;"),
 ]
 
 

@@ -29,7 +29,7 @@ function riquadro(l, t, r, b) {
   return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
 }
 
-function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false, premio = null, pannello = false, audio = null } = {}) {
+function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false, premio = null, pannello = false, audio = null, arena = null } = {}) {
   const richieste = [];
   const ascoltatori = {};
   const contesto2d = new Proxy({}, {
@@ -99,6 +99,7 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
     finestra.localStorage = { getItem() { throw new Error("il ring dell'estensione non deve usare localStorage"); }, setItem() { throw new Error("no"); } };
   }
   if (premio) finestra.__ringPremium = premio;
+  if (arena) finestra.__ringArena = arena;
   if (audio) finestra.AudioContext = audio;
   const sandbox = {
     window: finestra, document: documento, Math, Date, Object, JSON, String, Number,
@@ -4037,4 +4038,69 @@ test("maghi: la maledizione di smeraldo toglie tutta la vita in un colpo, e lo s
   r.energia("robot", 99);
   const s = amb.stato();
   assert.strictEqual(s.radiale.accese[s.radiale.voci.indexOf("smeraldo")], false, "a energia non piena la maledizione deve restare spenta");
+});
+
+
+test("i comandi da telefono: mosse con icona ed energia, vita e punteggio dei due, cambio di personaggio", () => {
+  const amb = ambiente({ estensione: true, memoria: { "mut-ring": "on" } });
+  const r = amb.finestra.__ring;
+  amb.avanza(30);
+  let m = r.mosse();
+  assert.ok(m.voci.length >= 4, "almeno quattro mosse per i quattro tasti");
+  for (const v of m.voci) assert.ok(v.id && v.icona && v.nome && typeof v.costo === "number" && typeof v.pronta === "boolean", JSON.stringify(v));
+  assert.strictEqual(m.lottatori.length, 2);
+  for (const l of m.lottatori) assert.ok(l.vita >= 0 && l.vita <= 1 && l.nome && l.colore, JSON.stringify(l));
+  assert.deepStrictEqual(Object.keys(m.punteggio).sort(), ["mela", "robot"]);
+  assert.strictEqual(m.lava, false, "senza __ringArena niente lava");
+  r.comandi.stile("guerrieri"); amb.avanza(5);
+  m = r.mosse();
+  assert.ok(m.voci.some((v) => v.costo > 0), "i super guerrieri hanno mosse a energia");
+  const prima = m.chi;
+  r.cambia();
+  assert.notStrictEqual(r.mosse().chi, prima, "cambia passa all'altro lottatore");
+});
+
+test("l'arena di lava: si parte sulla piattaforma, chi cade nella lava dà il punto all'altro e rientra sulla piattaforma", () => {
+  const pedana = [60, 520, 352, 545];
+  const amb = ambiente({ estensione: true, larghezza: 412, altezza: 800, solidi: [pedana], arena: { lava: 90 }, memoria: { "mut-ring": "on", "mut-ring-cruento": "off" } });
+  const r = amb.finestra.__ring;
+  amb.avanza(40);
+  const s = amb.stato();
+  assert.strictEqual(s.pavimento, 710, "il pavimento è la superficie della lava");
+  for (const f of s.lottatori) {
+    assert.ok(f.cx > pedana[0] && f.cx < pedana[2], `${f.tipo} parte sulla piattaforma (x ${f.cx})`);
+    assert.ok(Math.abs(f.base - pedana[1]) < 4, `${f.tipo} poggia sulla piattaforma (base ${f.base})`);
+  }
+  assert.strictEqual(r.mosse().lava, true);
+  // La mela spinta di peso oltre il bordo: cade, brucia, il punto va al robot.
+  r.sposta("mela", 20);
+  let bruciata = false;
+  amb.avanza(240, (st) => { if (st.lottatori.find((f) => f.tipo === "mela").esploso) bruciata = true; });
+  assert.ok(bruciata, "chi tocca la lava sparisce");
+  assert.strictEqual(amb.stato().punteggio.robot, 1, "il punto è dell'altro");
+  amb.avanza(260);
+  const mela = amb.lottatore("mela");
+  assert.ok(!mela.esploso && mela.cx > pedana[0] && mela.cx < pedana[2], `rientra sulla piattaforma (x ${mela.cx})`);
+  // Un minuto e mezzo di lotta: nessuno resta nella lava, nessuna coordinata impazzita.
+  amb.avanza(60 * 90, (st) => {
+    for (const f of st.lottatori) {
+      if (f.esploso || f.fuori || f.vola) continue;
+      for (const n in f.punti) assert.ok(Number.isFinite(f.punti[n][0]) && Number.isFinite(f.punti[n][1]), "coordinate NaN");
+      assert.ok(f.bacino.y < st.pavimento + 5, `${f.tipo} dentro la lava senza bruciare`);
+    }
+  });
+});
+
+test("la pausa ferma il tempo e il ciclo, e si riprende da dove si era", () => {
+  const amb = ambiente({ estensione: true, memoria: { "mut-ring": "on" } });
+  const r = amb.finestra.__ring;
+  amb.avanza(60);
+  assert.strictEqual(r.pausa(true), true);
+  amb.avanza(2);
+  const prima = JSON.stringify(amb.stato().lottatori.map((f) => f.punti));
+  assert.strictEqual(amb.avanza(30), 0, "in pausa il ciclo non chiede altri fotogrammi");
+  assert.strictEqual(JSON.stringify(amb.stato().lottatori.map((f) => f.punti)), prima, "in pausa niente si muove");
+  assert.strictEqual(r.pausa(false), false);
+  amb.avanza(60);
+  assert.notStrictEqual(JSON.stringify(amb.stato().lottatori.map((f) => f.punti)), prima, "ripreso, si muovono di nuovo");
 });

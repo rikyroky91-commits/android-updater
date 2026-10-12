@@ -32,6 +32,11 @@ final class Memoria {
         return c.getSharedPreferences("opzioni", Context.MODE_PRIVATE);
     }
 
+    /** Dove si gioca: "blocco" (solo blocco schermo), "sistema" (ovunque), "chrome" (solo Chrome), "app" (arene). */
+    static final String[] MODI = {"blocco", "sistema", "chrome", "app"};
+    static String modo(Context c) { return opzioni(c).getString("modo", "sistema"); }
+    static void modo(Context c, String m) { opzioni(c).edit().putString("modo", m).apply(); }
+
     static boolean bolla(Context c) { return opzioni(c).getBoolean("bolla", true); }
     static void bolla(Context c, boolean si) { opzioni(c).edit().putBoolean("bolla", si).apply(); }
     static boolean blocco(Context c) { return opzioni(c).getBoolean("blocco", false); }

@@ -2,10 +2,9 @@
  *
  * In tutti e due i modi (sopra lo schermo e nel browser interno):
  *  - lo stile per telefono (`mobile.css`, incollato qui da costruisci.py).
+ * Pausa, vita, punteggio, ✕ e le 4 abilità sono comandi nativi (Comandi.java).
  * Sopra lo schermo, in più:
- *  - ✕ in alto a sinistra chiude il ring e ridà lo schermo (anche il tasto
- *    Indietro del telefono fa lo stesso); il tasto di accensione sparisce,
- *    farebbe la stessa cosa;
+ *  - spegnere le lotte dalla tendina chiude il ring;
  *  - le due tendine a scelta (`<select>`: puntata e gravità) diventano tasti
  *    con un elenco disegnato qui: sopra le altre app la pagina vive in un
  *    servizio, e il menu di sistema di una `<select>` lì non si può aprire.
@@ -31,15 +30,7 @@
   if (!schermo) return;
   if (radice.host) radice.host.setAttribute("data-pb-schermo", "");
 
-  function chiudi() { try { if (pb) pb.chiudi(); } catch (e) { /* niente */ } }
-  var info = (window.__pbSchermo && window.__pbSchermo.info) || { alto: 0 };
-  var esci = document.createElement("button");
-  esci.type = "button"; esci.className = "pb-tasto"; esci.textContent = "\u2715";
-  esci.setAttribute("aria-label", "Chiudi il ring"); esci.title = "Chiudi il ring";
-  esci.style.left = "12px";
-  esci.style.top = (Math.max(info.alto, 8) + 8) + "px";
-  document.body.appendChild(esci);
-  esci.addEventListener("click", chiudi);
+  function chiudi() { try { if (pb && pb.chiudi) pb.chiudi(); } catch (e) { /* niente */ } }
 
   // Lotte spente dalla tendina: il ring si chiude.
   var accensione = radice.querySelector("[data-gioca]");

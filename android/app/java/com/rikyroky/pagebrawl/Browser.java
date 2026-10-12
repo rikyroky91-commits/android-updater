@@ -45,6 +45,8 @@ public class Browser extends Activity {
     private static final Pattern URL = Pattern.compile("https?://[^\\s<>\"]+");
 
     private WebView web;
+    private Comandi comandi;
+    private android.widget.FrameLayout scena;
     private EditText barra;
     private TextView guantone;
     private static String pacchetto;     // i file del ring, letti una volta sola
@@ -139,8 +141,21 @@ public class Browser extends Activity {
                 if (Memoria.webAuto(Browser.this)) inietta();
             }
         });
-        col.addView(web, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
+        scena = new android.widget.FrameLayout(this);
+        scena.addView(web, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        col.addView(scena, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
         setContentView(col);
+        // I comandi da telefono (capsula e 4 abilità) sopra la pagina; ✕ spegne il ring sulla pagina.
+        OspiteVista ospite = new OspiteVista(scena, web, new Runnable() {
+            @Override public void run() {
+                web.evaluateJavascript("window.__ringEstensione&&window.__ring&&window.__ring.mosse().acceso&&window.__ringEstensione.alterna()", null);
+                Memoria.webAuto(Browser.this, false);
+                segna(false);
+            }
+        });
+        ospite.alto = px(8);
+        comandi = new Comandi(this, ospite, web);
+        comandi.avvia();
 
         String inizio = daIntent(getIntent());
         if (stato != null) web.restoreState(stato);
@@ -168,6 +183,7 @@ public class Browser extends Activity {
 
     @Override
     protected void onDestroy() {
+        comandi.ferma();
         web.destroy();
         super.onDestroy();
     }
