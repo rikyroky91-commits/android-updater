@@ -56,6 +56,9 @@ final class Comandi {
         /** La superficie del ring deve ricevere i tocchi (tendina aperta) o lasciarli passare. */
         void superficieToccabile(boolean si);
         void mostraLottatori(boolean si);
+        /** Le zone toccabili che seguono i lottatori (per prenderli col dito) servono o no. */
+        void seguiLottatori(boolean si);
+        void apriApp();
         void chiudiGioco();
         int margineAlto();
         int margineBasso();
@@ -115,6 +118,7 @@ final class Comandi {
 
     void ferma() {
         attivo = false;
+        if (seguendo) { seguendo = false; ospite.seguiLottatori(false); }
         h.removeCallbacksAndMessages(null);
         togliTutto();
     }
@@ -201,10 +205,13 @@ final class Comandi {
         voceMenu("Opzioni del ring", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 apriMenu(false);
-                ospite.superficieToccabile(true);
                 pannello = true;
+                tocchi(true);
                 web.evaluateJavascript("window.__ring&&__ring.pannello(true)", null);
             }
+        });
+        voceMenu("Apri Page Brawl", new View.OnClickListener() {
+            @Override public void onClick(View v) { apriMenu(false); ospite.apriApp(); }
         });
         menu.setOnTouchListener(new View.OnTouchListener() {
             @Override public boolean onTouch(View v, MotionEvent e) {
@@ -342,11 +349,16 @@ final class Comandi {
         final Voce v = id == null ? null : voci.get(id);
         final Disegni.Tasto t = tasti[i];
         if (v == null || !t.pronta()) { rifiuto(t); t.rifiuta(); return; }
-        web.evaluateJavascript("window.__ring?__ring.ordina(" + JSONObject.quote(chi) + "," + JSONObject.quote(id) + "):false",
+        String js = "__finale".equals(id) ? "window.__ring?__ring.corsaFinale():false"
+                : id.startsWith("__oggetto") ? "window.__ring?__ring.corsaOggetto(" + id.substring(9) + "):false"
+                : "window.__ring?__ring.ordina(" + JSONObject.quote(chi) + "," + JSONObject.quote(id) + "):false";
+        final boolean speciale = id.startsWith("__");
+        web.evaluateJavascript(js,
                 new ValueCallback<String>() {
                     @Override public void onReceiveValue(String ok) {
                         if ("true".equals(ok)) {
                             tocco(t);
+                            if (speciale) return;                     // nella corsa carica e oggetti li conta il gioco
                             v.usata = SystemClock.uptimeMillis();
                             v.durata = attesa(id);
                             v.carica = 0;
@@ -391,12 +403,16 @@ final class Comandi {
         if (json.isEmpty()) { visibili = false; dispone(); return; }
         JSONObject o = new JSONObject(json), m = o.getJSONObject("m");
         boolean p = o.optBoolean("p"), z = o.optBoolean("z");
-        if (pannello && !p) ospite.superficieToccabile(false);
         pannello = p;
+        // La superficie prende i tocchi quando il gioco li chiede (tendina, corsa, mira, scelta del modo);
+        // il resto del tempo li lascia al telefono, tranne sulle zone che seguono i lottatori.
+        tocchi(p || m.optBoolean("vuoleTocchi"));
         if (z != inPausa) { inPausa = z; tastoPausa.tipo(z ? Disegni.GIOCA : Disegni.PAUSA); }
         visibili = m.optBoolean("acceso", true);
         boolean gioco = !m.optBoolean("scelta") && !m.optBoolean("corsa");
         chi = m.optString("chi", chi);
+        JSONObject ch = m.optJSONObject("corsaHud");          // la corsa infinita, con l'eroe in campo
+        boolean corsaLotta = ch != null && "lotta".equals(ch.optString("fase"));
 
         JSONArray ls = m.optJSONArray("lottatori");
         if (ls != null && ls.length() >= 2) {
@@ -406,18 +422,65 @@ final class Comandi {
             avatarA.imposta(a.optString("nome"), ca, (float) a.optDouble("vita", 1), a.optBoolean("ko"), chi.equals(tipoA));
             avatarB.imposta(b.optString("nome"), cb, (float) b.optDouble("vita", 1), b.optBoolean("ko"), chi.equals(tipoB));
             coloreChi = chi.equals(tipoA) ? ca : cb;
-            avatarA.setVisibility(gioco ? View.VISIBLE : View.GONE);
+            avatarA.setVisibility(gioco || ch != null ? View.VISIBLE : View.GONE);
             avatarB.setVisibility(gioco ? View.VISIBLE : View.GONE);
-            JSONObject pt = m.optJSONObject("punteggio");
-            if (pt != null) aggiornaPunti(pt.optInt(tipoA) + " – " + pt.optInt(tipoB));
-            double ki = (chi.equals(tipoA) ? a : b).optDouble("ki", 0);
-            leggiVoci(m.optJSONArray("voci"), ki);
+            if (gioco) {
+                JSONObject pt = m.optJSONObject("punteggio");
+                if (pt != null) aggiornaPunti(pt.optInt(tipoA) + " – " + pt.optInt(tipoB));
+                double ki = (chi.equals(tipoA) ? a : b).optDouble("ki", 0);
+                leggiVoci(m.optJSONArray("voci"), ki);
+            } else if (ch != null) {
+                // Corsa: l'eroe nella capsula (anello = vita), poi vite, round e cosa c'è da fare.
+                JSONObject e = ch.optString("chi").equals(tipoB) ? b : a;
+                coloreChi = colore(e.optString("colore"));
+                float k = (float) (ch.optDouble("hp", 0) / Math.max(1, ch.optDouble("hpMax", 1)));
+                avatarA.imposta(e.optString("nome"), coloreChi, k, false, true);
+                String ob = ch.optString("obiettivo", "");
+                aggiornaPunti("♥" + ch.optInt("vite") + "  ·  R" + ch.optInt("round") + (ob.isEmpty() ? "" : "  ·  " + ob));
+            }
         }
-        punti.setVisibility(gioco || inPausa ? View.VISIBLE : View.GONE);
-        if (!gioco) { for (int i = 0; i < 4; i++) posti[i] = null; }
-        else if (posti[0] == null) ruota();
+        punti.setVisibility(gioco || ch != null || inPausa ? View.VISIBLE : View.GONE);
+        if (corsaLotta) postiCorsa(ch);
+        else if (!gioco) { for (int i = 0; i < 4; i++) posti[i] = null; inCorsa = false; }
+        else {
+            if (inCorsa) { inCorsa = false; for (int i = 0; i < 4; i++) posti[i] = null; }
+            if (posti[0] == null) ruota();
+        }
         dispone();
         for (int i = 0; i < 4; i++) mostraTasto(i);
+        boolean segui = visibili && mostraLottatori && !inPausa && !superficie;
+        if (segui != seguendo) { seguendo = segui; ospite.seguiLottatori(segui); }
+    }
+
+    private boolean superficie, seguendo;
+    private void tocchi(boolean si) {
+        if (si == superficie) return;
+        superficie = si;
+        ospite.superficieToccabile(si);
+    }
+
+    // ·· La corsa infinita: il colpo finale nell'angolo, i tre oggetti attorno ··
+    private boolean inCorsa;
+    private void postiCorsa(JSONObject ch) {
+        if (!inCorsa) { inCorsa = true; firmaVoci = ""; voci.clear(); ordine.clear(); }
+        Voce f = voce("__finale", "\uD83C\uDFAF");
+        f.carica = (float) ch.optDouble("energia", 0);
+        f.pronta = f.carica >= 1f;
+        posti[0] = f.id;
+        JSONArray og = ch.optJSONArray("oggetti");
+        for (int i = 0; i < 3; i++) {
+            JSONObject o = og == null ? null : og.optJSONObject(i);
+            if (o == null) { posti[i + 1] = null; continue; }
+            Voce v = voce("__oggetto" + i, o.optString("icona"));
+            v.carica = 1f; v.pronta = true;
+            posti[i + 1] = v.id;
+        }
+    }
+    private Voce voce(String id, String icona) {
+        Voce v = voci.get(id);
+        if (v == null) { v = new Voce(); v.id = id; voci.put(id, v); }
+        v.icona = icona;
+        return v;
     }
 
     private String ultimiPunti = "0 – 0";

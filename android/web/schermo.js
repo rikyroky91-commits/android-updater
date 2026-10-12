@@ -43,5 +43,16 @@
   }
 
   window.__pbSchermo = { disegna: disegna, info: info };
+
+  // Dove stanno i lottatori, 20 volte al secondo (solo quando cambia): l'app ci mette sopra una zona
+  // toccabile che li segue, così si possono prendere col dito senza togliere i tocchi al telefono.
+  var ultimiCorpi = "";
+  setInterval(function () {
+    try {
+      if (!window.PB || !window.PB.corpi || !window.__ring || !window.__ring.corpi) return;
+      var c = JSON.stringify(window.__ring.corpi());
+      if (c !== ultimiCorpi) { ultimiCorpi = c; window.PB.corpi(c); }
+    } catch (e) { /* il prossimo giro */ }
+  }, 50);
   try { if (window.PB && window.PB.schermo) disegna(JSON.parse(window.PB.schermo())); } catch (e) { /* schermo vuoto: si lotta sul pavimento */ }
 })();

@@ -4052,6 +4052,13 @@ test("i comandi da telefono: mosse con icona ed energia, vita e punteggio dei du
   for (const l of m.lottatori) assert.ok(l.vita >= 0 && l.vita <= 1 && l.nome && l.colore, JSON.stringify(l));
   assert.deepStrictEqual(Object.keys(m.punteggio).sort(), ["mela", "robot"]);
   assert.strictEqual(m.lava, false, "senza __ringArena niente lava");
+  assert.strictEqual(m.vuoleTocchi, false, "nel combattimento libero il canvas non chiede tocchi");
+  const corpi = r.corpi();
+  assert.strictEqual(corpi.length, 2);
+  for (const c of corpi) assert.ok(c && c[2] > c[0] && c[3] > c[1], "un riquadro per ogni lottatore: " + JSON.stringify(c));
+  r.sceltaModo(true); amb.avanza(2);
+  assert.strictEqual(r.mosse().vuoleTocchi, true, "la scelta del modo si fa toccando");
+  r.tastoGiu("KeyD"); amb.avanza(2);
   r.comandi.stile("guerrieri"); amb.avanza(5);
   m = r.mosse();
   assert.ok(m.voci.some((v) => v.costo > 0), "i super guerrieri hanno mosse a energia");
@@ -4081,10 +4088,12 @@ test("l'arena di lava: si parte sulla piattaforma, chi cade nella lava dà il pu
   amb.avanza(260);
   const mela = amb.lottatore("mela");
   assert.ok(!mela.esploso && mela.cx > pedana[0] && mela.cx < pedana[2], `rientra sulla piattaforma (x ${mela.cx})`);
-  // Un minuto e mezzo di lotta: nessuno resta nella lava, nessuna coordinata impazzita.
+  // Un minuto e mezzo di lotta, anche coi super guerrieri che volano: nessuno resta nella lava (nemmeno
+  // volando a filo), nessuna coordinata impazzita.
+  r.comandi.stile("guerrieri");
   amb.avanza(60 * 90, (st) => {
     for (const f of st.lottatori) {
-      if (f.esploso || f.fuori || f.vola) continue;
+      if (f.esploso || f.fuori) continue;
       for (const n in f.punti) assert.ok(Number.isFinite(f.punti[n][0]) && Number.isFinite(f.punti[n][1]), "coordinate NaN");
       assert.ok(f.bacino.y < st.pavimento + 5, `${f.tipo} dentro la lava senza bruciare`);
     }
@@ -4103,4 +4112,23 @@ test("la pausa ferma il tempo e il ciclo, e si riprende da dove si era", () => {
   assert.strictEqual(r.pausa(false), false);
   amb.avanza(60);
   assert.notStrictEqual(JSON.stringify(amb.stato().lottatori.map((f) => f.punti)), prima, "ripreso, si muovono di nuovo");
+});
+
+test("sopra la lava l'orda sta sulla piattaforma e gli zombie li cala un elicottero", () => {
+  const pedana = [60, 520, 352, 545];
+  const amb = ambiente({ estensione: true, larghezza: 412, altezza: 800, solidi: [pedana], arena: { lava: 90 }, memoria: { "mut-ring": "on", "mut-ring-cruento": "off" } });
+  const r = amb.finestra.__ring;
+  amb.avanza(40);
+  r.orda(2, 7);
+  let calati = 0, maxAlzo = 0;
+  amb.avanza(60 * 20, (st) => {
+    if (!st.orda) return;
+    assert.strictEqual(Math.round(st.orda.base), pedana[1], "l'orda combatte sulla piattaforma, non sulla lava");
+    for (const z of st.orda.zombie) {
+      if (z.stato === "cala") { calati++; maxAlzo = Math.max(maxAlzo, st.orda.base - z.y); }
+      if (!z.volo) assert.ok(z.x >= pedana[0] - 1 && z.x <= pedana[2] + 1, "gli zombie restano sulla piattaforma (x " + z.x + ")");
+    }
+  });
+  assert.ok(calati > 0, "gli zombie arrivano calati dall'alto");
+  assert.ok(maxAlzo > 100, "e partono ben sopra la piattaforma (" + maxAlzo + ")");
 });

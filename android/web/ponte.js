@@ -18,6 +18,8 @@
   window.__ringDati = dati;
   // Il dizionario delle lingue serve solo alla tendina: la pagina sotto non si traduce.
   window.__lingueSoloDizionario = true;
+  // Vita, round, colpo finale e oggetti della corsa li disegna l'app (comandi nativi), non il canvas.
+  window.__ringHudEsterno = true;
   window.__pbSalva = function (oggetto) {
     if (!pb) return;
     try { pb.salva(JSON.stringify(oggetto)); } catch (e) { /* resta in memoria per questa volta */ }

@@ -312,6 +312,7 @@ public class Ring extends AccessibilityService {
         }
         if (Build.VERSION.SDK_INT >= 30) lpArena.setFitInsetsTypes(0);
         wm.addView(arena, lpArena);
+        creaZone();          // sopra il ring ma sotto i comandi (che arrivano dopo)
 
         dopoIlDisegno(new Runnable() {
             @Override public void run() {
@@ -427,6 +428,7 @@ public class Ring extends AccessibilityService {
         inAvvio = false;
         apertoDaBlocco = false;
         if (comandi != null) { comandi.ferma(); comandi = null; }
+        togliZone();
         if (arena != null) {
             try { wm.removeView(arena); } catch (Exception ignorata) { }
         }
@@ -690,9 +692,96 @@ public class Ring extends AccessibilityService {
             try { wm.updateViewLayout(arena, lpArena); } catch (Exception ignorata) { }
         }
         @Override public void mostraLottatori(boolean si) { if (web != null) web.setVisibility(si ? View.VISIBLE : View.INVISIBLE); }
+        @Override public void seguiLottatori(boolean si) { seguendo = si; if (!si) for (int i = 0; i < 2; i++) nascondiZona(i); }
+        @Override public void apriApp() { Ring.this.apriApp(); }
         @Override public void chiudiGioco() { chiudi(); }
         @Override public int margineAlto() { return Math.max(alto, dimensioneDiSistema("status_bar_height")); }
         @Override public int margineBasso() { return bassoPx; }
+    }
+
+    // ------------------------------------------- le zone che seguono i lottatori
+    // Sopra lo schermo la finestra del ring lascia passare i tocchi. Per poter comunque prendere, trascinare e
+    // lanciare i lottatori, su ognuno c'è una finestrella invisibile e toccabile che lo segue (la pagina ne
+    // manda la posizione 20 volte al secondo, `PB.corpi`). Il gesto che parte lì va alla pagina, intero, anche
+    // quando il dito esce dalla finestrella: Android consegna tutto il gesto alla finestra dove è cominciato.
+    private final View[] zone = new View[2];
+    private final WindowManager.LayoutParams[] lpZone = new WindowManager.LayoutParams[2];
+    private final boolean[] zonaPremuta = new boolean[2];
+    private boolean seguendo;
+
+    private void creaZone() {
+        for (int i = 0; i < 2; i++) {
+            final int n = i;
+            View z = new View(this) {
+                @Override public boolean onTouchEvent(MotionEvent e) { return inoltra(n, e); }
+            };
+            z.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            WindowManager.LayoutParams lp = new WindowManager.LayoutParams(1, 1,
+                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                            | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    PixelFormat.TRANSLUCENT);
+            lp.gravity = Gravity.TOP | Gravity.LEFT;
+            lp.x = -10; lp.y = -10;
+            if (Build.VERSION.SDK_INT >= 28) lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            try { wm.addView(z, lp); zone[i] = z; lpZone[i] = lp; } catch (Exception e) { Log.w(TAG, "zona", e); }
+        }
+    }
+
+    private void togliZone() {
+        for (int i = 0; i < 2; i++) {
+            if (zone[i] != null) { try { wm.removeView(zone[i]); } catch (Exception ignorata) { } }
+            zone[i] = null; lpZone[i] = null; zonaPremuta[i] = false;
+        }
+        seguendo = false;
+    }
+
+    private void nascondiZona(int i) {
+        WindowManager.LayoutParams lp = lpZone[i];
+        if (zone[i] == null || lp == null || zonaPremuta[i] || (lp.flags & WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE) != 0) return;
+        lp.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+        lp.width = 1; lp.height = 1; lp.x = -10; lp.y = -10;
+        try { wm.updateViewLayout(zone[i], lp); } catch (Exception ignorata) { }
+    }
+
+    /** I riquadri dei lottatori in pixel della pagina: [[l,t,r,b] | null, ...]. */
+    private void aggiornaZone(String json) {
+        if (!seguendo || web == null) return;
+        try {
+            JSONArray a = new JSONArray(json);
+            float dp = getResources().getDisplayMetrics().density;
+            int margine = Math.round(14 * dp), minimo = Math.round(56 * dp);
+            for (int i = 0; i < 2 && i < a.length(); i++) {
+                WindowManager.LayoutParams lp = lpZone[i];
+                if (zone[i] == null || lp == null || zonaPremuta[i]) continue;      // durante una presa la zona sta ferma
+                JSONArray q = a.optJSONArray(i);
+                if (q == null) { nascondiZona(i); continue; }
+                int l = ox + Math.round((float) q.getDouble(0) * dp), t = oy + Math.round((float) q.getDouble(1) * dp);
+                int r = ox + Math.round((float) q.getDouble(2) * dp), b = oy + Math.round((float) q.getDouble(3) * dp);
+                int w = Math.max(minimo, r - l + 2 * margine), hh = Math.max(minimo, b - t + 2 * margine);
+                int x = (l + r) / 2 - w / 2, y = (t + b) / 2 - hh / 2;
+                boolean nascosta = (lp.flags & WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE) != 0;
+                if (!nascosta && Math.abs(lp.x - x) < 3 && Math.abs(lp.y - y) < 3 && Math.abs(lp.width - w) < 3 && Math.abs(lp.height - hh) < 3) continue;
+                lp.flags &= ~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+                lp.x = x; lp.y = y; lp.width = w; lp.height = hh;
+                try { wm.updateViewLayout(zone[i], lp); } catch (Exception ignorata) { }
+            }
+        } catch (Exception ignorata) { /* il prossimo giro */ }
+    }
+
+    /** Il gesto preso da una zona va alla pagina del ring, nelle sue coordinate. */
+    private boolean inoltra(int i, MotionEvent e) {
+        if (web == null) return false;
+        int azione = e.getActionMasked();
+        if (azione == MotionEvent.ACTION_DOWN) zonaPremuta[i] = true;
+        int[] w = new int[2];
+        web.getLocationOnScreen(w);
+        MotionEvent c = MotionEvent.obtain(e);
+        c.offsetLocation(e.getRawX() - e.getX() - w[0], e.getRawY() - e.getY() - w[1]);
+        web.dispatchTouchEvent(c);
+        c.recycle();
+        if (azione == MotionEvent.ACTION_UP || azione == MotionEvent.ACTION_CANCEL) zonaPremuta[i] = false;
+        return true;
     }
 
     // --------------------------------------------------- il ponte con la pagina
@@ -701,6 +790,9 @@ public class Ring extends AccessibilityService {
         @JavascriptInterface public String dati() { return Memoria.dati(Ring.this); }
         @JavascriptInterface public void salva(String json) { Memoria.salva(Ring.this, json); }
         @JavascriptInterface public String schermo() { return schermo; }
+        @JavascriptInterface public void corpi(final String json) {
+            h.post(new Runnable() { @Override public void run() { aggiornaZone(json); } });
+        }
 
         @JavascriptInterface public void chiudi() {
             h.post(new Runnable() { @Override public void run() { Ring.this.chiudi(); } });

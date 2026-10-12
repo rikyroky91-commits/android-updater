@@ -788,6 +788,11 @@
     for (const o of ostacoli) if (x >= o.l + 4 * S && x <= o.r - 4 * S && o.t >= da - 6 * S) return true;
     return false;
   }
+  // Quanto in basso si può volare: sopra la lava, non sotto il piano della piattaforma.
+  function fondoVolo() {
+    const m = lava ? piattaforma() : null;
+    return m ? Math.min(pavimento, m.t + 10 * S) : pavimento;
+  }
   // Dove si rientra dopo essere spariti: dal proprio lato, o sulla piattaforma se sotto c'è la lava.
   function xRientro(tipo) {
     const m = inArena ? piattaforma() : null;
@@ -807,6 +812,20 @@
     // Il punto è dell'altro, se non l'aveva già mandato K.O. con l'ultimo colpo.
     if (!f.koVero && altro && altro.p) segnaKO(altro, f);
     if (f.fuori || f.esploso) return;                          // il gran finale se l'è già preso
+    sparisci(f);
+  }
+
+  // Nella corsa la lava toglie un quinto della vita all'eroe (l'avversario del duello va K.O.), poi si rientra.
+  function lavaCorsa(f) {
+    const x = f.p.bacino.x;
+    if (f.tel) lasciaCadere(f);
+    if (f.arma) lasciaArma(f);
+    scintille(x, pavimento - 4 * S, 24, "#ff5a1f"); scintille(x, pavimento - 12 * S, 14, "#ffd23f");
+    scrivi(dici("LAVA!"), x, pavimento - 70 * S, true);
+    suona("fiamma", x, 1.2);
+    if (f.tipo === corsa.chi) feritaEroe(Math.round(corsa.hpMax * 0.2), x, pavimento - 20 * S);
+    else if (!f.koVero) { const e = eroe(); if (e) segnaKO(e, f); }
+    if (f.fuori || f.esploso) return;
     sparisci(f);
   }
 
@@ -1500,7 +1519,7 @@
     f.volo = false;
     const b = f.p.bacino;
     f.jet = Math.round(caso(260, 560)); f.azione = null; f.scalata = null; f.pensa = 6;
-    f.volaY = Math.max(110, Math.min(pavimento - 90 * S, b.y - caso(70, 170) * S));
+    f.volaY = Math.max(110, Math.min(fondoVolo() - 90 * S, b.y - caso(70, 170) * S));
     f.caos = impazzito ? Math.round(caso(200, 340)) : 0;
     f.giro = (Math.random() < 0.5 ? -1 : 1) * caso(0.09, 0.16); f.rot = 0;
     for (const n in f.p) f.p[n].oy = f.p[n].y + 3.5 * S;
@@ -1533,10 +1552,10 @@
     f.dir = ob.x >= mio.x ? 1 : -1;
     if (altro.ko || altro.preso) {
       // L'avversario è a terra: si scende a festeggiare.
-      f.jet = Math.min(f.jet, 70); f.meta = altro.cx; f.volaY = Math.min(pavimento - 60 * S, ob.y - 30 * S);
+      f.jet = Math.min(f.jet, 70); f.meta = altro.cx; f.volaY = Math.min(fondoVolo() - 60 * S, ob.y - 30 * S);
       f.pensa = 20; return;
     }
-    f.volaY = Math.max(100, Math.min(pavimento - 70 * S, ob.y - caso(-8, 28) * S));
+    f.volaY = Math.max(100, Math.min(fondoVolo() - 70 * S, ob.y - caso(-8, 28) * S));
     const dx = Math.abs(ob.x - mio.x) / S;
     if (puoSparare(f, dx) && Math.random() < 0.5) { inizia(f, azioneArma(f.arma)); return; }
     if (anime && f.ki >= 45 && dx > 70 && Math.random() < 0.3) { inizia(f, "onda"); return; }
@@ -4681,7 +4700,9 @@
     if (orda || !a || !b) return;
     // Dove si combatte: l'elemento su cui stanno tutti e due, se è largo; sennò il pavimento.
     const oa = verso > 0 && !(a.jet > 0) ? appoggio(a)[1] : null, ob = verso > 0 && !(b.jet > 0) ? appoggio(b)[1] : null;
-    const o = oa && oa === ob && oa.r - oa.l > 320 * S ? oa : null;
+    // Nelle arene dell'app si combatte sempre sulla pedana più larga (sopra la lava non c'è un «pavimento»).
+    const pd = inArena && verso > 0 ? piattaforma() : null;
+    const o = pd || (oa && oa === ob && oa.r - oa.l > 320 * S ? oa : null);
     const sx = a.p.bacino.x <= b.p.bacino.x ? a : b, dx = sx === a ? b : a;
     seme = seme || Math.floor(Math.random() * 1e9) + 1;
     orda = { t: 0, fase: "pausa", pausa: 36, festa: 0, su: !!o, base: o ? o.t : pavimento, l: o ? o.l : 0, r: o ? o.r : W, zombie: [],
@@ -4757,6 +4778,37 @@
     if (q.ondate && q.ondata >= q.ondate) { fineOrda(true); return; }
     q.fase = "pausa"; q.pausa = ORDA.pausa;
   }
+  // L'ELICOTTERO DEGLI ZOMBIE (12/10/2026, Riccardo: «gli zombie in quel caso arrivano da sopra con un
+  // elicottero»). Sopra la lava gli zombie non possono uscire dal terreno: un elicottero va avanti e indietro
+  // sopra la piattaforma e li cala giù, uno alla volta.
+  let elicottero = null;
+  function muoviElicottero() {
+    const q = orda;
+    if (!elicottero) elicottero = { x: q.cx, dir: Math.random() < 0.5 ? -1 : 1, t: 0, y: 0 };
+    const e = elicottero;
+    e.t++;
+    e.y = Math.max(testataBasso + 70 * S, q.base - 230 * S) + Math.sin(e.t * 0.05) * 6 * S;
+    e.x += e.dir * 2.2 * S;
+    if (e.x > q.r - 24 * S) e.dir = -1; else if (e.x < q.l + 24 * S) e.dir = 1;
+  }
+  function disegnaElicottero() {
+    const e = elicottero;
+    ctx.save();
+    ctx.translate(e.x, e.y); ctx.scale(e.dir * S, S);
+    ctx.strokeStyle = "rgba(20,20,20,.55)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, 15); ctx.lineTo(0, 34); ctx.stroke();                 // la fune
+    ctx.fillStyle = "#3d4a3a"; ctx.fillRect(-60, -7, 42, 7);                              // la coda
+    ctx.fillStyle = "#2c3629"; ctx.beginPath(); ctx.ellipse(-62, -9, 4, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#4b5a46"; ctx.strokeStyle = "#1c2219"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(0, 0, 27, 15, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();  // il corpo
+    ctx.fillStyle = "#9fd3e6"; ctx.beginPath(); ctx.ellipse(12, -3, 11, 8, 0, -Math.PI / 2, Math.PI / 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-18, 21); ctx.lineTo(19, 21); ctx.moveTo(-10, 14); ctx.lineTo(-12, 21); ctx.moveTo(10, 14); ctx.lineTo(12, 21); ctx.stroke();
+    ctx.fillStyle = "#1c2219"; ctx.fillRect(-2, -21, 4, 7);
+    const r = 40 * Math.abs(Math.cos(passi * 0.9));                                       // il rotore che gira
+    ctx.strokeStyle = "rgba(28,34,25,.85)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-r, -21); ctx.lineTo(r, -21); ctx.stroke();
+    ctx.restore();
+  }
   function nuovoZombie(tipo, lato) {
     const q = orda, Z = ZOMBI[tipo] || ZOMBI.lento;
     // Dal terreno, a qualche passo dai due (non dal bordo della finestra: ci metterebbero una vita).
@@ -4780,6 +4832,12 @@
       // La quota è sopra il terreno dell'orda: se l'orda trasloca su un altro piano, il draghetto la segue.
       z.quota = nuovaQuota(z); z.alto = quotaDrago(z, q); z.y = z.alto - 40 * S; z.cambia = Math.round(caso(200, 360));
       z.distanza = (Z.picchia ? caso(80, 160) : caso(120, 210)) * S; z.cd = Math.round(caso(50, 110)); z.ali = caso(0, 6); z.tiri = 0;
+      return;
+    }
+    if (lava && elicottero) {
+      // Sopra la lava: calato dall'elicottero sulla piattaforma.
+      z.x = Math.max(q.l + 10 * S, Math.min(q.r - 10 * S, elicottero.x));
+      z.stato = "cala"; z.alzo = Math.max(0, q.base - elicottero.y - 34 * S); z.vy = 0;
       return;
     }
     polvere(x, q.base - 1, 4);
@@ -5122,6 +5180,7 @@
     return !!(corsa && corsa.chi && l.tipo === corsa.chi && Math.max(l.p.piedeA.y, l.p.piedeD.y) > q.base - 62 * S);
   }
   function aggiornaOrda() {
+    if (lava && orda) muoviElicottero();
     const q = orda;
     if (!q) return;
     q.t++;
@@ -5192,6 +5251,12 @@
       z.x += z.vx; z.vx *= 0.86;
       z.x = Math.max(q.l + 6 * S, Math.min(q.r - 6 * S, z.x));
       if (z.stato === "giu") continue;
+      if (z.stato === "cala") {
+        // Giù dalla fune dell'elicottero, sempre più svelto, fino alla piattaforma.
+        z.vy = (z.vy || 0) + 0.45 * S; z.alzo = Math.max(0, z.alzo - z.vy);
+        if (z.alzo <= 0) { z.stato = "va"; z.s = 0; z.vy = 0; polvere(z.x, q.base - 1, 5); suona("pop", z.x, 0.5); }
+        continue;
+      }
       if (z.alzo > 0 && z.stato !== "salto") z.alzo = Math.max(0, z.alzo - 4 * S);      // colpito a mezz'aria: giù
       if (z.stato === "esce") { if (z.s % 6 === 0 && z.s < 40) polvere(z.x, q.base - 1, 1); if (z.s >= 46) { z.stato = "va"; z.s = 0; } continue; }
       if (z.botta > 0) { z.botta--; continue; }
@@ -5843,6 +5908,7 @@
     const q = orda;
     if (!q) return;
     for (const z of q.zombie) if (!z.inBuco) disegnaZombie(z);
+    if (lava && elicottero) disegnaElicottero();
     if (q.fase === "festa" || !q.ricetta || corsa) return;      // nella corsa il conto lo tiene il suo cruscotto
     const n = q.ricetta.totale, abbattuti = q.fase === "pausa" ? n : q.uccisiOndata, passo = Math.min(10.5 * S, (W - 150 * S) / n), r = Math.min(3.6 * S, passo * 0.36);
     const y = verso < 0 ? pavimento - 54 * S : Math.max(22 * S, testataBasso + 22 * S) + (barreVita ? 36 * S : 0), x0 = W / 2 - (n - 1) * passo / 2 + 30 * S;
@@ -5901,6 +5967,7 @@
   // (la tastiera si prepara più in basso, dopo la tendina: finché non è pronta la tendina non la disegna)
   const statoTastiera = { pronta: false };
   try { radiale.aperto = deposito.getItem("mut-ring-radiale") === "on"; if (deposito.getItem("mut-ring-radiale-lato") === "sx") radiale.lato = "sx"; } catch (errore) { /* resta chiuso */ }
+  if (window.__ringHudEsterno) radiale.aperto = false;
   if (radiale.aperto) radiale.apre = 1;
   // Durante la tregua le mosse che si fanno sull'altro lasciano il posto a quelle che si fanno CON l'altro.
   let vociTregua = null, vociTreguaDi = null;
@@ -6030,6 +6097,8 @@
     }
   }
   function apriRadiale(apri) {
+    // Nell'app Android i comandi sono nativi (capsula e 4 tasti): il controller a ventaglio non si apre mai.
+    if (window.__ringHudEsterno) apri = false;
     radiale.aperto = !!apri; radiale.sopra = -2; radiale.giu = null;
     if (preferisceFermo) radiale.apre = radiale.aperto ? 1 : 0;
     try { deposito.setItem("mut-ring-radiale", radiale.aperto ? "on" : "off"); } catch (errore) { /* pazienza */ }
@@ -6771,7 +6840,7 @@
   function prendiIlVolo(f) {
     const b = f.p.bacino;
     f.volo = true; f.jet = Math.round(caso(900, 1600)); f.caos = 0; f.azione = null; f.scalata = null; f.pensa = 8;
-    f.volaY = Math.max(110, Math.min(pavimento - 70 * S, b.y - caso(60, 150) * S));
+    f.volaY = Math.max(110, Math.min(fondoVolo() - 70 * S, b.y - caso(60, 150) * S));
     f.paracadute = 0;
     for (const n in f.p) f.p[n].oy = f.p[n].y + 6 * S;
     const col = COLORI_ANIME[f.tipo];
@@ -10064,6 +10133,7 @@
   }
 
   function passo() {
+    if (!orda && elicottero) elicottero = null;
     passi++; tempo++;
     if (passi % 45 === 0) rileva();
     const [a, b] = lottatori;
@@ -10121,11 +10191,17 @@
       }
       // In volo la «base» è il corpo stesso: il busto resta dritto da solo.
       if (f.jet > 0) { f.base = f.p.bacino.y + 30 * S; f.supporto = null; }
-      if (lava && !corsa && verso > 0 && !inScena) {
-        if (!(f.jet > 0) && !f.fuori && !f.supporto) {
+      if (lava && verso > 0 && !inScena) {
+        if (!f.fuori && !f.supporto) {
+          // Anche chi vola: la lava brucia chiunque la tocchi (12/10/2026, Riccardo: «restano sulla lava senza danni»).
           let giu = 0;
           for (const n in f.p) giu = Math.max(giu, f.p[n].y + f.p[n].r);
-          if (giu >= pavimento - 2 * S) { nellaLava(f, altro); continue; }
+          if (giu >= pavimento - 2 * S) { if (corsa && corsa.chi) lavaCorsa(f); else nellaLava(f, altro); continue; }
+        }
+        // Il volo non finisce sopra la lava: chi sta per atterrare torna prima sopra la piattaforma.
+        if (f.jet > 0 && f.jet < 30) {
+          const pd = piattaforma(), b0 = f.p.bacino;
+          if (pd && !sottoCe(b0.x, b0.y)) { f.jet = 30; f.meta = (pd.l + pd.r) / 2; f.volaY = pd.t - 60 * S; }
         }
         // Sul bordo ci si ferma: nessuno si butta da solo.
         const o = f.supporto, m = 8 * S;
@@ -13674,6 +13750,18 @@
   // Il cruscotto: vite, vita, energia, monete; il round in alto a destra; il colpo finale e gli oggetti in basso.
   function disegnaHud() {
     const c = corsa, col = coloreCorsa(), m = 12 * S, y0 = testataBasso + 14 * S;
+    if (window.__ringHudEsterno) {
+      // Dentro l'app Android vita, round, colpo finale e oggetti sono comandi nativi (Comandi.java):
+      // qui resta solo la barra del capo o dell'avversario, sotto la capsula dell'app.
+      const nemico = barraNemico();
+      if (nemico) {
+        const wn = Math.min(220 * S, W - 2 * m), xn = W / 2 - wn / 2, yn = y0 + 64 * S;
+        pannelloUI(xn - 10 * S, yn, wn + 20 * S, 40 * S, 10 * S, "#e0443a");
+        scriviUI(nemico.nome, W / 2, yn + 12 * S, 12 * S, "#ffffff", "center");
+        barraUI(xn, yn + 24 * S, wn, 9 * S, nemico.k, "#e0443a");
+      }
+      return;
+    }
     // In cima, per tutta la larghezza: l'esperienza verso il prossimo livello.
     const kx = Math.min(1, c.xp / xpPerLivello(c.liv));
     ctx.fillStyle = "rgba(12,11,18,.75)"; ctx.fillRect(0, testataBasso + 2 * S, W, 7 * S);
@@ -13978,6 +14066,13 @@
       const f = comandato();
       return {
         chi: radiale.chi, acceso: !fermo, scelta: !!(sceltaModo && !corsa), corsa: !!corsa, lava: !!lava,
+        // Momenti che si giocano toccando il canvas (scelta del modo, corsa, mira, scontro di energie):
+        // sopra lo schermo del telefono la finestra del ring deve prendere i tocchi finché durano.
+        vuoleTocchi: !!((sceltaModo && !corsa) || (corsa && (corsa.fase !== "lotta" || corsa.bottega || corsaModale())) || mira || sfida || classifica.aperta),
+        corsaHud: corsa && corsa.chi ? {
+          chi: corsa.chi, fase: corsa.fase, round: corsa.round, obiettivo: obiettivo(), hp: Math.max(0, corsa.hp), hpMax: corsa.hpMax, vite: corsa.vite,
+          energia: Math.min(1, corsa.energia / CORSA.energia), oggetti: corsa.slot.map((id) => (id && OGGETTI[id] ? { id, icona: OGGETTI[id].icona } : null)),
+        } : null,
         voci: vociRadiale().map((v) => ({ id: v[0], icona: v[1], nome: dici(v[2]), costo: v[3] || 0, pronta: !!(f && puoFare(f, v)) })),
         lottatori: lottatori.map((l) => ({
           tipo: l.tipo, nome: stile && ASPETTI[stile] ? ASPETTI[stile][l.tipo].nome : dici(l.tipo === "robot" ? "Robot" : "Mela"),
@@ -13986,6 +14081,15 @@
       };
     },
     cambia: () => eseguiTasto("cambia"),
+    corsaFinale: () => !!tastoFinale(),
+    corsaOggetto: (i) => !!usaOggetto(i),
+    // Dove stanno i corpi dei lottatori (per le zone toccabili che li seguono sopra lo schermo del telefono).
+    corpi: () => lottatori.map((f) => {
+      if (!f.p || f.esploso || f.fuoriCampo) return null;
+      let l = 1e9, t = 1e9, r = -1e9, b = -1e9;
+      for (const n in f.p) { const q = f.p[n]; l = Math.min(l, q.x - q.r); t = Math.min(t, q.y - q.r); r = Math.max(r, q.x + q.r); b = Math.max(b, q.y + q.r); }
+      return [Math.round(l), Math.round(t), Math.round(r), Math.round(b)];
+    }),
     pausa: (si) => {
       if (si !== undefined && !!si !== inPausa) { inPausa = !!si; ultimo = 0; riserva = 0; if (!inPausa) riparti(); }
       return inPausa;

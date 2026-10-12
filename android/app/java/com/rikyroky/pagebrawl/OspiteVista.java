@@ -47,6 +47,11 @@ class OspiteVista implements Comandi.Ospite {
     @Override public void mostraLottatori(boolean si) {
         web.evaluateJavascript("(function(){var o=document.getElementById('page-brawl');if(o)o.style.visibility='" + (si ? "visible" : "hidden") + "';})()", null);
     }
+    @Override public void seguiLottatori(boolean si) { }            // nell'attività i lottatori si prendono già col dito
+    @Override public void apriApp() {
+        android.content.Context c = sopra.getContext();
+        c.startActivity(new android.content.Intent(c, Principale.class).addFlags(android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+    }
     @Override public void chiudiGioco() { chiudi.run(); }
     @Override public int margineAlto() { return alto; }
     @Override public int margineBasso() { return basso; }
