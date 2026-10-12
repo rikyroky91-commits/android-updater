@@ -47,7 +47,7 @@ SCHERMATE = [
                  ("Scegli i lottatori", "Robot, maghi e duellanti, ognuno con le sue mosse.")),
     ("corsa", 2, ("Endless run", "Survive the waves, pick upgrades, beat the bosses."),
                  ("Corsa infinita", "Sopravvivi alle ondate, scegli i potenziamenti, batti i boss.")),
-    ("ring", 1, ("Your phone stays usable", "Clean controls: pause, minimise or remove the game with one tap."),
+    ("ringv", 1, ("Your phone stays usable", "Clean controls: pause, minimise or remove the game with one tap."),
                 ("Il telefono resta usabile", "Comandi puliti: pausa, riduci o togli il gioco con un tocco.")),
 ]
 
@@ -59,7 +59,7 @@ SEGMENTI = [
     ("lava", 0.5, "Don't touch the lava", "Push your rival off\nthe floating platform."),
     ("cielo", 1.0, "Pick your fighters", "Robots, wizards, duelists:\neach with their own moves."),
     ("corsa", 2.0, "Endless run", "Waves, upgrades, bosses."),
-    ("ring", 0.5, "Your phone stays usable", "Pause, minimise or remove it\nwith one tap."),
+    ("ringv", 0.0, "Your phone stays usable", "Pause, minimise or remove it\nwith one tap."),
 ]
 DURATA_SEGMENTO, DURATA_CARTA, DISSOLVENZA = 4.5, 3.0, 0.4
 

@@ -42,6 +42,8 @@ SCENE = {
     "cielo":  {"url": "web/arena.html?tipo=cielo", "alto": 2, "tocca": (180, 378), "stile": "maghi"},
     "ring":   {"url": "web/arena.html?tipo=ring",  "alto": 2, "tocca": (180, 378), "stile": "lame"},
     "corsa":  {"url": "web/arena.html?tipo=cielo", "alto": 2, "tocca": (180, 210), "corsa": True},
+    # Per il video: il ring coi personaggi di partenza (robot e mela).
+    "ringv":  {"url": "web/arena.html?tipo=ring",  "alto": 2, "tocca": (180, 378)},
 }
 FOTO_A = [4.0 + 1.5 * i for i in range(11)]     # secondi dopo l'avvio: poi si scelgono le migliori
 VIDEO_SECONDI = 9.0

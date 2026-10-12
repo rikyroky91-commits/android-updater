@@ -4111,6 +4111,22 @@ test("l'arena di lava: si parte sulla piattaforma, chi cade nella lava dà il pu
   });
 });
 
+test("il ring dell'app: il tappeto è il pavimento e nessuno ci finisce sotto", () => {
+  // 12/10/2026: col tappeto come pedana sopra il fondo dello schermo i lottatori ci scendevano sotto (si vedeva
+  // nel video dello store). Ora il ring dà un pavimento rialzato: niente pedane, niente «sotto».
+  const amb = ambiente({ estensione: true, larghezza: 412, altezza: 800, arena: { lava: 0, pavimento: 224 }, memoria: { "mut-ring": "on", "mut-ring-cruento": "off" } });
+  amb.avanza(40);
+  assert.strictEqual(amb.stato().pavimento, 576, "il pavimento è il piano del tappeto");
+  assert.strictEqual(amb.finestra.__ring.mosse().lava, false, "non è lava");
+  amb.avanza(60 * 90, (st) => {
+    for (const f of st.lottatori) {
+      if (f.esploso || f.fuori) continue;
+      assert.ok(f.bacino.y < st.pavimento + 5, `${f.tipo} sotto il tappeto (bacino ${Math.round(f.bacino.y)})`);
+    }
+  });
+  assert.ok(amb.stato().lottatori.every((f) => f.esploso || f.fuori || Math.abs(f.base - 576) < 60 || f.vola || f.jet), "a fine lotta sono sul tappeto o in aria");
+});
+
 test("la pausa ferma il tempo e il ciclo, e si riprende da dove si era", () => {
   const amb = ambiente({ estensione: true, memoria: { "mut-ring": "on" } });
   const r = amb.finestra.__ring;

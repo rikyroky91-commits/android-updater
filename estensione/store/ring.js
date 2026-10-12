@@ -625,6 +625,9 @@
     inArena = !!arena;
     lava = arena && arena.lava > 0 ? Math.min(H * 0.4, arena.lava) : 0;
     if (lava) pavimento = H - lava;
+    // Un pavimento rialzato senza lava (il ring dell'app, 12/10/2026): il tappeto è il pavimento vero. Prima
+    // era una pedana sopra un pavimento in fondo allo schermo, e i lottatori ci scendevano sotto e restavano lì.
+    else if (arena && arena.pavimento > 0) pavimento = H - Math.min(H * 0.5, arena.pavimento);
   }
 
   // --- Il corpo --------------------------------------------------------

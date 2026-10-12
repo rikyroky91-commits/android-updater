@@ -129,12 +129,15 @@
         pedana("isola", cl + cw * 1.08 - pw, pt, pw, 40);
         pedana("isola", (W - pw * 0.9) / 2, pt - Math.max(110, H * 0.15), pw * 0.9, 36);
       } else {
-        window.__ringArena = { lava: 0 };
         el("div", "faro");
         el("div", "pavimento-ring");
-        var rw = Math.min(largo ? W * 0.7 : W * 0.92, 760), rl = (W - rw) / 2, rt = H * 0.72;
-        pedana("tappeto", rl, rt, rw, Math.round(H * 0.28));
-        var pali = [rl - 2, rl + rw - 6];
+        // 12/10/2026: il tappeto era una pedana (solido di 16 px) sopra il fondo dello schermo: i lottatori ci
+        // scendevano sotto e restavano lì, e l'altro si incastrava al palo cercando di raggiungerli (si vedeva
+        // nel video dello store). Ora il tappeto è il pavimento del motore e va da un bordo all'altro.
+        var rt = Math.round(H * 0.72), rw = W, rl = 0;
+        window.__ringArena = { lava: 0, pavimento: H - rt };
+        el("div", "pietra tappeto", "left:0;top:" + rt + "px;width:" + W + "px;height:" + (H - rt) + "px");
+        var pali = [0, W - 8];
         for (var q = 0; q < 2; q++) el("div", "palo", "left:" + pali[q] + "px;top:" + (rt - 110) + "px;height:110px");
         for (var c = 0; c < 3; c++) el("div", "corda", "left:" + rl + "px;width:" + rw + "px;top:" + (rt - 96 + c * 30) + "px");
       }
