@@ -46,9 +46,11 @@ jobs:
             if [ "$v" = leggera ]; then extra="--leggera"; fi
             python3 android/costruisci.py --gradle --aab $extra
             if ! gradle -p android/gradle-progetto :app:bundleRelease --no-daemon --stacktrace > "gradle-$v.log" 2>&1; then
-              grep -E "error:|^e: |What went wrong|Could not|Execution failed|cannot find symbol|incompatible types|> " -A3 "gradle-$v.log" \
-                | grep -v "^--$" | head -80 | while IFS= read -r riga; do echo "::error title=gradle $v::$riga"; done
-              tail -25 "gradle-$v.log" | while IFS= read -r riga; do echo "::warning title=coda $v::$riga"; done
+              # GitHub mostra al massimo 10 annotazioni per tipo: si mandano blocchi interi, a capo come %0A.
+              unisci() { sed 's/%/%25/g; s/\r//g' | awk 'BEGIN{ORS="%0A"} {print}'; }
+              echo "::error title=gradle $v: cosa non va::$(sed -n '/What went wrong/,/^\* Try:/p' "gradle-$v.log" | head -45 | unisci)"
+              echo "::error title=gradle $v: errori::$(grep -E 'error:|ERROR:|^e: ' "gradle-$v.log" | grep -v 'org.gradle' | head -40 | unisci)"
+              echo "::error title=gradle $v: righe intorno::$(grep -B2 -A6 -E 'error:|ERROR:' "gradle-$v.log" | grep -v 'at org.gradle' | head -45 | unisci)"
               exit 1
             fi
             cp android/gradle-progetto/app/build/outputs/bundle/release/app-release.aab "uscita/PageBrawl-$v-nonfirmato.aab"
