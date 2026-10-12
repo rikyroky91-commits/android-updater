@@ -58,6 +58,8 @@ final class Comandi {
         void mostraLottatori(boolean si);
         /** Le zone toccabili che seguono i lottatori (per prenderli col dito) servono o no. */
         void seguiLottatori(boolean si);
+        /** La frequenza dello schermo che serve (120 per i 120 fps, 0 = quella di sistema). */
+        void frequenza(float hz);
         void apriApp();
         void chiudiGioco();
         int margineAlto();
@@ -384,10 +386,18 @@ final class Comandi {
     }
 
     // ------------------------------------------------------- lettura stato
+    private String graficaData = "";
     private final Runnable leggi = new Runnable() {
         @Override public void run() {
             if (!attivo) return;
-            web.evaluateJavascript("(function(){try{return window.__ring&&window.__ring.mosse?JSON.stringify({m:__ring.mosse(),p:__ring.pannello(),z:__ring.pausa()}):''}catch(e){return ''}})()",
+            // La grafica scelta nell'app vale subito, anche a partita aperta.
+            String g = Memoria.graficaJs(ctx), prima = "";
+            if (!g.equals(graficaData)) {
+                prima = "window.__ring&&window.__ring.grafica&&__ring.grafica(" + g + ");";
+                graficaData = g;
+                ospite.frequenza(Memoria.fps(ctx) == 120 ? 120f : 0f);
+            }
+            web.evaluateJavascript(prima + "(function(){try{return window.__ring&&window.__ring.mosse?JSON.stringify({m:__ring.mosse(),p:__ring.pannello(),z:__ring.pausa()}):''}catch(e){return ''}})()",
                     new ValueCallback<String>() {
                         @Override public void onReceiveValue(String s) {
                             try { applica(s); } catch (Exception ignorata) { /* il prossimo giro */ }

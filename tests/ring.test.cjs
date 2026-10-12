@@ -4161,3 +4161,20 @@ test("nell'app gli oggetti restano a un decimo dai bordi, e un oggetto irraggiun
     assert.ok(t.stato === "libero" || t.stato === "portato", "si è fermato o è stato raccolto (" + t.stato + ")");
   }
 });
+
+test("la grafica dell'app: 120 fps interpolati senza spostare niente, risoluzione dal canvas, dettaglio basso con meno particelle", () => {
+  const amb = ambiente({ estensione: true, memoria: { "mut-ring": "on", "mut-ring-cruento": "off" } });
+  const r = amb.finestra.__ring;
+  amb.avanza(30);
+  assert.strictEqual(JSON.stringify(r.grafica({})), JSON.stringify({ fps: 0, risoluzione: 0, dettaglio: "medio", particelle: 320 }), "di serie tutto come prima");
+  const g = r.grafica({ fps: 120, risoluzione: 0.5, dettaglio: "basso" });
+  assert.strictEqual(g.fps, 120); assert.strictEqual(g.particelle, 90);
+  assert.strictEqual(amb.tela.width, 600, "metà densità: il canvas largo la metà dei pixel (" + amb.tela.width + ")");
+  // Dopo ogni fotogramma interpolato i corpi tornano dove li ha messi la fisica: nessuna deriva, niente NaN.
+  amb.avanza(60 * 20, (s) => {
+    for (const f of s.lottatori) for (const n in f.punti) assert.ok(Number.isFinite(f.punti[n][0]) && Number.isFinite(f.punti[n][1]), "coordinate NaN");
+  });
+  dentro(amb);
+  assert.strictEqual(r.grafica({ fps: 45, dettaglio: "boh" }).fps, 0, "valori strani: si torna al solito");
+  assert.strictEqual(r.grafica({}).dettaglio, "medio");
+});

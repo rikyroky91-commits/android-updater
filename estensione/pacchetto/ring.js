@@ -171,6 +171,15 @@
   // LA PAUSA (12/10/2026, app Android: «in qualsiasi momento mettere in pausa il gioco»): `__ring.pausa(true)`
   // ferma il tempo; il ring resta disegnato com'è e il ciclo si addormenta finché non si riprende.
   let inPausa = false;
+  // LA GRAFICA (12/10/2026, app Android: «modalità 30, 60 e 120 fps, uno slider di risoluzione e 3 tipi di
+  // dettagli»). Chi ospita il ring la dichiara in `window.__ringGrafica` o la cambia con `__ring.grafica({...})`:
+  //   fps          30, 60 o 120 fotogrammi disegnati al secondo (la fisica resta a 60 passi: sopra i 60 i fotogrammi
+  //                in mezzo si interpolano fra un passo e l'altro). 0 = come sempre (uno ogni due, e tutti mentre
+  //                si tiene qualcosa in mano);
+  //   risoluzione  0,5…1: la densità del canvas rispetto a quella vera dello schermo. 0 = come sempre (al massimo 2×);
+  //   dettaglio    "basso" (poche particelle, niente ombre sfumate), "medio" (com'è sempre stato), "alto" (più particelle).
+  const grafica = { fps: 0, risoluzione: 0, dettaglio: "medio" };
+  let ultimoDisegno = 0;
   const classifica = { aperta: false, voci: null, letta: -1e9, stato: "", mia: -1 };
   // Le monete in banca e i potenziamenti permanenti della bottega: restano fra una corsa e l'altra.
   let banca = 0, bottega = {};
@@ -695,7 +704,9 @@
   }
 
   function dimensiona() {
-    const rapporto = Math.min(window.devicePixelRatio || 1, 2);
+    const rapporto = grafica.risoluzione > 0
+      ? Math.max(0.5, Math.min(3, (window.devicePixelRatio || 1) * grafica.risoluzione))
+      : Math.min(window.devicePixelRatio || 1, 2);
     W = window.innerWidth || tela.clientWidth; H = window.innerHeight || tela.clientHeight;
     tela.width = Math.floor(W * rapporto); tela.height = Math.floor(H * rapporto);
     // DIMENSIONE IN PIXEL ESPLICITI, non `100vh`: su iPhone `100vh` è l'altezza
@@ -3574,7 +3585,7 @@
   // fuoco che si gonfia e si spegne in fumo, detriti che volano e rimbalzano
   // su pagina e pavimento, braci che ricadono piano. E una spinta vera: i
   // lottatori, gli oggetti e i pezzi vicini vengono sbalzati via.
-  const MAX_PARTICELLE = 320;
+  let MAX_PARTICELLE = 320;                      // cambia col dettaglio grafico (vedi «LA GRAFICA»)
   function esplosione(x, y, potenza, att, inPieno) {
     suona("boom", x, potenza);
     const R = 80 * S * potenza;
@@ -11724,10 +11735,49 @@
       if (giri === 4) riserva = 0;
     }
     // Un disegno ogni due (30 fps); mentre se ne tiene uno in mano, tutti.
-    if (presa.f || presa.tel || (fotogramma++ & 1) === 0 || inPausa) disegna();
+    let disegnare;
+    if (grafica.fps) disegnare = inPausa || presa.f || presa.tel || adesso - ultimoDisegno >= 1000 / grafica.fps - 2;
+    else disegnare = presa.f || presa.tel || (fotogramma++ & 1) === 0 || inPausa;
+    if (disegnare) {
+      ultimoDisegno = adesso;
+      if (grafica.fps > 60 && !inPausa) disegnaInterpolato(riserva / PASSO_MS); else disegna();
+    }
     if (inPausa) return;                                         // in pausa: un ultimo disegno, poi niente
     richiesta = requestAnimationFrame(ciclo);
   }
+  // Sopra i 60 fps: il fotogramma fra due passi della fisica. Corpi e oggetti si disegnano a metà strada fra la
+  // posizione del passo prima (ox, oy: la integrazione di Verlet la tiene già) e quella di adesso, poi si rimettono.
+  function disegnaInterpolato(a) {
+    a = Math.max(0, Math.min(1, a));
+    if (a > 0.97) { disegna(); return; }
+    const presi = [];
+    const sposta = (q) => { presi.push(q, q.x, q.y); q.x = q.ox + (q.x - q.ox) * a; q.y = q.oy + (q.y - q.oy) * a; };
+    for (const f of lottatori) if (f.p && !f.esploso) for (const n in f.p) sposta(f.p[n]);
+    for (const t of telefoni) if (t.stato === "volo" || t.stato === "libero") sposta(t);
+    try { disegna(); } finally {
+      for (let i = 0; i < presi.length; i += 3) { presi[i].x = presi[i + 1]; presi[i].y = presi[i + 2]; }
+    }
+  }
+  // Applica la grafica: dettaglio (particelle, ombre), risoluzione (rifà il canvas), fps.
+  const ombraVera = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(ctx) || {}, "shadowBlur");
+  function impostaGrafica(g) {
+    if (!g || typeof g !== "object") return;
+    const prima = grafica.risoluzione;
+    if (g.fps !== undefined) grafica.fps = [30, 60, 120].indexOf(+g.fps) >= 0 ? +g.fps : 0;
+    if (g.risoluzione !== undefined) grafica.risoluzione = +g.risoluzione > 0 ? Math.max(0.5, Math.min(1, +g.risoluzione)) : 0;
+    if (g.dettaglio !== undefined) grafica.dettaglio = ["basso", "medio", "alto"].indexOf(g.dettaglio) >= 0 ? g.dettaglio : "medio";
+    MAX_PARTICELLE = grafica.dettaglio === "basso" ? 90 : grafica.dettaglio === "alto" ? 480 : 320;
+    if (particelle.length > MAX_PARTICELLE) particelle.length = MAX_PARTICELLE;
+    // Dettaglio basso: le ombre sfumate (le più care da disegnare) non si accendono.
+    try {
+      if (grafica.dettaglio === "basso" && ombraVera && ombraVera.set) {
+        Object.defineProperty(ctx, "shadowBlur", { configurable: true, get: () => 0, set: () => ombraVera.set.call(ctx, 0) });
+      } else if (Object.prototype.hasOwnProperty.call(ctx, "shadowBlur")) delete ctx.shadowBlur;
+    } catch (errore) { /* un canvas che non si lascia toccare: pazienza */ }
+    if (grafica.risoluzione !== prima && W) dimensiona();
+  }
+  impostaGrafica(window.__ringGrafica);
+
   function riparti() {
     if (fermo || richiesta || document.hidden) return;
     ultimo = 0; riserva = 0;
@@ -14112,6 +14162,7 @@
       };
     },
     cambia: () => eseguiTasto("cambia"),
+    grafica: (g) => { impostaGrafica(g); return Object.assign({}, grafica, { particelle: MAX_PARTICELLE }); },
     // Solo per i test: i danni di un lottatore (la vita è 1 − danni/soglia).
     ferisci: (tipo, quota) => { const f = lottatori.find((l) => l.tipo === tipo); if (f) f.danni = Math.max(0, Math.min(0.99, quota)) * f.soglia; },
     corsaFinale: () => !!tastoFinale(),

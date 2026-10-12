@@ -698,6 +698,11 @@ public class Ring extends AccessibilityService {
         @Override public void mostraLottatori(boolean si) { if (web != null) web.setVisibility(si ? View.VISIBLE : View.INVISIBLE); }
         @Override public void seguiLottatori(boolean si) { seguendo = si; if (!si) for (int i = 0; i < 2; i++) nascondiZona(i); }
         @Override public void apriApp() { Ring.this.apriApp(); }
+        @Override public void frequenza(float hz) {
+            if (arena == null || lpArena == null) return;
+            lpArena.preferredRefreshRate = hz;
+            try { wm.updateViewLayout(arena, lpArena); } catch (Exception ignorata) { }
+        }
         @Override public void chiudiGioco() { chiudi(); }
         @Override public int margineAlto() { return Math.max(alto, dimensioneDiSistema("status_bar_height")); }
         @Override public int margineBasso() { return bassoPx; }

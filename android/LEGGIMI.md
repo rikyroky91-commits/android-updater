@@ -27,6 +27,7 @@ Tre cose opzionali in `ring.js` (12/10/2026), che sito ed estensione non usano:
 - `window.__ringArena = { lava: altezza }`: pavimento = superficie della lava, chi la tocca va K.O. (punto all'altro) e rientra sulla piattaforma; i lottatori non scendono dai bordi da soli, provano a spingere giù l'avversario, chi vola giù ha un ultimo balzo. Con `lava: 0` è un'arena normale: si parte e si rientra sulla pedana più larga;
 - `__ring.mosse()`, `__ring.cambia()`, `__ring.pannello(apri)`: quello che leggono i comandi nativi;
 - `__ring.pausa(si)`: ferma il tempo e addormenta il ciclo.
+- `window.__ringGrafica` / `__ring.grafica({ fps, risoluzione, dettaglio })`: 30/60/120 fotogrammi al secondo (sopra i 60 interpolati fra un passo della fisica e l'altro), densità del canvas 50–100 % di quella dello schermo, dettaglio basso/medio/alto (particelle 90/320/480, niente ombre sfumate nel basso). Nell'app: sezione GRAPHICS delle impostazioni, vale subito anche a partita aperta; a 120 fps l'app chiede allo schermo i 120 Hz.
 
 ## Perché l'accessibilità
 

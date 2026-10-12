@@ -22,6 +22,12 @@
   window.__ringHudEsterno = true;
   // Gli oggetti restano almeno a un decimo dai bordi dello schermo: negli angoli i lottatori si incastravano.
   window.__ringBordoOggetti = 0.1;
+  // La grafica scelta nell'app (fps, risoluzione, dettaglio): di serie 60 fps, 75 %, dettaglio medio.
+  window.__ringGrafica = {
+    fps: [30, 60, 120].indexOf(+dati["pb-fps"]) >= 0 ? +dati["pb-fps"] : 60,
+    risoluzione: Math.max(50, Math.min(100, +dati["pb-risoluzione"] || 75)) / 100,
+    dettaglio: ["basso", "medio", "alto"].indexOf(dati["pb-dettaglio"]) >= 0 ? dati["pb-dettaglio"] : "medio",
+  };
   window.__pbSalva = function (oggetto) {
     if (!pb) return;
     try { pb.salva(JSON.stringify(oggetto)); } catch (e) { /* resta in memoria per questa volta */ }

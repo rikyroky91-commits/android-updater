@@ -182,6 +182,39 @@ public class Principale extends Activity {
         lista.addView(sito);
         col.addView(lista);
 
+        // La grafica: fps, risoluzione, dettaglio (valgono subito, anche a partita aperta).
+        col.addView(spazio(22));
+        col.addView(titoletto("GRAPHICS"));
+        LinearLayout gr = superficie();
+        gr.setPadding(px(16), px(4), px(16), px(8));
+        LinearLayout rFps = riga("Frame rate", "120 needs a 120 Hz screen");
+        rFps.addView(scelte(new String[]{"30", "60", "120"}, new String[]{"30", "60", "120"}, String.valueOf(Memoria.fps(this)), "pb-fps", 40));
+        gr.addView(rFps);
+        gr.addView(linea());
+        final LinearLayout rRis = riga("Resolution", Memoria.risoluzione(this) + "% of the screen");
+        gr.addView(rRis);
+        android.widget.SeekBar ris = new android.widget.SeekBar(this);
+        ris.setMax(50);
+        ris.setProgress(Memoria.risoluzione(this) - 50);
+        ris.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(android.widget.SeekBar b, int v, boolean utente) {
+                int pct = 50 + v;
+                TextView sotto = (TextView) ((LinearLayout) rRis.getChildAt(0)).getChildAt(1);
+                sotto.setText(pct + "% of the screen");
+                if (utente) Memoria.grafica(Principale.this, "pb-risoluzione", String.valueOf(pct));
+            }
+            @Override public void onStartTrackingTouch(android.widget.SeekBar b) { }
+            @Override public void onStopTrackingTouch(android.widget.SeekBar b) { }
+        });
+        LinearLayout.LayoutParams lpr = new LinearLayout.LayoutParams(-1, -2);
+        lpr.bottomMargin = px(10);
+        gr.addView(ris, lpr);
+        gr.addView(linea());
+        LinearLayout rDet = riga("Detail", "Particles and glow effects");
+        rDet.addView(scelte(new String[]{"Low", "Med", "High"}, new String[]{"basso", "medio", "alto"}, Memoria.dettaglio(this), "pb-dettaglio", 46));
+        gr.addView(rDet);
+        col.addView(gr);
+
         TextView piede = testo("It only uses where things are on screen, and only while you play. It reads no text and sends nothing.", 12, TENUE, false);
         piede.setPadding(px(4), px(18), px(4), 0);
         col.addView(piede);
@@ -384,6 +417,24 @@ public class Principale extends Activity {
         sw.setOnCheckedChangeListener(cambia);
         r.addView(sw);
         return r;
+    }
+
+    /** Un gruppo di scelte a pillola salvato nella chiave del ring `chiave`. */
+    private LinearLayout scelte(String[] nomi, final String[] valori, String scelto, final String chiave, int largo) {
+        LinearLayout box = new LinearLayout(this);
+        box.setBackground(tondo(0xFF212A25, 10));
+        box.setPadding(px(3), px(3), px(3), px(3));
+        for (int i = 0; i < nomi.length; i++) {
+            final String v = valori[i];
+            TextView t = testo(nomi[i], 13, v.equals(scelto) ? SU_VERDE : TESTO, true);
+            t.setGravity(Gravity.CENTER);
+            if (v.equals(scelto)) t.setBackground(tondo(VERDE, 8));
+            t.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View x) { Memoria.grafica(Principale.this, chiave, v); disegna(); }
+            });
+            box.addView(t, new LinearLayout.LayoutParams(px(largo), px(30)));
+        }
+        return box;
     }
 
     /** La lingua del gioco (chiave del ring `pb-lingua`): inglese di serie. */

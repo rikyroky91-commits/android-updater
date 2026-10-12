@@ -90,4 +90,13 @@ final class Memoria {
         return "en";
     }
     static void lingua(Context c, String l) { gioco(c).edit().putString("pb-lingua", l).apply(); }
+
+    // La grafica (chiavi del ring, lette da ponte.js e da Comandi): fps 30/60/120, risoluzione 50–100 %, dettaglio.
+    static int fps(Context c) { try { int f = Integer.parseInt(gioco(c).getString("pb-fps", "60")); return f == 30 || f == 120 ? f : 60; } catch (Exception e) { return 60; } }
+    static int risoluzione(Context c) { try { return Math.max(50, Math.min(100, Integer.parseInt(gioco(c).getString("pb-risoluzione", "75")))); } catch (Exception e) { return 75; } }
+    static String dettaglio(Context c) { String d = gioco(c).getString("pb-dettaglio", "medio"); return "basso".equals(d) || "alto".equals(d) ? d : "medio"; }
+    static void grafica(Context c, String chiave, String valore) { gioco(c).edit().putString(chiave, valore).apply(); }
+    static String graficaJs(Context c) {
+        return "{fps:" + fps(c) + ",risoluzione:" + (risoluzione(c) / 100.0) + ",dettaglio:'" + dettaglio(c) + "'}";
+    }
 }
