@@ -37,6 +37,18 @@ jobs:
         with:
           gradle-version: "8.14.3"
 
+      # L'APK di prova da installare a mano (senza Gradle, firma di prova, Premium aperto): l'SDK del runner
+      # ha aapt2, d8 e apksigner; se manca la piattaforma 36 si prende android.jar da Sable/android-platforms.
+      - name: APK di prova
+        run: |
+          set -o pipefail
+          mkdir -p uscita "$HOME/tools"
+          if [ ! -f "$ANDROID_HOME/platforms/android-36/android.jar" ]; then
+            curl -sSL -o "$HOME/tools/android-36.jar" https://raw.githubusercontent.com/Sable/android-platforms/master/android-36/android.jar
+          fi
+          python3 android/costruisci.py
+          cp android/build/PageBrawl.apk uscita/PageBrawl-prova.apk
+
       - name: AAB completa e leggera
         run: |
           set -o pipefail
@@ -55,7 +67,7 @@ jobs:
             fi
             cp android/gradle-progetto/app/build/outputs/bundle/release/app-release.aab "uscita/PageBrawl-$v-nonfirmato.aab"
           done
-          ( cd uscita && sha256sum *.aab | tee SHA256SUMS )
+          ( cd uscita && sha256sum *.aab *.apk | tee SHA256SUMS )
           while IFS= read -r riga; do echo "::notice title=AAB::$riga"; done < uscita/SHA256SUMS
 
       - name: Pre-release con gli AAB
@@ -64,6 +76,6 @@ jobs:
         run: |
           tag="android-${GITHUB_SHA::7}"
           gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
-          gh release create "$tag" uscita/*.aab uscita/SHA256SUMS --prerelease --target "$GITHUB_SHA" \
+          gh release create "$tag" uscita/*.aab uscita/*.apk uscita/SHA256SUMS --prerelease --target "$GITHUB_SHA" \
             --title "Page Brawl Android ${GITHUB_SHA::7} (AAB non firmati)" \
             --notes "Da firmare con la chiave di caricamento: python3 android/costruisci.py --firma PageBrawl-completa-nonfirmato.aab"
