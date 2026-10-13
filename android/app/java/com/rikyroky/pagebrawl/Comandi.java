@@ -242,6 +242,15 @@ final class Comandi {
                 web.evaluateJavascript("window.__ring&&__ring.pannello(true)", null);
             }
         });
+        // La classifica globale (13/10/2026, Riccardo: «manca la classifica»): a portata dal menu, non solo
+        // dentro la tendina del motore o a fine corsa.
+        voceMenu("Leaderboard", new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                apriMenu(false);
+                if (inPausa) pausa(false);       // in pausa il motore non ridisegna: la classifica non si vedrebbe arrivare
+                web.evaluateJavascript("window.__ring&&__ring.comandi&&__ring.comandi.classifica(true)", null);
+            }
+        });
         voceMenu("Open Page Brawl", new View.OnClickListener() {
             @Override public void onClick(View v) { apriMenu(false); ospite.apriApp(); }
         });
