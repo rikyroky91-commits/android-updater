@@ -8,6 +8,14 @@ Controllato sulla documentazione di Chrome il 02/10/2026 e ricontrollato il 05/1
 
 **Un punto da verificare nella console: il video.** La pagina `cws-dashboard-listing` elenca fra le cose da fornire anche il link a un video YouTube che mostra l'estensione, e dichiara facoltativo solo il riquadro grande (1400×560). Non ho potuto aprire la console per vedere se il campo blocca davvero l'invio. Se lo blocca, basta mezzo minuto di schermo registrato con la lotta, il controller e l'orda, caricato su YouTube come «non in elenco».
 
+## La 1.1.0 (13/10/2026): cosa cambia rispetto alla 1.0.0
+
+- Super guerrieri: occhi nuovi sul disegno di Riccardo (palpebra spessa che scende verso il naso, pupilla piccola); Zefir e Brasa dell'11/10 con costumi nuovi (Zefir gilet cremisi senza maniche e pantaloni antracite, Brasa casacca verde bosco col bordo oro, niente corazza) perché non ricalchino i personaggi di Dragon Ball.
+- La pagina conta di più: si sale sul bordo alto di riquadri, card e post (sporgenze solo da sopra), si leggono anche gli elementi dentro i web component (shadow DOM aperti: Reddit e simili), i titoli di media grandezza sono solidi, si vola dopo 8 secondi invece che dopo un minuto e spesso verso un elemento più in alto; un lottatore lanciato contro un riquadro, o un'esplosione vicina, fa sobbalzare l'elemento vero (Web Animations, `composite: add`, niente modifiche alla pagina).
+- Classifica globale anche nell'estensione: due chiamate dal service worker a `https://mobileupdatetracker.duckdns.org/api/corsa` (lettura della classifica, invio del punteggio solo quando si preme Invia). Nessun permesso nuovo: il server risponde con CORS aperto (`_CORSA_CORS` in `web/main.py`). **Va pubblicato il sito (unione su main) prima di inviare la 1.1.0**, sennò l'invio dall'estensione fallisce.
+- Scheda dello store: descrizioni nuove che puntano sul roguelike e sul giocare mentre si lavora; descrizione breve nuova; cinque schermate nuove e riquadri promozionali in `scheda/1-1-0/`.
+- **Privacy da aggiornare nella console**: ora esce un dato (la voce in classifica). Testi e caselle nella sezione «Scheda Privacy» qui sotto, e l'informativa è `https://mobileupdatetracker.duckdns.org/static/pagebrawl/privacy.html` (aggiornata per estensione e app; manca l'email di contatto da mettere al posto del segnaposto).
+
 ## In breve, per questa uscita (1.0.0, tutto gratis)
 
 Decisione di Riccardo del 10/10/2026: «metterlo totalmente gratuito per questa versione». Iscrizione da sviluppatore pagata da Riccardo il 10/10. Effetti cruenti lasciati come sono (decisione sua: se la revisione li contesta si tolgono dalla variante `store`).
@@ -72,88 +80,82 @@ Riscritta con la 1.0.0 (Riccardo, 10/10: «la descrizione che parla solo di un r
 ## Descrizione lunga (EN)
 
 ```
-Page Brawl turns any web page into an arena. Click the icon and the fight starts right on the site you are reading: the fighters run and jump on its headings, buttons and images, so every site is a new arena with its own platforms.
+Page Brawl is a roguelike survivor that you play on top of the web page you already have open. Click the icon and the site you are reading becomes the arena: headings, buttons, images and cards turn into platforms, and every website plays differently. A run takes a few minutes, so it fits between one email and the next.
 
-TWO MODES
-• Every time you start, choose how to play: Endless run or Free combat. Characters, items and surprises live in the Free combat menu.
+ENDLESS RUN: THE ROGUELIKE
+• Pick a fighter and survive wave after wave. Every round is bigger and faster than the last, and almost every round brings a new enemy.
+• Defeated enemies drop gems. Every level up pauses the game and offers 3 cards: new automatic weapons, upgrades, or an evolution. No two runs build the same way.
+• Six auto-weapons that fire on their own: orbiting phones, shockwave, lightning, fire aura, homing darts, spinning blade. Take one to level 5 with its paired upgrade and it evolves.
+• Enemies: shamblers, crawlers, bloaters, armored and enraged zombies, boomers that explode, frost biters that slow you down, leapers, spitters, brutes, bosses with their own health bar, crows diving from above and little dragons breathing fire, lightning or venom.
+• Ground and sky: fly up to hunt the dragons, then slam down on the crowd.
+• Surprises every few seconds: a golden zombie running off with coins, a rain of gems, a chest on a parachute, a frenzy that doubles your weapons.
+• Three lives that don't come back, and one last chance: aim your finishing move along a sweeping line, and if it lands you get a life back.
+• Coins carry over between runs: spend them in the Workshop on permanent upgrades and go further every time.
+• Global leaderboard: at the end of a run, type a name and see where you rank against everyone else.
 
-ENDLESS RUN: A ROGUELIKE SURVIVOR
-• Pick your fighter and survive round after round, with no menus in between. Every round is bigger, faster and different from the last one.
-• A new enemy in almost every round: shamblers, crawlers, bloaters, armored and enraged zombies, boomers that explode, frosty biters that slow you down, leapers, spitters, brutes, a boss with a health bar, ghoul crows diving from the sky, and little dragons that shoot fire, lightning or venom.
-• Ground and sky at the same time: your fighter takes off to hunt flying enemies and slams back down on the crowd below.
-• Defeated enemies drop gems. Every level up pauses the action and offers three cards: automatic weapons (orbiting phones, shockwave, lightning, fire aura, homing darts, spinning blade), upgrades, and evolutions when a weapon reaches level five with its paired upgrade.
-• Surprises every few seconds: a golden zombie running off with coins, a rain of gems, a chest floating down on a parachute, a frenzy that doubles your weapons.
-• Duels against the other fighter, survival rounds against the clock, boss rounds with chests.
-• Three lives that don't come back, and a last chance: aim your final move along a sweeping line, and if it hits, you get a life back.
-• Coins stay between runs and buy permanent upgrades in the workshop. Your best score stays on your device.
-• Runs are short and intense, a few minutes each, and the better you play, the longer you last.
+THE PAGE IS PART OF THE GAME
+• Fighters climb on headings, buttons, images and cards, and fly up to land on them.
+• Throw a fighter into a card, or let a bomb go off next to it, and the real element on the page jolts and bounces back.
+• Works on news sites, shops, forums and the web apps you use every day, including pages built with web components.
 
-MANY FIGHTERS
-• Four families, two fighters each, switchable at the start of every run. You start with the super warriors, who fly, fire energy waves and transform. Then the wizards, who freeze, shrink and ride brooms, the duelists with energy blades, and the classic robot and apple.
+FOUR FAMILIES OF FIGHTERS
+• Super warriors who fly, fire energy waves and power up; wizards who freeze, shrink and ride brooms; duelists with energy blades; the classic robot and apple.
 
 FREE COMBAT
-• Two fighters brawl on their own: grab them with the mouse, throw them, hit one with the other.
-• Smoke bombs, jars that release fire, lightning and water creatures, weapons and bombs.
-• Zombie hordes where the two team up back to back, a black hole, meteorites, rain, hurricanes, slow motion and strange gravity.
-• Energy clashes you win by hammering a button, finishing moves with short cinematic scenes, transformations and health bars.
-• A corner controller to command every move with one click.
+• Prefer to watch? Two fighters brawl on their own. Grab them with the mouse, throw them, or use one to hit the other.
+• Items, creature jars, a black hole, meteorites, zombie hordes where the two team up, energy clashes, finishing moves and a corner controller for every move.
 
 KEYBOARD AND SOUND
-• Play with the keyboard: Q W E R T Y for moves, A and D to walk, F to fly, Z for the final move, X C V for items. Every key can be remapped.
-• Optional sound, synthesized on the spot, coming from the side of the screen where things happen.
+• Q W E R T Y for moves, A and D to walk, F to fly, Z for the finishing move, X C V for items. Every key can be remapped.
+• Optional synthesized sound.
 
-Everything is free: nothing to unlock, nothing to buy, no account.
+Free. No account, no ads, nothing to buy.
 
-The power button in the corner turns everything off. The page itself is never changed. Game language: English by default, Italian, Spanish, French and German in the options.
+The power button in the corner turns everything off at once. The page is never changed and never read: Page Brawl only measures where things are on screen.
+Privacy: the only data that leaves your browser is a leaderboard entry (a name you type and your score), and only when you press Send. Settings, coins and records stay on your device.
 
-Privacy: Page Brawl collects nothing and sends nothing. It only runs on the tab where you click its icon. Your settings, coins and records stay on your device.
-
-Cartoon violence only. Stronger effects are off by default and can be enabled in the panel.
-
+Cartoon violence. Stronger effects are off by default.
 Does not run on browser pages (chrome://), the Chrome Web Store or PDF files.
 ```
 
 ## Descrizione lunga (IT)
 
 ```
-Page Brawl trasforma qualsiasi pagina web in un'arena. Clicca l'icona e la lotta parte sul sito che stai leggendo: i lottatori corrono e saltano su titoli, tasti e immagini della pagina, quindi ogni sito è un ring nuovo, con le sue piattaforme.
+Page Brawl è un survivor roguelike che giochi sopra la pagina web che hai già aperta. Clicchi l'icona e il sito che stai leggendo diventa l'arena: titoli, tasti, immagini e riquadri diventano piattaforme, e ogni sito si gioca in modo diverso. Una corsa dura pochi minuti, ci sta fra una mail e l'altra.
 
-DUE MODI
-• A ogni accensione scegli come giocare: Corsa infinita o Combattimento libero. Personaggi, oggetti e imprevisti stanno nel menu del Combattimento libero.
+CORSA INFINITA: IL ROGUELIKE
+• Scegli un lottatore e sopravvivi ondata dopo ondata. Ogni round è più grande e più veloce del precedente, e quasi ogni round porta un nemico nuovo.
+• I nemici abbattuti lasciano gemme. A ogni livello il gioco si ferma e offre 3 carte: armi automatiche nuove, potenziamenti o un'evoluzione. Nessuna corsa si costruisce uguale.
+• Sei armi automatiche che colpiscono da sole: telefoni in orbita, onda d'urto, fulmine, aura di fuoco, dardi a ricerca, lama rotante. Portane una al livello 5 col suo potenziamento e si evolve.
+• Nemici: zombie lenti, striscianti, gonfi, corazzati e rabbiosi, il botto che esplode, il gelido che ti rallenta, il saltatore, lo sputatore, il bestione, capi con la loro barra della vita, corvacci in picchiata e draghetti che sputano fuoco, fulmini o veleno.
+• Terra e cielo: voli su a caccia dei draghi e ripiombi sulla folla.
+• Sorprese ogni pochi secondi: lo zombie d'oro che scappa con le monete, la pioggia di gemme, il forziere col paracadute, la frenesia che raddoppia le armi.
+• Tre vite che non tornano e un'ultima possibilità: mira il colpo finale lungo una linea che oscilla, e se va a segno ti ridà una vita.
+• Le monete restano fra una corsa e l'altra: spendile nella Bottega in potenziamenti permanenti e arrivi più lontano ogni volta.
+• Classifica globale: a fine corsa scrivi un nome e vedi dove sei rispetto a tutti gli altri.
 
-CORSA INFINITA: UN SURVIVOR ROGUELIKE
-• Scegli il tuo lottatore e sopravvivi round dopo round, senza menu in mezzo. Ogni round è più grande, più veloce e diverso dal precedente.
-• Un nemico nuovo quasi a ogni round: zombie lenti, striscianti, gonfi, corazzati e rabbiosi, il botto che esplode, il gelido che ti rallenta, il saltatore, lo sputatore, il bestione, un capo con la sua barra della vita, corvacci che piombano dal cielo e draghetti che tirano fuoco, fulmini o veleno.
-• Terra e cielo insieme: il tuo lottatore decolla per prendere i nemici in volo e ripiomba di schianto sulla folla.
-• I nemici abbattuti lasciano gemme. A ogni livello il gioco si ferma e offre tre carte: armi automatiche (telefoni in orbita, onda d'urto, fulmine, aura di fuoco, dardi a ricerca, lama rotante), potenziamenti, ed evoluzioni quando un'arma arriva al quinto livello col suo potenziamento.
-• Sorprese ogni pochi secondi: lo zombie d'oro che scappa con le monete, una pioggia di gemme, un forziere col paracadute, la frenesia che raddoppia le armi.
-• Duelli contro l'altro lottatore, round di sopravvivenza a tempo, round col capo e i forzieri.
-• Tre vite che non tornano, e un'ultima possibilità: mira il colpo finale lungo una linea che oscilla, e se va a segno ti ridà una vita.
-• Le monete restano fra una corsa e l'altra e comprano potenziamenti permanenti nella bottega. Il tuo record resta sul tuo dispositivo.
-• Partite corte e intense, pochi minuti l'una; più giochi bene, più duri.
+LA PAGINA FA PARTE DEL GIOCO
+• I lottatori salgono su titoli, tasti, immagini e riquadri, e ci volano sopra per atterrarci.
+• Lancia un lottatore contro un riquadro, o fai scoppiare una bomba lì accanto, e l'elemento vero della pagina sobbalza e torna a posto.
+• Funziona su siti di notizie, negozi, forum e le web app che usi ogni giorno, anche quelle fatte coi web component.
 
-TANTI PERSONAGGI
-• Quattro famiglie, due lottatori ciascuna, da cambiare all'inizio di ogni corsa. Si parte coi super guerrieri, che volano, lanciano onde di energia e si trasformano. Poi i maghi, che congelano, rimpiccioliscono e volano sulla scopa, i duellanti con le lame di energia, e il robot e la mela classici.
+QUATTRO FAMIGLIE DI LOTTATORI
+• Super guerrieri che volano, lanciano onde di energia e si trasformano; maghi che congelano, rimpiccioliscono e volano sulla scopa; duellanti con le lame di energia; il robot e la mela classici.
 
 COMBATTIMENTO LIBERO
-• Due lottatori si picchiano da soli: prendili col mouse, lanciali, usa l'uno per colpire l'altro.
-• Fumogeni, barattoli che liberano creature di fuoco, fulmini e acqua, armi e bombe.
-• Orde di zombie in cui i due si alleano spalle a spalla, il buco nero, meteoriti, pioggia, uragani, rallentatore e gravità strane.
-• Scontri di energie da vincere martellando un tasto, colpi finali con brevi scene, trasformazioni e barre della vita.
-• Un controller nell'angolo per comandare ogni mossa con un clic.
+• Preferisci guardare? Due lottatori si picchiano da soli. Prendili col mouse, lanciali, usa l'uno per colpire l'altro.
+• Oggetti, barattoli con le creature, buco nero, meteoriti, orde di zombie in cui i due si alleano, scontri di energie, colpi finali e un controller nell'angolo per ogni mossa.
 
 TASTIERA E AUDIO
-• Si gioca anche da tastiera: Q W E R T Y le mosse, A e D per camminare, F per volare, Z il colpo finale, X C V gli oggetti. Ogni tasto si cambia.
-• Audio facoltativo, sintetizzato al momento, che arriva dal lato dello schermo dove succede la cosa.
+• Q W E R T Y le mosse, A e D per camminare, F per volare, Z il colpo finale, X C V gli oggetti. Ogni tasto si cambia.
+• Audio facoltativo, sintetizzato al momento.
 
-È tutto gratis: niente da sbloccare, niente da comprare, nessun account.
+Gratis. Niente account, niente pubblicità, niente da comprare.
 
-Il tasto di accensione nell'angolo spegne tutto. La pagina non viene mai modificata. Lingua del gioco: inglese di serie, italiano, spagnolo, francese e tedesco nelle opzioni.
+Il tasto di accensione nell'angolo spegne tutto in un colpo. La pagina non viene mai modificata né letta: Page Brawl misura solo dove stanno le cose sullo schermo.
+Privacy: l'unico dato che esce dal browser è una voce in classifica (un nome che scrivi tu e il tuo punteggio), e solo quando premi Invia. Opzioni, monete e record restano sul tuo dispositivo.
 
-Privacy: Page Brawl non raccoglie e non invia niente. Funziona solo sulla scheda in cui clicchi la sua icona. Opzioni, monete e record restano sul tuo dispositivo.
-
-Solo violenza da cartone animato. Gli effetti più forti sono spenti e si accendono dalla tendina.
-
+Violenza da cartone animato. Gli effetti più forti partono spenti.
 Non funziona sulle pagine del browser (chrome://), sul Chrome Web Store e sui PDF.
 ```
 
@@ -171,14 +173,14 @@ Page Brawl is a cartoon fighting game (an endless roguelike survivor plus a free
 | --- | --- |
 | `activeTab` | The animation is drawn on the current tab only after the user clicks the extension icon. activeTab gives access to that single tab for that click, so no host permissions are needed. |
 | `scripting` | Used to inject the extension's own bundled scripts and one small style rule into the tab the user clicked on. No remote code is loaded. |
-| `storage` | Saves the user's options, the in-game coins, the keyboard mapping and what the fighters have learned locally, so they are the same on every site. Nothing is sent anywhere. |
+| `storage` | Saves the user's options, the in-game coins, the keyboard mapping and what the fighters have learned locally, so they are the same on every site. Stored data is never sent anywhere. |
 | Host facoltativo (`<all_urls>`) | Optional and off by default. It is requested only when the user turns on "Show the power button on every site" in the options page; it is used to place that one button on each page so the animation can be started without the toolbar icon. No page content is read or transmitted. Turning the option off removes the permission. |
 
 **Codice remoto:** No, I am not using remote code.
 
-**Uso dei dati:** nessuna casella spuntata (l'estensione non raccoglie dati). Spuntare le tre dichiarazioni finali: i dati non vengono venduti, non vengono usati per scopi estranei, non servono a valutare l'affidabilità creditizia.
+**Uso dei dati (dalla 1.1.0):** spuntare **«Informazioni che consentono l'identificazione personale»**. Il nome della classifica è uno pseudonimo scelto dal giocatore, ma qualcuno può scriverci il proprio nome vero: dichiararlo è la scelta prudente, e non dichiararlo rischia un rifiuto. Le altre caselle restano vuote (niente salute, finanze, autenticazione, comunicazioni, posizione, cronologia, attività o contenuti dei siti). Le tre dichiarazioni finali restano tutte spuntate.
 
-**Informativa sulla privacy:** per un'estensione che non raccoglie dati l'indirizzo non è obbligatorio, e con la 1.0.0 tutta gratis resta così: non parte nessuna richiesta di rete. Quando si aggiunge l'acquisto di Premium diventa necessario, perché il servizio di pagamento tratta l'email di chi compra.
+**Informativa sulla privacy (dalla 1.1.0, obbligatoria):** `https://mobileupdatetracker.duckdns.org/static/pagebrawl/privacy.html`, la stessa dell'app Android, con la sezione sulla classifica globale. Prima di inviare va messa l'email di contatto al posto del segnaposto.
 
 ## Immagini
 

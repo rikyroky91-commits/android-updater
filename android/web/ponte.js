@@ -28,6 +28,19 @@
     risoluzione: Math.max(50, Math.min(100, +dati["pb-risoluzione"] || 75)) / 100,
     dettaglio: ["basso", "medio", "alto"].indexOf(dati["pb-dettaglio"]) >= 0 ? dati["pb-dettaglio"] : "medio",
   };
+  // LA CLASSIFICA GLOBALE (13/10/2026): la stessa del sito e dell'estensione. Rete solo quando
+  // si apre la classifica o si manda il proprio punteggio (nome scelto, punti, round).
+  var CLASSIFICA = "https://mobileupdatetracker.duckdns.org/api/corsa";
+  window.__pbClassifica = {
+    carica: function () {
+      return fetch(CLASSIFICA + "/classifica?limite=10", { cache: "no-store", credentials: "omit" })
+        .then(function (r) { if (!r.ok) throw r.status; return r.json(); });
+    },
+    invia: function (dati) {
+      return fetch(CLASSIFICA + "/punteggio", { method: "POST", credentials: "omit", headers: { "Content-Type": "application/json" }, body: JSON.stringify(dati) })
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; }); });
+    },
+  };
   window.__pbSalva = function (oggetto) {
     if (!pb) return;
     try { pb.salva(JSON.stringify(oggetto)); } catch (e) { /* resta in memoria per questa volta */ }

@@ -136,6 +136,10 @@
   // --- Stato del mondo -------------------------------------------------
   let W = 0, H = 0, S = 1, pavimento = 0;
   let ostacoli = [];
+  // Le «scatole» della pagina (13/10/2026): riquadri con uno sfondo, un bordo o un'ombra (schede,
+  // card, barre, post). Il loro bordo alto è una sporgenza su cui salire; se ci sbatte contro
+  // un lottatore lanciato o un'esplosione, il riquadro vero sobbalza e torna a posto.
+  let scatole = [];
   let lottatori = [];
   let scritte = [];
   let punteggio = { robot: 0, mela: 0 };
@@ -154,7 +158,10 @@
   let prossimoEvento = 700, prossimoTelefono = 360;
   // La corsa infinita (vedi «LA CORSA INFINITA»): lo stato sta qui in cima perché
   // il pannello e il primo disegno lo leggono mentre lo script si avvia.
-  const sulSito = !window.__ringRadice;                        // l'estensione non parla con nessun server
+  const sulSito = !window.__ringRadice;
+  // La classifica globale: c'è dove qualcuno ha messo `window.__ringClassifica` (il sito con
+  // static/classifica.js; dal 13/10/2026 anche l'estensione, che passa dal suo service worker).
+  const conClassifica = () => !!window.__ringClassifica;
   let corsa = null, recordCorsa = 0, tastiUI = [], campoNome = null;
   // La scelta del modo (10/10/2026, estensione): all'accensione «Corsa infinita» o «Combattimento libero».
   // La chiede chi carica il ring con `window.__ringSceltaModo` (l'estensione); il sito parte libero.
@@ -423,6 +430,8 @@
   // si sblocca l'arsenale: tablet, portatili, eventi, jetpack, il pieghevole
   // della mela. Dopo 70 arrivano anche pistole e spade (da cartone animato).
   const CALMA = 60 * 60, ARMI = 70 * 60;
+  // In volo si va presto (13/10/2026, Riccardo: «volano poco»): dopo otto secondi, non dopo un minuto.
+  const VOLO_DOPO = 8 * 60;
   let tempo = 0, prossimaArma = 0, prossimoDuo = 0, prossimaBombaRobot = 0, proiettili = [], pezzi = [];
   // Gli imprevisti scelti a mano dalla tendina (o arrivati a sorpresa).
   let acquazzone = false, uragano = null, gravitaScelta = 1, sorprese = true;
@@ -553,7 +562,7 @@
   // largo quanto la colonna anche quando la riga è corta), più i
   // controlli — campi, tasti, immagini — e la testata intera. Tutto in
   // coordinate della finestra, come il canvas.
-  const SOLIDI = "input, button, select, textarea, img";
+  const SOLIDI = "input, button, select, textarea, img, video, iframe, [role=button], [role=img]";
   const RIGA_MIN = 32;
   const FUORI = ".ultimora, script, style, canvas, noscript, datalist, [hidden], .sr-only";
 
@@ -562,10 +571,101 @@
       r.bottom > -40 && r.top < H + 40 && r.right > 0 && r.left < W;
   }
 
+  // Gli elementi dentro i web component (Reddit, YouTube…) stanno in uno shadow DOM aperto:
+  // querySelectorAll dalla pagina non li vede. Si entra nelle radici aperte, con un tetto.
+  function radiciOmbra(radice, fuori) {
+    const out = [];
+    if (!document.createTreeWalker) return out;
+    const giro = document.createTreeWalker(radice, 1 /* NodeFilter.SHOW_ELEMENT */);
+    let n, visti = 0;
+    while ((n = giro.nextNode()) && visti++ < 6000 && out.length < 400) {
+      if (n.shadowRoot && n !== fuori) { out.push(n.shadowRoot); out.push(...radiciOmbra(n.shadowRoot, fuori)); }
+    }
+    return out;
+  }
+  let ombreCache = null, ombreQuando = -1e9;
+  function tutteLeRadici() {
+    const host = tela && tela.getRootNode && tela.getRootNode().host;
+    if (!ombreCache || passi - ombreQuando > 240) { ombreCache = document.body ? radiciOmbra(document.body, host) : []; ombreQuando = passi; }
+    return document.body ? [document.body].concat(ombreCache) : [];
+  }
+  // Ha l'aria di un riquadro? Uno sfondo non trasparente, un bordo visibile o un'ombra.
+  function eScatola(el, cs) {
+    const tag = el.tagName;
+    if (tag === "IMG" || tag === "VIDEO" || tag === "IFRAME" || tag === "PICTURE") return true;
+    if (cs.backgroundImage && cs.backgroundImage !== "none") return true;
+    const bg = cs.backgroundColor;
+    if (bg && bg !== "transparent" && !/rgba\([^)]*,\s*0(\.0+)?\)$/.test(bg)) return true;
+    if (parseFloat(cs.borderTopWidth) >= 1 && cs.borderTopStyle !== "none" && !/rgba\([^)]*,\s*0(\.0+)?\)$/.test(cs.borderTopColor)) return true;
+    if (cs.boxShadow && cs.boxShadow !== "none") return true;
+    return false;
+  }
+  // Le scatole visibili: si guarda la finestra a griglia e, sotto ogni punto, gli elementi
+  // e i loro antenati (anche dentro gli shadow DOM). Solo quello che si vede, e niente di nostro.
+  function cercaScatole(host) {
+    const trovate = [], visti = new Set();
+    if (!document.elementsFromPoint || typeof getComputedStyle !== "function") return trovate;
+    const passo = Math.max(44, Math.round(Math.min(W, H) / 12));
+    const considera = (el) => {
+      for (let k = 0; el && k < 7; k++, el = el.parentElement || (el.getRootNode && el.getRootNode().host) || null) {
+        if (visti.has(el)) return;
+        visti.add(el);
+        if (el === document.body || el === document.documentElement || el === host) return;
+        const r = el.getBoundingClientRect();
+        if (r.width < 48 || r.height < 24 || r.width > W * 0.985 && r.height > H * 0.7) continue;
+        if (r.bottom < 0 || r.top > H || r.top < 8) continue;
+        const cs = getComputedStyle(el);
+        if (cs.visibility === "hidden" || cs.position === "fixed" && r.height > H * 0.5) continue;
+        if (eScatola(el, cs)) trovate.push({ l: r.left, t: r.top, r: r.right, b: r.bottom, el });
+      }
+    };
+    for (let y = passo * 0.6; y < H - 10; y += passo) for (let x = passo * 0.5; x < W; x += passo) {
+      let sotto = document.elementsFromPoint(x, y);
+      for (let i = 0; i < Math.min(4, sotto.length); i++) {
+        let el = sotto[i];
+        // dentro gli shadow DOM aperti, fino in fondo
+        for (let g = 0; g < 4 && el && el.shadowRoot && el.shadowRoot.elementsFromPoint; g++) {
+          const dentro = el.shadowRoot.elementsFromPoint(x, y)[0];
+          if (!dentro || dentro === el) break;
+          considera(dentro); el = dentro;
+        }
+        considera(sotto[i]);
+      }
+    }
+    // dalla più piccola: dentro una card conta prima il riquadro interno
+    trovate.sort((a, b) => (a.r - a.l) * (a.b - a.t) - (b.r - b.l) * (b.b - b.t));
+    return trovate.slice(0, 90);
+  }
+  const inArenaApp = () => !!window.__ringArena;
+  // IL SOBBALZO (13/10/2026): l'elemento vero della pagina che prende una botta si sposta di
+  // qualche pixel verso dove è stato colpito, ruota appena e torna a posto da solo. È solo
+  // un'animazione (Web Animations, `composite: add`): la pagina non viene modificata.
+  const sobbalzi = new WeakMap();
+  function scuoti(el, dx, dy, forza) {
+    if (!el || !el.animate || !el.isConnected || inArenaApp() || el.tagName === "IMG" && !el.src) return;
+    const ora = performance.now();
+    if (ora - (sobbalzi.get(el) || 0) < 260) return;
+    sobbalzi.set(el, ora);
+    const k = Math.max(0.25, Math.min(1, forza)), lung = Math.hypot(dx, dy) || 1;
+    const mx = dx / lung * 9 * k, my = dy / lung * 9 * k, rot = (dx >= 0 ? 1 : -1) * 2.2 * k;
+    try {
+      el.animate([
+        { transform: "translate(0px, 0px) rotate(0deg)" },
+        { transform: `translate(${mx.toFixed(1)}px, ${my.toFixed(1)}px) rotate(${rot.toFixed(2)}deg)`, offset: 0.22 },
+        { transform: `translate(${(-mx * 0.35).toFixed(1)}px, ${(-my * 0.35).toFixed(1)}px) rotate(${(-rot * 0.4).toFixed(2)}deg)`, offset: 0.55 },
+        { transform: "translate(0px, 0px) rotate(0deg)" },
+      ], { duration: 420 + 180 * k, easing: "ease-out", composite: "add" });
+    } catch (e) { /* un elemento che non si anima: pazienza */ }
+  }
+  // Le scatole sotto un punto (la più piccola per prima, come le ha messe cercaScatole).
+  function scatolaA(x, y) {
+    for (const sc of scatole) if (x >= sc.l && x <= sc.r && y >= sc.t && y <= sc.b) return sc;
+    return null;
+  }
   function rileva() {
     const lista = [];
-    const aggiungi = (r) => {
-      if (riquadroUtile(r)) lista.push({ l: r.left, t: r.top, r: r.right, b: r.bottom });
+    const aggiungi = (r, el) => {
+      if (riquadroUtile(r)) lista.push({ l: r.left, t: r.top, r: r.right, b: r.bottom, el: el || null });
     };
     const testata = document.querySelector(".testata");
     if (testata && testata.getBoundingClientRect) {
@@ -574,26 +674,33 @@
       testataBasso = rt.bottom > 0 && rt.bottom < H * 0.3 ? rt.bottom : 0;
     }
 
-    const radice = document.body;
-    if (radice && radice.querySelectorAll) {
+    const host = tela && tela.getRootNode && tela.getRootNode().host;
+    const radici = tutteLeRadici();
+    for (const radice of radici) {
+      if (!radice.querySelectorAll) continue;
       for (const el of radice.querySelectorAll(SOLIDI)) {
         if (el.closest && (el.closest(FUORI) || (testata && el.closest(".testata")))) continue;
-        aggiungi(el.getBoundingClientRect());
+        aggiungi(el.getBoundingClientRect(), el);
       }
     }
-    if (radice && document.createTreeWalker && document.createRange) {
-      const giro = document.createTreeWalker(radice, 4 /* NodeFilter.SHOW_TEXT */);
+    if (document.createTreeWalker && document.createRange) {
       const intervallo = document.createRange();
-      let nodo;
-      while ((nodo = giro.nextNode()) && lista.length < 220) {
-        if (!nodo.nodeValue || !nodo.nodeValue.trim()) continue;
-        const padre = nodo.parentElement;
-        if (!padre || padre.closest(FUORI) || padre.closest(SOLIDI) ||
-            (testata && padre.closest(".testata"))) continue;
-        intervallo.selectNodeContents(nodo);
-        // Le scritte piccole (note, didascalie, righe di testo corrente) non
-        // sono solide: i lottatori ci si incastravano di continuo.
-        for (const r of intervallo.getClientRects()) if (r.height >= RIGA_MIN) aggiungi(r);
+      for (const radice of radici) {
+        const giro = document.createTreeWalker(radice, 4 /* NodeFilter.SHOW_TEXT */);
+        let nodo;
+        while ((nodo = giro.nextNode()) && lista.length < 260) {
+          if (!nodo.nodeValue || !nodo.nodeValue.trim()) continue;
+          const padre = nodo.parentElement;
+          if (!padre || padre.closest(FUORI) || padre.closest(SOLIDI) ||
+              (testata && padre.closest(".testata"))) continue;
+          intervallo.selectNodeContents(nodo);
+          // Le scritte piccole (note, didascalie, righe di testo corrente) non
+          // sono solide: i lottatori ci si incastravano di continuo. I titoli sì,
+          // anche quelli di media grandezza (i titoli dei post, delle schede).
+          const titolo = padre.closest("h1, h2, h3, h4, [role=heading]");
+          const minimo = titolo ? 18 : RIGA_MIN;
+          for (const r of intervallo.getClientRects()) if (r.height >= minimo) aggiungi(r, titolo || padre);
+        }
       }
     }
     // Le righe vicine sulla stessa linea diventano un pezzo solo: meno
@@ -603,7 +710,7 @@
     for (const o of lista) {
       const u = uniti[uniti.length - 1];
       if (u && Math.abs(u.t - o.t) < 4 && Math.abs(u.b - o.b) < 4 && o.l <= u.r + 10) {
-        u.r = Math.max(u.r, o.r); u.l = Math.min(u.l, o.l);
+        u.r = Math.max(u.r, o.r); u.l = Math.min(u.l, o.l); if (!u.el) u.el = o.el;
       } else uniti.push(Object.assign({}, o));
     }
     // E le righe dello stesso paragrafo diventano un blocco: fra una riga e
@@ -618,6 +725,15 @@
       } else blocchi.push(o);
     }
     ostacoli = blocchi.slice(0, 160);
+    // Le sporgenze: il bordo alto delle scatole, sottile e solo da sopra (ci si sale, da sotto
+    // ci si passa attraverso). Non dove c'è già un elemento solido allo stesso punto.
+    scatole = inArenaApp() ? [] : cercaScatole(host);
+    for (const sc of scatole) {
+      if (ostacoli.length >= 230) break;
+      if (sc.r - sc.l < 60) continue;
+      const gia = ostacoli.some((o) => Math.abs(o.t - sc.t) < 6 && o.l <= sc.l + 8 && o.r >= sc.r - 8);
+      if (!gia) ostacoli.push({ l: sc.l, t: sc.t, r: sc.r, b: sc.t + 7, uno: true, el: sc.el });
+    }
     pavimento = barra && barra.getBoundingClientRect ? barra.getBoundingClientRect().top : H;
     if (barra && barra.getBoundingClientRect) barraAlta = barra.getBoundingClientRect().height || 44;
     if (!(pavimento > 0)) pavimento = H;
@@ -1539,6 +1655,16 @@
   }
 
   // --- Il jetpack: si decolla, si lotta in aria, ogni tanto impazzisce ----
+  // A che altezza si vola: spesso fino al bordo di una scheda della pagina più in alto, per
+  // poi posarcisi sopra (13/10/2026: «le interazioni con il sito sono limitate»); se no, poco sopra.
+  function quotaVolo(b, margine, su, piuSu) {
+    const fondo = fondoVolo() - margine * S;
+    if (!lava && !inArenaApp() && Math.random() < 0.65) {
+      const mete = ostacoli.filter((o) => o.t > 90 && o.t < b.y - 40 * S && o.r - o.l > 50 * S);
+      if (mete.length) { const o = mete[Math.floor(Math.random() * mete.length)]; return Math.max(80, Math.min(fondo, o.t - 34 * S)); }
+    }
+    return Math.max(110, Math.min(fondo, b.y - caso(su, piuSu) * S));
+  }
   function decolla(f, impazzito) {
     if (f && f.p) suona("jet", f.p.bacino.x, 0.8);
     if (verso < 0) return;                       // sottosopra niente jetpack
@@ -1546,7 +1672,7 @@
     f.volo = false;
     const b = f.p.bacino;
     f.jet = Math.round(caso(260, 560)); f.azione = null; f.scalata = null; f.pensa = 6;
-    f.volaY = Math.max(110, Math.min(fondoVolo() - 90 * S, b.y - caso(70, 170) * S));
+    f.volaY = quotaVolo(b, 90, 70, 170);
     f.caos = impazzito ? Math.round(caso(200, 340)) : 0;
     f.giro = (Math.random() < 0.5 ? -1 : 1) * caso(0.09, 0.16); f.rot = 0;
     for (const n in f.p) f.p[n].oy = f.p[n].y + 3.5 * S;
@@ -1759,7 +1885,7 @@
     const lv = livelloDi(f.tipo);
     // Chi ha imparato (livello 4) si alza in volo di proposito per inseguire
     // un avversario che sta volando.
-    if (tempo >= CALMA && !lava && !f.tel && Math.random() < 0.045 * f.furbo * (lv >= 4 && altro.jet > 0 ? 5 : 1)) { decolla(f, altro.jet > 0 ? false : Math.random() < 0.3); return; }
+    if (tempo >= VOLO_DOPO && !lava && !f.tel && Math.random() < 0.07 * f.furbo * (lv >= 4 && altro.jet > 0 ? 5 : 1)) { decolla(f, altro.jet > 0 ? false : Math.random() < 0.3); return; }
     // L'avversario sta per colpire: ci si para o si schiva.
     if (altro.azione && COLPI[altro.azione] && Math.abs(altro.cx - f.cx) < 34 * S &&
         Math.abs(altro.base - f.base) <= 18 * S &&
@@ -2400,6 +2526,7 @@
         // Solo scendendo, e solo se un attimo prima si era sopra il bordo alto.
         if (pt.oy <= o.t - r + 1 && pt.y > o.t - r) {
           const vx = pt.x - pt.ox, vy = pt.y - pt.oy;
+          if (vy > 6 * S && o.el) scuoti(o.el, 0, 1, vy / (VELOCITA_MAX * S));
           pt.y = o.t - r; if (vy > 0) pt.oy = pt.y; pt.ox = pt.x - vx * 0.7;
           urto = Math.max(urto, prima);
         }
@@ -2407,6 +2534,17 @@
       return urto;
     }
     for (const o of ostacoli) {
+      if (o.uno) {
+        // Una sporgenza (il bordo alto di una scatola): ci si posa solo arrivando da sopra.
+        if (pt.x < o.l - r || pt.x > o.r + r) continue;
+        if (pt.oy <= o.t - r + 1 && pt.y > o.t - r) {
+          const vx = pt.x - pt.ox, vy = pt.y - pt.oy;
+          if (vy > 6 * S) scuoti(o.el, vx * 0.3, 1, vy / (VELOCITA_MAX * S));
+          pt.y = o.t - r; if (vy > 0) pt.oy = pt.y; pt.ox = pt.x - vx * 0.7;
+          urto = Math.max(urto, prima);
+        }
+        continue;
+      }
       const dentroX = pt.x >= o.l - r && pt.x <= o.r + r;
       // Attraversato in un passo solo (un lancio veloce su una riga sottile):
       // conta come urto sul lato da cui arrivava.
@@ -2426,6 +2564,7 @@
         lato = m === pt.y - (o.t - r) ? "su" : m === (o.b + r) - pt.y ? "giu"
              : m === pt.x - (o.l - r) ? "sx" : "dx";
       }
+      if (prima > 6 * S && o.el) scuoti(o.el, lato === "sx" ? 1 : lato === "dx" ? -1 : vx * 0.2, lato === "su" ? 1 : lato === "giu" ? -1 : 0, prima / (VELOCITA_MAX * S));
       if (lato === "su") { pt.y = o.t - r; if (vy > 0) pt.oy = pt.y; pt.ox = pt.x - vx * 0.7; }
       else if (lato === "giu") { pt.y = o.b + r; if (vy < 0) pt.oy = pt.y; }
       else if (lato === "sx") { pt.x = o.l - r; pt.ox = pt.x + Math.max(0, vx) * 0.3; }
@@ -3591,6 +3730,11 @@
     suona("boom", x, potenza);
     const R = 80 * S * potenza;
     scossa = Math.max(scossa, Math.round(10 + 8 * potenza)); fermoColpo = Math.max(fermoColpo, 6);
+    // Le schede della pagina vicine allo scoppio sobbalzano via dal centro.
+    for (const sc of scatole) {
+      const cx = Math.max(sc.l, Math.min(x, sc.r)), cy = Math.max(sc.t, Math.min(y, sc.b)), d = Math.hypot(cx - x, cy - y);
+      if (d < R * 1.6) scuoti(sc.el, (sc.l + sc.r) / 2 - x, (sc.t + sc.b) / 2 - y, potenza * (1 - d / (R * 1.6)) + 0.3);
+    }
     const metti = (q) => { if (particelle.length < MAX_PARTICELLE) particelle.push(q); };
     metti({ tipo: "lampo", x, y, vx: 0, vy: 0, vita: 7, max: 7, r: R * 1.4 });
     metti({ tipo: "onda", x, y, vx: 0, vy: 0, vita: 24, max: 24, colore: "#fff3b0" });
@@ -6880,7 +7024,7 @@
   function prendiIlVolo(f) {
     const b = f.p.bacino;
     f.volo = true; f.jet = Math.round(caso(900, 1600)); f.caos = 0; f.azione = null; f.scalata = null; f.pensa = 8;
-    f.volaY = Math.max(110, Math.min(fondoVolo() - 70 * S, b.y - caso(60, 150) * S));
+    f.volaY = quotaVolo(b, 70, 60, 150);
     f.paracadute = 0;
     for (const n in f.p) f.p[n].oy = f.p[n].y + 6 * S;
     const col = COLORI_ANIME[f.tipo];
@@ -8212,13 +8356,14 @@
   // richiamano né il robot né la mela, né personaggi di altri.
   const ASPETTI = {
     guerrieri: {
-      // Zefir rifatto l'11/10/2026 sul pupazzo disegnato da Riccardo: capelli argento a punte,
-      // torso nudo, pantaloni arancioni, fascia, polsini e stivali blu col risvolto rosso.
-      robot: { nome: "ZEFIR", pelle: "#f2c9a0", capelli: "#a9bbdc", tuta: "#f08a24", bordo: "#2f5fb8", maniche: "#f2c9a0", gambe: "#f08a24", scarpe: "#2f5fb8", risvolto: "#e0482a", testa: "punte", nudo: true, fiero: true, testaGrande: true },
-      // Brasa rifatto l'11/10/2026 su richiesta di Riccardo: capelli neri a fiamma con la punta
-      // sulla fronte, tuta blu, corazza bianca con spalline e ventre dorati, guanti e stivali bianchi.
-      mela: { nome: "BRASA", pelle: "#e6b58c", capelli: "#17171c", tuta: "#2b3596", bordo: "#f2f2ee", maniche: "#2b3596", gambe: "#2b3596", scarpe: "#f2f2ee", risvolto: "#f2f2ee",
-              testa: "fiamma", armatura: "#b8952a", guanti: "#f2f2ee", fiero: true, iride: "#17171c" },
+      // Zefir rifatto l'11/10/2026 sul pupazzo disegnato da Riccardo (capelli argento a punte);
+      // il 13/10 costume nuovo: gilet cremisi senza maniche col bordo nero, pantaloni antracite,
+      // stivali di cuoio. Occhi fieri dal disegno di Riccardo (occhioFiero).
+      robot: { nome: "ZEFIR", pelle: "#f2c9a0", capelli: "#a9bbdc", tuta: "#a8233a", bordo: "#1d1d24", maniche: "#f2c9a0", gambe: "#343947", scarpe: "#5a3a24", risvolto: "#a8233a", testa: "punte", fiero: true, testaGrande: true },
+      // Brasa rifatto l'11/10/2026 (capelli neri a fiamma); il 13/10 costume nuovo: casacca verde
+      // bosco col bordo oro, pantaloni neri, stivali di cuoio, niente corazza.
+      mela: { nome: "BRASA", pelle: "#e6b58c", capelli: "#17171c", tuta: "#2f6b45", bordo: "#e9c46a", maniche: "#2f6b45", gambe: "#1d1d24", scarpe: "#4a3322", risvolto: "#e9c46a",
+              testa: "fiamma", fiero: true },
     },
     maghi: {
       robot: { nome: "MERLO", pelle: "#f0c9a4", capelli: "#e3e6ea", tuta: "#4b2f8f", bordo: "#ffd84a", maniche: "#4b2f8f", gambe: "#4b2f8f", scarpe: "#5a3a1e", testa: "cappello", cappello: "#4b2f8f", veste: true, barba: true },
@@ -8293,6 +8438,37 @@
     ctx.fillStyle = lontano ? scuro(guanto) : guanto; ctx.strokeStyle = "#17171c"; ctx.lineWidth = 1 * S;
     ctx.beginPath(); ctx.arc(mano.x, mano.y, (grande ? 4.6 : 3.2) * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   }
+  // L'occhio fiero dei super guerrieri (13/10/2026, sul disegno di Riccardo):
+  // una mandorla larga, la palpebra di sopra nera e spessa che scende dritta
+  // verso il naso, la pupilla piccola e tonda giù nel mezzo, e sopra una piega
+  // sottile che segue la palpebra. `lato` -1 sinistro, 1 destro.
+  function occhioFiero(x0, ey, lato, d, batte, rabbia, luce, nero) {
+    const k = rabbia ? 1.25 : 1, w = 2.7 * S;
+    const est = { x: x0 + lato * w, y: ey - 1.1 * S * k }, int = { x: x0 - lato * w * 0.8, y: ey + 0.5 * S * k };
+    const giu = { x: x0 + lato * 0.15 * S, y: ey + (5.4 * batte - 0.9) * S };
+    ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+    if (batte > 0.5) {
+      ctx.beginPath(); ctx.moveTo(est.x, est.y); ctx.lineTo(int.x, int.y);
+      ctx.quadraticCurveTo(giu.x, giu.y, est.x, est.y); ctx.closePath();
+      ctx.fillStyle = luce || "#ffffff"; ctx.fill();
+      if (!luce) {
+        ctx.save(); ctx.clip();
+        const px = x0 - lato * 0.1 * S + d * 0.35 * S, py = ey + 1.25 * S;
+        tondo(px, py, 0.9 * S, nero); tondo(px + 0.3 * S, py - 0.32 * S, 0.28 * S, "#ffffff");
+        ctx.restore();
+      }
+      ctx.strokeStyle = nero; ctx.lineWidth = 0.55 * S; ctx.stroke();
+    }
+    // La palpebra: una sbarra nera spessa, dritta, un filo oltre l'angolo esterno.
+    ctx.strokeStyle = nero; ctx.lineWidth = 1.3 * S; ctx.beginPath();
+    ctx.moveTo(est.x + lato * 0.35 * S, est.y - 0.2 * S); ctx.lineTo(int.x, int.y); ctx.stroke();
+    // La piega sopra, sottile, che curva come la palpebra.
+    ctx.lineWidth = 0.5 * S; ctx.beginPath();
+    ctx.moveTo(est.x - lato * 0.1 * S, est.y - 1.3 * S);
+    ctx.quadraticCurveTo(x0 + lato * 0.4 * S, ey - 2.6 * S * k, int.x + lato * 0.4 * S, int.y - 1.2 * S);
+    ctx.stroke();
+    ctx.restore();
+  }
   // La faccia, nel riferimento della testa (su = -y): cambia con quello che succede.
   function facciaUmana(f, A, luce) {
     const d = f.dir, nero = "#17171c";
@@ -8312,22 +8488,11 @@
       for (const lato of [-1, 1]) { ctx.beginPath(); ctx.arc(lato * 2.8 * S + d * 1.2 * S, ey + 0.8 * S, 1.5 * S, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke(); }
     } else {
       const batte = Math.floor(passi / 3) % 80 === 0 ? 0.3 : 1;
-      for (const lato of [-1, 1]) {
+      if (stile === "guerrieri") {
+        // Solo i super guerrieri: gli occhi fieri del disegno di Riccardo, grandi e diritti.
+        for (const lato of [-1, 1]) occhioFiero(lato * 3.1 * S + d * 0.5 * S, ey - 0.2 * S, lato, d, batte, attacca || urla, luce, nero);
+      } else for (const lato of [-1, 1]) {
         const x0 = lato * 2.8 * S + d * 1.2 * S;
-        if (A.fiero) {
-          // Zefir guarda come il pupazzo: occhi grandi a mandorla, iride grigio-azzurra (accesa da
-          // trasformato) e sopracciglia spesse che scendono verso il naso.
-          ctx.fillStyle = "#ffffff"; ctx.strokeStyle = nero; ctx.lineWidth = 0.9 * S;
-          ctx.beginPath(); ctx.ellipse(x0, ey, 2.25 * S, 2 * S * batte, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-          if (batte === 1) {
-            tondo(x0 + d * 0.7 * S, ey + 0.2 * S, (A.iride ? 0.8 : 1.05) * S, luce || A.iride || "#7f93b0");
-            tondo(x0 + d * 0.75 * S, ey + 0.2 * S, 0.5 * S, nero);
-            tondo(x0 + d * 0.25 * S, ey - 0.45 * S, 0.38 * S, "#ffffff");
-          }
-          ctx.strokeStyle = nero; ctx.lineWidth = 1.7 * S; ctx.lineCap = "round"; ctx.beginPath();
-          ctx.moveTo(x0 + lato * 2.5 * S, ey - 4.3 * S); ctx.lineTo(x0 - lato * 1.8 * S, ey - 2.7 * S); ctx.stroke();
-          continue;
-        }
         ctx.fillStyle = luce || nero; ctx.beginPath(); ctx.ellipse(x0, ey, 1.25 * S, 1.6 * S * batte, 0, 0, Math.PI * 2); ctx.fill();
         if (!luce) tondo(x0 + d * 0.4 * S, ey - 0.5 * S, 0.45 * S, "#ffffff");
         if (attacca || urla || luce) {
@@ -8760,8 +8925,10 @@
     ctx.beginPath(); ctx.arc(d * 7.4 * S, 1.4 * S, 1.5 * S, d > 0 ? -Math.PI / 2 : Math.PI / 2, d > 0 ? Math.PI / 2 : Math.PI * 1.5); ctx.stroke();
     facciaUmana(f, A, acceso ? coloreAnime(f) : null);
     // l'orecchio (i capelli davanti lo coprono, se ci arrivano)
-    // (Zefir guarda dritto davanti, come il pupazzo: l'orecchio in mezzo alla faccia sembrava un terzo occhio)
-    if (!A.fiero) { ctx.fillStyle = mix(A.pelle, "#000000", 0.06); ctx.beginPath(); ctx.ellipse(-d * 1.6 * S, 0.8 * S, 1.6 * S, 2.3 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    // coi super guerrieri, che guardano di fronte, va sul bordo della testa e non copre l'occhio
+    const xOr = stile === "guerrieri" ? -d * 7.4 * S : -d * 1.6 * S;
+    ctx.fillStyle = mix(A.pelle, "#000000", 0.06); ctx.beginPath();
+    ctx.ellipse(xOr, 0.8 * S, 1.6 * S, 2.3 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     disegnaSegni(f, "testa");
     if (!sup) capoUmano(f, A, bordo, false);
     if (cavaliere) {
@@ -10424,6 +10591,19 @@
           const pt = f.p[n];
           if (fisso === n) continue;
           if (!f.fantasma) urto = Math.max(urto, urta(f, pt, piattaforma));
+          // Un lottatore lanciato (o volato via dopo un colpo) che attraversa una scheda della
+          // pagina ci sbatte: la scheda sobbalza e lui perde un po' di slancio.
+          if (giro === 0 && n === "bacino" && !piattaforma && scatole.length && (f.lanciato > 0 || f.ko > 0)) {
+            const vx = pt.x - pt.ox, vy = pt.y - pt.oy, v = Math.hypot(vx, vy);
+            if (v > 7 * S) {
+              const sc = scatolaA(pt.x, pt.y);
+              if (sc && !(sc.colpito > passi)) {
+                sc.colpito = passi + 20; scuoti(sc.el, vx, vy, v / (VELOCITA_MAX * S));
+                for (const m in f.p) { const q = f.p[m]; q.ox += (q.x - q.ox) * 0.3; q.oy += (q.y - q.oy) * 0.3; }
+                scintille(pt.x, pt.y, 6, "#ffffff"); suona("colpo", pt.x, 0.5);
+              }
+            }
+          }
           if (pt.y > pavimento - pt.r) {
             const caduta = pt.y - pt.oy;
             if (caduta > 11.5 * S) danneggiaStriscia(pt.x, Math.min(1, caduta / (VELOCITA_MAX * S)));
@@ -12084,7 +12264,7 @@
     for (const b of dentroPannello("[data-libero]")) b.addEventListener("click", () => { if (corsa) chiudiCorsa(); sceltaModo = false; aggiornaInterruttori(); riparti(); });
     for (const b of dentroPannello("[data-audio]")) { b.setAttribute("aria-pressed", audio.acceso ? "true" : "false"); b.addEventListener("click", () => comandi.audio()); }
     for (const b of dentroPannello("[data-classifica]")) {
-      if (!sulSito) b.hidden = true;                             // l'estensione non manda e non chiede niente a nessuno
+      if (!conClassifica()) b.hidden = true;                     // senza rete (l'app sul telefono) la classifica non c'è
       else b.addEventListener("click", () => { apriPannello(false); comandi.classifica(true); });
     }
     for (const b of dentroPannello("[data-imprevisto]")) {
@@ -12516,7 +12696,7 @@
       recordCorsa = corsa.punti; corsa.record = true;
       try { deposito.setItem("mut-ring-corsa", String(recordCorsa)); } catch (errore) { /* pazienza */ }
     }
-    if (sulSito) { caricaClassifica(); mostraNome(true); }
+    if (conClassifica()) { caricaClassifica(); mostraNome(true); }
   }
   // Fuori dalla corsa: si torna al ring di sempre, com'era prima.
   function chiudiCorsa() {
@@ -13229,7 +13409,7 @@
       // Finito il carburante a mezz'aria (senza passare da `atterraCorsa`): anche così, sulla folla si piomba.
       if (f && f.caccia && !(f.jet > 0)) { f.caccia = false; if (orda && f.p && !(f.ko > 0) && !f.schianto) preparaSchianto(f, orda, c); }
     }
-    if (c.fase === "fine") { if (sulSito && classifica.voci && passi - classifica.letta > 600) caricaClassifica(); return; }
+    if (c.fase === "fine") { if (conClassifica() && classifica.voci && passi - classifica.letta > 600) caricaClassifica(); return; }
     if (!c.chi) return;
     // La valvola: con fotogrammi oltre i 45 ms di media, al massimo 20 zombie insieme (finché non si torna sotto i 30).
     if (c.dtMedio > 45) c.affanno = true; else if (c.dtMedio < 30) c.affanno = false;
@@ -13407,9 +13587,10 @@
     f.pensa = 4;
   }
 
-  // ·· La classifica (solo sul sito) ··
-  // Le chiamate al server le fa `static/classifica.js`, che carica solo il sito: qui non c'è rete.
-  const rete = () => (sulSito && window.__ringClassifica) || null;
+  // ·· La classifica globale ··
+  // Le chiamate al server non stanno qui: le fa chi carica il ring (`static/classifica.js` sul
+  // sito, il service worker nell'estensione). Qui non c'è rete.
+  const rete = () => window.__ringClassifica || null;
   function caricaClassifica() {
     const r = rete();
     if (!r) return;
@@ -13440,12 +13621,12 @@
   }
   // Il campo per il nome: un vero campo di testo sopra il canvas, solo sul sito.
   function mostraNome(si) {
-    if (!sulSito || !document.createElement || !document.body) return;
+    if (!conClassifica() || !document.createElement || !document.body) return;
     if (!si) { if (campoNome && campoNome.parentNode) campoNome.parentNode.removeChild(campoNome); campoNome = null; return; }
     if (campoNome || !corsa || corsa.inviato) return;
     const modulo = document.createElement("form");
     modulo.className = "corsa-nome";
-    modulo.setAttribute("style", "position:fixed;z-index:2147483000;display:flex;gap:6px;align-items:center;left:50%;transform:translateX(-50%);");
+    modulo.setAttribute("style", "position:fixed;z-index:2147483000;display:flex;gap:6px;align-items:center;left:50%;transform:translateX(-50%);pointer-events:auto;");
     const campo = document.createElement("input");
     campo.type = "text"; campo.maxLength = 16; campo.value = corsa.nome || ""; campo.placeholder = dici("Il tuo nome");
     campo.setAttribute("aria-label", dici("Il tuo nome per la classifica"));
@@ -13456,7 +13637,8 @@
     modulo.appendChild(campo); modulo.appendChild(tasto);
     modulo.addEventListener("submit", (e) => { e.preventDefault(); inviaPunteggio(campo.value); });
     for (const tipo of ["pointerdown", "mousedown", "touchstart", "keydown"]) modulo.addEventListener(tipo, (e) => e.stopPropagation());
-    document.body.appendChild(modulo);
+    // nell'estensione dentro lo shadow DOM del ring, così lo stile del sito non lo tocca
+    (window.__ringRadice && window.__ringRadice.appendChild ? window.__ringRadice : document.body).appendChild(modulo);
     campoNome = modulo;
     posizionaNome();
   }
@@ -13931,7 +14113,7 @@
     const yb = pavimento - 34 * S;
     if (recordCorsa) scriviUI(dici("Il tuo record") + ": " + cifre(recordCorsa), W / 2, yb - 26 * S, 12 * S, ORO, "center");
     const tasti = [[dici("Bottega") + " \u{1FA99} " + cifre(banca), () => { c.bottega = true; }]]
-      .concat(sulSito ? [[dici("Classifica"), () => apriClassifica(true)]] : [], [[dici("Chiudi"), () => chiudiCorsa()]]);
+      .concat(conClassifica() ? [[dici("Classifica"), () => apriClassifica(true)]] : [], [[dici("Chiudi"), () => chiudiCorsa()]]);
     const wb = Math.min(140 * S, (W - 32 - (tasti.length - 1) * 10) / tasti.length), xb = W / 2 - (tasti.length * wb + (tasti.length - 1) * 10) / 2;
     tasti.forEach(([t, fa], i) => tastoUI(xb + i * (wb + 10), yb - 14 * S, wb, 30 * S, t, fa, { colore: "#2a2735", scritta: "#ffffff", bordo: "rgba(255,255,255,.3)", px: 12 * S }));
     if (c.bottega) { tastiUI = []; disegnaBottega(); }            // la bottega copre tutto: sotto non si tocca niente
@@ -14022,14 +14204,14 @@
   }
   function disegnaFine() {
     const c = corsa, w = Math.min(440 * S, W - 24), x = W / 2 - w / 2, y = testataBasso + 16 * S;
-    const lista = sulSito ? 10 : 0, h = (sulSito ? 216 : 166) * S + lista * 20 * S;
+    const lista = conClassifica() ? 10 : 0, h = (conClassifica() ? 216 : 166) * S + lista * 20 * S;
     pannelloUI(x, y, w, h, 14 * S, coloreCorsa());
     scriviUI(dici("La corsa è finita"), W / 2, y + 26 * S, 22 * S, "#ffffff", "center", 900);
     scriviUI(dici("Round") + " " + c.round + "  ·  " + cifre(c.punti) + " " + dici("punti") + "  ·  " + c.uccisi + " " + dici("nemici"), W / 2, y + 52 * S, 13 * S, ORO, "center");
     scriviUI(c.record ? dici("Nuovo record!") : dici("Il tuo record") + ": " + cifre(recordCorsa), W / 2, y + 72 * S, 12 * S, c.record ? "#7dffb0" : GRIGIO_UI, "center", 700);
     scriviUI(dici("Liv.") + " " + c.liv + "  ·  +" + (c.inBanca || 0) + " \u{1FA99} " + dici("in banca") + " (" + cifre(banca) + ")", W / 2, y + 92 * S, 12 * S, ORO, "center", 700);
     let yy = y + 112 * S;
-    if (sulSito) {
+    if (conClassifica()) {
       c.yNome = yy - 4 * S; posizionaNome();
       const msg = c.inviato === "fatto" ? (c.posizione ? dici("Sei in classifica, posizione") + " " + c.posizione : dici("Inviato!"))
         : c.inviato === "invio" ? dici("Invio…") : c.erroreInvio ? dici(c.erroreInvio) : "";

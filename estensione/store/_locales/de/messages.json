@@ -3,7 +3,7 @@
     "message": "Page Brawl"
   },
   "descrizione": {
-    "message": "Ein endloser Roguelike-Survivor auf jeder Webseite: Jede Seite ist eine neue Arena. Viele Kämpfer, Horden, Drachen, Auto-Waffen."
+    "message": "Ein Roguelike-Survivor auf jeder Webseite: aufleveln, Karten wählen, Auto-Waffen entwickeln, Horden und Bosse besiegen. Gratis."
   },
   "linguaEtichetta": {
     "message": "Spielsprache"
@@ -30,7 +30,7 @@
     "message": "So funktioniert Page Brawl"
   },
   "guidaIntro": {
-    "message": "Zwei Kämpfer prügeln sich über der Seite, die du gerade ansiehst. Die Seite darunter bleibt, wie sie ist: Es wird nichts gelesen und nichts gesendet."
+    "message": "Ein endloser Roguelike-Survivor, gespielt über der Seite, die du gerade ansiehst: Jede Seite ist eine neue Arena, und eine schnelle Runde passt zwischen zwei Aufgaben. Die Seite darunter bleibt, wie sie ist: Es wird nichts gelesen und nichts gesendet."
   },
   "guidaP1T": {
     "message": "Öffne irgendeine Seite"
@@ -42,7 +42,7 @@
     "message": "Klicke auf das Page-Brawl-Symbol"
   },
   "guidaP2": {
-    "message": "Es sitzt in der Symbolleiste des Browsers, im Erweiterungsmenü (das Puzzleteil): Hefte es an, damit es immer griffbereit ist. Ein Klick und die Kämpfer kommen herein."
+    "message": "Es sitzt in der Symbolleiste des Browsers, im Erweiterungsmenü (das Puzzleteil): Hefte es an, damit es immer griffbereit ist. Ein Klick und du wählst, wie du spielst: Endloslauf, der Roguelike-Survivor (Taste A), oder Freier Kampf (Taste D)."
   },
   "guidaP3T": {
     "message": "Aus- und einschalten mit dem Knopf unten rechts"

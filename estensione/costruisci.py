@@ -34,7 +34,7 @@ from pathlib import Path
 RADICE = Path(__file__).resolve().parent.parent
 QUI = Path(__file__).resolve().parent
 VARIANTI = {"pacchetto": {"premium_di_prova": True}, "store": {"premium_di_prova": False}}
-VERSIONE = "1.0.0"
+VERSIONE = "1.1.0"
 NOME = "Page Brawl"
 
 MANIFEST = {
@@ -57,7 +57,7 @@ MANIFEST = {
 # titolo del tasto e i testi della pagina delle opzioni, nelle lingue dell'estensione.
 MESSAGGI = {
     "en": {
-        "descrizione": "An endless roguelike survivor on any web page: every site is a new arena. Many fighters, hordes, dragons, auto-weapons. Free.",
+        "descrizione": "A roguelike survivor on any web page: level up, pick cards, evolve auto-weapons, beat hordes and bosses. Quick runs, all free.",
         "linguaEtichetta": "Game language",
         "titolo": "Start or stop the brawl on this page",
         "opzioniTitolo": "Page Brawl options",
@@ -66,7 +66,7 @@ MESSAGGI = {
         "sempreNegato": "Permission not granted: the button stays off.",
     },
     "it": {
-        "descrizione": "Un survivor roguelike infinito su qualsiasi pagina web: ogni sito è un ring nuovo. Tanti personaggi, orde, draghi, armi automatiche.",
+        "descrizione": "Un roguelike survivor su ogni pagina web: sali di livello, scegli carte, evolvi armi automatiche, batti orde e boss. Gratis.",
         "linguaEtichetta": "Lingua del gioco",
         "titolo": "Accendi o spegni la lotta su questa pagina",
         "opzioniTitolo": "Opzioni di Page Brawl",
@@ -75,7 +75,7 @@ MESSAGGI = {
         "sempreNegato": "Permesso non concesso: il tasto resta spento.",
     },
     "es": {
-        "descrizione": "Un survivor roguelike infinito en cualquier página web: cada sitio es un ring nuevo. Muchos luchadores, hordas, dragones y armas.",
+        "descrizione": "Un roguelike survivor en cualquier web: sube de nivel, elige cartas, evoluciona armas, vence hordas y jefes. Partidas rápidas.",
         "linguaEtichetta": "Idioma del juego",
         "titolo": "Enciende o apaga la pelea en esta página",
         "opzioniTitolo": "Opciones de Page Brawl",
@@ -84,7 +84,7 @@ MESSAGGI = {
         "sempreNegato": "Permiso no concedido: el botón sigue apagado.",
     },
     "fr": {
-        "descrizione": "Un survivor roguelike sans fin sur n'importe quelle page web : chaque site est une nouvelle arène. Combattants, hordes, dragons.",
+        "descrizione": "Un roguelike survivor sur toute page web : montez de niveau, choisissez des cartes, faites évoluer vos armes, battez les boss.",
         "linguaEtichetta": "Langue du jeu",
         "titolo": "Lancer ou arrêter le combat sur cette page",
         "opzioniTitolo": "Options de Page Brawl",
@@ -93,7 +93,7 @@ MESSAGGI = {
         "sempreNegato": "Autorisation refusée : le bouton reste désactivé.",
     },
     "de": {
-        "descrizione": "Ein endloser Roguelike-Survivor auf jeder Webseite: Jede Seite ist eine neue Arena. Viele Kämpfer, Horden, Drachen, Auto-Waffen.",
+        "descrizione": "Ein Roguelike-Survivor auf jeder Webseite: aufleveln, Karten wählen, Auto-Waffen entwickeln, Horden und Bosse besiegen. Gratis.",
         "linguaEtichetta": "Spielsprache",
         "titolo": "Kampf auf dieser Seite starten oder stoppen",
         "opzioniTitolo": "Optionen von Page Brawl",
@@ -113,11 +113,11 @@ GUIDA = {
     "en": {
         "guidaLink": "How it works",
         "guidaTitolo": "How Page Brawl works",
-        "guidaIntro": "Two fighters brawl on top of the page you are viewing. The page underneath stays as it is: nothing is read and nothing is sent anywhere.",
+        "guidaIntro": "An endless roguelike survivor played on top of the page you are viewing: every site is a new arena, and you can play a quick run between one task and the next. The page underneath stays as it is: nothing is read and nothing is sent anywhere.",
         "guidaP1T": "Open any page",
         "guidaP1": "A news site, a shop, anything you like. It cannot start on the browser's internal pages, on the Chrome Web Store or in PDFs.",
         "guidaP2T": "Click the Page Brawl icon",
-        "guidaP2": "It sits in the browser toolbar, inside the extensions menu (the puzzle piece): pin it to keep it at hand. One click and the fighters walk in.",
+        "guidaP2": "It sits in the browser toolbar, inside the extensions menu (the puzzle piece): pin it to keep it at hand. One click and you choose how to play: Endless run, the roguelike survivor (press A), or Free combat (press D).",
         "guidaP3T": "Turn it off and on with the button in the bottom right",
         "guidaP3": "The power button is always visible: it stops the brawl and starts it again without reloading the page.",
         "guidaP4T": "Grab them with the mouse",
@@ -146,11 +146,11 @@ GUIDA = {
     "it": {
         "guidaLink": "Come funziona",
         "guidaTitolo": "Come funziona Page Brawl",
-        "guidaIntro": "Due lottatori si picchiano sopra la pagina che stai guardando. La pagina sotto resta com'è: non viene letto né inviato niente.",
+        "guidaIntro": "Un survivor roguelike infinito giocato sopra la pagina che stai guardando: ogni sito è un'arena nuova, e una corsa veloce ci sta fra un lavoro e l'altro. La pagina sotto resta com'è: non viene letto né inviato niente.",
         "guidaP1T": "Apri una pagina qualsiasi",
         "guidaP1": "Un sito di notizie, un negozio, quello che vuoi. Non può partire sulle pagine interne del browser, sul Chrome Web Store e nei PDF.",
         "guidaP2T": "Clicca l'icona di Page Brawl",
-        "guidaP2": "È nella barra del browser, dentro il menu delle estensioni (il pezzo di puzzle): fissala con la puntina per averla sempre a portata. Un clic e i lottatori entrano.",
+        "guidaP2": "È nella barra del browser, dentro il menu delle estensioni (il pezzo di puzzle): fissala con la puntina per averla sempre a portata. Un clic e scegli come giocare: Corsa infinita, il survivor roguelike (tasto A), o Combattimento libero (tasto D).",
         "guidaP3T": "Spegni e riaccendi dal tasto in basso a destra",
         "guidaP3": "Il tasto di accensione resta sempre visibile: ferma la lotta e la fa ripartire senza ricaricare la pagina.",
         "guidaP4T": "Prendili col mouse",
@@ -179,11 +179,11 @@ GUIDA = {
     "es": {
         "guidaLink": "Cómo funciona",
         "guidaTitolo": "Cómo funciona Page Brawl",
-        "guidaIntro": "Dos luchadores se pelean encima de la página que estás viendo. La página de debajo se queda como está: no se lee ni se envía nada.",
+        "guidaIntro": "Un survivor roguelike infinito que se juega encima de la página que estás viendo: cada sitio es una arena nueva, y una partida rápida cabe entre una tarea y otra. La página de debajo se queda como está: no se lee ni se envía nada.",
         "guidaP1T": "Abre cualquier página",
         "guidaP1": "Un sitio de noticias, una tienda, lo que quieras. No puede arrancar en las páginas internas del navegador, en Chrome Web Store ni en los PDF.",
         "guidaP2T": "Haz clic en el icono de Page Brawl",
-        "guidaP2": "Está en la barra del navegador, dentro del menú de extensiones (la pieza de puzle): fíjalo con la chincheta para tenerlo a mano. Un clic y entran los luchadores.",
+        "guidaP2": "Está en la barra del navegador, dentro del menú de extensiones (la pieza de puzle): fíjalo con la chincheta para tenerlo a mano. Un clic y eliges cómo jugar: Carrera infinita, el survivor roguelike (tecla A), o Combate libre (tecla D).",
         "guidaP3T": "Apaga y enciende con el botón de abajo a la derecha",
         "guidaP3": "El botón de encendido siempre está a la vista: detiene la pelea y la reanuda sin recargar la página.",
         "guidaP4T": "Agárralos con el ratón",
@@ -212,11 +212,11 @@ GUIDA = {
     "fr": {
         "guidaLink": "Comment ça marche",
         "guidaTitolo": "Comment fonctionne Page Brawl",
-        "guidaIntro": "Deux combattants se battent par-dessus la page que vous regardez. La page en dessous reste telle quelle : rien n'est lu, rien n'est envoyé.",
+        "guidaIntro": "Un survivor roguelike sans fin, joué par-dessus la page que vous regardez : chaque site est une nouvelle arène, et une partie rapide tient entre deux tâches. La page en dessous reste telle quelle : rien n'est lu, rien n'est envoyé.",
         "guidaP1T": "Ouvrez n'importe quelle page",
         "guidaP1": "Un site d'actualités, une boutique, ce que vous voulez. Il ne peut pas démarrer sur les pages internes du navigateur, sur le Chrome Web Store ni dans les PDF.",
         "guidaP2T": "Cliquez sur l'icône de Page Brawl",
-        "guidaP2": "Elle se trouve dans la barre du navigateur, dans le menu des extensions (la pièce de puzzle) : épinglez-la pour l'avoir sous la main. Un clic et les combattants arrivent.",
+        "guidaP2": "Elle se trouve dans la barre du navigateur, dans le menu des extensions (la pièce de puzzle) : épinglez-la pour l'avoir sous la main. Un clic et vous choisissez comment jouer : Course infinie, le survivor roguelike (touche A), ou Combat libre (touche D).",
         "guidaP3T": "Arrêtez et relancez avec le bouton en bas à droite",
         "guidaP3": "Le bouton de mise en marche reste toujours visible : il arrête le combat et le relance sans recharger la page.",
         "guidaP4T": "Attrapez-les à la souris",
@@ -245,11 +245,11 @@ GUIDA = {
     "de": {
         "guidaLink": "So funktioniert es",
         "guidaTitolo": "So funktioniert Page Brawl",
-        "guidaIntro": "Zwei Kämpfer prügeln sich über der Seite, die du gerade ansiehst. Die Seite darunter bleibt, wie sie ist: Es wird nichts gelesen und nichts gesendet.",
+        "guidaIntro": "Ein endloser Roguelike-Survivor, gespielt über der Seite, die du gerade ansiehst: Jede Seite ist eine neue Arena, und eine schnelle Runde passt zwischen zwei Aufgaben. Die Seite darunter bleibt, wie sie ist: Es wird nichts gelesen und nichts gesendet.",
         "guidaP1T": "Öffne irgendeine Seite",
         "guidaP1": "Eine Nachrichtenseite, ein Shop, was du willst. Auf den internen Seiten des Browsers, im Chrome Web Store und in PDFs kann es nicht starten.",
         "guidaP2T": "Klicke auf das Page-Brawl-Symbol",
-        "guidaP2": "Es sitzt in der Symbolleiste des Browsers, im Erweiterungsmenü (das Puzzleteil): Hefte es an, damit es immer griffbereit ist. Ein Klick und die Kämpfer kommen herein.",
+        "guidaP2": "Es sitzt in der Symbolleiste des Browsers, im Erweiterungsmenü (das Puzzleteil): Hefte es an, damit es immer griffbereit ist. Ein Klick und du wählst, wie du spielst: Endloslauf, der Roguelike-Survivor (Taste A), oder Freier Kampf (Taste D).",
         "guidaP3T": "Aus- und einschalten mit dem Knopf unten rechts",
         "guidaP3": "Der Einschaltknopf bleibt immer sichtbar: Er stoppt den Kampf und startet ihn wieder, ohne die Seite neu zu laden.",
         "guidaP4T": "Pack sie mit der Maus",
@@ -382,8 +382,29 @@ async function avvia(tab) {
 }
 chrome.action.onClicked.addListener(avvia);
 // Dal tasto sempre visibile (per chi l'ha acceso nelle opzioni) e dalla tendina.
-chrome.runtime.onMessage.addListener((messaggio, mittente) => {
+// LA CLASSIFICA GLOBALE (13/10/2026): l'unica rete dell'estensione. Solo verso il server di
+// Page Brawl, solo quando si apre la classifica o si manda il proprio punteggio (un nome scelto
+// da chi gioca, i punti, il round, il personaggio). Il server risponde con CORS aperto: niente
+// permessi in più sui siti.
+const CLASSIFICA = "https://mobileupdatetracker.duckdns.org/api/corsa";
+async function classifica(messaggio) {
+  if (messaggio.azione === "carica") {
+    const r = await fetch(CLASSIFICA + "/classifica?limite=10", { cache: "no-store", credentials: "omit" });
+    if (!r.ok) throw new Error(String(r.status));
+    return { ok: true, d: await r.json() };
+  }
+  const d = messaggio.dati || {};
+  const corpo = { nome: String(d.nome || "").slice(0, 16), punti: +d.punti || 0, round: +d.round || 0, personaggio: String(d.personaggio || ""),
+                  stile: String(d.stile || ""), uccisi: +d.uccisi || 0, durata: +d.durata || 0 };
+  const r = await fetch(CLASSIFICA + "/punteggio", { method: "POST", credentials: "omit", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+  return { ok: r.ok, d: await r.json().catch(() => ({})) };
+}
+chrome.runtime.onMessage.addListener((messaggio, mittente, rispondi) => {
   if (!messaggio) return;
+  if (messaggio.tipo === "classifica") {
+    classifica(messaggio).then(rispondi, (e) => rispondi({ ok: false, errore: String(e && e.message || e) }));
+    return true;                                  // la risposta arriva dopo
+  }
   if (messaggio.tipo === "avvia" && mittente.tab) avvia(mittente.tab);
   if (messaggio.tipo === "opzioni") chrome.runtime.openOptionsPage();
   if (messaggio.tipo === "guida") chrome.tabs.create({ url: chrome.runtime.getURL("benvenuto.html") });
@@ -608,6 +629,17 @@ PREPARA = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
     memoria[k] = String(v);
     try { var o = {}; o[k] = String(v); chrome.storage.local.set(o); } catch (e) { /* resta in memoria */ }
   }
+  // La classifica globale passa dal service worker (sfondo.js): la pagina non vede niente.
+  var chiedi = function (m) {
+    return new Promise(function (ok, no) {
+      try { chrome.runtime.sendMessage(m, function (r) { if (chrome.runtime.lastError || !r) no(chrome.runtime.lastError || "rete"); else ok(r); }); }
+      catch (e) { no(e); }
+    });
+  };
+  window.__ringClassifica = {
+    carica: function () { return chiedi({ tipo: "classifica", azione: "carica" }).then(function (r) { if (!r.ok) throw r.errore; return r.d; }); },
+    invia: function (dati) { return chiedi({ tipo: "classifica", azione: "invia", dati: dati }).then(function (r) { return { ok: !!r.ok, d: r.d || {} }; }); },
+  };
   window.__ringDeposito = {
     getItem: function (k) { return Object.prototype.hasOwnProperty.call(memoria, k) ? memoria[k] : null; },
     setItem: function (k, v) {

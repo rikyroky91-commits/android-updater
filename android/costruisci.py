@@ -83,6 +83,8 @@ SOSTITUZIONI_PREPARA = [
     ("chrome.runtime.sendMessage(", "window.__pbMessaggio("),
     # Sopra lo schermo si entra subito nel combattimento libero (la corsa è nelle arene dell'app).
     ("window.__ringSceltaModo = true;", "window.__ringSceltaModo = window.__pbSceltaModo !== false;"),
+    # La classifica globale (13/10/2026): nell'app la chiama ponte.js direttamente, senza service worker.
+    ("window.__ringClassifica = {", "window.__ringClassifica = window.__pbClassifica || {"),
 ]
 
 

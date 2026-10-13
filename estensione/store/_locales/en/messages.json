@@ -3,7 +3,7 @@
     "message": "Page Brawl"
   },
   "descrizione": {
-    "message": "An endless roguelike survivor on any web page: every site is a new arena. Many fighters, hordes, dragons, auto-weapons. Free."
+    "message": "A roguelike survivor on any web page: level up, pick cards, evolve auto-weapons, beat hordes and bosses. Quick runs, all free."
   },
   "linguaEtichetta": {
     "message": "Game language"
@@ -30,7 +30,7 @@
     "message": "How Page Brawl works"
   },
   "guidaIntro": {
-    "message": "Two fighters brawl on top of the page you are viewing. The page underneath stays as it is: nothing is read and nothing is sent anywhere."
+    "message": "An endless roguelike survivor played on top of the page you are viewing: every site is a new arena, and you can play a quick run between one task and the next. The page underneath stays as it is: nothing is read and nothing is sent anywhere."
   },
   "guidaP1T": {
     "message": "Open any page"
@@ -42,7 +42,7 @@
     "message": "Click the Page Brawl icon"
   },
   "guidaP2": {
-    "message": "It sits in the browser toolbar, inside the extensions menu (the puzzle piece): pin it to keep it at hand. One click and the fighters walk in."
+    "message": "It sits in the browser toolbar, inside the extensions menu (the puzzle piece): pin it to keep it at hand. One click and you choose how to play: Endless run, the roguelike survivor (press A), or Free combat (press D)."
   },
   "guidaP3T": {
     "message": "Turn it off and on with the button in the bottom right"

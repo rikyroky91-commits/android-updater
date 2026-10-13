@@ -70,8 +70,21 @@ class TestEstensione(unittest.TestCase):
         for nome, cartella in VARIANTI.items():
             for file in ("prepara.js", "sfondo.js", "ring.js", "lingue.js", "tasto.js", "opzioni.js"):
                 testo = (cartella / file).read_text(encoding="utf-8")
-                for vietato in ("fetch(", "XMLHttpRequest", "eval(", "new Function", "importScripts(", "<script"):
+                vietati = ("XMLHttpRequest", "eval(", "new Function", "importScripts(", "<script")
+                if file != "sfondo.js":
+                    vietati += ("fetch(",)
+                for vietato in vietati:
                     self.assertNotIn(vietato, testo, f"{nome}/{file}: {vietato}")
+
+    def test_la_sola_rete_e_la_classifica_dal_service_worker(self):
+        # Dal 13/10/2026 l'estensione ha la classifica globale: due chiamate, solo dal service
+        # worker, solo verso le rotte della classifica, senza credenziali.
+        for nome, cartella in VARIANTI.items():
+            sfondo = (cartella / "sfondo.js").read_text(encoding="utf-8")
+            self.assertEqual(sfondo.count("fetch("), 2, nome)
+            self.assertEqual(re.findall(r"fetch\(([^,)]+)", sfondo), ['CLASSIFICA + "/classifica?limite=10"', 'CLASSIFICA + "/punteggio"'])
+            self.assertEqual(re.findall(r"https?://[^\s\"']+", sfondo), ["https://mobileupdatetracker.duckdns.org/api/corsa"])
+            self.assertEqual(sfondo.count('credentials: "omit"'), 2)
 
     def test_la_tendina_sta_in_uno_shadow_dom_con_lo_stile_costruito(self):
         for nome, cartella in VARIANTI.items():

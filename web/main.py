@@ -2232,7 +2232,7 @@ def api_ricerche_recenti():
 # `static/ring.js`). A fine corsa il giocatore mette un nome e manda il
 # punteggio qui; la classifica la rilegge ogni dieci secondi mentre è aperta.
 # Niente account e niente dati personali: un nome scelto da chi gioca, i
-# punti, il round. L'estensione del browser non chiama mai queste rotte.
+# punti, il round. Dal 13/10/2026 le chiama anche l'estensione del browser (vedi _CORSA_CORS).
 #
 # Il punteggio lo calcola il browser, quindi si può falsificare: qui si
 # scartano i valori fuori misura (più punti di quanti un round ne possa dare,
@@ -2280,15 +2280,28 @@ def _troppi_invii(chi: str, adesso: float) -> bool:
     return False
 
 
+# Dal 13/10/2026 la classifica è anche dell'estensione del browser (Page Brawl), che chiama
+# queste due rotte dal suo service worker (origine chrome-extension://…): CORS aperto, senza
+# credenziali. Nessun cookie, nessun account: solo il nome scelto, i punti e il round.
+_CORSA_CORS = {"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+               "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Max-Age": "86400"}
+
+
+@app.options("/api/corsa/classifica")
+@app.options("/api/corsa/punteggio")
+def api_corsa_preflight():
+    return Response(status_code=204, headers=_CORSA_CORS)
+
+
 @app.get("/api/corsa/classifica")
 def api_corsa_classifica(limite: int = Query(default=10, ge=1, le=50)):
-    return JSONResponse({"voci": storage.classifica_corsa(limite)}, headers={"Cache-Control": "no-store"})
+    return JSONResponse({"voci": storage.classifica_corsa(limite)}, headers={"Cache-Control": "no-store", **_CORSA_CORS})
 
 
 @app.post("/api/corsa/punteggio")
 async def api_corsa_punteggio(request: Request):
     import time as _time
-    errore = lambda testo, codice=422: JSONResponse({"errore": testo}, status_code=codice, headers={"Cache-Control": "no-store"})
+    errore = lambda testo, codice=422: JSONResponse({"errore": testo}, status_code=codice, headers={"Cache-Control": "no-store", **_CORSA_CORS})
     try:
         if int(request.headers.get("content-length") or 0) > 2048:
             return errore("Troppo lungo", 413)
@@ -2317,7 +2330,7 @@ async def api_corsa_punteggio(request: Request):
         return errore("Troppe corse di fila: riprova fra qualche minuto", 429)
     nuovo, posizione = storage.salva_punteggio_corsa(nome, punti, round_, personaggio, stile, uccisi, durata)
     return JSONResponse({"ok": True, "id": nuovo, "posizione": posizione, "voci": storage.classifica_corsa(10)},
-                        headers={"Cache-Control": "no-store"})
+                        headers={"Cache-Control": "no-store", **_CORSA_CORS})
 
 
 @app.get("/api/suggerimenti")
