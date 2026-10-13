@@ -544,11 +544,12 @@ test("lottando davvero l'esperienza cresce e viene salvata", () => {
   assert.ok(pesi.every((w) => w >= 0.4 && w <= 2.6));
 });
 
-test("il primo minuto è tranquillo: niente jetpack, niente eventi, al massimo due oggetti, nessuna arma", () => {
+test("il primo minuto è tranquillo: niente eventi, al massimo due oggetti, nessuna arma; in volo solo dopo otto secondi", () => {
+  // Dal 13/10/2026 (Riccardo: «volano poco») il volo non aspetta più un minuto: otto secondi.
   for (let prova = 0; prova < 3; prova++) {
     const amb = ambiente();
-    amb.avanza(60 * 58, (s) => {
-      assert.ok(!s.lottatori.some((f) => f.vola), "jetpack acceso nel primo minuto");
+    amb.avanza(60 * 7.5, (s) => assert.ok(!s.lottatori.some((f) => f.vola), "in volo nei primi otto secondi"));
+    amb.avanza(60 * 50, (s) => {
       assert.strictEqual(s.evento, null, "evento nel primo minuto");
       assert.ok(s.telefoni.length <= 2, "troppi oggetti nel primo minuto: " + s.telefoni.length);
       for (const t of s.telefoni) assert.ok(["classico", "grande", "pieghevole", "orologio"].includes(t.tipo), "oggetto grosso nel primo minuto: " + t.tipo);
@@ -3270,8 +3271,23 @@ function corsaAvviata(opz = {}, chi = "robot", seme = 4242) {
   return { amb, r };
 }
 
+const classificaFinta = (registro) => ({
+  carica: () => { registro.push("carica"); return Promise.resolve({ voci: [{ id: 7, nome: "Ricky", punti: 900, round: 4, personaggio: "robot", stile: "guerrieri" }] }); },
+  invia: (dati) => { registro.push(dati); return Promise.resolve({ ok: true, d: { id: 8, posizione: 2, voci: [] } }); },
+});
+
+test("la classifica globale c'è dove qualcuno la fornisce (sito, estensione, app), e solo lì", () => {
+  const senza = ambiente({ pannello: true });
+  senza.avanza(30);
+  assert.strictEqual(senza.tastiPannello["[data-classifica]"][0].hidden, true, "senza chi parla col server il tasto non c'è");
+  const registro = [];
+  const con = ambiente({ pannello: true, estensione: true, globali: { __ringClassifica: classificaFinta(registro) } });
+  con.avanza(30);
+  assert.strictEqual(con.tastiPannello["[data-classifica]"][0].hidden, false, "nell'estensione con la classifica il tasto c'è");
+});
+
 test("la corsa: il tasto del pannello la apre, anche mentre lo script si avvia", () => {
-  const amb = ambiente({ pannello: true });
+  const amb = ambiente({ pannello: true, globali: { __ringClassifica: classificaFinta([]) } });
   amb.avanza(30);
   const tasto = amb.tastiPannello["[data-corsa]"][0];
   assert.ok(tasto.ascolta.click, "il tasto «Corsa infinita» deve essere collegato");

@@ -37,6 +37,13 @@ Il resto del tempo il lottatore continua a pensare da sé: il controller dà ord
 
 Di suo l'estensione entra in una pagina solo quando clicchi l'icona (`activeTab`). Chi vuole il tasto di accensione su ogni pagina lo accende nelle opzioni (in fondo alla tendina, o dal menu dell'estensione): il browser chiede allora il permesso su tutti i siti, che è **facoltativo** e si toglie spegnendo la stessa spunta. Chi non lo accende non vede mai l'avviso sui dati di tutti i siti.
 
+### La 1.1.0 (13/10/2026)
+
+- **La pagina conta di più.** `rileva()` entra negli shadow DOM aperti (Reddit e gli altri siti fatti coi web component), considera solidi anche video, iframe e `[role=button]`, e i titoli `h1`–`h4` dai 18 px in su. Le «scatole» (riquadri con sfondo, bordo o ombra, trovate a griglia con `elementsFromPoint`) danno una **sporgenza** sottile sul loro bordo alto, su cui si sale solo da sopra (`uno: true` in `urta`). Un lottatore lanciato, o volato via dopo un colpo, che attraversa una scatola la fa **sobbalzare** (`scuoti`, Web Animations con `composite: "add"`: niente stili toccati, la pagina non cambia); lo stesso fanno le esplosioni vicine e gli atterraggi pesanti.
+- **Si vola di più**: dopo 8 secondi invece che dopo un minuto (`VOLO_DOPO`), un po' più spesso, e due volte su tre verso il bordo di un elemento più in alto (`quotaVolo`).
+- **Classifica globale anche qui.** `prepara.js` mette `window.__ringClassifica`, che passa dal service worker (`sfondo.js`, due `fetch` verso `https://mobileupdatetracker.duckdns.org/api/corsa`, senza credenziali). Nessun permesso in più: il server risponde con CORS aperto (`_CORSA_CORS` in `web/main.py`). Il ring mostra classifica e campo del nome dovunque ci sia `__ringClassifica` (`conClassifica()`), non più solo sul sito. Il campo del nome sta nello shadow DOM.
+- **Super guerrieri**: occhi fieri sul disegno di Riccardo (`occhioFiero`, solo per loro; l'orecchio va sul bordo della testa); Zefir e Brasa dell'11/10 con costumi nuovi.
+
 ### Le due varianti
 
 | Cartella | A cosa serve | Premium |

@@ -55,6 +55,20 @@ class TestClassificaCorsa(unittest.TestCase):
         self.assertEqual([v["nome"] for v in voci], ["Secondo", "Primo", "Terzo"])
         self.assertEqual(set(voci[0]), {"id", "nome", "punti", "round", "personaggio", "stile", "quando"})
 
+    def test_aperta_all_estensione_del_browser(self):
+        # L'estensione chiama dal service worker (origine chrome-extension://…): serve CORS.
+        origine = {"Origin": "chrome-extension://abcdefghijklmnop"}
+        pre = self.client.options("/api/corsa/punteggio", headers={**origine, "Access-Control-Request-Method": "POST",
+                                                                   "Access-Control-Request-Headers": "content-type"})
+        self.assertEqual(pre.status_code, 204)
+        self.assertEqual(pre.headers["access-control-allow-origin"], "*")
+        self.assertIn("POST", pre.headers["access-control-allow-methods"])
+        self.assertEqual(self.client.get("/api/corsa/classifica", headers=origine).headers["access-control-allow-origin"], "*")
+        r = self.client.post("/api/corsa/punteggio", json=_corsa(), headers={**origine, "X-Forwarded-For": "5.6.7.8"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.headers["access-control-allow-origin"], "*")
+        self.assertEqual(self.manda(nome="").headers["access-control-allow-origin"], "*", "anche gli errori si leggono")
+
     def test_nomi_puliti(self):
         self.assertEqual(self.manda(nome="  Ricky   91 ").json()["voci"][0]["nome"], "Ricky 91")
         self.assertEqual(self.manda(nome="Élodie-Ñ").status_code, 200, "le lettere accentate vanno bene")

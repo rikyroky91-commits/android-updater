@@ -3,7 +3,7 @@
     "message": "Page Brawl"
   },
   "descrizione": {
-    "message": "Un survivor roguelike sans fin sur n'importe quelle page web : chaque site est une nouvelle arène. Combattants, hordes, dragons."
+    "message": "Un roguelike survivor sur toute page web : montez de niveau, choisissez des cartes, faites évoluer vos armes, battez les boss."
   },
   "linguaEtichetta": {
     "message": "Langue du jeu"
@@ -30,7 +30,7 @@
     "message": "Comment fonctionne Page Brawl"
   },
   "guidaIntro": {
-    "message": "Deux combattants se battent par-dessus la page que vous regardez. La page en dessous reste telle quelle : rien n'est lu, rien n'est envoyé."
+    "message": "Un survivor roguelike sans fin, joué par-dessus la page que vous regardez : chaque site est une nouvelle arène, et une partie rapide tient entre deux tâches. La page en dessous reste telle quelle : rien n'est lu, rien n'est envoyé."
   },
   "guidaP1T": {
     "message": "Ouvrez n'importe quelle page"
@@ -42,7 +42,7 @@
     "message": "Cliquez sur l'icône de Page Brawl"
   },
   "guidaP2": {
-    "message": "Elle se trouve dans la barre du navigateur, dans le menu des extensions (la pièce de puzzle) : épinglez-la pour l'avoir sous la main. Un clic et les combattants arrivent."
+    "message": "Elle se trouve dans la barre du navigateur, dans le menu des extensions (la pièce de puzzle) : épinglez-la pour l'avoir sous la main. Un clic et vous choisissez comment jouer : Course infinie, le survivor roguelike (touche A), ou Combat libre (touche D)."
   },
   "guidaP3T": {
     "message": "Arrêtez et relancez avec le bouton en bas à droite"

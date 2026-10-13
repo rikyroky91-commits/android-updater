@@ -23,6 +23,17 @@
     memoria[k] = String(v);
     try { var o = {}; o[k] = String(v); chrome.storage.local.set(o); } catch (e) { /* resta in memoria */ }
   }
+  // La classifica globale passa dal service worker (sfondo.js): la pagina non vede niente.
+  var chiedi = function (m) {
+    return new Promise(function (ok, no) {
+      try { chrome.runtime.sendMessage(m, function (r) { if (chrome.runtime.lastError || !r) no(chrome.runtime.lastError || "rete"); else ok(r); }); }
+      catch (e) { no(e); }
+    });
+  };
+  window.__ringClassifica = {
+    carica: function () { return chiedi({ tipo: "classifica", azione: "carica" }).then(function (r) { if (!r.ok) throw r.errore; return r.d; }); },
+    invia: function (dati) { return chiedi({ tipo: "classifica", azione: "invia", dati: dati }).then(function (r) { return { ok: !!r.ok, d: r.d || {} }; }); },
+  };
   window.__ringDeposito = {
     getItem: function (k) { return Object.prototype.hasOwnProperty.call(memoria, k) ? memoria[k] : null; },
     setItem: function (k, v) {

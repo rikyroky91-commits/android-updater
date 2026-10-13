@@ -3,7 +3,7 @@
     "message": "Page Brawl"
   },
   "descrizione": {
-    "message": "Un survivor roguelike infinito en cualquier página web: cada sitio es un ring nuevo. Muchos luchadores, hordas, dragones y armas."
+    "message": "Un roguelike survivor en cualquier web: sube de nivel, elige cartas, evoluciona armas, vence hordas y jefes. Partidas rápidas."
   },
   "linguaEtichetta": {
     "message": "Idioma del juego"
@@ -30,7 +30,7 @@
     "message": "Cómo funciona Page Brawl"
   },
   "guidaIntro": {
-    "message": "Dos luchadores se pelean encima de la página que estás viendo. La página de debajo se queda como está: no se lee ni se envía nada."
+    "message": "Un survivor roguelike infinito que se juega encima de la página que estás viendo: cada sitio es una arena nueva, y una partida rápida cabe entre una tarea y otra. La página de debajo se queda como está: no se lee ni se envía nada."
   },
   "guidaP1T": {
     "message": "Abre cualquier página"
@@ -42,7 +42,7 @@
     "message": "Haz clic en el icono de Page Brawl"
   },
   "guidaP2": {
-    "message": "Está en la barra del navegador, dentro del menú de extensiones (la pieza de puzle): fíjalo con la chincheta para tenerlo a mano. Un clic y entran los luchadores."
+    "message": "Está en la barra del navegador, dentro del menú de extensiones (la pieza de puzle): fíjalo con la chincheta para tenerlo a mano. Un clic y eliges cómo jugar: Carrera infinita, el survivor roguelike (tecla A), o Combate libre (tecla D)."
   },
   "guidaP3T": {
     "message": "Apaga y enciende con el botón de abajo a la derecha"
