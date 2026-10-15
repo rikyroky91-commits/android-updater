@@ -1204,6 +1204,137 @@ class TestSoccorsoAI(_Sito):
         self.assertEqual(esito["ai_perche"], "sembra un Samsung")
 
 
+class TestCodiceSconosciutoNonCambiaTelefono(_Sito):
+    """Segnalato dall'utente il 15/10/2026: cercando «SM-A575G» la pagina
+    diceva «Hai scritto SM-A575G, ho cercato SM-A057G» e mostrava il
+    Galaxy A05s, mentre l'IMEI dello stesso telefono trovava modello e
+    scheda tecnica. Il codice non era sbagliato: era solo assente dai
+    cataloghi, e il soccorso AI lo scambiava con il codice più somigliante
+    che avesse un firmware. Difetto di QUALUNQUE codice vero sconosciuto
+    ai cataloghi, non di quello solo."""
+
+    def _con_ai(self, proposte, cerca):
+        from unittest.mock import patch
+        from core import aiquery
+        from web import main
+
+        finta = aiquery.Interpretazione(proposte=tuple(proposte), motivo="refuso")
+        return (patch.object(aiquery, "disponibile", return_value=True),
+                patch.object(aiquery, "interpreta", return_value=finta),
+                patch.object(main, "_cerca_davvero", side_effect=cerca))
+
+    def test_lai_non_sostituisce_un_codice_con_un_altro_telefono(self):
+        from web import main
+
+        def cerca(q, senza_rete=False):
+            return {"trovato": True, "senza_firmware": False,
+                    "nome": "Samsung Galaxy A05s", "codice": "SM-A057G"}
+
+        scartate = []
+        a, b, c = self._con_ai(["SM-A057G"], cerca)
+        with a, b, c as finto:
+            self.assertIsNone(main._soccorso_ai("SM-A575G", scartate))
+        # Scartato prima di pagarne la ricerca.
+        finto.assert_not_called()
+        self.assertEqual(scartate, ["SM-A057G"])
+
+    def test_neanche_quando_lai_propone_il_nome_dellaltro_telefono(self):
+        from web import main
+
+        def cerca(q, senza_rete=False):
+            return {"trovato": True, "senza_firmware": False,
+                    "nome": "Samsung Galaxy A05s", "codice": "SM-A057G"}
+
+        a, b, c = self._con_ai(["Galaxy A05s"], cerca)
+        with a, b, c:
+            self.assertIsNone(main._soccorso_ai("a575g"))
+
+    def test_unaltra_variante_di_mercato_dello_stesso_telefono_resta_ammessa(self):
+        from web import main
+
+        def cerca(q, senza_rete=False):
+            return {"trovato": True, "senza_firmware": False,
+                    "nome": "Samsung Galaxy A57", "codice": "SM-A575F"}
+
+        a, b, c = self._con_ai(["SM-A575F"], cerca)
+        with a, b, c:
+            esito = main._soccorso_ai("SM-A575G")
+        self.assertIsNotNone(esito)
+        self.assertEqual(esito["ai_a"], "SM-A575F")
+
+    def test_le_frasi_restano_libere(self):
+        """Il vincolo vale per i codici: «quel samsung nero» resta il caso
+        per cui il soccorso esiste."""
+        from web import main
+
+        def cerca(q, senza_rete=False):
+            return {"trovato": True, "senza_firmware": False,
+                    "nome": "Samsung Galaxy A05s", "codice": "SM-A057G"}
+
+        a, b, c = self._con_ai(["Galaxy A05s"], cerca)
+        with a, b, c:
+            self.assertIsNotNone(main._soccorso_ai("quel samsung nero"))
+
+    def test_la_proposta_scartata_diventa_un_forse_cercavi(self):
+        from unittest.mock import patch
+        from web import main
+
+        vuoto = {"trovato": False, "senza_firmware": False, "nome": "SM-A575G",
+                 "scheda": {"trovata": False}, "forse": []}
+        main.RICERCHE.svuota()
+        with patch.object(main, "_cerca_davvero", return_value=vuoto), \
+             patch.object(main, "_esito_dal_tac", return_value=None), \
+             patch.object(main, "_soccorso_ai",
+                          side_effect=lambda q, scartate: scartate.append("SM-A057G")):
+            esito = main._esito_ricerca("SM-A575G")
+        main.RICERCHE.svuota()
+        self.assertFalse(esito["trovato"])
+        self.assertNotEqual(esito.get("ai_da"), "SM-A575G")
+        self.assertIn("SM-A057G", esito["forse"])
+
+    def test_il_codice_trova_il_telefono_dai_database_tac_come_limei(self):
+        """La ricerca per codice prende la stessa strada di quella per IMEI:
+        dalle righe TAC che dichiarano il codice al nome commerciale."""
+        from unittest.mock import patch
+        from core import imeicheck
+        from web import main
+
+        def cerca(q, senza_rete=False):
+            if q == "SM-A575G":
+                return {"trovato": False, "senza_firmware": False, "nome": q,
+                        "codice": "", "scheda": {"trovata": False}, "forse": []}
+            # Il nome è condiviso: la fonte risponde con la build di un
+            # ALTRO codice, che non deve finire sotto SM-A575G.
+            return {"trovato": True, "senza_firmware": False, "nome": "Galaxy A07",
+                    "codice": "SM-A075F", "riga": "Ultimo Android verificato: Android 16",
+                    "fonte": "Endpoint FOTA ufficiale", "tipo_versione": "current",
+                    "scheda": {"trovata": False}, "forse": []}
+
+        main.RICERCHE.svuota()
+        with patch.object(main, "_cerca_davvero", side_effect=cerca), \
+             patch.object(imeicheck, "identita_per_codice",
+                          return_value=("SAMSUNG", "SAMSUNG GALAXY A07, Samsung SM-A575G")), \
+             patch.object(main, "_soccorso_ai", return_value=None):
+            esito = main._esito_ricerca("SM-A575G")
+        main.RICERCHE.svuota()
+        self.assertTrue(esito["trovato"])
+        self.assertIn("Galaxy A07", esito["nome"])
+        self.assertEqual(esito["codice"], "SM-A575G")
+        self.assertNotIn("Ultimo Android verificato", esito.get("riga") or "")
+
+    def test_identita_per_codice_vuole_il_codice_esatto(self):
+        from unittest.mock import patch
+        from core import imeicheck
+
+        righe = {"35000001": ("SAMSUNG", "SAMSUNG GALAXY A57, Samsung SM-A575GN"),
+                 "35000002": ("SAMSUNG", "SAMSUNG GALAXY A57, Samsung SM-A575G/DS")}
+        with patch.object(imeicheck, "tac_inseriti", return_value=righe), \
+             patch.object(imeicheck, "_indice_curato", return_value={}), \
+             patch.object(imeicheck, "tac_esterni", return_value={}):
+            self.assertEqual(imeicheck.identita_per_codice("SM-A575G"), righe["35000002"])
+            self.assertIsNone(imeicheck.identita_per_codice("SM-A057G"))
+
+
 class TestConfrontoConImei(_Sito):
     """Segnalato dall'utente: «quando cerco un dispositivo e poi faccio il
     confronto, la barra di ricerca del confronto non permette la ricerca

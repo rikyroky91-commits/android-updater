@@ -3286,7 +3286,72 @@ def _ricerca_debole(esito: dict) -> bool:
     return bool(esito) and (not esito.get("trovato") or esito.get("senza_firmware"))
 
 
-def _soccorso_ai(query: str) -> dict | None:
+def _codice_digitato(query: str) -> str:
+    """Il codice modello COMPLETO che è stato scritto, o "" se non è un codice.
+
+    `a575g`, `Samsung SM-A575G`, `SM-A575G/DS` → `SM-A575G`. Un nome
+    commerciale («Galaxy A57») o una frase non sono codici e danno "".
+    """
+    testo = _codice_senza_marca(" ".join(str(query or "").split()))
+    if not testo or " " in testo or not sources.looks_like_model_code(testo):
+        return ""
+    return sources.espandi_codice_samsung(testo) or sources.normalizza_codice_modello(testo)
+
+
+def _radice_codice(codice: str) -> str:
+    """Il codice senza la lettera del mercato: `SM-A575G` → `SMA575`.
+
+    Le lettere in coda dopo l'ultima cifra distinguono le varianti di
+    mercato dello stesso telefono (SM-A575F, SM-A575G, SM-A575M); le cifre
+    distinguono i telefoni (SM-A575 e SM-A057 sono due modelli diversi).
+    """
+    chiave = re.sub(r"[^A-Z0-9]", "", sources.normalizza_codice_modello(codice or ""))
+    return re.sub(r"(?<=\d)[A-Z]+$", "", chiave)
+
+
+def _stesso_modello_del_codice(scritto: str, altro: str) -> bool:
+    """Se `altro` è lo stesso telefono di `scritto`, al più in un altro mercato.
+
+    Il confronto per prefisso tiene dentro le varianti con una cifra in più
+    in coda (`SM-A5750`, la cinese) e il codice incompleto (`SM-A575`).
+    """
+    a, b = _radice_codice(scritto), _radice_codice(altro)
+    return bool(a and b) and (a.startswith(b) or b.startswith(a))
+
+
+def _ai_resta_sul_codice(codice: str, proposta: str, candidato: dict) -> bool:
+    """L'AI può correggere la grafia di un codice, non cambiare telefono.
+
+    Segnalato dall'utente il 15/10/2026: «SM-A575G» diventava «SM-A057G»
+    (Galaxy A05s), con il suo firmware presentato come risposta. Il codice
+    scritto non era un errore — l'IMEI dello stesso telefono lo
+    confermava — era solo assente dai cataloghi. E per questo la ricerca
+    risultava debole, e partiva il soccorso: il modello sceglie fra
+    candidati costruiti per SOMIGLIANZA, e due codici a due cifre di
+    distanza si somigliano quanto basta.
+
+    Il difetto era sistematico, non di quel codice: QUALUNQUE codice vero
+    che i cataloghi non conoscono — un modello uscito da poco, una
+    variante di mercato rara — veniva scambiato con il vicino più
+    somigliante che avesse un firmware. Un codice è già una risposta
+    esatta; se nessuna fonte lo conosce, la risposta onesta è «non lo
+    conosco», con i codici simili proposti come «Forse cercavi», non un
+    altro telefono al posto suo.
+    """
+    if _codice_digitato(proposta) and not _stesso_modello_del_codice(codice, proposta):
+        return False
+    trovato = (candidato or {}).get("codice") or ""
+    if trovato:
+        return _stesso_modello_del_codice(codice, trovato)
+    nome = (candidato or {}).get("nome") or proposta
+    try:
+        nomi = modelcodes.resolve(codice)
+    except Exception:      # pragma: no cover - percorso difensivo
+        nomi = []
+    return any(modelcodes.stesso_telefono(n, nome) for n in nomi)
+
+
+def _soccorso_ai(query: str, scartate: list[str] | None = None) -> dict | None:
     """Riprova la ricerca con quello che l'AI ha capito, e torna il
     risultato migliore — oppure None se non c'è niente di meglio.
 
@@ -3310,6 +3375,11 @@ def _soccorso_ai(query: str) -> dict | None:
     Il risultato si tiene solo se è MIGLIORE: un'interpretazione che
     porta a un altro buco viene scartata, e resta la risposta onesta
     sulla domanda originale.
+
+    E su un codice modello completo si tiene solo se è LO STESSO
+    TELEFONO — vedi `_ai_resta_sul_codice`. Le proposte scartate per
+    questo motivo finiscono in `scartate`, perché la pagina le offra come
+    «Forse cercavi» invece di sceglierle al posto di chi cerca.
     """
     if not aiquery.disponibile():
         return None
@@ -3319,14 +3389,25 @@ def _soccorso_ai(query: str) -> dict | None:
         return None
     if not interpretazione.riuscita:
         return None
+    codice = _codice_digitato(query)
 
     # Due tentativi al massimo: ognuno è una ricerca vera, e la pagina
     # deve restare una pagina, non un'attesa.
     for proposta in list(interpretazione.proposte)[:2]:
         if not proposta or proposta.strip().lower() == query.strip().lower():
             continue
+        # Un altro codice si scarta prima di pagarne la ricerca.
+        if (codice and _codice_digitato(proposta)
+                and not _stesso_modello_del_codice(codice, proposta)):
+            if scartate is not None:
+                scartate.append(proposta)
+            continue
         candidato = _cerca_davvero(proposta)
         if _ricerca_debole(candidato):
+            continue
+        if codice and not _ai_resta_sul_codice(codice, proposta, candidato):
+            if scartate is not None:
+                scartate.append(proposta)
             continue
         candidato = dict(candidato)
         candidato["ai_da"] = query
@@ -3334,6 +3415,54 @@ def _soccorso_ai(query: str) -> dict | None:
         candidato["ai_perche"] = interpretazione.motivo
         return candidato
     return None
+
+
+def _esito_dal_tac(query: str, esito: dict, senza_rete: bool = False) -> dict | None:
+    """Un codice che i cataloghi non conoscono, riconosciuto dai database TAC.
+
+    È la stessa strada della ricerca per IMEI, presa dal codice invece che
+    dal numero: le righe TAC che dichiarano quel codice danno marca e nome
+    commerciale, il nome trova la scheda tecnica, e `_ancora_esito_imei`
+    tiene ferma l'identità. Così «SM-A575G» e un IMEI di un SM-A575G
+    rispondono con lo stesso telefono (segnalato il 15/10/2026).
+
+    Solo quando la ricerca normale non ha identificato niente: se il
+    telefono è già riconosciuto, il TAC non ha niente da aggiungere.
+
+    IL FIRMWARE TROVATO PER NOME NON VALE PER UN ALTRO CODICE. Il nome
+    commerciale è condiviso fra varianti con build diverse («Galaxy A57»
+    è SM-A575G e SM-A576B): se la versione arriva da un codice di un
+    altro modello, si toglie, e resta la versione di lancio della scheda.
+    """
+    if not esito or esito.get("trovato") or (esito.get("scheda") or {}).get("trovata"):
+        return None
+    codice = _codice_digitato(query)
+    if not codice:
+        return None
+    try:
+        trovato = imeicheck.identita_per_codice(codice)
+    except Exception:      # pragma: no cover - un indice illeggibile non ferma la ricerca
+        return None
+    if not trovato:
+        return None
+    marca, specs = trovato
+    dettagli = imeicheck.parse_specs(marca, specs)
+    nome = (dettagli.get("model") or "").strip()
+    if not nome or _codice_digitato(nome):
+        return None
+
+    per_nome = dict(_esito_ricerca(nome, senza_rete=senza_rete))
+    dal_firmware = per_nome.get("codice") or ""
+    if dal_firmware and not _stesso_modello_del_codice(codice, dal_firmware):
+        per_nome.update(riga="", fonte="", fonte_url="", tipo_versione="",
+                        senza_firmware=True, ai_da="", ai_a="", ai_perche="",
+                        firmware_confronto={"android": "", "build": "", "tipo": ""})
+    identita = {"modello_cercato": nome, "codice": dettagli.get("code") or codice,
+                "modello": nome, "marca": marca,
+                "descrizione": imeicheck.describe(marca, specs)}
+    ancorato = _ancora_esito_imei(per_nome, identita)
+    ancorato["query"] = query
+    return ancorato
 
 
 def _in_due_tempi(completo: int = 0) -> bool:
@@ -3374,11 +3503,19 @@ def _esito_ricerca(query: str, senza_rete: bool = False) -> dict:
         # successivi, compreso il secondo caricamento che sta per
         # arrivare. Il risultato sarebbe una pagina ferma sulla rotellina.
         esito = _cerca_davvero(query, senza_rete=True)
+        esito = _esito_dal_tac(query, esito, senza_rete=True) or esito
         esito["firmware_in_arrivo"] = True
         return esito
     esito = _cerca_davvero(query)
     if _ricerca_debole(esito):
-        migliore = _soccorso_ai(query)
+        esito = _esito_dal_tac(query, esito) or esito
+    if _ricerca_debole(esito):
+        scartate: list[str] = []
+        migliore = _soccorso_ai(query, scartate)
+        if migliore is None and scartate:
+            esito = dict(esito)
+            esito["forse"] = list(dict.fromkeys(
+                [*(esito.get("forse") or []), *scartate]))[:8]
         if migliore is not None:
             # Un firmware disponibile non autorizza l'AI a cambiare un telefono
             # già identificato. Moto G30 senza aggiornamenti resta Moto G30.
