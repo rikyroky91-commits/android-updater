@@ -44,6 +44,16 @@ Di suo l'estensione entra in una pagina solo quando clicchi l'icona (`activeTab`
 - **Classifica globale anche qui.** `prepara.js` mette `window.__ringClassifica`, che passa dal service worker (`sfondo.js`, due `fetch` verso `https://mobileupdatetracker.duckdns.org/api/corsa`, senza credenziali). Nessun permesso in più: il server risponde con CORS aperto (`_CORSA_CORS` in `web/main.py`). Il ring mostra classifica e campo del nome dovunque ci sia `__ringClassifica` (`conClassifica()`), non più solo sul sito. Il campo del nome sta nello shadow DOM.
 - **Super guerrieri**: occhi fieri sul disegno di Riccardo (`occhioFiero`, solo per loro; l'orecchio va sul bordo della testa); Zefir e Brasa dell'11/10 con costumi nuovi.
 
+### La 1.2.0 (16/10/2026)
+
+Su richiesta di Riccardo: «un lavoro ex novo su tempi morti, animazioni e combat».
+
+- **Meno tempi morti** (misurati con `tests/misura-lotta.cjs` su 46 pagine vere, primo minuto): si cammina più svelti e da lontano si corre, arrivati a tiro si colpisce subito, chi è su un elemento largo e ha l'avversario sotto si lascia cadere attraverso invece di camminare fino al bordo, chi vola scende all'altezza di chi è a terra, ci si regge solo sull'elemento sotto i piedi, il fumogeno acceca meno, un K.O. chiede un colpo in più. Colpi a segno al minuto: classico 17 → 25, duellanti 27 → 31, super guerrieri 17 → 18,5, maghi 28 → 27 (ora da lontano); tempo in piedi passato in pause oltre i 4 secondi: classico 45% → 31%, duellanti 12% → 9%, super guerrieri 16% → 13%, maghi 20% → 14%. Fra una misura e l'altra i numeri ballano di un paio di punti: sono simulazioni col caso dentro. È il lavoro del 02/10 (`61f8ca9`) che non era mai arrivato su `main`, rifatto sul motore di oggi.
+- **Super guerrieri più fluidi e più da anime**: le pose si inseguono invece di scattare (veloci nei colpi, morbide nel resto), lo scatto in volo parte e frena, l'onda d'energia si carica a mani giunte sul fianco e parte coi palmi avanti, la carica dell'aura è a pugni stretti e tremando, il teletrasporto lascia un'immagine residua, i colpi forti hanno le linee d'impatto.
+- **Limit Break**: la trasformazione si chiama così. Gli occhi del trasformato restano occhi (bianco, iride del colore della forma, sopracciglio staccato sopra); prima la scia degli occhi accesi passava sul viso come una visiera. La testa trasformata ha la calotta di capelli e non sembra più calva.
+- **Maghi con un combattimento loro**, a distanza: stanno in una fascia di tiro, chi si avvicina troppo viene respinto (mossa nuova, **Respinta**, 10 di energia) o il mago sparisce **lontano** (prima la sparizione lo rimetteva accanto all'avversario), lo scudo si alza solo per le magie grosse, il mana si ricarica più in fretta e a secco ci si concentra. Distanza media fra i due: 122 → 193.
+- **Corsa infinita, il ciclo**: tre **missioni** che restano fra una corsa e l'altra (arriva al round N, abbatti N nemici, sconfiggi N capi, evolvi un'arma, vinci round senza danni, fai N punti): fatte pagano monete e salgono di gradino, si vedono nella scelta e nel riepilogo, e in corsa si annunciano. **Il capo ogni cinque round** (5, 10, 15…), col forziere da tre premi; il cruscotto dice quando arriva. **Rimescola** alle carte di un livello, una volta a corsa più i **Dadi** della bottega (nuovo, fino a due).
+
 ### Le due varianti
 
 | Cartella | A cosa serve | Premium |
@@ -82,7 +92,7 @@ Alla prima installazione si apre `benvenuto.html`: sei passi (l'ultimo è il con
 
 Scelto uno stile, in campo non ci sono più il robot e la mela ma due personaggi inventati per quel tema:
 
-- **Super guerrieri** (Zefir e Brasa): volano, onde di energia, sfera gigante, teletrasporto, e la **trasformazione** («sovraccarico», due forme: anelli di luce sopra la testa, bordi e occhi accesi, colpi più forti).
+- **Super guerrieri** (Zefir e Brasa): volano, onde di energia, sfera gigante, teletrasporto, e la **trasformazione**, il **Limit Break** (fino al 16/10/2026 «sovraccarico»; due livelli: anelli di luce sopra la testa, capelli del colore della forma, iridi accese, colpi più forti).
 - **Maghi** (Merlo e Ortica): bacchetta e scopa; dardi, raggio, gelo, rimpicciolimento, fulmine, levitazione, scudo, sparizione. Dal 10/10/2026 anche:
   - **Sciame di falene**: falene di luce che svolazzano verso l'altro e pungono (ogni tre punture, un colpo).
   - **Catene di rune**: un cerchio di rune si accende sotto i piedi dell'altro; se non ne esce prima che si chiuda, catene di luce lo legano per un paio di secondi.
@@ -152,7 +162,7 @@ Dal pannello, «Corsa infinita» trasforma il ring in un gioco che cresce senza 
 
 Nell'estensione la corsa è gratis, come il colpo finale, ma i personaggi a pagamento restano a pagamento: nella scelta le tre famiglie hanno il lucchetto finché Premium è chiuso. Gli imprevisti della corsa capitano anche senza Premium, perché non si scelgono: fanno parte del round.
 
-La classifica globale sta solo sul sito: l'estensione non manda niente a nessuno, tiene record e monete nel browser e il tasto «Classifica» lì non c'è.
+Dalla 1.1.0 la classifica globale c'è anche nell'estensione (vedi sopra, «La 1.1.0»). Record, monete, bottega e missioni restano nel browser.
 
 ### L'audio (09/10/2026, gratis)
 

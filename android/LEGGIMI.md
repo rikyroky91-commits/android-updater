@@ -80,6 +80,11 @@ Gratis con sblocco Premium a acquisto unico (Riccardo: «facciamo gratuito con s
 - `app/java-billing/PremiumGoogle.java` il pagamento vero (Google Play Billing 9.1.0, prodotto `premium` a acquisto unico, conferma entro 3 giorni). Lo compila solo Gradle; senza (APK di prova) vale il Premium finto: tutto aperto.
 - Build del Play: `.github/workflows/android-play.yml` (Gradle 8.14.3, AGP 8.13, progetto in `android/gradle-progetto/` che legge i sorgenti di `android/app` e quello che prepara `costruisci.py --gradle --aab [--leggera]`). Esce una pre-release `android-<commit>` con gli AAB non firmati; si firmano con `python3 android/costruisci.py --firma PageBrawl-completa-nonfirmato.aab`.
 
+## 1.5.1 e 1.6.0
+
+- **1.5.1** (13/10/2026, su `main` dal 16/10): spegnendo lo schermo il ring si **sospende** invece di chiudersi (la partita o la corsa riprende da dov'era), niente più comandi rimasti sullo schermo dopo la chiusura, «Leaderboard» nel menu ⋯, l'APK di prova esce nella pre-release insieme agli AAB.
+- **1.6.0** (16/10/2026, versionCode 11, lite 12): il motore della 1.2.0 dell'estensione (meno tempi morti, super guerrieri più fluidi, Limit Break, maghi a distanza con la respinta, missioni, capo ogni cinque round, rimescola carte; vedi `estensione/LEGGIMI.md`, «La 1.2.0»). Niente di nuovo lato Java: il cruscotto nativo della corsa non mostra ancora missioni e prossimo capo, che si vedono nelle schermate del motore (scelta, carte, riepilogo).
+
 ## Installare
 
 1. Se c'è l'APK fatto prima con Capacitor (stesso nome, `com.rikyroky.pagebrawl`, firma diversa): disinstallarlo.

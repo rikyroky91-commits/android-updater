@@ -8,6 +8,13 @@ Controllato sulla documentazione di Chrome il 02/10/2026 e ricontrollato il 05/1
 
 **Un punto da verificare nella console: il video.** La pagina `cws-dashboard-listing` elenca fra le cose da fornire anche il link a un video YouTube che mostra l'estensione, e dichiara facoltativo solo il riquadro grande (1400×560). Non ho potuto aprire la console per vedere se il campo blocca davvero l'invio. Se lo blocca, basta mezzo minuto di schermo registrato con la lotta, il controller e l'orda, caricato su YouTube come «non in elenco».
 
+## La 1.2.0 (16/10/2026): cosa cambia rispetto alla 1.1.0
+
+- Lotte più fitte, super guerrieri più fluidi, il Limit Break al posto del «sovraccarico», maghi che combattono a distanza con la respinta, e il ciclo della corsa (missioni, il capo ogni cinque round, rimescola carte). Dettaglio in `LEGGIMI.md`, «La 1.2.0».
+- Permessi e dati raccolti **invariati** rispetto alla 1.1.0: nella console non c'è niente da cambiare nella scheda privacy.
+- Testi dello store: le descrizioni della 1.1.0 restano valide. Se si vuole, nella descrizione lunga si può aggiungere una riga sulle missioni («Missions that carry over between runs, a boss every five rounds, card rerolls»).
+- Da caricare: `python3 estensione/costruisci.py --zip` → `estensione/zip/page-brawl-1.2.0-store.zip`.
+
 ## La 1.1.0 (13/10/2026): cosa cambia rispetto alla 1.0.0
 
 - Super guerrieri: occhi nuovi sul disegno di Riccardo (palpebra spessa che scende verso il naso, pupilla piccola); Zefir e Brasa dell'11/10 con costumi nuovi (Zefir gilet cremisi senza maniche e pantaloni antracite, Brasa casacca verde bosco col bordo oro, niente corazza) perché non ricalchino i personaggi di Dragon Ball.

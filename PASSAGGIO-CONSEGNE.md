@@ -27,9 +27,9 @@ Proprietario e unico decisore: **Riccardo** (account GitHub `rikyroky91-commits`
 | --- | --- | --- | --- |
 | Sito M.U.T. | commit su `main` | `/health` → `versione.commit` | deploy automatico su Oracle a ogni push su `main` |
 | `DATA_LOGIC_VERSION` | 34 | `core/config.py` | si alza quando cambia l'interpretazione di una fonte |
-| Estensione Page Brawl | 1.1.0 | `estensione/costruisci.py` → `VERSIONE` | `premium_attivo: false`: tutto gratis. Pubblicata sul Chrome Web Store (aggiornata il 14/10) |
+| Estensione Page Brawl | 1.2.0 sul ramo `claude/exciting-cori-6cwl9m`; 1.1.0 su `main` e nello store | `estensione/costruisci.py` → `VERSIONE` | `premium_attivo: false`: tutto gratis. La 1.1.0 è pubblicata sul Chrome Web Store (aggiornata il 14/10); la 1.2.0 non è ancora stata caricata |
 | Estensione Page Snow | 0.2.0 | `estensione/costruisci.py` → `NATALE_VERSIONE` | tema di Natale, non pubblicata |
-| App Android | 1.5.1, versionCode 9 (lite: 10) | `android/costruisci.py` → `VERSIONE`, `CODICE_VERSIONE` | unita a `main` il 16/10; mai provata su telefono vero da Claude |
+| App Android | 1.6.0, versionCode 11 (lite: 12) sul ramo; 1.5.1, versionCode 9 su `main` | `android/costruisci.py` → `VERSIONE`, `CODICE_VERSIONE` | la 1.5.1 è unita a `main` il 16/10; nessuna delle due provata da Claude su un telefono vero |
 
 ### Rami con lavoro non unito a `main`
 
@@ -37,7 +37,8 @@ Il flusso del repository è **push diretto su `main`** (nessuna PR è mai stata 
 
 | Ramo | Cosa contiene | Da fare |
 | --- | --- | --- |
-| `claude/ultimora-tema-scuro-codice-modello` (02/10) | Commit `61f8ca9` «Ring: lotte più fitte, meno tempi morti»: risposta alla segnalazione «a volte sembrano fermi», misurata su 46 pagine (da 23 a 34 colpi al minuto, pause lunghe dal 29% al 4%), con lo strumento `tests/misura-lotta.cjs` | **Lavoro perso: non è mai arrivato su `main`.** Il cherry-pick oggi dà 8 conflitti in `ring.js`, quindi va riportato a mano: prima misurare `main` con `misura-lotta.cjs` per vedere se il difetto c'è ancora, poi rifare le modifiche che servono. Non cancellare il ramo finché non è deciso |
+| `claude/exciting-cori-6cwl9m` (16/10) | Page Brawl 1.2.0 / Android 1.6.0: tempi morti, super guerrieri più fluidi, Limit Break, maghi a distanza, ciclo della corsa (dettaglio in `estensione/LEGGIMI.md`, «La 1.2.0») | Riccardo lo prova (sito in locale, estensione dallo zip di prova, APK dalla pre-release), poi si unisce a `main`: l'unione pubblica il ring nuovo sulla home del sito |
+| `claude/ultimora-tema-scuro-codice-modello` (02/10) | Commit `61f8ca9` «lotte più fitte, meno tempi morti», mai arrivato su `main` | **Rifatto a mano il 16/10** sul ramo qui sopra (con lo strumento `tests/misura-lotta.cjs` che stava lì). Il ramo vecchio si può cancellare quando quello nuovo è su `main` |
 
 ### Pulizia dei rami (verificata il 16/10/2026)
 
@@ -53,7 +54,7 @@ Controllo fatto su ogni ramo remoto con `git rev-list origin/main..<ramo>`, poi 
 
 **Unite a `main` il 16/10, ora cancellabili anche loro:** `claude/android-ring` (1.5.1) e `claude/loving-cannon-1t7wdu` (ricerca per codice). La CI rossa di quest'ultimo veniva da due test casuali del ring (`ring.test.cjs` n. 59 «imprevisti a mano» e n. 96 «oggetti dai lati»), non dalla correzione: i test Python erano verdi.
 
-**Da tenere:** `claude/ultimora-tema-scuro-codice-modello` (tabella sopra) e il ramo del giro in corso.
+**Da tenere:** il ramo del giro in corso finché non è su `main`; dopo, anche `claude/ultimora-tema-scuro-codice-modello` è cancellabile.
 
 ### Stato dei test (verificato il 16/10/2026)
 
@@ -312,11 +313,17 @@ Dipendenza da ricordare: **estensione e app dipendono dal dominio del tracker**.
 - Le **scommesse coi gettoni** sono state tolte da sito, estensione e app il 12/10.
 - Effetti cruenti spenti di serie; Riccardo ha scelto di lasciare l'interruttore. Se un revisore li contesta, si tolgono dalla variante `store`.
 - Di serie il gioco parte in inglese e coi super guerrieri («come personaggi principali metti i guerrieri»), tranne l'AAB del Play che parte con robot e mela.
-- Super guerrieri ridisegnati l'11/10 e il 13/10 sul pupazzo di Riccardo, con costumi scelti perché non ricalchino Dragon Ball.
+- Super guerrieri ridisegnati l'11/10 e il 13/10 sul pupazzo di Riccardo, con costumi scelti perché non ricalchino Dragon Ball. Le **animazioni** invece devono essere «affini al mondo Dragon Ball» (16/10): stile del genere (scatti con immagini residue, onde caricate al fianco, carica dell'aura, linee d'impatto), mai gesti firma di un personaggio preciso.
+- La trasformazione dei super guerrieri si chiama **Limit Break** in tutte le lingue (16/10, prima «sovraccarico»).
+- I **maghi combattono a distanza** (16/10): fascia di tiro in `MAGO`, respinta, sparizione lontana (`sparizioneMago`). Duellanti e classici (robot e mela) restano com'erano per scelta di Riccardo («spadaccini e androidi li lascerei così per ora»): li toccano solo le correzioni generali dei tempi morti.
 
 ### 4.7 Test
 
-`tests/ring.test.cjs` (circa 170 prove; con gli altri file Node sono 182) simula il motore in Node; `tests/test_estensione.py` controlla che le cartelle generate siano allineate e che i ritocchi reggano. Sono simulazioni col caso dentro: una caduta isolata si riprova, due di fila vanno indagate. `tests/misura-posture.cjs` è uno strumento di misura, non un test.
+`tests/ring.test.cjs` (circa 180 prove; con gli altri file Node sono 193) simula il motore in Node; `tests/test_estensione.py` controlla che le cartelle generate siano allineate e che i ritocchi reggano. Sono simulazioni col caso dentro: una caduta isolata si riprova, due di fila vanno indagate.
+
+Due strumenti di misura, che non sono test: `tests/misura-posture.cjs` e `tests/misura-lotta.cjs` (quanto si lotta davvero su 46 pagine vere: colpi al minuto, pause lunghe, cosa fanno i lottatori; `STILI=maghi SECONDI=60 node tests/misura-lotta.cjs`, `RING_JS=altro-ring.js` per confrontare con una versione vecchia). Ogni modifica a IA, ritmo o movimento si misura prima e dopo con `misura-lotta`.
+
+**Trappola già presa:** `ring.js` è un'unica funzione enorme, quindi due `function` con lo stesso nome non danno errore, l'ultima vince in silenzio. Il 16/10 una `sparisci` nuova dei maghi ha sostituito quella vecchia (che fa sparire chi esce dal ring o cade nella lava) e ha rotto tre test che non c'entravano. Prima di aggiungere una funzione: `grep -n "function nome" web/static/ring.js`.
 
 ### 4.8 Storia in breve
 
@@ -330,6 +337,7 @@ Dipendenza da ricordare: **estensione e app dipendono dal dominio del tracker**.
 | 11/10 | Super guerrieri rifatti |
 | 12/10 | **App Android** da 1.0 a 1.5.0 in un giorno: quattro modalità, lava, comandi nativi, grafica 30/60/120 fps, target API 36, consenso accessibilità, variante leggera, Billing con Gradle in CI |
 | 13/10 | **Estensione 1.1.0**: la pagina conta di più, classifica globale ovunque. Android 1.5.1 (unita il 16/10) |
+| 16/10 | **1.2.0 / Android 1.6.0** (sul ramo): tempi morti, super guerrieri più fluidi e Limit Break, maghi a distanza, missioni, capo ogni cinque round, rimescola |
 
 ### 4.9 Problemi noti
 
@@ -337,7 +345,6 @@ Dipendenza da ricordare: **estensione e app dipendono dal dominio del tracker**.
 - **Accessibilità e Play Store**: Google può rifiutare un'app non di accessibilità che usa quel servizio. Il piano B (`--leggera`) esiste ma perde blocco schermo, «tutto il telefono» e «solo Chrome».
 - **Premium dell'estensione** senza verifica d'acquisto; Premium dell'app senza verifica lato server dell'acquisto (solo Billing sul dispositivo).
 - **Classifica** con punteggi dichiarati dal client.
-- `LEGGIMI.md` dell'estensione dice ancora, nella sezione della corsa, che «la classifica globale sta solo sul sito»: dalla 1.1.0 non è più vero.
 - La docstring di `android/costruisci.py` parla ancora di piattaforma 34 in un punto; la build usa la 36.
 - Nome «Page Brawl» provvisorio: mai verificato fra i marchi registrati. Robot e mela possono ricordare due marchi noti.
 - Maghi senza trasformazione vera (solo trance e aura).
@@ -347,7 +354,8 @@ Dipendenza da ricordare: **estensione e app dipendono dal dominio del tracker**.
 ### 4.10 Miglioramenti possibili
 
 1. Rendere la prova su telefono vero un passo fisso della checklist Android.
-1. Riportare a mano «lotte più fitte» (`61f8ca9`, ramo `claude/ultimora-tema-scuro-codice-modello`), dopo aver misurato se i lottatori di `main` restano ancora fermi.
+1. Tempi morti, il resto: la lotta classica passa ancora il 31% del tempo in piedi in pause lunghe, quasi tutte con i due su piani diversi o uno in volo col jetpack che l'altro non raggiunge. È il prossimo punto da misurare e sistemare (con l'accordo di Riccardo, perché tocca robot e mela).
+1. Il cruscotto nativo della corsa nell'app (Comandi.java) non mostra missioni e prossimo capo.
 2. Spostare il motore in una cartella `pagebrawl/` con `ring.js` diviso in moduli (fisica, personaggi, eventi, corsa, interfaccia) e un passo di build che li unisca: 14.500 righe in un file sono il collo di bottiglia di ogni modifica.
 3. Verifica degli acquisti lato server (Play Developer API) prima di vendere davvero.
 4. Classifica: firma o controllo di plausibilità più stretto (durata reale, eventi della partita), e un dominio proprio per Page Brawl, così gli store non dipendono dal tracker.
@@ -408,6 +416,7 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 16/10/2026 | Claude | Page Brawl 1.2.0 / Android 1.6.0: tempi morti rifatti da `61f8ca9` e misurati, super guerrieri più fluidi, Limit Break (occhi e capelli sistemati), maghi a distanza con la respinta, missioni, capo ogni cinque round, rimescola. Non su `main` | `claude/exciting-cori-6cwl9m` |
 | 16/10/2026 | Claude | Unite a `main` Android 1.5.1 (`claude/android-ring`) e la correzione della ricerca per codice (`claude/loving-cannon-1t7wdu`), dopo revisione del codice e test della ricerca verdi | `main` |
 | 16/10/2026 | Claude | Controllati tutti i rami remoti contro `main`: 30 cancellabili, 3 da tenere; trovato il lavoro perso `61f8ca9` (lotte più fitte). Verificato che l'estensione 1.1.0 è pubblicata | `claude/exciting-cori-6cwl9m` |
 | 16/10/2026 | Claude | Creato questo documento unico di consegna (tracker + Page Brawl) e la regola di aggiornamento in `CLAUDE.md` | `claude/exciting-cori-6cwl9m` |

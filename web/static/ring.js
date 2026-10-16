@@ -194,6 +194,12 @@
     const v = parseInt(deposito.getItem("mut-ring-banca"), 10); if (Number.isFinite(v) && v > 0) banca = v;
     const b = JSON.parse(deposito.getItem("mut-ring-bottega") || "{}"); if (b && typeof b === "object") bottega = b;
   } catch (errore) { /* da zero */ }
+  // Le missioni della corsa (vedi MISSIONI): le tre attive e a che gradino è ogni tipo.
+  let missioni = { attive: ["round", "uccisi", "evo"], gradi: {} };
+  try {
+    const m = JSON.parse(deposito.getItem("mut-ring-missioni") || "null");
+    if (m && Array.isArray(m.attive) && m.gradi && typeof m.gradi === "object") missioni = { attive: m.attive.slice(0, 3), gradi: m.gradi };
+  } catch (errore) { /* da zero */ }
 
   // ·· L'AUDIO (09/10/2026, chiesto da Riccardo: «aggiungi l'audio a tutto da attivare opzionalmente») ··
   // Spento finché non lo si accende (tasto «Audio» nel pannello, e l'altoparlante
@@ -341,7 +347,7 @@
     [/^PRESO!/, "preso"],
     [/^MANCATO!/, "mancato"],
     [/^MIRA!/, "carica"],
-    [/^(SOVRACCARICO|COLOSSO|GRANDE ALBERO|CAVALIERE|SFERA FINALE|COLPO FINALE)/, "potenza"],
+    [/^(LIMIT BREAK|COLOSSO|GRANDE ALBERO|CAVALIERE|SFERA FINALE|COLPO FINALE)/, "potenza"],
     [/^(SU|HOP|OPLÀ|VAI|CAMBIO|CINQUE)!/, "salto"],
     [/^POP!/, "pop"],
     [/^SPLASH!/, "acqua"],
@@ -793,7 +799,7 @@
     if (base === undefined) base = pavimento;
     const f = {
       tipo, dir, cx: x, base, supporto: null, p: {}, aste: [],
-      forza: 1, ko: 0, rialzo: 0, stordito: 0, danni: 0, soglia: Math.round(caso(3, 6)),
+      forza: 1, ko: 0, rialzo: 0, stordito: 0, danni: 0, soglia: Math.round(caso(4, 7)),
       azione: null, t: 0, durata: 0, colpito: false, pensa: caso(20, 60), meta: x,
       passo: 0, dolore: 0, preso: null, scalata: null, inVolo: false, botta: 0, fantasma: false,
       aggr: caso(0.75, 1.3), furbo: caso(0.6, 1.4), furia: 0, tel: null, prendiTel: null, polv: 0,
@@ -901,6 +907,7 @@
     for (const o of ostacoli) {
       if (f.cx < o.l - 3 * S || f.cx > o.r + 3 * S) continue;
       if (o.t < piede - 10 * S) continue;
+      if (f.attraversa && Math.abs(o.t - f.attraversa.y) < 2) continue;      // ci sta scendendo attraverso
       if (o.t < y) { y = o.t; chi = o; }
     }
     return [y, chi];
@@ -986,6 +993,11 @@
       q.piedeD = [Math.max(0, -5 * Math.cos(ph)), -8 - 7 * Math.sin(ph)];
       q.ginocchioA = [14 + Math.max(0, 3 * Math.cos(ph)), 6 + 4 * Math.sin(ph)];
       q.ginocchioD = [14 + Math.max(0, -3 * Math.cos(ph)), -3 - 4 * Math.sin(ph)];
+      // Di corsa: busto in avanti e falcata più lunga.
+      if (f.azione === "avanza" && f.veloce) {
+        q.collo[1] += 3; q.testa[1] += 5; q.bacino[1] += 1;
+        q.piedeA[1] *= 1.3; q.piedeD[1] *= 1.3;
+      }
     }
     // Prima di colpire ci si carica un attimo all'indietro (anticipazione).
     const carica = COLPI[f.azione] ? Math.max(0, 1 - f.t / 5) : 0;
@@ -1187,6 +1199,7 @@
         break;
       case "gelo":
       case "rimpicciolisci":
+      case "respinta":
         // Un colpo di bacchetta: indietro, poi di scatto in avanti.
         if (f.t < 14) { const k = f.t / 14; q.manoA = [56 + 16 * k, 8 - 12 * k]; q.gomitoA = [50 + 8 * k, 6 - 6 * k]; }
         else { const k = Math.min(1, (f.t - 14) / 5); q.manoA = [72 - 20 * k, -4 + 30 * k]; q.gomitoA = [58 - 8 * k, 14 * k]; q.collo[1] += 3 * k; q.testa[1] += 3 * k; }
@@ -1276,7 +1289,15 @@
         const tr = Math.sin(f.t * 1.7) * 0.6;
         q.piedeA = [0, 12]; q.piedeD = [0, -12]; q.ginocchioA = [12, 11]; q.ginocchioD = [12, -9];
         q.bacino[0] -= 4; q.collo[0] -= 3; q.testa[0] -= 3; q.testa[1] += tr;
-        q.manoA = [28, 16]; q.gomitoA = [39, 12]; q.manoD = [28, -12]; q.gomitoD = [39, -9];
+        if (stile === "guerrieri") {
+          // I super guerrieri si caricano a pugni stretti, giù e larghi ai fianchi, il petto in fuori e la testa
+          // all'indietro a urlare: tutto il corpo trema di più man mano che l'energia sale.
+          const k = Math.min(1, f.t / 14), sc = Math.sin(f.t * 2.3) * (0.4 + 0.6 * Math.min(1, f.ki / 100));
+          q.manoA = [24 - 2 * k, 18 + 3 * k + sc]; q.gomitoA = [38, 16 + 2 * k]; q.manoD = [24 - 2 * k, -16 - 3 * k - sc]; q.gomitoD = [38, -14 - 2 * k];
+          q.collo[1] -= 2 * k; q.testa[1] -= 3 * k; q.testa[0] += 1 * k + sc * 0.3;
+        } else {
+          q.manoA = [28, 16]; q.gomitoA = [39, 12]; q.manoD = [28, -12]; q.gomitoD = [39, -9];
+        }
         break;
       }
       case "spingi": {
@@ -1290,11 +1311,15 @@
       case "onda":
         q.piedeA = [0, 13]; q.piedeD = [0, -10]; q.ginocchioA = [13, 11]; q.ginocchioD = [13, -7];
         if (f.t < 34) {
-          q.manoA = [36, -6]; q.manoD = [38, -8]; q.gomitoA = [42, 4]; q.gomitoD = [42, 2];
-          q.collo[1] -= 3; q.testa[1] -= 2;
+          // La carica: le mani a coppa sul fianco dietro, il busto ruotato indietro, sempre più giù.
+          const k = Math.min(1, f.t / 18), tr = f.t > 20 ? Math.sin(f.t * 1.9) * 0.5 : 0;
+          q.manoA = [36 - 4 * k, -6 - 4 * k + tr]; q.manoD = [38 - 4 * k, -8 - 4 * k - tr]; q.gomitoA = [42, 4 - 2 * k]; q.gomitoD = [42, 2 - 2 * k];
+          q.collo[1] -= 3 + 2 * k; q.testa[1] -= 2 + 2 * k; q.bacino[0] -= 2 * k;
         } else {
-          q.manoA = [49, 27]; q.manoD = [48, 25]; q.gomitoA = [49, 15]; q.gomitoD = [48, 13];
-          q.collo[1] += 3; q.testa[1] += 3;
+          // Lo sparo: le mani avanti, il corpo che ci si butta dietro.
+          const k = Math.min(1, (f.t - 34) / 4);
+          q.manoA = [32 + 17 * k, -10 + 37 * k]; q.manoD = [34 + 14 * k, -12 + 37 * k]; q.gomitoA = [42 + 7 * k, 2 + 13 * k]; q.gomitoD = [42 + 6 * k, 11 * k];
+          q.collo[1] += -5 + 8 * k; q.testa[1] += -4 + 7 * k;
         }
         if (eMela(f)) for (const nome of SPALLA_MELA) q[nome][0] += ABBASSA_MELA * 0.5;
         break;
@@ -1418,6 +1443,19 @@
       q.testa[1] += d * 1.2; q.collo[1] += d * 0.7; q.bacino[0] -= 3;
       q.manoA = [33, 9 + d]; q.gomitoA = [41, 7 + d * 0.5]; q.manoD = [32, -3 + d]; q.gomitoD = [40, 1 + d * 0.5];
     }
+    // LE POSE DEI SUPER GUERRIERI SCORRONO (16/10/2026, Riccardo: «i super guerrieri devono avere animazioni più fluide e affini al mondo dragon ball»).
+    // Le pose cambiano di colpo (carica → sparo, un pugno → l'altro) e i muscoli ci arrivano in uno o due fotogrammi:
+    // da qui gli scatti. Per loro la posa voluta si insegue un po' alla volta, nel riferimento del corpo: veloce nei
+    // colpi (che devono restare secchi), più morbida nel resto.
+    if (stile === "guerrieri" && !(f.ko > 0) && !f.preso && !f.tenuto) {
+      const a = COLPI[f.azione] || f.azione === "rush" ? 0.7 : 0.38, L = f.qLiscia || (f.qLiscia = {});
+      for (const nome in q) {
+        const v = L[nome];
+        if (!v) { L[nome] = [q[nome][0], q[nome][1]]; continue; }
+        v[0] += (q[nome][0] - v[0]) * a; v[1] += (q[nome][1] - v[1]) * a;
+        q[nome][0] = v[0]; q[nome][1] = v[1];
+      }
+    } else if (f.qLiscia) f.qLiscia = null;
     // In coordinate della finestra.
     const fuori = {};
     for (const nome in q) {
@@ -1621,7 +1659,7 @@
                    carica: 70, onda: 80, raffica: 40, rush: 44,
                    sfera: 150, disco: 56, lampo: 40, barriera: 110, avvinghia: 96, telecinesi: 124,
                    trasforma: 96, gelo: 44, rimpicciolisci: 40, fulmine: 50, levita: 100,
-                   falene: 46, catene: 40, stelle: 62, smeraldo: 104,
+                   falene: 46, catene: 40, stelle: 62, smeraldo: 104, respinta: 26,
                    affondo: 24, rovescio: 26, scattoLama: 44, lancioLama: 40, pressa: 50, testata: 22,
                    cavallina: 46, sgabello: 46, trottola: 34, insieme: 38, bolide: 50, fionda: 34 };
 
@@ -1700,7 +1738,7 @@
     if (orda && corsa && eDellaCorsa(f)) { pensaVoloCorsa(f); return; }
     // Arriva l'orda: si scende a terra, accanto all'alleato.
     if (orda) { f.jet = Math.min(f.jet, 24); f.meta = Math.max(orda.l + 20 * S, Math.min(orda.r - 20 * S, orda.cx + (orda.lati[f.tipo] || 1) * 15 * S)); f.pensa = 12; return; }
-    if (f.volo) { pensaGuerriero(f, altro); return; }
+    if (f.volo) { if (maghi() && f.jet >= 60 && pensaMago(f, altro, true)) return; pensaGuerriero(f, altro); return; }
     const ob = altro.p.bacino, mio = f.p.bacino;
     f.dir = ob.x >= mio.x ? 1 : -1;
     if (altro.ko || altro.preso) {
@@ -1708,7 +1746,9 @@
       f.jet = Math.min(f.jet, 70); f.meta = altro.cx; f.volaY = Math.min(fondoVolo() - 60 * S, ob.y - 30 * S);
       f.pensa = 20; return;
     }
-    f.volaY = Math.max(100, Math.min(fondoVolo() - 70 * S, ob.y - caso(-8, 28) * S));
+    // Chi vola scende fino all'altezza dell'altro, anche se quello è a terra: più su i colpi andavano a vuoto e chi
+    // stava sotto non poteva attaccare (16/10/2026, rifatto sul motore di oggi dal giro del 02/10 rimasto fuori da main, `61f8ca9`).
+    f.volaY = Math.max(100, Math.min(fondoVolo() - 44 * S, ob.y - caso(-6, 18) * S));
     const dx = Math.abs(ob.x - mio.x) / S;
     if (puoSparare(f, dx) && Math.random() < 0.5) { inizia(f, azioneArma(f.arma)); return; }
     if (anime && f.ki >= 45 && dx > 70 && Math.random() < 0.3) { inizia(f, "onda"); return; }
@@ -1838,7 +1878,10 @@
           const piano = f.dopo; f.dopo = null; f.azione = null;
           if (raggiungibile(f, piano.o)) { iniziaScalata(f, piano.o, piano.lato); return; }
         }
-        f.azione = null; f.pensa = f.combo || f.ordine ? 1 : orda ? caso(2, 8) : caso(3, 22);
+        // Arrivati a tiro si colpisce subito: le attese più lunghe (e più visibili) erano quelle dei due fermi uno
+        // davanti all'altro dopo essersi raggiunti (16/10/2026, rifatto sul motore di oggi dal giro del 02/10 rimasto fuori da main, `61f8ca9`).
+        const eraAvanza = f.azione === "avanza";
+        f.azione = null; f.pensa = f.combo || f.ordine ? 1 : orda ? caso(2, 8) : eraAvanza ? caso(1, 4) : caso(2, 12);
       }
       return;
     }
@@ -1862,6 +1905,8 @@
       inizia(f, "balla"); return;
     }
     if (altro.ko || altro.preso || altro.tenuto) { inizia(f, Math.random() < 0.7 ? "esulta" : "provoca"); return; }
+    // I maghi hanno un combattimento tutto loro, a distanza (vedi pensaMago).
+    if (maghi() && !f.arma && !f.tel && pensaMago(f, altro, false)) return;
     // I duellanti pensano con la lama; senza (lanciata, o col braccio staccato) tornano a fare a pugni.
     if (lame() && pensaLama(f, altro)) return;
     // La mela, ogni tanto e solo passato il primo minuto, tira fuori dal
@@ -1959,11 +2004,12 @@
         if (verso > 0 && !f.tel && Math.random() < 0.4) { decolla(f, false); return; }
         inizia(f, scegli([[50, "provoca"], [25, "indietro"], [25, "para"]]));
       } else if (distanza > 34) {
-        const azione = scegli([[74 * f.aggr, "avanza"], [14 * pesoMossa(f, "provoca"), "provoca"], [12 * pesoMossa(f, "salto"), "salto"]]);
+        // Le provocazioni si fanno da lontano; a mezza distanza si va sotto.
+        const azione = scegli([[74 * f.aggr, "avanza"], [(distanza > 150 ? 12 : 3) * pesoMossa(f, "provoca"), "provoca"], [9 * pesoMossa(f, "salto"), "salto"]]);
         inizia(f, azione, altro.cx);
       } else if (distanza < 22) {
-        inizia(f, scegli([[45 * pesoMossa(f, "indietro"), "indietro"], [25 * pesoMossa(f, "montante"), "montante"],
-                          [30 * pesoMossa(f, "pugno"), "pugno"], [pesoPresa * 1.5, "presa"]]));
+        inizia(f, scegli([[24 * pesoMossa(f, "indietro"), "indietro"], [30 * pesoMossa(f, "montante"), "montante"],
+                          [36 * pesoMossa(f, "pugno"), "pugno"], [pesoPresa * 1.5, "presa"]]));
       } else {
         // Dopo un colpo a segno o una parata si va in serie: solo attacchi,
         // scelti ancora più in base a quel che ha funzionato.
@@ -1981,7 +2027,12 @@
       // l'elemento su cui siamo, verso il bordo più vicino per scendere.
       const o = f.supporto;
       let meta = altro.cx;
-      if (o && altro.cx >= o.l - 4 * S && altro.cx <= o.r + 4 * S) {
+      if (o && verso > 0 && !lava && !altro.scalata && !raggiungibile(altro, o) && Math.min(f.cx - o.l, o.r - f.cx) > 60 * S) {
+        // Il bordo è lontano e l'altro da sotto non può arrampicarsi: l'elemento è una piattaforma, ci si lascia
+        // cadere attraverso. Prima si camminava fino in fondo (anche dieci secondi su una testata larga quanto la
+        // pagina) mentre l'altro aspettava sotto (16/10/2026, rifatto sul motore di oggi dal giro del 02/10 rimasto fuori da main, `61f8ca9`).
+        f.attraversa = { y: o.t, t: 120 };
+      } else if (o && altro.cx >= o.l - 4 * S && altro.cx <= o.r + 4 * S) {
         meta = (f.cx - o.l < o.r - f.cx) ? o.l - 14 * S : o.r + 14 * S;
       }
       f.dir = meta >= f.cx ? 1 : -1;
@@ -1996,7 +2047,7 @@
     } else {
       // Più in alto: ci si arrampica sul fianco dell'elemento su cui sta.
       const o = altro.supporto;
-      if (raggiungibile(f, o)) {
+      if (raggiungibile(f, o) && !altro.attraversa) {
         const lato = f.cx < (o.l + o.r) / 2 ? -1 : 1;
         const xw = lato < 0 ? o.l : o.r;
         const meta = xw + lato * 11 * S;
@@ -2005,8 +2056,13 @@
         inizia(f, "avanza", meta);
         f.dopo = { o, lato };
       } else {
-        // Irraggiungibile: aspetta che scenda lui, provocandolo.
-        inizia(f, scegli([[70, "provoca"], [30, "salto"]]));
+        // Irraggiungibile: gli si va sotto (l'altro scende attraverso l'elemento), e passato il primo minuto ogni
+        // tanto lo si raggiunge in volo (16/10/2026, rifatto sul motore di oggi dal giro del 02/10 rimasto fuori da main, `61f8ca9`).
+        f.dir = altro.cx >= f.cx ? 1 : -1;
+        const sotto = altro.cx - f.dir * 30 * S;
+        if (tempo >= CALMA && !f.tel && !lava && Math.random() < 0.3) { decolla(f, false); return; }
+        if (Math.abs(altro.cx - f.cx) > 60 * S) inizia(f, "avanza", Math.max(10 * S, Math.min(W - 10 * S, sotto)));
+        else inizia(f, scegli([[35, "provoca"], [65, "salto"]]));
       }
     }
   }
@@ -2148,6 +2204,11 @@
     if (eMela(altro) && (forza > 4.6 || suono === "BANG!" || taglio) && Math.random() < 0.4) mordi(altro, x, y);
     scintille(x, y, ko ? 16 : 9, f.furia > 0 ? "#ff6a3a" : "#ffe27a");
     fermoColpo = ko ? 9 : 3;
+    // Coi super guerrieri un colpo forte ha le sue linee d'impatto: una raggiera bianca che si apre (16/10/2026, Riccardo: «i super guerrieri devono avere animazioni più fluide e affini al mondo dragon ball»).
+    if (stile === "guerrieri" && (forza >= 4 || ko) && particelle.length < MAX_PARTICELLE) {
+      particelle.push({ tipo: "impatto", x, y, vx: 0, vy: 0, vita: 9, max: 9, r: (ko ? 46 : 32) * S, giro: Math.random() * Math.PI,
+                        colore: f.p ? coloreAnime(f) : "#ffffff" });
+    }
     if (ko) scossa = 12;
     const spinta = forza * S * (ko ? 1.9 : 1);
     for (const n in altro.p) {
@@ -2170,7 +2231,7 @@
     altro.koVero = true;
     for (const l of lottatori) l.mutato = false;                 // il round nuovo: la rimonta torna buona
     if (altro.forma && altro.potenziato > 1) altro.potenziato = 1;
-    altro.ko = Math.round(caso(110, 170)); altro.danni = 0; altro.soglia = Math.round(caso(3, 6));
+    altro.ko = Math.round(caso(110, 170)); altro.danni = 0; altro.soglia = Math.round(caso(4, 7));
     if (f.tipo) punteggio[f.tipo]++;
     // Chi vince balla (01/10/2026, su richiesta), appena l'altro è giù.
     if (f.p && f !== altro) f.daBallare = true;
@@ -2523,6 +2584,10 @@
     if (piattaforma) {
       for (const o of ostacoli) {
         if (pt.x < o.l - r || pt.x > o.r + r) continue;
+        if (f.attraversa && Math.abs(o.t - f.attraversa.y) < 2) continue;
+        // Regge solo l'elemento su cui si poggiano i piedi (o uno più in basso): a quelli più in alto non ci si resta
+        // appesi con le mani o con la testa dopo un salto o un colpo preso da sotto (16/10/2026, rifatto sul motore di oggi dal giro del 02/10 rimasto fuori da main, `61f8ca9`).
+        if (o.t < f.base - 2 * S) continue;
         // Solo scendendo, e solo se un attimo prima si era sopra il bordo alto.
         if (pt.oy <= o.t - r + 1 && pt.y > o.t - r) {
           const vx = pt.x - pt.ox, vy = pt.y - pt.oy;
@@ -2642,7 +2707,7 @@
   function aggiornaParticelle() {
     for (const q of particelle) {
       q.x += q.vx; q.y += q.vy; q.vita--;
-      if (q.tipo === "onda" || q.tipo === "lampo" || q.tipo === "vento" || q.tipo === "zip" || q.tipo === "linea" || q.tipo === "taglio") continue;
+      if (q.tipo === "onda" || q.tipo === "lampo" || q.tipo === "vento" || q.tipo === "zip" || q.tipo === "linea" || q.tipo === "taglio" || q.tipo === "impatto") continue;
       if (q.tipo === "mote") {
         // Un granello d'energia che vola verso la sfera che si sta formando.
         const s = q.verso && q.verso.sfera;
@@ -3533,7 +3598,7 @@
         particelle.push({ tipo: "fumo", x: n.x + caso(-42, 42) * S, y: n.y + caso(-26, 22) * S, vx: caso(-0.5, 0.5) * S, vy: -caso(0.1, 0.5) * S,
                           vita: 80, max: 80, r: caso(9, 15) * S, colore: passi % 4 < 2 ? "#bdb8cc" : "#dedbe8" });
       }
-      if (n.t > 260) continue;
+      if (n.t > 150) continue;                    // acceca per due secondi e mezzo, poi è solo fumo
       for (const f of lottatori) {
         if (f.tipo === n.per || f.esploso || f.fuori || f.ko > 0 || f.preso || f.tenuto) continue;
         if (Math.hypot(f.p.testa.x - n.x, f.p.testa.y - n.y) < 64 * S) {
@@ -6134,12 +6199,13 @@
                 ["raffica", "\u2728", "Raffica di sfere", 15], ["rush", "\u{1F44A}", "Raffica di pugni", 8], ["telecinesi", "\u270B", "Presa a distanza", 50],
                 ["lampo", "\u{1F4A1}", "Lampo accecante", 15],
                 ["barriera", "\u{1F6E1}\uFE0F", "Barriera", 20], ["teletrasporto", "\u26A1", "Teletrasporto", 15], ["carica", "\u{1F525}", "Carica l'aura"],
-                ["trasforma", "\u{1F31F}", "Trasformazione", 40], ["avvinghia", "\u{1F4A5}", "Autodistruzione", 30]],
+                ["trasforma", "\u{1F31F}", "Limit Break", 40], ["avvinghia", "\u{1F4A5}", "Autodistruzione", 30]],
     maghi: [["raffica", "\u2728", "Dardi magici", 15], ["onda", "\u{1F300}", "Raggio", 45], ["gelo", "\u2744\uFE0F", "Gelo", 20], ["rimpicciolisci", "\u{1F52E}", "Rimpicciolisci", 25],
             ["fulmine", "\u26A1", "Fulmine", 25], ["levita", "\u{1F388}", "Levitazione", 30],
             ["falene", "\u{1F98B}", "Sciame di falene", 20], ["catene", "\u26D3\uFE0F", "Catene di rune", 30],
             ["stelle", "\u{1F320}", "Pioggia di stelle", 35], ["smeraldo", "\u{1F49A}", "Maledizione di smeraldo", 100],
-            ["barriera", "\u{1F6E1}\uFE0F", "Scudo magico", 20], ["teletrasporto", "\u{1F4A8}", "Sparizione", 15], ["carica", "\u{1F525}", "Carica l'aura"]],
+            ["barriera", "\u{1F6E1}\uFE0F", "Scudo magico", 20], ["respinta", "\u{1F32C}\uFE0F", "Respinta", 10],
+            ["teletrasporto", "\u{1F4A8}", "Sparizione", 15], ["carica", "\u{1F525}", "Carica l'aura"]],
     lame: [["fendente", "\u2694\uFE0F", "Fendente"], ["affondo", "\u{1F5E1}\uFE0F", "Affondo"], ["rovescio", "\u21A9\uFE0F", "Rovescio"], ["scattoLama", "\u{1F4A8}", "Scatto tagliente"],
            ["lancioLama", "\u{1F3AF}", "Lama lanciata"], ["duello", "\u2716\uFE0F", "Incrocio di lame"],
            ["para", "\u{1F6E1}\uFE0F", "Parata"], ["salto", "\u{1F998}", "Salto"], ["jet", "\u{1F680}", "Jetpack"]],
@@ -6509,9 +6575,11 @@
     }
   }
   function teletrasporta(f, altro) {
+    if (maghi() && !orda && sparizioneMago(f, altro)) return true;          // i maghi spariscono LONTANO (vedi pensaMago)
     if (f && f.p) suona("zap", f.p.bacino.x, 0.5);
     if (f.esploso || f.tenuto || f.preso || f.ko || !altro || altro.esploso) return false;
     f.ki = Math.max(0, f.ki - 15);
+    if (stile === "guerrieri") { residua(f); residua(f); }          // l'immagine residua resta dov'era, e sbiadisce
     const da = { x: f.p.bacino.x, y: f.p.bacino.y };
     const lato = f.cx < altro.cx ? 1 : -1;
     let nx = altro.cx + lato * 30 * S;
@@ -7039,7 +7107,7 @@
   // insegue l'avversario.
   function scatta(f, altro, frames) {
     if (!(f.jet > 0)) prendiIlVolo(f);
-    f.scatto = frames || 22; f.bersaglio = altro; f.azione = null;
+    f.scatto = frames || 22; f.bersaglio = altro; f.azione = null; f.scattoT = 0;
   }
   function aggiornaScatto(f) {
     const a = f.bersaglio, b = f.p.bacino;
@@ -7054,7 +7122,11 @@
       if (d < 40 * S && !a.ko) inizia(f, !maghi() && f.ki >= 8 && Math.random() < 0.55 ? "rush" : scegli([[3, "pugno"], [2, "calcio"], [2, "montante"]]));
       return;
     }
-    const passo = Math.min(d, VOLO_VEL * S * (f.forma > 0 && f.potenziato > 0 ? 1.35 : 1)), ux = dx / d, uy = dy / d;
+    // Parte piano, in tre fotogrammi è a tutta, e frena negli ultimi sessanta punti: prima andava a velocità fissa
+    // dal primo all'ultimo fotogramma, e si fermava di colpo (16/10/2026, Riccardo: «i super guerrieri devono avere animazioni più fluide e affini al mondo dragon ball»).
+    f.scattoT = (f.scattoT || 0) + 1;
+    const spunto = Math.min(1, 0.35 + 0.22 * f.scattoT), frena = Math.max(0.45, Math.min(1, d / (60 * S)));
+    const passo = Math.min(d, VOLO_VEL * S * (f.forma > 0 && f.potenziato > 0 ? 1.35 : 1) * spunto * frena), ux = dx / d, uy = dy / d;
     for (const n in f.p) { const q = f.p[n]; q.x += ux * passo; q.y += uy * passo; q.ox += ux * passo; q.oy += uy * passo; }
     f.cx += ux * passo; f.meta = f.cx; f.volaY = b.y; f.base = b.y + 30 * S;
     f.vel = { x: ux, y: uy };
@@ -7270,6 +7342,7 @@
     if (f.azione === "catene" && f.t === 12 && f.ki >= 30) { f.ki -= 30; evocaRune(f, altro); }
     if (f.azione === "stelle" && f.t === 20 && f.ki >= 35) { f.ki -= 35; chiamaStelle(f, altro); }
     if (f.azione === "smeraldo" && !(fatale && fatale.da === f)) eseguiSmeraldo(f, altro);
+    if (f.azione === "respinta" && f.t === 14) respingi(f, altro);
   }
   // La presa a distanza: con una mano alzata si solleva l'avversario, che
   // resta sospeso a braccia e gambe larghe mentre una luce gli cresce dentro;
@@ -7486,7 +7559,7 @@
 
   // --- I PERSONAGGI NUOVI (02/10/2026, su richiesta) ----------------------
   // Tre stili, tutti disegnati e inventati qui. I SUPER GUERRIERI hanno ora
-  // una trasformazione, il «sovraccarico»: anelli di luce sopra la testa,
+  // una trasformazione, il «Limit Break» (fino al 16/10/2026 «sovraccarico»): anelli di luce sopra la testa,
   // occhi accesi, colpi più forti (e una seconda forma, con tre sfere che
   // orbitano). I MAGHI lottano a incantesimi con la bacchetta e volano sulla
   // scopa. I DUELLANTI hanno una lama di energia: fendenti, affondi, lo
@@ -7525,7 +7598,7 @@
     for (const k of [0, 8]) if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "onda", x: b.x, y: b.y - 12 * S, vx: 0, vy: 0, vita: 22 + k, max: 22 + k, colore: k ? "#ffffff" : col });
     scintille(b.x, b.y - 14 * S, 26, col); scintille(b.x, b.y - 14 * S, 12, "#ffffff");
     scossa = Math.max(scossa, 14); fermoColpo = Math.max(fermoColpo, 6);
-    scrivi(GRIDO_FORMA[formaDi(f)] || (f.forma >= 2 ? "SOVRACCARICO II!" : "SOVRACCARICO!"), b.x, b.y - 62 * S, true);
+    scrivi(GRIDO_FORMA[formaDi(f)] || (f.forma >= 2 ? "LIMIT BREAK II!" : "LIMIT BREAK!"), b.x, b.y - 62 * S, true);
     // L'onda d'urto sbalza via l'avversario, senza fargli danno.
     // (se anche l'altro si sta trasformando non lo tocca: si trasformano insieme, senza spingersi)
     if (!altro.esploso && !altro.preso && !altro.tenuto && altro.azione !== "trasforma") {
@@ -7578,10 +7651,8 @@
         ctx.globalAlpha = 1; tondo(x, y, 1.9 * S, "#ffffff");
       }
     }
-    // Gli occhi accesi lasciano una scia.
-    const ox = f.p.testa.x + f.dir * 3 * S, oy = f.p.testa.y;
-    ctx.globalAlpha = 0.55; ctx.strokeStyle = col; ctx.lineWidth = 2 * S;
-    ctx.beginPath(); ctx.moveTo(ox, oy); ctx.quadraticCurveTo(ox - f.dir * 7 * S, oy - 1 * S, ox - f.dir * 15 * S, oy - (4 + Math.sin(passi * 0.3) * 1.5) * S); ctx.stroke();
+    // (Fino al 16/10/2026 qui gli occhi accesi lasciavano una scia: sul viso di fronte dei super guerrieri
+    // passava sopra tutti e due gli occhi e sembrava una visiera. Via: l'iride accesa basta.)
     ctx.restore();
   }
 
@@ -7591,15 +7662,17 @@
     return { x: m.x + (m.x - g.x) / L * 14 * S, y: m.y + (m.y - g.y) / L * 14 * S };
   };
   const INCANTI = { gelo: 1, rimpicciolisci: 1, fulmine: 1, levita: 1, raffica: 1, onda: 1, carica: 1, barriera: 1, lampo: 1,
-                    falene: 1, catene: 1, stelle: 1, smeraldo: 1 };
+                    falene: 1, catene: 1, stelle: 1, smeraldo: 1, respinta: 1 };
   // Che incantesimo fare adesso (o nessuno: allora decide il resto del cervello).
   function incantesimo(f, altro) {
     const b = f.p.bacino, ob = altro.p.bacino, d = Math.hypot(ob.x - b.x, ob.y - b.y) / S;
     const fermo = altro.gelato > 0 || altro.stordito > 0 || altro.accecato > 0;
     // La maledizione di smeraldo non si para: si vede arrivare, e chi può si scansa.
     if (scansaSmeraldo(f, altro)) return true;
-    if (f.ki >= 20 && (altro.azione === "onda" || altro.azione === "raffica" || altro.azione === "fulmine" || altro.azione === "gelo" || altro.azione === "rimpicciolisci" ||
-                       altro.azione === "falene" || altro.azione === "stelle") && Math.random() < 0.4) { inizia(f, "barriera"); return true; }
+    // Lo scudo si alza per le magie grosse, non per ogni dardo: fra due maghi ci si parava a vicenda tutto, e la
+    // lotta diventava due scudi accesi (16/10/2026, misurato: lo scudo era il 6% del tempo).
+    if (f.ki >= 20 && (altro.azione === "onda" || altro.azione === "fulmine" || altro.azione === "gelo" || altro.azione === "rimpicciolisci" ||
+                       altro.azione === "stelle") && Math.random() < 0.22) { inizia(f, "barriera"); f.durata = 55; return true; }
     // A energia piena, la mossa finale: più volentieri se l'altro è fermo (legato, gelato, stordito).
     if (f.ki >= 100 && d > 60 && !altro.ko && !altro.esploso && !orda && Math.random() < (fermo || altro.legato > 0 ? 0.8 : 0.22)) { inizia(f, "smeraldo"); return true; }
     if (f.ki >= 30 && d > 40 && !fermo && !(altro.legato > 0) && !(altro.jet > 0) && Math.random() < 0.09) { inizia(f, "catene"); return true; }
@@ -7611,6 +7684,99 @@
     if (f.ki >= 25 && d > 50 && !(altro.piccolo > 0) && Math.random() < 0.08) { inizia(f, "rimpicciolisci"); return true; }
     if (f.ki >= 15 && d < 200 && !(altro.accecato > 0) && Math.random() < 0.05) { inizia(f, "lampo"); return true; }
     return false;
+  }
+  // ·· IL COMBATTIMENTO DEI MAGHI (16/10/2026, Riccardo: «i maghi devono preferire le lotte a distanza e avere un
+  // combat tutto loro») ··
+  // Prima i maghi pensavano coi super guerrieri: camminavano incontro all'avversario, facevano a pugni, e la
+  // «sparizione» li rimetteva ACCANTO a lui. Ora:
+  //  - la FASCIA buona è fra `vicino` e `lontano`: lì si lancia, una magia dopo l'altra;
+  //  - chi entra sotto `troppo` viene respinto (la respinta, una spinta di forza), o il mago sparisce lontano, o
+  //    arretra, o alza lo scudo; solo chi è all'angolo senza mana torna alle bacchettate;
+  //  - troppo lontano si accorcia, ma solo fino alla fascia; in volo (sulla scopa) si sta in fascia, all'altezza sua;
+  //  - le magie si legano: chi è fermo (gelato, legato, stordito) prende fulmine, stelle o la maledizione;
+  //  - il mana si ricarica da sé più in fretta dell'energia degli altri: un mago vive di incantesimi, e quando è
+  //    a secco e al sicuro si concentra (carica) invece di aspettare.
+  const MAGO = { troppo: 72, vicino: 100, lontano: 210, mana: 0.09 };
+  function pensaMago(f, altro, inAria) {
+    if (altro.ko || altro.preso || altro.tenuto || altro.esploso || altro.fuoriCampo || !altro.p) return false;
+    const b = f.p.bacino, ob = altro.p.bacino;
+    const dx = Math.abs(ob.x - b.x) / S, dy = Math.abs(ob.y - b.y) / S, d = Math.hypot(dx, dy);
+    const lato = ob.x >= b.x ? 1 : -1;
+    f.dir = lato;
+    if (inAria) {
+      // Sulla scopa: in fascia, alla sua altezza, dal lato dove c'è più spazio.
+      const dove = Math.max(40 * S, Math.min(W - 40 * S, ob.x - lato * (MAGO.vicino + 50) * S));
+      f.meta = dove; f.volaY = Math.max(100, Math.min(fondoVolo() - 70 * S, ob.y - caso(0, 30) * S));
+    }
+    // 1. Troppo vicino: via.
+    if (d < MAGO.troppo) {
+      const dietro = lato > 0 ? b.x - 30 * S : W - 30 * S - b.x;
+      const r = Math.random();
+      if (f.ki >= 10 && r < 0.45) { inizia(f, "respinta"); return true; }
+      if (f.ki >= 15 && r < 0.75 && sparizioneMago(f, altro)) return true;
+      if (!inAria && dietro > 60 * S) { inizia(f, "indietro"); return true; }
+      if (f.ki >= 20 && altro.azione && COLPI[altro.azione]) { inizia(f, "barriera"); return true; }
+      if (f.ki >= 15 && sparizioneMago(f, altro)) return true;
+      return false;                                                     // all'angolo, a secco: bacchettate
+    }
+    // 2. A tiro: si lancia.
+    if (d <= MAGO.lontano + 60) {
+      if (incantesimo(f, altro)) return true;
+      if (f.ki >= 45 && dy < 50 && d > MAGO.vicino && Math.random() < 0.3) { inizia(f, "onda"); return true; }
+      if (f.ki >= 15 && Math.random() < 0.55) { inizia(f, "raffica"); return true; }
+    }
+    // 3. Troppo lontano: ci si accorcia fino alla fascia (a piedi, se si è sullo stesso piano).
+    if (d > MAGO.lontano) {
+      if (inAria) { f.pensa = 8; return true; }
+      if (dy <= 18) { inizia(f, "avanza", ob.x - lato * (MAGO.vicino + 30) * S); return true; }
+      return false;                                                     // un altro piano: sale o scende come tutti
+    }
+    // 4. In fascia ma senza una magia pronta: al sicuro ci si concentra, troppo stretti si arretra.
+    if (d < MAGO.vicino && !inAria && (lato > 0 ? b.x : W - b.x) > 80 * S) { inizia(f, "indietro"); return true; }
+    if (f.ki < 60) { inizia(f, "carica"); f.durata = 40; return true; }
+    if (!inAria && verso > 0 && !lava && Math.random() < 0.12) { prendiIlVolo(f); return true; }
+    inizia(f, f.ki >= 15 ? "raffica" : "carica");
+    return true;
+  }
+  // La sparizione dei maghi: un lampo e ricompare LONTANO, in fascia, dal lato dove c'è più spazio
+  // (sopra la lava solo dove sotto c'è qualcosa). Il contrario del teletrasporto dei super guerrieri.
+  function sparizioneMago(f, altro) {
+    if (!f.p || f.esploso || f.tenuto || f.preso || f.ko || f.ki < 15 || !altro || !altro.p || altro.esploso) return false;
+    const via = caso(MAGO.vicino + 30, MAGO.lontano - 20) * S;
+    let nx = null, meglio = -1;
+    for (const x of [altro.cx - via, altro.cx + via]) {
+      const qui = Math.max(30 * S, Math.min(W - 30 * S, x)), lungi = Math.abs(qui - altro.cx);
+      if (lava && !sottoCe(qui, f.base - 1)) continue;
+      if (lungi > meglio) { meglio = lungi; nx = qui; }
+    }
+    if (nx === null || meglio < MAGO.troppo * S) return false;
+    suona("zap", f.p.bacino.x, 0.5);
+    f.ki -= 15;
+    const da = { x: f.p.bacino.x, y: f.p.bacino.y }, sp = nx - f.cx;
+    for (const n in f.p) { f.p[n].x += sp; f.p[n].ox = f.p[n].x; f.p[n].oy = f.p[n].y; }
+    f.cx = nx; f.meta = nx; f.caos = 0; f.scatto = 0; f.onda = null; f.scalata = null; f.inVolo = false; f.azione = null;
+    f.dir = altro.cx >= nx ? 1 : -1;
+    zip(da.x, da.y, COLORI_ANIME[f.tipo]); zip(f.p.bacino.x, f.p.bacino.y, COLORI_ANIME[f.tipo]);
+    f.pensa = 4;                                                        // ricomparso, lancia quasi subito
+    return true;
+  }
+  // La respinta: un colpo di bacchetta e un'onda di forza che butta lontano chi è troppo vicino. Poco danno,
+  // tanto spazio: è la mossa che apre la fascia.
+  function respingi(f, altro) {
+    if (f.ki < 10) return;
+    f.ki -= 10;
+    const m = puntaBacchetta(f), col = COLORI_ANIME[f.tipo];
+    for (const k of [0, 6]) if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "onda", x: m.x, y: m.y, vx: 0, vy: 0, vita: 16 + k, max: 16 + k, colore: k ? "#ffffff" : col });
+    scintille(m.x, m.y, 10, col);
+    const ob = altro.p.bacino;
+    if (altro.ko || altro.esploso || altro.preso || altro.tenuto || altro.fuoriCampo || Math.hypot(ob.x - m.x, ob.y - m.y) > 105 * S) return;
+    if (altro.azione === "barriera") { scintille(ob.x, ob.y, 6, "#bfe9ff"); return; }
+    colpisci(f, altro, 1.4, ob.x, ob.y - 10 * S, "FWOOSH!");
+    const s = Math.sign(ob.x - f.p.bacino.x) || f.dir;
+    // Lontano sì, fuori dalla finestra no.
+    const spinta = Math.max(0, Math.min(11 * S, s > 0 ? (W - 16 * S - ob.x) / 3 : (ob.x - 16 * S) / 3));
+    for (const n in altro.p) { altro.p[n].ox -= s * spinta; altro.p[n].oy += verso * 3 * S; }
+    altro.azione = null; altro.stordito = Math.max(altro.stordito, 14); altro.scatto = 0; altro.onda = null;
   }
   function lanciaIncanto(f, altro, tipo) {
     const m = puntaBacchetta(f), bx = altro.p.collo.x, by = (altro.p.collo.y + altro.p.bacino.y) / 2;
@@ -8430,6 +8596,23 @@
       ctx.closePath(); ctx.fill(); ctx.stroke();
     }
   }
+  // Davanti, sopra la faccia del trasformato (16/10/2026): la calotta nel colore della forma, con l'attaccatura
+  // a punte RIVOLTE IN SU. Prima la cresta partiva da dietro la testa e il cranio restava nudo, come calvo.
+  // L'attaccatura sta sopra le sopracciglia: niente deve scendere sugli occhi.
+  function frangiaSuper(f, col, d) {
+    const chiaro = mix(col, "#ffffff", 0.35);
+    ctx.fillStyle = col; ctx.strokeStyle = NERO; ctx.lineWidth = 1.1 * S; ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(-d * 8.3 * S, -1.2 * S);
+    ctx.quadraticCurveTo(-d * 9.2 * S, -9.6 * S, 0, -10.2 * S);
+    ctx.quadraticCurveTo(d * 9 * S, -9.8 * S, d * 8.4 * S, -3.4 * S);
+    for (const [x, y] of [[7.2, -5.2], [6.4, -9.6], [4.6, -6], [2.8, -10.8], [1, -6.2], [-1.2, -11], [-2.8, -6.4], [-5, -10], [-6.2, -5.6], [-7.6, -2.2]]) {
+      ctx.lineTo(d * x * S, y * S);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = chiaro; ctx.lineWidth = 1.4 * S; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-d * 5 * S, -8.4 * S); ctx.quadraticCurveTo(0, -9.6 * S, d * 4 * S, -8.6 * S); ctx.stroke();
+  }
   function pugno(gomito, mano, A, colore, lontano, grande) {
     const L = Math.hypot(mano.x - gomito.x, mano.y - gomito.y) || 1, ux = (mano.x - gomito.x) / L, uy = (mano.y - gomito.y) / L;
     // Il polsino, poi la mano.
@@ -8450,23 +8633,40 @@
     if (batte > 0.5) {
       ctx.beginPath(); ctx.moveTo(est.x, est.y); ctx.lineTo(int.x, int.y);
       ctx.quadraticCurveTo(giu.x, giu.y, est.x, est.y); ctx.closePath();
-      ctx.fillStyle = luce || "#ffffff"; ctx.fill();
-      if (!luce) {
-        ctx.save(); ctx.clip();
-        const px = x0 - lato * 0.1 * S + d * 0.35 * S, py = ey + 1.25 * S;
+      ctx.fillStyle = "#ffffff"; ctx.fill();
+      ctx.save(); ctx.clip();
+      const px = x0 - lato * 0.1 * S + d * 0.35 * S, py = ey + 1.25 * S;
+      if (luce) {
+        // LIMIT BREAK (16/10/2026, Riccardo: «ha le sopracciglia sopra gli occhi e risulta brutto»). Prima l'occhio
+        // si riempiva tutto del colore della forma, e la scia degli occhi accesi gli passava sopra come una
+        // visiera: due sbarre colorate al posto degli occhi. Ora l'occhio resta un occhio, con l'iride accesa.
+        tondo(px, py, 1.25 * S, scuro(luce)); tondo(px, py, 1.0 * S, luce);
+        tondo(px, py, 0.42 * S, nero); tondo(px + 0.32 * S, py - 0.36 * S, 0.3 * S, "#ffffff");
+      } else {
         tondo(px, py, 0.9 * S, nero); tondo(px + 0.3 * S, py - 0.32 * S, 0.28 * S, "#ffffff");
-        ctx.restore();
       }
+      ctx.restore();
       ctx.strokeStyle = nero; ctx.lineWidth = 0.55 * S; ctx.stroke();
     }
     // La palpebra: una sbarra nera spessa, dritta, un filo oltre l'angolo esterno.
     ctx.strokeStyle = nero; ctx.lineWidth = 1.3 * S; ctx.beginPath();
     ctx.moveTo(est.x + lato * 0.35 * S, est.y - 0.2 * S); ctx.lineTo(int.x, int.y); ctx.stroke();
-    // La piega sopra, sottile, che curva come la palpebra.
-    ctx.lineWidth = 0.5 * S; ctx.beginPath();
-    ctx.moveTo(est.x - lato * 0.1 * S, est.y - 1.3 * S);
-    ctx.quadraticCurveTo(x0 + lato * 0.4 * S, ey - 2.6 * S * k, int.x + lato * 0.4 * S, int.y - 1.2 * S);
-    ctx.stroke();
+    if (luce) {
+      // Il sopracciglio della forma: staccato SOPRA la palpebra, appuntito, che scende verso il naso.
+      const ax = est.x + lato * 0.5 * S, ay = est.y - 2.5 * S, bx = int.x + lato * 0.15 * S, by = int.y - 1.6 * S;
+      ctx.fillStyle = nero; ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.quadraticCurveTo((ax + bx) / 2, Math.min(ay, by) - 0.9 * S, bx, by - 0.45 * S);
+      ctx.lineTo(bx, by + 0.45 * S);
+      ctx.quadraticCurveTo((ax + bx) / 2, Math.min(ay, by) + 0.1 * S, ax, ay);
+      ctx.closePath(); ctx.fill();
+    } else {
+      // La piega sopra, sottile, che curva come la palpebra.
+      ctx.lineWidth = 0.5 * S; ctx.beginPath();
+      ctx.moveTo(est.x - lato * 0.1 * S, est.y - 1.3 * S);
+      ctx.quadraticCurveTo(x0 + lato * 0.4 * S, ey - 2.6 * S * k, int.x + lato * 0.4 * S, int.y - 1.2 * S);
+      ctx.stroke();
+    }
     ctx.restore();
   }
   // La faccia, nel riferimento della testa (su = -y): cambia con quello che succede.
@@ -8931,6 +9131,7 @@
     ctx.ellipse(xOr, 0.8 * S, 1.6 * S, 2.3 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     disegnaSegni(f, "testa");
     if (!sup) capoUmano(f, A, bordo, false);
+    else frangiaSuper(f, crine, d);
     if (cavaliere) {
       // Il cappuccio cala sulla testa e lascia in ombra la faccia; resta accesa la fessura della maschera.
       ctx.fillStyle = "#1a1b22"; ctx.strokeStyle = "#0d0e12"; ctx.lineWidth = 1.3 * S; ctx.lineJoin = "round";
@@ -10172,7 +10373,7 @@
                             lato: caso(1.8, 3) * S, colore: Math.random() < 0.5 ? "#3f9a3a" : "#2d7a2b" });
         }
       }
-      if (anime && !f.esploso) f.ki = Math.min(100, f.ki + (f.forma > 0 && f.potenziato > 0 ? 0.12 : 0.04));
+      if (anime && !f.esploso) f.ki = Math.min(100, f.ki + (maghi() ? MAGO.mana : f.forma > 0 && f.potenziato > 0 ? 0.12 : 0.04));
       if (f.piccolo > 0) f.piccolo--;
       f.scala += ((f.piccolo > 0 ? 0.55 : 1) - f.scala) * 0.15;
     }
@@ -10395,6 +10596,9 @@
       if (!(f.jet > 0)) { f.volo = false; f.scatto = 0; }
       if (anime) aggiornaInseguimento(f, altro);
       if (f.caos > 0) f.forza = Math.min(f.forza, 0.35);
+      // La discesa attraverso un elemento finisce quando tutto il corpo è passato sotto (non solo i piedi).
+      if (f.attraversa && (--f.attraversa.t <= 0 || f.ko > 0 || f.preso || f.tenuto || f.jet > 0 ||
+                           Object.keys(f.p).every((n) => f.p[n].y - f.p[n].r > f.attraversa.y + 2))) f.attraversa = null;
       // Nel colpo finale il piano resta quello della scena: chi salta altissimo per la schiacciata
       // non deve «posarsi» su un elemento della pagina che si trova a passare lì sotto.
       const inScena = fatale && fatale.fase !== "fine" && (f === fatale.da || f === fatale.a);
@@ -10494,8 +10698,12 @@
         if (corre) f.corsa--;
         // Chi si trascina avanza a strappi, quando la mano piantata tira.
         const strappo = ng === 0 ? 0.45 + 0.9 * Math.abs(Math.sin(f.passo)) : 1;
-        f.cx += lato * (corre ? 2.3 : Math.abs(f.meta - f.cx) > 220 * S ? 1.6 : 0.95) * S * andatura(f) * strappo;
-        f.passo += ng === 0 ? 0.2 : corre ? 0.5 : 0.28;
+        // PIÙ SVELTI (16/10/2026, rifatto sul motore di oggi dal giro del 02/10 rimasto fuori da main, `61f8ca9`): si passava il 40% del tempo a raggiungersi a passo
+        // lento. Da vicino si va di buon passo, da lontano si corre.
+        const manca = Math.abs(f.meta - f.cx), vel = corre ? 2.3 : manca > 220 * S ? 2.4 : manca > 80 * S ? 1.8 : 1.25;
+        f.veloce = vel > 1.5 && ng === 2;
+        f.cx += lato * Math.min(vel * S * andatura(f) * strappo, Math.max(manca, 0.5 * S));
+        f.passo += ng === 0 ? 0.2 : 0.18 + 0.12 * vel;
         if (ng === 0 && passi % 16 === 0 && !f.polv) polvere(f.p.manoA.x, f.base - 1, 1);
       } else if (f.azione === "indietro") { f.cx -= f.dir * 1.0 * S * andatura(f); f.passo += gambe(f) === 0 ? 0.2 : 0.3; }
       else f.passo += 0.08;
@@ -10570,7 +10778,7 @@
         const v = Math.hypot(vx, vy), lim = VELOCITA_MAX * S;
         if (v > lim) { vx *= lim / v; vy *= lim / v; }
         // Col paracadute si scende piano, ondeggiando un po'.
-        if (f.para > 0.3) { vy = Math.min(vy, 1.5 * S); vx = vx * 0.96 + Math.sin(passi * 0.05) * 0.05 * S; }
+        if (f.para > 0.3) { vy = Math.min(vy, 3 * S); vx = vx * 0.96 + Math.sin(passi * 0.05) * 0.05 * S; }
         pt.ox = pt.x; pt.oy = pt.y;
         pt.x += vx; pt.y += vy + GRAVITA * S * moltG * verso;
       }
@@ -11446,6 +11654,15 @@
       const v = Math.hypot(q.vx, q.vy) || 1;
       ctx.strokeStyle = q.colore; ctx.lineWidth = 1.4 * S; ctx.lineCap = "round";
       ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x + q.vx / v * q.lung, q.y + q.vy / v * q.lung); ctx.stroke();
+    } else if (q.tipo === "impatto") {
+      // La raggiera dei colpi forti: linee che partono dal punto del colpo e si allungano mentre sbiadiscono.
+      const k = 1 - q.vita / q.max;
+      ctx.globalAlpha = 1 - k * 0.8; ctx.lineCap = "round";
+      for (let i = 0; i < 12; i++) {
+        const a = q.giro + i * Math.PI / 6 + (i % 2 ? 0.12 : 0), r0 = q.r * (0.25 + 0.35 * k), r1 = q.r * (i % 2 ? 0.75 : 1.05) * (0.6 + 0.5 * k);
+        ctx.strokeStyle = i % 3 ? "#ffffff" : q.colore; ctx.lineWidth = (i % 2 ? 1.4 : 2.4) * S * (1 - k * 0.6);
+        ctx.beginPath(); ctx.moveTo(q.x + Math.cos(a) * r0, q.y + Math.sin(a) * r0); ctx.lineTo(q.x + Math.cos(a) * r1, q.y + Math.sin(a) * r1); ctx.stroke();
+      }
     } else if (q.tipo === "taglio") {
       // Il segno di un taglio: una riga di luce che si assottiglia.
       const k = q.vita / q.max, dx = Math.cos(q.ang) * q.lung * (1.2 - 0.2 * k), dy = Math.sin(q.ang) * q.lung * (1.2 - 0.2 * k);
@@ -12571,8 +12788,66 @@
     fortuna: { icona: "\u{1F340}", nome: "Fortuna", max: 3, costo: 100, testo: "Forzieri più ricchi, più oggetti" },
     avidita: { icona: "\u{1F4B0}", nome: "Avidità", max: 5, costo: 80, testo: "+10% monete" },
     rinascita: { icona: "\u{1F496}", nome: "Rinascita", max: 1, costo: 600, testo: "Si parte con una vita in più" },
+    dadi: { icona: "\u{1F3B2}", nome: "Dadi", max: 2, costo: 120, testo: "Un rimescolo di carte in più a corsa" },
   };
   const costoBottega = (id) => Math.round(BOTTEGA[id].costo * Math.pow(1.6, bottega[id] || 0));
+  // ·· IL CICLO FRA UNA CORSA E L'ALTRA (16/10/2026, Riccardo: «migliorerei il lato loop dell'endless run migliorando il gameplay e il gioco in sé») ··
+  // Finita una corsa restavano solo le monete per la bottega: niente diceva PERCHÉ farne un'altra, e dentro la corsa i
+  // round erano tutti uguali per peso. Tre cose:
+  //  - LE MISSIONI: tre obiettivi alla volta, che restano fra una corsa e l'altra (nel browser). Fatti, pagano monete
+  //    e il tipo sale di gradino (più difficile, pagato meglio); al posto suo entra un altro tipo. Si vedono prima di
+  //    partire e nel riepilogo, e quando una si compie in corsa lo si dice subito.
+  //  - IL CAPO OGNI CINQUE ROUND: il 5, il 10, il 15… sono sempre «Il capo», col forziere da tre premi, e il cruscotto
+  //    dice quando arriva il prossimo. La corsa ha tappe, non solo un numero che sale.
+  //  - RIMESCOLA: alle carte di un livello, una volta per corsa (più i dadi comprati in bottega), tre carte nuove.
+  //    Una corsa non si butta più per tre carte sbagliate.
+  const MISSIONI = {
+    round: { icona: "\u{1F3C1}", testo: (n) => dici("Arriva al round") + " " + n, gradini: [6, 10, 15, 20, 30], premio: [40, 80, 150, 250, 400], misura: (c) => c.round },
+    uccisi: { icona: "\u{1F9DF}", testo: (n) => dici("Abbatti") + " " + n + " " + dici("nemici in una corsa"), gradini: [80, 200, 400, 800], premio: [40, 90, 160, 300], misura: (c) => c.uccisi },
+    capi: { icona: "\u{1F480}", testo: (n) => dici("Sconfiggi") + " " + n + " " + dici(n > 1 ? "capi in una corsa" : "capo"), gradini: [1, 2, 3, 5], premio: [50, 100, 180, 320], misura: (c) => c.capi || 0 },
+    evo: { icona: "\u{1F31F}", testo: (n) => (n > 1 ? dici("Evolvi") + " " + n + " " + dici("armi in una corsa") : dici("Evolvi un'arma")), gradini: [1, 2, 3], premio: [70, 150, 300], misura: (c) => c.evoluzioni || 0 },
+    puliti: { icona: "\u2728", testo: (n) => dici("Vinci") + " " + n + " " + dici("round senza danni"), gradini: [2, 4, 7], premio: [40, 90, 180], misura: (c) => c.puliti || 0 },
+    punti: { icona: "\u{1F4AF}", testo: (n) => dici("Fai") + " " + cifre(n) + " " + dici("punti"), gradini: [3000, 10000, 30000, 80000], premio: [40, 90, 180, 350], misura: (c) => c.punti },
+  };
+  const ORDINE_MISSIONI = ["round", "uccisi", "evo", "capi", "puliti", "punti"];
+  const OGNI_CAPO = 5;
+  const prossimoCapo = (n) => Math.ceil((n + 1) / OGNI_CAPO) * OGNI_CAPO;
+  // La missione attiva di quel tipo: quanto chiede e quanto paga (null se il tipo è finito).
+  function missione(tipo) {
+    const M = MISSIONI[tipo], g = missioni.gradi[tipo] || 0;
+    return M && g < M.gradini.length ? { tipo, n: M.gradini[g], premio: M.premio[g], icona: M.icona, testo: M.testo(M.gradini[g]) } : null;
+  }
+  function salvaMissioni() {
+    try { deposito.setItem("mut-ring-missioni", JSON.stringify(missioni)); } catch (errore) { /* pazienza */ }
+  }
+  // A fine corsa: quelle fatte pagano, salgono di gradino e lasciano il posto a un altro tipo.
+  function chiudiMissioni(c) {
+    const fatte = [];
+    missioni.attive = missioni.attive.filter((tipo) => missione(tipo));
+    for (const tipo of missioni.attive.slice()) {
+      const m = missione(tipo);
+      if (!m || MISSIONI[tipo].misura(c) < m.n) continue;
+      fatte.push(m); banca += m.premio;
+      missioni.gradi[tipo] = (missioni.gradi[tipo] || 0) + 1;
+      const i = missioni.attive.indexOf(tipo), dopo = ORDINE_MISSIONI.concat(ORDINE_MISSIONI).slice(ORDINE_MISSIONI.indexOf(tipo) + 1)
+        .find((x) => missioni.attive.indexOf(x) < 0 && missione(x));
+      if (dopo) missioni.attive[i] = dopo; else if (!missione(tipo)) missioni.attive.splice(i, 1);
+    }
+    while (missioni.attive.length < 3) { const x = ORDINE_MISSIONI.find((y) => missioni.attive.indexOf(y) < 0 && missione(y)); if (!x) break; missioni.attive.push(x); }
+    salvaMissioni();
+    return fatte;
+  }
+  // In corsa: quando una missione si compie, lo si dice subito (una volta sola).
+  function controllaMissioni(c) {
+    for (const tipo of missioni.attive) {
+      const m = missione(tipo);
+      if (!m || (c.annunciate || []).indexOf(tipo) >= 0 || MISSIONI[tipo].misura(c) < m.n) continue;
+      (c.annunciate = c.annunciate || []).push(tipo);
+      const f = eroe();
+      scrivi("MISSIONE COMPIUTA!", f && f.p ? f.p.bacino.x : W / 2, (f && f.p ? f.base : pavimento) - 110 * S, true);
+      suona("premio");
+    }
+  }
   const IMPREVISTI_CORSA = { luna: ["\u{1F319}", "Gravità lunare"], pioggia: ["\u{1F4F1}", "Pioggia di telefoni"], terremoto: ["\u{1F30B}", "Terremoto"],
                             meteoriti: ["☄️", "Meteoriti"], buco: ["\u{1F573}️", "Buco nero"], temporale: ["⛈️", "Temporale"],
                             jet: ["\u{1F680}", "Jetpack impazziti"], uragano: ["\u{1F32A}️", "Uragano"] };
@@ -12669,6 +12944,7 @@
       invuln: 0, scudo: 0, imprevisti: [], prossimoImprevisto: 0, nemicoGiu: false, iniziata: Date.now(), danniRound: 0, inviato: false, nome: "",
       tLotta: 0, tiri: [], pozze: [], sbloccati: ["lento", "svelto", "corvo"], novita: 0, cdVolo: 300, nuovo: null, protagonisti: [], gelato: 0, frenesia: 0,
       prossimaSorpresa: 600, ultimaSorpresa: null, sorprese: 0,
+      capi: 0, evoluzioni: 0, puliti: 0, annunciate: [], rimescola: 1 + (bottega.dadi || 0), missioniFatte: [],
     });
     try { corsa.nome = deposito.getItem("mut-ring-nome") || ""; } catch (errore) { /* niente nome */ }
     corsa.armi[(ARMA_DI_PARTENZA[stile] || ARMA_DI_PARTENZA[""])[tipo]] = 1;
@@ -12691,7 +12967,9 @@
     const n = nemicoCorsa();
     if (n && !n.panchina) panchina(n);
     corsa.inBanca = Math.round(corsa.monete * (1 + 0.1 * (bottega.avidita || 0)));
-    banca += corsa.inBanca; salvaBottega();
+    banca += corsa.inBanca;
+    corsa.missioniFatte = chiudiMissioni(corsa);
+    salvaBottega();
     if (corsa.punti > recordCorsa) {
       recordCorsa = corsa.punti; corsa.record = true;
       try { deposito.setItem("mut-ring-corsa", String(recordCorsa)); } catch (errore) { /* pazienza */ }
@@ -12733,6 +13011,11 @@
   function scegliTipoRound(n) {
     if (corsa.prossimoTipo) { const t = corsa.prossimoTipo; corsa.prossimoTipo = null; return t; }
     if (n === 1) return "ondata";
+    if (n % OGNI_CAPO === 0) return "boss";                       // la tappa: sempre il capo
+    if (n % OGNI_CAPO === OGNI_CAPO - 1 || n % OGNI_CAPO === 1) {   // a ridosso della tappa niente capo a sorte
+      const prima = corsa.tipo, r = corsa.rng(), voci = prima === "duello" ? ["ondata", "tempo"] : ["ondata", "ondata", "duello", "tempo"];
+      return n >= 3 ? voci[Math.floor(r * voci.length)] : "ondata";
+    }
     const prima = corsa.tipo, r = corsa.rng;
     const voci = [[5, "ondata"], [prima === "duello" ? 0 : 1.5, "duello"], [n >= 3 && prima !== "tempo" ? 2.4 : 0, "tempo"], [n >= 5 && prima !== "boss" && corsa.tipi.slice(-3).indexOf("boss") < 0 ? 2.2 : 0, "boss"]];
     let tot = 0; for (const v of voci) tot += v[0];
@@ -12746,6 +13029,7 @@
     c.tipo = scegliTipoRound(c.round);
     c.tipi.push(c.tipo);
     c.fase = "intro"; c.t = 0; c.nemicoGiu = false; c.danniRound = 0; c.variante = null; c.scadenza = 0;
+    c.tappa = c.tipo === "boss" && c.round % OGNI_CAPO === 0;
     // Il nemico nuovo di questo round (solo dove c'è l'orda).
     c.nuovo = null; c.vistoNuovo = false;
     if (c.tipo !== "duello" && c.round > 1 && c.novita < NOVITA_CORSA.length) { c.nuovo = NOVITA_CORSA[c.novita++]; c.sbloccati.push(c.nuovo); }
@@ -12876,6 +13160,7 @@
     if (orda && orda.fase !== "festa") fineOrda(true);
     const punti = 50 * c.round + (c.danniRound === 0 ? 50 * c.round : 0);
     c.punti += punti;
+    if (c.danniRound === 0) c.puliti = (c.puliti || 0) + 1;
     suona(come === "salvezza" ? "salvo" : "vittoria");
     if (come === "salvezza") {
       c.ultima = false; c.vite = 1; c.hp = Math.round(c.hpMax * 0.5); c.salvezze++;
@@ -12936,6 +13221,7 @@
   }
   function applicaCarta(k) {
     const c = corsa;
+    if (k.evo) c.evoluzioni = (c.evoluzioni || 0) + 1;
     if (k.arma) c.armi[k.arma] = k.evo ? 6 : (c.armi[k.arma] || 0) + 1;
     else if (k.potere) {
       c.livelli[k.potere] = livello(k.potere) + 1;
@@ -12950,6 +13236,14 @@
     c.pausa = true;
     suona("premio");
   }
+  function rimescolaCarte() {
+    const c = corsa;
+    if (!c || !c.scelta || !(c.rimescola > 0)) return false;
+    c.rimescola--;
+    c.scelta.carte = carteLivello(3);
+    suona("premio");
+    return true;
+  }
   function prendiCarta(i) {
     const c = corsa;
     if (!c || !c.scelta || !c.scelta.carte[i]) return false;
@@ -12963,7 +13257,8 @@
   // Il forziere: uno o tre premi scelti fra quelli che uscirebbero a un livello, più monete.
   function apriForziere() {
     const c = corsa, fortuna = bottega.fortuna || 0;
-    const tanti = c.rng() < 0.15 + 0.08 * fortuna ? 3 : 1;
+    const tanti = c.tappa || c.rng() < 0.15 + 0.08 * fortuna ? 3 : 1;          // il capo della tappa ne dà sempre tre
+    c.tappa = false;
     const premi = carteLivello(tanti).map((k) => (k.monete || k.cura) ? k : k);
     if (c.rng() < 0.08 + 0.03 * fortuna) premi.push({ vita: true });
     else if (c.hp < c.hpMax * 0.6) premi.push({ cura: true });
@@ -13236,6 +13531,7 @@
     const p = corpoZ(z), x = p[0], y = p[1];
     lasciaGemma(x, y, GEMMA_ZOMBIE[z.tipo] || 1, "gemma");
     if (c.rng() < 0.06 + 0.03 * livello("tasche")) lasciaGemma(x, y, 1 + livello("tasche"), "moneta");
+    if (z.tipo === "capo") c.capi = (c.capi || 0) + 1;
     if (z.tipo === "capo") { c.forzieri.push({ x, y, base: orda.base, vy: -4 * S }); lasciaOggetto(x + 20 * S, y, oggettoCorsa()); for (let i = 0; i < 6; i++) lasciaGemma(x, y, 3, "moneta"); }
     else if (z.tipo === "doro") {
       // Lo zombie d'oro: una fontana di monete e tre gemme grosse.
@@ -13398,6 +13694,7 @@
     if (c.gelato > 0) c.gelato--;
     if (c.frenesia > 0) c.frenesia--;
     if (c.cdVolo > 0 && c.fase === "lotta") c.cdVolo--;
+    if (c.chi && c.fase !== "fine" && c.t % 20 === 0) controllaMissioni(c);
     {
       // Lo schianto dal volo: appena i piedi toccano terra.
       const f = eroe();
@@ -13980,7 +14277,7 @@
     const w2 = Math.min(210 * S, W * 0.5 - 2 * m), x2 = W - m - w2, T = TIPI_ROUND[c.tipo] || ["", ""];
     pannelloUI(x2, y0, w2, h, 10 * S, "rgba(255,255,255,.25)");
     scriviUI(dici("Round") + " " + c.round, x2 + 10 * S, y0 + 14 * S, 15 * S, "#ffffff");
-    scriviUI(T[0] + " " + dici(T[1]), x2 + 10 * S, y0 + 34 * S, 11 * S, GRIGIO_UI, "left", 700);
+    scriviUI(T[0] + " " + dici(T[1]) + (c.tipo === "boss" ? "" : "  ·  \u{1F480} " + dici("Round") + " " + prossimoCapo(c.round)), x2 + 10 * S, y0 + 34 * S, 11 * S, GRIGIO_UI, "left", 700);
     scriviUI(obiettivo(), x2 + 10 * S, y0 + 54 * S, 12 * S, ORO);
     let xi = x2 + w2 - 12 * S;
     for (let i = c.imprevisti.length - 1; i >= 0; i--) { scriviUI(IMPREVISTI_CORSA[c.imprevisti[i]][0], xi, y0 + 34 * S, 14 * S, "#ffffff", "right"); xi -= 20 * S; }
@@ -14112,6 +14409,7 @@
     }
     const yb = pavimento - 34 * S;
     if (recordCorsa) scriviUI(dici("Il tuo record") + ": " + cifre(recordCorsa), W / 2, yb - 26 * S, 12 * S, ORO, "center");
+    disegnaMissioni(W / 2, top + 112 * S, null);
     const tasti = [[dici("Bottega") + " \u{1FA99} " + cifre(banca), () => { c.bottega = true; }]]
       .concat(conClassifica() ? [[dici("Classifica"), () => apriClassifica(true)]] : [], [[dici("Chiudi"), () => chiudiCorsa()]]);
     const wb = Math.min(140 * S, (W - 32 - (tasti.length - 1) * 10) / tasti.length), xb = W / 2 - (tasti.length * wb + (tasti.length - 1) * 10) / 2;
@@ -14156,6 +14454,8 @@
       ctx.restore();
       tastiUI.push({ x, y, w, h, fa: () => prendiCarta(i) });
     });
+    if (c.rimescola > 0) tastoUI(W / 2 - 80 * S, y + h + 14 * S, 160 * S, 30 * S, "\u{1F3B2} " + dici("Rimescola") + " (" + c.rimescola + ")", () => rimescolaCarte(),
+                                 { colore: "#2a2735", scritta: "#ffffff", bordo: "rgba(255,255,255,.35)", px: 12 * S });
   }
   function disegnaForziere() {
     tastiUI = [];
@@ -14202,13 +14502,33 @@
     caratteri(24 * S, 900); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineWidth = 5 * S; ctx.strokeStyle = "#17171c"; ctx.fillStyle = "#ffffff";
     ctx.strokeText(t, W / 2, y); ctx.fillText(t, W / 2, y);
   }
+  // Le missioni, dall'alto a partire da `y`. Nel riepilogo (`fatte`) quelle compiute in questa corsa stanno in cima,
+  // col segno e il premio.
+  function disegnaMissioni(cx, y, fatte) {
+    const righe = (fatte || []).map((m) => ({ m, fatta: true })).concat(missioni.attive.map((t) => missione(t)).filter(Boolean).map((m) => ({ m, fatta: false })));
+    if (!righe.length) return 0;
+    const w = Math.min(360 * S, W - 32), rh = 22 * S, h = 26 * S + righe.length * rh;
+    pannelloUI(cx - w / 2, y, w, h, 10 * S, "rgba(255,216,74,.45)");
+    scriviUI(dici("Missioni"), cx, y + 13 * S, 12 * S, ORO, "center", 900);
+    righe.forEach(({ m, fatta }, i) => {
+      const yy = y + 26 * S + i * rh + rh / 2;
+      scriviUI(fatta ? "\u2705" : m.icona, cx - w / 2 + 16 * S, yy, 12 * S, "#ffffff", "center");
+      scriviUI(m.testo, cx - w / 2 + 30 * S, yy, 11 * S, fatta ? "#7dffb0" : "#ffffff", "left", 700);
+      scriviUI((fatta ? "+" : "") + m.premio + " \u{1FA99}", cx + w / 2 - 10 * S, yy, 11 * S, ORO, "right", 800);
+    });
+    return h;
+  }
   function disegnaFine() {
     const c = corsa, w = Math.min(440 * S, W - 24), x = W / 2 - w / 2, y = testataBasso + 16 * S;
     const lista = conClassifica() ? 10 : 0, h = (conClassifica() ? 216 : 166) * S + lista * 20 * S;
+    // Sotto il riepilogo, le missioni: quelle appena fatte e quelle che aspettano la prossima corsa.
+    disegnaMissioni(W / 2, y + h + 20 * S, c.missioniFatte);
     pannelloUI(x, y, w, h, 14 * S, coloreCorsa());
     scriviUI(dici("La corsa è finita"), W / 2, y + 26 * S, 22 * S, "#ffffff", "center", 900);
     scriviUI(dici("Round") + " " + c.round + "  ·  " + cifre(c.punti) + " " + dici("punti") + "  ·  " + c.uccisi + " " + dici("nemici"), W / 2, y + 52 * S, 13 * S, ORO, "center");
-    scriviUI(c.record ? dici("Nuovo record!") : dici("Il tuo record") + ": " + cifre(recordCorsa), W / 2, y + 72 * S, 12 * S, c.record ? "#7dffb0" : GRIGIO_UI, "center", 700);
+    scriviUI(c.record ? dici("Nuovo record!") : dici("Il tuo record") + ": " + cifre(recordCorsa) +
+             (recordCorsa > c.punti ? "  ·  " + dici("mancavano") + " " + cifre(recordCorsa - c.punti) + " " + dici("punti") : ""),
+             W / 2, y + 72 * S, 12 * S, c.record ? "#7dffb0" : GRIGIO_UI, "center", 700);
     scriviUI(dici("Liv.") + " " + c.liv + "  ·  +" + (c.inBanca || 0) + " \u{1FA99} " + dici("in banca") + " (" + cifre(banca) + ")", W / 2, y + 92 * S, 12 * S, ORO, "center", 700);
     let yy = y + 112 * S;
     if (conClassifica()) {
@@ -14419,6 +14739,9 @@
       tocca: (x, y) => { const t = tastoCorsa(x, y); if (t) t.fa(); return !!t; }, tasti: () => tastiUI.map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.h })),
       sorpresa: (nome) => sorpresa(nome), minuti: (m) => { if (corsa && corsa.chi) corsa.tLotta = Math.round(m * 3600); },
       senzaVolo: () => { if (corsa) corsa.cdVolo = 1e9; },
+      rimescola: () => rimescolaCarte(), apriLivello: () => { if (corsa && corsa.chi) apriLivello(); },
+      missioni: (m) => { if (m) { missioni = m; salvaMissioni(); } return JSON.parse(JSON.stringify(missioni)); },
+      conta: (cosa, n) => { if (corsa && corsa.chi) corsa[cosa] = n; },
       tiri: () => (corsa && corsa.tiri ? corsa.tiri.map((t) => ({ tipo: t.tipo, x: t.x, y: t.y, t: t.t })) : []),
     },
     // Solo per i test: apri la mira, spostala a un'altezza, spara.
@@ -14450,7 +14773,8 @@
                      imprevisti: (corsa.imprevisti || []).slice(), invuln: corsa.invuln || 0, scudo: corsa.scudo || 0, scadenza: corsa.scadenza || 0,
                      tiri: (corsa.tiri || []).length, pozze: (corsa.pozze || []).length, sbloccati: (corsa.sbloccati || []).slice(), nuovo: corsa.nuovo || null,
                      protagonisti: (corsa.protagonisti || []).slice(), frenesia: corsa.frenesia || 0, gelato: corsa.gelato || 0, minuti: (corsa.tLotta || 0) / 3600, sorprese: corsa.sorprese || 0, schianti: corsa.schianti || 0, cdVolo: corsa.cdVolo || 0,
-                     tasti: tastiUI.length, modale: corsaModale() } : null,
+                     tasti: tastiUI.length, modale: corsaModale(), rimescola: corsa.rimescola || 0, capi: corsa.capi || 0, evoluzioni: corsa.evoluzioni || 0,
+                     puliti: corsa.puliti || 0, annunciate: (corsa.annunciate || []).slice(), missioniFatte: (corsa.missioniFatte || []).map((m) => m.tipo + ":" + m.n) } : null,
     classifica: { aperta: classifica.aperta, voci: classifica.voci ? classifica.voci.length : null }, recordCorsa, banca, bottega: Object.assign({}, bottega),
     audio: { acceso: audio.acceso, pronto: !!audio.ctx, anelli: Object.keys(audio.anelli).filter((k) => audio.anelli[k]) },
     tastiera: { attiva: tastiera, rimappa, chi: radiale.chi, controller: radiale.aperto },
@@ -14475,7 +14799,7 @@
                      tipo: sfida.tipo, u: sfida.u, t: sfida.t, fiato: sfida.fiato.slice(), spinte: sfida.spinte.slice(), x: sfida.x, y: sfida.y,
                      strattoni: sfida.strattoni.slice(), primo: sfida.primo,
                      sinistra: sfida.a.tipo, destra: sfida.b.tipo } : null, ultimaSfida: ultimaSfida ? Object.assign({}, ultimaSfida) : null,
-    particelleTipi: particelle.reduce((m, q) => { m[q.tipo] = (m[q.tipo] || 0) + 1; return m; }, {}),
+    particelleTipi: particelle.reduce((m, q) => { m[q.tipo] = (m[q.tipo] || 0) + 1; return m; }, {}), scritte: scritte.map((s) => s.testo),
     costume, particelle: particelle.length, danniStriscia: danni.length,
     campoRicerca: !!document.querySelector(".ricerca-grande input"), evento: evento ? evento.nome : null, moltG,
     lottatori: lottatori.map((f) => ({
@@ -14504,7 +14828,7 @@
       return { x: f.p.bacino.x + dx / 2 + nx * 0.14 * lun, y: f.p.bacino.y + dy / 2 + ny * 0.14 * lun };
     }) : ginocchia(f)).map((g) => [g.x, g.y]),
     fuori: f.fuori || 0, tenuto: !!f.tenuto,
-    dir: f.dir, forza: f.forza, stordito: f.stordito, rialzo: f.rialzo, inVolo: f.inVolo, fantasma: f.fantasma,
+    dir: f.dir, forza: f.forza, stordito: f.stordito, rialzo: f.rialzo, inVolo: f.inVolo, fantasma: f.fantasma, attraversa: !!f.attraversa,
   })), punteggio: Object.assign({}, punteggio), pavimento, testataBasso, larghezza: W, altezza: H, scala: S,
     creature: creature.map((c) => ({ el: c.el, x: c.x, y: c.y, per: c.per, colpo: c.colpo })), nubi: nubi.length,
     finale: finale ? { tipo: finale.tipo, t: finale.t, uscito: !!finale.lampo, lancio: !!finale.perso } : null,

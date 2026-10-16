@@ -49,8 +49,8 @@ ESTENSIONE = RADICE / "estensione" / "store"
 COSTRUZIONE = QUI / "build"
 APP = QUI / "app"
 
-VERSIONE = "1.5.1"
-CODICE_VERSIONE = 9          # la variante leggera prende CODICE_VERSIONE + 1 (vedi LEGGIMI, piano B)
+VERSIONE = "1.6.0"
+CODICE_VERSIONE = 11         # la variante leggera prende CODICE_VERSIONE + 1 (vedi LEGGIMI, piano B)
 MIN_SDK = 26
 TARGET_SDK = 36
 

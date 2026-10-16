@@ -879,8 +879,11 @@ test("barre della vita: si accendono dalla tendina, si ricordano, e la vita scen
   assert.ok(scesa, "la vita della mela non è scesa");
   amb.finestra.__ring.ko("mela");
   assert.strictEqual(amb.lottatore("mela").vita, 0, "a K.O. la barra non è vuota");
-  amb.avanza(60 * 5);
-  assert.strictEqual(amb.lottatore("mela").vita, 1, "dopo il K.O. la barra non torna piena");
+  // (dal 16/10/2026 si lotta più fitto: rialzata, la mela può prendere un colpo nuovo prima dei cinque secondi;
+  // quello che conta è che la barra torni piena, non che lo sia ancora alla fine)
+  let piena = false;
+  amb.avanza(60 * 5, (s) => { if (s.lottatori.find((f) => f.tipo === "mela").vita === 1) { piena = true; return false; } });
+  assert.ok(piena, "dopo il K.O. la barra non torna piena");
 });
 
 test("super guerrieri: energia, onda energetica che colpisce e rompe il bordo, raffica, teletrasporto, potenziamento", () => {
@@ -2169,7 +2172,8 @@ test("controller ad angolo: sta nell'angolo in basso a destra, comanda il person
 test("controller: le mosse sono quelle dei personaggi scelti, quelle a energia si spengono se l'energia non basta", () => {
   // Ci sono tutte le mosse della tendina: la presa a distanza, il lampo e l'autodistruzione
   // dei guerrieri, la sparizione e le magie del 10/10/2026 dei maghi, l'incrocio di lame dei duellanti.
-  const attese = { guerrieri: 12, maghi: 13, lame: 9 }, devono = { guerrieri: ["telecinesi", "lampo", "avvinghia"], maghi: ["teletrasporto", "falene", "catene", "stelle", "smeraldo"], lame: ["duello"] };
+  // (dal 16/10/2026 i maghi hanno anche la respinta)
+  const attese = { guerrieri: 12, maghi: 14, lame: 9 }, devono = { guerrieri: ["telecinesi", "lampo", "avvinghia"], maghi: ["teletrasporto", "falene", "catene", "stelle", "smeraldo", "respinta"], lame: ["duello"] };
   for (const stile of Object.keys(attese)) {
     const amb = ambiente({ memoria: { "mut-ring-stile": stile, "mut-ring-radiale": "on" } });
     amb.avanza(60);
@@ -4187,4 +4191,151 @@ test("la grafica dell'app: 120 fps interpolati senza spostare niente, risoluzion
   dentro(amb);
   assert.strictEqual(r.grafica({ fps: 45, dettaglio: "boh" }).fps, 0, "valori strani: si torna al solito");
   assert.strictEqual(r.grafica({}).dettaglio, "medio");
+});
+
+// --- 16/10/2026: Limit Break, maghi a distanza, meno tempi morti ---
+
+test("super guerrieri: la trasformazione si chiama Limit Break, e lo scrive", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  const r = amb.finestra.__ring;
+  r.comandi.stile("guerrieri");
+  let visto = false, ordinato = false;
+  amb.avanza(60 * 40, (s) => {
+    const f = s.lottatori.find((l) => l.tipo === "robot");
+    if (!ordinato && f.ki >= 40 && !f.ko && r.ordina("robot", "trasforma")) ordinato = true;
+    if (s.scritte.some((x) => /^LIMIT BREAK/.test(x))) { visto = true; return false; }
+    if (s.scritte.some((x) => /SOVRACCARICO/.test(x))) assert.fail("si chiama ancora sovraccarico");
+  });
+  assert.ok(ordinato, "in quaranta secondi non si è potuto chiedere il Limit Break");
+  assert.ok(visto, "il Limit Break non ha scritto il suo nome");
+});
+
+test("maghi: lottano a distanza (fascia di tiro), senza raffiche di pugni", () => {
+  let somma = 0, conti = 0, attaccati = 0, pugni = 0;
+  for (let prova = 0; prova < 3; prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    amb.finestra.__ring.comandi.stile("maghi");
+    amb.avanza(60 * 60, (s) => {
+      const [a, b] = s.lottatori;
+      if (a.ko || b.ko || a.esploso || b.esploso || a.preso || b.preso) return;
+      const d = Math.abs(a.bacino.x - b.bacino.x) / s.scala;
+      somma += d; conti++;
+      if (d < 40) attaccati++;
+      for (const f of s.lottatori) if (f.azione === "rush") pugni++;
+    });
+  }
+  const media = somma / conti;
+  assert.ok(media > 140, "i maghi si tengono troppo vicini: distanza media " + media.toFixed(0));
+  assert.ok(attaccati / conti < 0.08, "i maghi passano troppo tempo attaccati: " + (100 * attaccati / conti).toFixed(1) + "%");
+  assert.strictEqual(pugni, 0, "un mago ha fatto la raffica di pugni dei super guerrieri");
+});
+
+test("maghi: la sparizione porta lontano dall'avversario, la respinta lo butta via", () => {
+  let sparito = false, respinto = false;
+  for (let prova = 0; prova < 8 && !(sparito && respinto); prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    const r = amb.finestra.__ring;
+    r.comandi.stile("maghi");
+    amb.avanza(60 * 8);                                  // il mana si ricarica
+    for (const [mossa, prova2] of [["teletrasporto", 0], ["respinta", 1]]) {
+      r.sposta("robot", 560); r.sposta("mela", 600);
+      amb.avanza(2);
+      const s0 = amb.stato(), d0 = Math.abs(s0.lottatori[0].bacino.x - s0.lottatori[1].bacino.x);
+      if (!r.ordina("robot", mossa)) continue;
+      let dMax = d0;
+      amb.avanza(mossa === "respinta" ? 50 : 3, (s) => { dMax = Math.max(dMax, Math.abs(s.lottatori[0].bacino.x - s.lottatori[1].bacino.x)); });
+      if (mossa === "teletrasporto" && dMax - d0 > 70 * s0.scala) sparito = true;
+      if (mossa === "respinta" && dMax - d0 > 25 * s0.scala) respinto = true;
+      void prova2;
+    }
+  }
+  assert.ok(sparito, "la sparizione dei maghi non porta lontano");
+  assert.ok(respinto, "la respinta non allontana l'avversario");
+});
+
+test("chi sta su un elemento largo e l'altro sotto non può salire: scende attraverso, non cammina fino al bordo", () => {
+  let veloce = 0, attraverso = false;
+  for (let prova = 0; prova < 6; prova++) {
+    // (un elemento spesso: uno sottile non regge chi ci cade sopra floscio, e il robot finirebbe giù da solo)
+    const amb = ambiente({ solidi: [[60, 470, 1140, 560]] });
+    amb.avanza(30);
+    amb.porta("robot", 600, 300);
+    amb.rilascia(600, 300);
+    amb.finestra.__ring.sposta("mela", 620);
+    let giu = null;
+    amb.avanza(60 * 6, (s) => {
+      const f = s.lottatori.find((l) => l.tipo === "robot");
+      if (f.attraversa) attraverso = true;
+      if (giu === null && f.base > 600 && !f.ko) { giu = s.tempo; return false; }
+    });
+    if (giu !== null) veloce++;
+  }
+  assert.ok(attraverso, "nessuno si è lasciato cadere attraverso l'elemento");
+  assert.ok(veloce >= 4, "dall'elemento largo si è sceso in fretta solo " + veloce + " volte su 6");
+});
+
+// --- 16/10/2026: il ciclo della corsa (missioni, il capo ogni cinque round, rimescola) ---
+
+test("la corsa: ogni cinque round arriva il capo, mai a ridosso, e il suo forziere ha tre premi", () => {
+  const { amb, r } = corsaAvviata();
+  const tipi = [];
+  for (let i = 0; i < 11; i++) {
+    avanzaCorsa(amb, r, 60);
+    const s = amb.stato().corsa;
+    tipi[s.round - 1] = s.tipo;
+    if (s.round === 5) {
+      r.corsa.forziere();
+      assert.ok(amb.stato().corsa.forziere >= 3, "il forziere del capo della tappa ha tre premi");
+      r.corsa.chiudiForziere();
+    }
+    r.corsa.vinci();
+    avanzaCorsa(amb, r, 45);
+  }
+  assert.strictEqual(tipi[4], "boss", "il round 5 è del capo: " + tipi.join(","));
+  assert.strictEqual(tipi[9], "boss", "il round 10 è del capo: " + tipi.join(","));
+  for (const i of [3, 5, 8, 10]) assert.notStrictEqual(tipi[i], "boss", "a ridosso della tappa un capo a sorte: round " + (i + 1) + " " + tipi.join(","));
+  dentro(amb);
+});
+
+test("la corsa: le missioni restano fra una corsa e l'altra, si annunciano, pagano e salgono di gradino", () => {
+  const { amb, r } = corsaAvviata();
+  r.corsa.missioni({ attive: ["round", "uccisi", "evo"], gradi: {} });
+  r.corsa.banca(0);
+  avanzaCorsa(amb, r, 200);
+  r.corsa.conta("uccisi", 85);
+  let annunciata = false;
+  avanzaCorsa(amb, r, 60, (s) => { if (s.scritte.indexOf("MISSIONE COMPIUTA!") >= 0) annunciata = true; });
+  assert.ok(annunciata, "la missione compiuta in corsa non si annuncia");
+  assert.strictEqual(JSON.stringify(amb.stato().corsa.annunciate), '["uccisi"]');
+  r.corsa.finisci();
+  const s = amb.stato();
+  assert.strictEqual(JSON.stringify(s.corsa.missioniFatte), '["uccisi:80"]');
+  assert.ok(s.banca >= 40, "il premio della missione non è arrivato in banca: " + s.banca);
+  const m = r.corsa.missioni();
+  assert.strictEqual(m.gradi.uccisi, 1, "il tipo sale di gradino");
+  assert.strictEqual(m.attive.length, 3);
+  assert.ok(m.attive.indexOf("uccisi") < 0, "al posto della missione fatta entra un altro tipo: " + m.attive);
+  // Restano nel browser: un ambiente nuovo con la stessa memoria le ritrova.
+  const amb2 = ambiente({ memoria: Object.assign({}, amb.memoria) });
+  amb2.avanza(5);
+  assert.strictEqual(JSON.stringify(amb2.finestra.__ring.corsa.missioni()), JSON.stringify(m));
+});
+
+test("la corsa: alle carte di un livello si rimescola una volta, e una in più per ogni dado della bottega", () => {
+  const { amb, r } = corsaAvviata();
+  avanzaCorsa(amb, r, 100);
+  r.corsa.apriLivello();
+  let s = amb.stato().corsa;
+  assert.ok(s.carte && s.carte.length === 3, "le carte del livello");
+  assert.strictEqual(s.rimescola, 1);
+  assert.ok(r.corsa.rimescola(), "il primo rimescolo va");
+  s = amb.stato().corsa;
+  assert.strictEqual(s.rimescola, 0);
+  assert.ok(s.carte && s.carte.length === 3, "dopo il rimescolo, tre carte");
+  assert.strictEqual(r.corsa.rimescola(), false, "finiti i rimescoli non si rimescola");
+  const { amb: a2 } = corsaAvviata({ memoria: { "mut-ring-bottega": JSON.stringify({ dadi: 2 }) } });
+  assert.strictEqual(a2.stato().corsa.rimescola, 3, "con due dadi in bottega i rimescoli sono tre");
 });
