@@ -860,7 +860,8 @@ test("gravità sottosopra: si cade verso il tetto e lì si sta in piedi a testa 
   assert.strictEqual(amb.stato().verso, 1);
   // (senza colpo finale in questi secondi: «in orbita» e «schiacciata» mandano in alto apposta)
   amb.avanza(60 * 8, () => { amb.finestra.__ring.roundFatale(false); });
-  for (const f of amb.stato().lottatori) assert.ok(f.bacino.y > 600, f.tipo + " non è tornato giù");
+  // (dal 16/10/2026 si lotta più fitto e tornata la gravità qualcuno riparte col jetpack: in volo va bene, appeso al tetto no)
+  for (const f of amb.stato().lottatori) assert.ok(f.bacino.y > 600 || f.vola, f.tipo + " non è tornato giù");
   dentro(amb);
 });
 
@@ -1788,20 +1789,26 @@ test("senza gambe ci si trascina sulle mani o si vola; con una gamba sola si res
       r.comandi.sorprese(false);
       const alto = altezzaInPiedi(amb, "robot");
       assert.ok(alto > 40 * amb.stato().scala, "in piedi il collo dovrebbe stare in alto: " + alto);
+      // (prima si rimette a posto: una gamba persa nella lotta di prima tornerebbe da sola dopo sette secondi, «CLICK!»)
+      r.riattacca("robot");
       r.stacca("robot", ["gA", "gD"], "striscia");
-      let punti = amb.stato().punteggio.robot, danni = amb.lottatore("mela").danni;
+      let punti = amb.stato().punteggio.robot, danni = amb.lottatore("mela").danni, rientrato = false;
       amb.avanza(60 * 25, (s) => {
         const f = s.lottatori.find((l) => l.tipo === "robot"), m = s.lottatori.find((l) => l.tipo === "mela");
+        // (esploso o volato fuori dalla pagina rientra intero, con le gambe: quel giro finisce lì)
+        if (f.esploso) { rientrato = true; return false; }
         assert.strictEqual(f.gambe, 0);
         if (!f.ko && !f.vola && !f.inVolo && f.forza >= 1) { nTot++; if (f.base - f.collo.y < alto * 0.6) bassoTot++; }
         if (s.punteggio.robot > punti || m.danni > danni) { if (f.striscia) colpiDaTerra++; }
         punti = s.punteggio.robot; danni = m.danni;
       });
       dentro(amb);
+      if (rientrato) continue;
       // tornate le gambe, in un paio di secondi è di nuovo in piedi
       r.riattacca("robot");
       let ritto = false;
-      amb.avanza(60 * 6, (s) => { const f = s.lottatori.find((l) => l.tipo === "robot"); if (!f.ko && !f.vola && f.forza >= 1 && f.base - f.collo.y > alto * 0.8) ritto = true; });
+      // (se le gambe tornano mentre è in volo col jetpack, prima finisce il volo: fino a nove secondi)
+      amb.avanza(60 * 12, (s) => { const f = s.lottatori.find((l) => l.tipo === "robot"); if (!f.ko && !f.vola && f.forza >= 1 && f.base - f.collo.y > alto * 0.8) { ritto = true; return false; } });
       assert.ok(ritto, "riavute le gambe non si rialza");
     }
     assert.ok(nTot > 200 && bassoTot / nTot > 0.7, "senza gambe non sta per terra (" + stile + "): " + bassoTot + "/" + nTot);
@@ -4402,14 +4409,14 @@ test("parry: premuto troppo presto è solo una parata; tenuto è guardia, lascia
 function corsaConLetale(premi) {
   const amb = ambiente(); const r = amb.finestra.__ring;
   amb.avanza(30); r.corsa.apri(503); amb.avanza(20); r.corsa.scegli("robot");
-  let premuto = false, vista = false, hpPrima = null;
-  const scritte = new Set();
+  let premuto = false, vista = false, hpPrima = null, protetto = false;
+  const scritte = new Set(), dopo = new Set();      // (dopo: solo le scritte comparse da quando la carica è vicina)
   amb.avanza(60 * 40, (s) => {
     const c = s.corsa;
     if (!c) return false;
     if (c.carte) r.corsa.carta(0);
     if (c.forziere) r.corsa.chiudiForziere();
-    for (const x of s.scritte) scritte.add(x);
+    for (const x of s.scritte) { scritte.add(x); if (hpPrima !== null) dopo.add(x); }
     const f = s.lottatori.find((l) => l.tipo === "robot");
     if (s.orda) for (const z of s.orda.zombie) {
       if (z.stato === "mira") vista = true;
@@ -4418,13 +4425,23 @@ function corsaConLetale(premi) {
         if (d < 75 && d > 40) { hpPrima = c.hp; if (premi) premuto = r.tastoGiu("KeyS"); }
       }
     }
-    if (hpPrima !== null && (scritte.has("CONTRO LETALE!") || scritte.has("SBAM!") || scritte.has("PARATO!"))) return false;
+    // (finita la carica, cioè nessuno più in rincorsa: si guarda com'è andata)
+    if (hpPrima !== null && !(s.orda && s.orda.zombie.some((z) => z.stato === "letale"))) {
+      protetto = c.invuln > 0 || c.scudo > 0;
+      return false;
+    }
   });
-  return { amb, r, premuto, vista, hpPrima, scritte };
+  return { amb, r, premuto, vista, hpPrima, scritte, dopo, protetto };
 }
 
 test("carica letale: la scintilla rossa, la rincorsa; col parry niente danni e il contrattacco letale ad area", () => {
-  const { amb, premuto, vista, hpPrima, scritte } = corsaConLetale(true);
+  // (ogni tanto la carica va a vuoto da sola, oltre l'eroe o fuori tempo: allora si riprova, fino a tre corse)
+  let prova;
+  for (let k = 0; k < 3; k++) {
+    prova = corsaConLetale(true);
+    if (["CONTRO LETALE!", "SBAM!", "PARATO!"].some((x) => prova.dopo.has(x))) break;
+  }
+  const { amb, premuto, vista, hpPrima, scritte } = prova;
   assert.ok(vista, "nei primi round della corsa la carica letale arriva");
   assert.ok(premuto, "la parata deve partire");
   assert.ok(scritte.has("CONTRO LETALE!"), "il parry sulla carica dà il contrattacco letale");
@@ -4436,8 +4453,9 @@ test("carica letale: la scintilla rossa, la rincorsa; col parry niente danni e i
 test("carica letale: senza parata fa male", () => {
   let fatto = false;
   for (let k = 0; k < 3 && !fatto; k++) {
-    const { amb, hpPrima, scritte } = corsaConLetale(false);
-    if (hpPrima === null || !scritte.has("SBAM!")) continue;          // (l'IA dell'eroe ogni tanto para da sola)
+    const { amb, hpPrima, dopo, protetto } = corsaConLetale(false);
+    // (l'IA dell'eroe ogni tanto para da sola; e appena colpito, o con lo scudo, l'eroe non prende danni)
+    if (hpPrima === null || !dopo.has("SBAM!") || protetto) continue;
     assert.ok(amb.stato().corsa.hp < hpPrima, "presa in pieno, la carica letale toglie vita");
     fatto = true;
   }
