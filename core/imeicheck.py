@@ -357,6 +357,79 @@ def _ricorda_tac_esterno(tac: str, marca: str, modello: str) -> None:
         pass
 
 
+def _chiave_codice(codice: str) -> str:
+    """`SM-A575G/DS`, `sm a575g`, `SMA575G` → `SMA575G`."""
+    grezzo = re.sub(r"[/\s]+(?:DS|DSN|DUOS)\s*$", "", str(codice or "").upper())
+    return re.sub(r"[^A-Z0-9]", "", grezzo)
+
+
+def identita_per_codice(codice: str) -> tuple[str, str] | None:
+    """(marca, specs) di un TAC che dichiara QUESTO codice modello.
+
+    Segnalato dall'utente il 15/10/2026: cercando «SM-A575G» la pagina
+    rispondeva con un altro telefono, mentre l'IMEI dello stesso
+    esemplare trovava modello e scheda tecnica. Il motivo: la ricerca per
+    IMEI legge il codice NEI DATABASE TAC, e da lì ricava il nome
+    commerciale; la ricerca per codice consultava solo i cataloghi dei
+    codici, che SM-A575G non lo conoscevano. Stesso telefono, stessa
+    informazione già in casa, due risposte diverse.
+
+    Qui si fa la strada al contrario: dal codice alle righe TAC che lo
+    contengono. Si leggono, in ordine di fiducia, i TAC inseriti a mano,
+    quelli verificati nel repository, le risposte già pagate al servizio
+    esterno e — se esiste già su disco — l'indice SQLite completo. Non si
+    costruisce l'indice né si esce in rete: è un ripiego per una ricerca
+    già fallita, non deve costare un download.
+
+    Il confronto è sul codice ESATTO (a meno del suffisso dual-SIM): una
+    riga «SM-A575GN» non risponde per «SM-A575G».
+    """
+    chiave = _chiave_codice(codice)
+    if len(chiave) < 4:
+        return None
+
+    def corrisponde(specs: str) -> bool:
+        trovato, _anno = _split_code_and_year(specs or "")
+        return bool(trovato) and _chiave_codice(trovato) == chiave
+
+    voci: list[tuple[str, str, str]] = []
+    for fonte, catalogo in ((FONTE_UTENTE, tac_inseriti),
+                            (FONTE_CURATA, _indice_curato),
+                            (FONTE_ESTERNA, tac_esterni)):
+        try:
+            for marca, specs in catalogo().values():
+                if corrisponde(specs):
+                    voci.append((fonte, marca, specs))
+        except Exception:
+            continue
+    if voci:
+        return _ordina_per_affidabilita(voci)[0][1:]
+
+    percorso = os.path.abspath(C.DB_PATH) + ".tac.sqlite3"
+    if not os.path.isfile(percorso):
+        return None
+    from contextlib import closing
+    import sqlite3
+
+    from .tac_index import TacIndex
+
+    forme = {codice.strip().upper(), chiave}
+    try:
+        with closing(TacIndex(percorso).connect()) as conn:
+            celle = []
+            for forma in forme:
+                celle += [r[0] for r in conn.execute(
+                    "SELECT cell FROM catalog WHERE cell LIKE ? LIMIT 200",
+                    (f"%{forma}%",))]
+    except sqlite3.DatabaseError:
+        return None
+    for cella in celle:
+        voci += [v for v in _voci_dalla_cella(cella) if corrisponde(v[2])]
+    if not voci:
+        return None
+    return _ordina_per_affidabilita(voci)[0][1:]
+
+
 def tac_assenti() -> dict[str, str]:
     """I TAC gia' chiesti fuori che il servizio ha dichiarato di non avere.
 
