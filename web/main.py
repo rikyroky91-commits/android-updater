@@ -56,7 +56,7 @@ from core.util import (alleggerisci_se_serve, fmt_date, fmt_relative, libera_mem
                        registra_da_svuotare, stato_alleggerimento)
 
 from . import account, auth_web, presenters as P
-from . import imei_status, tac_admin
+from . import donazioni, imei_status, tac_admin
 from .cache import CacheATempo
 from .contesto import (RADICE, contesto as _contesto, rendi as _rendi,
                        rendi_blocco as _rendi_blocco)
@@ -105,6 +105,7 @@ app = FastAPI(title=C.APP_TITLE, docs_url=None, redoc_url=None,
 app.mount("/static", StaticFiles(directory=RADICE / "static"), name="static")
 app.include_router(account.router)
 app.include_router(tac_admin.router)
+app.include_router(donazioni.router)
 
 
 # La cache delle ricerche è la prima cosa che l'alleggerimento può

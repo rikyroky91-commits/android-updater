@@ -30,6 +30,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from html import escape as html_escape
 
 RADICE = Path(__file__).resolve().parent.parent
 QUI = Path(__file__).resolve().parent
@@ -806,6 +807,15 @@ VERSO_OPZIONI = """  <section class="ring-sezione">
       <button type="button" class="ring-tasto ring-largo" data-guida>&#10067; Come funziona</button>
     </section>
   """
+# La donazione libera (16/10/2026, Riccardo: «un sistema di donazione libero a cui può essere legata la possibilità
+# di mandare un messaggio e chiedere una feature o un personaggio aggiuntivo»; solo nell'estensione). Il tasto apre la
+# pagina Ko-fi (`url_donazione` in premium.json): lì si sceglie l'importo e si scrive il messaggio, che Ko-fi manda al
+# sito (`/api/kofi`, vedi web/main.py) e si legge in /admin/richieste. Finché l'indirizzo è vuoto la sezione non c'è.
+SEZIONE_DONA = """  <section class="ring-sezione">
+      <p class="ring-nota">Ti piace Page Brawl? Dona quanto vuoi: nel messaggio della donazione puoi chiedere una funzione o un personaggio nuovo.</p>
+      <a class="ring-tasto ring-largo" data-dona href="__URL__" target="_blank" rel="noopener noreferrer">&#10084;&#65039; Sostieni Page Brawl</a>
+    </section>
+  """
 TASTO_PROVA = """
       <button type="button" class="ring-tasto ring-largo" data-premio-prova aria-pressed="false">Premium di prova (solo in questa versione)</button>"""
 # Lo stesso interruttore, col nome che ha quando Premium si regala a tutti (`sblocco_gratis`).
@@ -830,7 +840,11 @@ def premium() -> dict:
     url = str(dati.get("url_acquisto") or "").strip()
     if url and not url.startswith("https://"):
         raise SystemExit("premium.json: url_acquisto deve cominciare con https://")
-    return {"premium": bool(dati.get("premium_attivo", True)), "urlAcquisto": url,
+    # `url_donazione`: la pagina Ko-fi della donazione libera; vuoto, niente sezione.
+    dona = str(dati.get("url_donazione") or "").strip()
+    if dona and not re.match(r"^https://ko-fi\.com/[A-Za-z0-9_]+/?$", dona):
+        raise SystemExit("premium.json: url_donazione deve essere una pagina https://ko-fi.com/<nome>")
+    return {"premium": bool(dati.get("premium_attivo", True)), "urlAcquisto": url, "urlDonazione": dona,
             "sbloccoGratis": bool(dati.get("premium_attivo", True)) and bool(dati.get("sblocco_gratis", False))}
 
 
@@ -857,7 +871,8 @@ def file_attesi(variante: str) -> dict:
     pannello = pannello.replace("&#128242; Pioggia di telefoni", "&#127776; Pioggia di oggetti")
     # In fondo alla tendina, la strada per le opzioni dell'estensione.
     fine = pannello.rindex("</div>")
-    pannello = pannello[:fine] + VERSO_OPZIONI + pannello[fine:]
+    dona = SEZIONE_DONA.replace("__URL__", html_escape(scelte["urlDonazione"])) if scelte.get("urlDonazione") else ""
+    pannello = pannello[:fine] + dona + VERSO_OPZIONI + pannello[fine:]
     html = '<canvas class="tela" data-ring aria-hidden="true"></canvas>\n<div class="ancora">\n  ' + pannello + "\n</div>" + BARRETTA
     if "style=" in html:
         raise SystemExit("la tendina ha stili in linea: una CSP severa li bloccherebbe")

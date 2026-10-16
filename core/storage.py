@@ -312,6 +312,23 @@ CREATE TABLE IF NOT EXISTS classifica_corsa (
     creato_il   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_classifica_punti ON classifica_corsa(punti DESC, id);
+-- Le donazioni libere di Page Brawl via Ko-fi (16/10/2026), col messaggio di chi dona (una funzione o un personaggio
+-- da aggiungere). Si tiene quello che serve a leggerle: il nome che il donatore ha dato a Ko-fi, l'importo e il
+-- messaggio. Niente email (Ko-fi la manda, qui non si salva). `kofi_id` è l'id della transazione: Ko-fi ripete
+-- il webhook se non riceve risposta, e la stessa donazione non deve contare due volte.
+CREATE TABLE IF NOT EXISTS donazioni (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    kofi_id     TEXT NOT NULL UNIQUE,
+    tipo        TEXT NOT NULL,
+    nome        TEXT NOT NULL DEFAULT '',
+    messaggio   TEXT NOT NULL DEFAULT '',
+    importo     TEXT NOT NULL DEFAULT '',
+    valuta      TEXT NOT NULL DEFAULT '',
+    pubblica    INTEGER NOT NULL DEFAULT 0,
+    letta       INTEGER NOT NULL DEFAULT 0,
+    ricevuta_il TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_donazioni_data ON donazioni(ricevuta_il DESC);
 """
 
 
@@ -1318,6 +1335,34 @@ def classifica_corsa(limit: int = 10) -> list[dict]:
          "personaggio": r["personaggio"], "stile": r["stile"], "quando": r["creato_il"]}
         for r in righe
     ]
+
+
+# --- Le donazioni di Page Brawl (Ko-fi) ---------------------------------------
+def salva_donazione(kofi_id: str, tipo: str, nome: str, messaggio: str, importo: str,
+                    valuta: str, pubblica: bool) -> bool:
+    """Registra una donazione arrivata dal webhook di Ko-fi. False se c'era già (Ko-fi ripete i webhook)."""
+    with transaction() as conn:
+        cur = conn.execute(
+            """INSERT OR IGNORE INTO donazioni (kofi_id, tipo, nome, messaggio, importo, valuta, pubblica, ricevuta_il)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (kofi_id, tipo, nome, messaggio, importo, valuta, 1 if pubblica else 0, now_iso()),
+        )
+        return cur.rowcount > 0
+
+
+def donazioni(limit: int = 200) -> list[dict]:
+    conn = connect()
+    righe = conn.execute(
+        """SELECT id, tipo, nome, messaggio, importo, valuta, pubblica, letta, ricevuta_il FROM donazioni
+           ORDER BY ricevuta_il DESC, id DESC LIMIT ?""",
+        (max(1, min(1000, int(limit))),),
+    ).fetchall()
+    return [dict(r) for r in righe]
+
+
+def segna_donazione(id_donazione: int, letta: bool) -> None:
+    with transaction() as conn:
+        conn.execute("UPDATE donazioni SET letta = ? WHERE id = ?", (1 if letta else 0, int(id_donazione)))
 
 
 def clear_search_history() -> None:

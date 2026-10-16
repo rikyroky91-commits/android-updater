@@ -500,6 +500,8 @@
     "NOTIFICA!": ["PING!", "¡AVISO!", "NOTIF !", "PLING!"],
     "CTRL+ALT+CANC!": ["CTRL+ALT+DEL!", "¡CTRL+ALT+SUPR!", "CTRL+ALT+SUPPR !", "STRG+ALT+ENTF!"],
     "Come funziona": ["How it works", "Cómo funciona", "Comment ça marche", "So funktioniert es"],
+    "Ti piace Page Brawl? Dona quanto vuoi: nel messaggio della donazione puoi chiedere una funzione o un personaggio nuovo.": ["Enjoying Page Brawl? Donate what you like: in the donation message you can ask for a new feature or character.", "¿Te gusta Page Brawl? Dona lo que quieras: en el mensaje de la donación puedes pedir una función o un personaje nuevo.", "Page Brawl vous plaît ? Donnez ce que vous voulez : dans le message du don, vous pouvez demander une fonction ou un personnage nouveau.", "Gefällt dir Page Brawl? Spende, so viel du willst: In der Nachricht zur Spende kannst du dir eine neue Funktion oder Figur wünschen."],
+    "Sostieni Page Brawl": ["Support Page Brawl", "Apoya Page Brawl", "Soutenir Page Brawl", "Page Brawl unterstützen"],
     "Tasto di accensione su tutti i siti": ["Power button on every site", "Botón de encendido en todos los sitios", "Bouton de mise en marche sur tous les sites", "Einschaltknopf auf allen Websites"],
     "Sblocca Premium": ["Unlock Premium", "Desbloquear Premium", "Débloquer Premium", "Premium freischalten"],
     "Premium arriva presto": ["Premium is coming soon", "Premium llegará pronto", "Premium arrive bientôt", "Premium kommt bald"],

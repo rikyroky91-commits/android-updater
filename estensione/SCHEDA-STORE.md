@@ -11,7 +11,7 @@ Controllato sulla documentazione di Chrome il 02/10/2026 e ricontrollato il 05/1
 ## La 1.2.0 (16/10/2026): cosa cambia rispetto alla 1.1.0
 
 - Lotte più fitte, super guerrieri più fluidi, il Limit Break al posto del «sovraccarico», maghi che combattono a distanza con la respinta, e il ciclo della corsa (missioni, il capo ogni cinque round, rimescola carte). Dettaglio in `LEGGIMI.md`, «La 1.2.0».
-- Permessi e dati raccolti **invariati** rispetto alla 1.1.0: nella console non c'è niente da cambiare nella scheda privacy.
+- Permessi e dati raccolti **invariati** rispetto alla 1.1.0: nella console non c'è niente da cambiare nella scheda privacy. Il tasto della donazione (quando `url_donazione` è impostato) apre soltanto ko-fi.com in una scheda: l'estensione non manda niente. L'informativa ha la sezione «Donazioni» (16/10).
 - Testi dello store: le descrizioni della 1.1.0 restano valide. Se si vuole, nella descrizione lunga si può aggiungere una riga sulle missioni («Missions that carry over between runs, a boss every five rounds, card rerolls»).
 - Da caricare: `python3 estensione/costruisci.py --zip` → `estensione/zip/page-brawl-1.2.0-store.zip`.
 

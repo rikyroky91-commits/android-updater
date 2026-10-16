@@ -150,6 +150,9 @@ NOTIFY_MAX_PER_SCAN = env_int("NOTIFY_MAX_PER_SCAN", 25)
 # storico di cosa è stato provato su ciascun device, non è materiale da
 # lasciare pubblico come la ricerca. Vedi core/auth.py e web/account.py.
 ADMIN_APPROVAL_EMAIL = env("ADMIN_APPROVAL_EMAIL", "Riccardo.cucurullo91@gmail.com")
+# Le donazioni libere di Page Brawl (16/10/2026): il token di verifica dei webhook di Ko-fi (Ko-fi → Impostazioni →
+# API → Webhooks → Advanced). Vuoto: `/api/kofi` rifiuta tutto (503), così senza token nessuno può scriverci.
+KOFI_VERIFICATION_TOKEN = env("KOFI_VERIFICATION_TOKEN", "")
 # Serve per comporre link assoluti nell'email di approvazione (un link
 # relativo non si può cliccare da un client di posta). Da impostare
 # sull'host reale in produzione; il default è quello del deploy attuale.

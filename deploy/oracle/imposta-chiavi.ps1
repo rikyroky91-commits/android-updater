@@ -25,6 +25,8 @@ $nomi = @(
     "SMTP_USERNAME", "SMTP_PASSWORD", "BREVO_API_KEY", "BREVO_MITTENTE",
     "TAC_API_KEY", "TAC_API_KEY_2", "TAC_API_PROVIDER_2", "TAC_API_KEY_3",
     "OXYGEN_USER_AGENT",
+    # Le donazioni di Page Brawl (Ko-fi → API → Webhooks → Advanced → Verification Token).
+    "KOFI_VERIFICATION_TOKEN",
     # Facoltativo: un modello Gemini preciso. Vuoto = l'elenco di modelli
     # flash in core/aiquery.py, che basta e costa meno.
     "AI_QUERY_MODEL"

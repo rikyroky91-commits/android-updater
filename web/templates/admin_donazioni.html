@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block titolo %}Donazioni di Page Brawl · {{ titolo_sito }}{% endblock %}
+{% block corpo %}
+<h1>Donazioni di Page Brawl</h1>
+{# 16/10/2026: le donazioni libere fatte dall'estensione via Ko-fi, col messaggio di chi dona
+   (di solito una funzione o un personaggio da aggiungere). Vedi web/donazioni.py. #}
+{% if not configurate %}
+<p class="nota">Le donazioni non sono ancora collegate: manca <code>KOFI_VERIFICATION_TOKEN</code> sul server, e finché manca il sito rifiuta i webhook di Ko-fi.</p>
+{% endif %}
+<p class="nota">Arrivano da Ko-fi. Si tengono il nome dato a Ko-fi, l’importo e il messaggio; l’email di chi dona non si salva. {{ da_leggere }} da leggere.</p>
+{% for v in voci %}
+<section class="esito">
+  <h2>{{ v.nome or "Anonimo" }} · {{ v.importo }} {{ v.valuta }}{% if v.tipo != "Donation" %} · {{ v.tipo }}{% endif %}{% if not v.letta %} · <strong>nuova</strong>{% endif %}</h2>
+  <p>{% if v.messaggio %}{{ v.messaggio }}{% else %}<em>Nessun messaggio.</em>{% endif %}</p>
+  <p class="nota">{{ fmt_date(v.ricevuta_il) }}{% if not v.pubblica %} · messaggio privato{% endif %}</p>
+  <form method="post" action="/admin/donazioni/{{ v.id }}/{{ 'da-leggere' if v.letta else 'letta' }}" class="in-riga">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="secondario">{{ "Segna da leggere" if v.letta else "Segna come letta" }}</button>
+  </form>
+</section>
+{% else %}<p>Nessuna donazione per ora.</p>{% endfor %}
+{% endblock %}

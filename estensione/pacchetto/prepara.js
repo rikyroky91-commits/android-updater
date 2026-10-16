@@ -8,7 +8,7 @@
 (function () {
   "use strict";
   if (window.__ringEstensione) return;
-  var CONFIG = {"premium": false, "urlAcquisto": "", "sbloccoGratis": false, "premiumDiProva": false};
+  var CONFIG = {"premium": false, "urlAcquisto": "", "urlDonazione": "", "sbloccoGratis": false, "premiumDiProva": false};
   var memoria = Object.assign({}, window.__ringDati || {});
   memoria["mut-ring"] = "on";                    // chi clicca l'icona vuole la lotta accesa
   // Schizzi e arti staccati partono spenti: si accendono dalla tendina.
