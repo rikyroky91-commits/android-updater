@@ -60,7 +60,7 @@ Controllo fatto su ogni ramo remoto con `git rev-list origin/main..<ramo>`, poi 
 
 - **CI su `main` (`df97c09`)**: `tests.yml` verde (run 144, Python 3.12).
 - **In locale, in un container Linux con Python 3.13**: 1858 passati, 9 falliti, tutti dello stesso caso: `TestRealmeNomiRegionali::test_differenza_di_nome_dichiarata_non_nascosta` e 8 sottocasi di `TestMatriceRicerca` su realme C61/C63/RMX3939 («realme C61» atteso, arriva solo «realme C63»). In CI passano: la differenza è d'ambiente (versione di Python o ordine dei dati), non ancora capita. Prima di toccare la ricerca realme, riprodurlo con Python 3.12.
-- **Test Node del ring**: 180 su 182 al primo giro, 1 caduta al secondo, sempre sull'arena di lava (`ring.test.cjs:4065`, «chi cade nella lava dà il punto all'altro»). Sono cadute casuali che la CI assorbe col secondo tentativo; quel test è il più fragile e andrebbe reso deterministico.
+- **Test Node del ring**: 180 su 182 al primo giro, 1 caduta al secondo, sempre sull'arena di lava (`ring.test.cjs:4065`, «chi cade nella lava dà il punto all'altro»). Sono cadute casuali che la CI assorbe col secondo tentativo; quel test è il più fragile e andrebbe reso deterministico. In CI cadono a volte due volte di fila anche il n. 59 «imprevisti a mano» (l'uragano che non solleva nessuno, o «fuori dalla finestra») e il n. 96 «oggetti dai lati»: è successo il 15/10 e il 16/10 su commit che non toccavano il gioco. Prima di dare la colpa a una modifica, rilanciare quel test da solo qualche volta e confrontarlo col motore di `main` (`RING_JS` in `misura-lotta`, o una copia del test che punta a `ring.js` di `main`).
 
 ### Cose in sospeso che dipendono da Riccardo
 
