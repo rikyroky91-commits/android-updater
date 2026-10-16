@@ -11,7 +11,7 @@ Nel repository convivono **due progetti** che condividono codice, server e deplo
 | Cos'è | Sito che dice, per ogni modello di telefono, quale firmware è uscito e quando, e da un IMEI ricava il modello | Gioco: due lottatori ragdoll che si picchiano usando gli elementi della pagina (o dello schermo) come terreno |
 | Dove vive | `core/`, `web/`, `worker.py`, `data/`, `scripts/` | `web/static/ring.js` (motore), `estensione/`, `android/` |
 | Uscite | Sito su `https://mobileupdatetracker.duckdns.org` | Ring nella home del sito, estensione Chrome, app Android |
-| Stato | In produzione | Estensione 1.1.0 pronta; app Android 1.5.0 su `main`, 1.5.1 su un ramo non unito |
+| Stato | In produzione | Estensione 1.1.0 pubblicata sul Chrome Web Store; app Android 1.5.0 su `main`, 1.5.1 su un ramo non unito |
 
 Page Brawl è nato il 30/09/2026 come animazione della home del sito ed è cresciuto fino a diventare un prodotto a sé. Per questo il motore sta ancora sotto `web/static/` e la classifica globale passa dal server del tracker.
 
@@ -27,8 +27,8 @@ Proprietario e unico decisore: **Riccardo** (account GitHub `rikyroky91-commits`
 | --- | --- | --- | --- |
 | Sito M.U.T. | commit su `main` | `/health` → `versione.commit` | deploy automatico su Oracle a ogni push su `main` |
 | `DATA_LOGIC_VERSION` | 34 | `core/config.py` | si alza quando cambia l'interpretazione di una fonte |
-| Estensione Page Brawl | 1.1.0 | `estensione/costruisci.py` → `VERSIONE` | `premium_attivo: false`: tutto gratis |
-| Estensione Page Snow | 0.2.0 | `estensione/costruisci.py` → `NATALE_VERSIONE` | tema di Natale |
+| Estensione Page Brawl | 1.1.0 | `estensione/costruisci.py` → `VERSIONE` | `premium_attivo: false`: tutto gratis. Pubblicata sul Chrome Web Store (aggiornata il 14/10) |
+| Estensione Page Snow | 0.2.0 | `estensione/costruisci.py` → `NATALE_VERSIONE` | tema di Natale, non pubblicata |
 | App Android | 1.5.0, versionCode 7 (lite: 8) | `android/costruisci.py` → `VERSIONE`, `CODICE_VERSIONE` | 1.5.1 su `claude/android-ring`, non in `main` |
 
 ### Rami con lavoro non unito a `main`
@@ -39,8 +39,21 @@ Il flusso del repository è **push diretto su `main`** (nessuna PR è mai stata 
 | --- | --- | --- |
 | `claude/android-ring` (13/10) | Android 1.5.1: schermo spento sospende il ring invece di chiuderlo, niente comandi orfani dopo `ferma()`, «Leaderboard» nel menu ⋯, APK di prova nella pre-release | Verificare sul telefono e unire. Ha già `main` dentro (merge `875ccc6`) |
 | `claude/loving-cannon-1t7wdu` (15/10) | Ricerca per codice: l'AI non sostituisce più un codice vero con uno simile (caso `SM-A575G` che diventava Galaxy A05s); un codice sconosciuto ai cataloghi si cerca nei TAC come l'IMEI | **CI rossa** (run 148 di `tests.yml`, 15/10): capire cosa rompe, sistemare, poi unire. È la correzione di un difetto sistematico |
-| `claude/corsa-difficile` (09/10) | «Corsa infinita: più difficile, partite più corte» | Probabilmente superato da `a3537c1` (partite da 2 a 5 minuti). Controllare prima di cancellare |
-| `agent/*`, `codex/*`, altri `claude/*` | Giri vecchi, già assorbiti o abbandonati | Pulizia: cancellare dopo un `git log origin/main..<ramo>` |
+| `claude/ultimora-tema-scuro-codice-modello` (02/10) | Commit `61f8ca9` «Ring: lotte più fitte, meno tempi morti»: risposta alla segnalazione «a volte sembrano fermi», misurata su 46 pagine (da 23 a 34 colpi al minuto, pause lunghe dal 29% al 4%), con lo strumento `tests/misura-lotta.cjs` | **Lavoro perso: non è mai arrivato su `main`.** Il cherry-pick oggi dà 8 conflitti in `ring.js`, quindi va riportato a mano: prima misurare `main` con `misura-lotta.cjs` per vedere se il difetto c'è ancora, poi rifare le modifiche che servono. Non cancellare il ramo finché non è deciso |
+
+### Pulizia dei rami (verificata il 16/10/2026)
+
+Controllo fatto su ogni ramo remoto con `git rev-list origin/main..<ramo>`, poi con `git cherry` e confrontando il codice per i commit rimasti fuori.
+
+**Cancellabili, perché ogni commit è già in `main` (26):** `agent/firmware-source-semantics`, `agent/fix-backup-diagnostics`, `agent/fix-complete-search-output`, `agent/imei-resilience-ai-preload`, `agent/rank-imei-candidates`, `claude/audio`, `claude/corsa-crescente`, `claude/corsa-infinita`, `claude/corsa-verticale`, `claude/estensione-1.1.0`, `claude/estensione-gratis-1.0`, `claude/estensione-modi-gioco`, `claude/imei-samsung-not-found-8z4c9d`, `claude/ring-controller-orda-tasto-scontro`, `claude/ring-senza-gambe-scontri-eventi`, `claude/test-rimonta-ballerino`, `claude/trasformazioni-scimmia-colosso-albero`, `codex/android-data-rilascio`, `codex/firmware-marche-prioritarie`, `codex/fix-g30-identity`, `codex/installed-software-tests`, `codex/memoria-diagnostica-v76`, `codex/oom-background-memory`, `codex/ui-compact-firmware`, `codex/ui-device-first`, `estensione-modi-gioco`.
+
+**Cancellabili, perché il contenuto è in `main` sotto altri commit (4):**
+- `claude/secondo-tempo-pagina-intera`: `git cherry` dà i due commit come già applicati.
+- `agent/fix-imei-specs-performance`: è solo il merge di due rami che stanno già tutti e due in `main`.
+- `agent/fix-imei-note-50-results`: l'ordinamento dei TAC per affidabilità (`_punteggio_affidabilita`, `_ordina_per_affidabilita`) è in `core/imeicheck.py`.
+- `claude/corsa-difficile`: la corsa più difficile del 09/10 è in `main`, poi ritoccata ancora (`ultima: 0.3`, `ricarica`, `salvezze`, cuore +15).
+
+**Da tenere:** `claude/android-ring`, `claude/loving-cannon-1t7wdu`, `claude/ultimora-tema-scuro-codice-modello` (tabella sopra) e il ramo del giro in corso.
 
 ### Stato dei test (verificato il 16/10/2026)
 
@@ -50,7 +63,7 @@ Il flusso del repository è **push diretto su `main`** (nessuna PR è mai stata 
 
 ### Cose in sospeso che dipendono da Riccardo
 
-- **Chrome Web Store**: iscrizione pagata il 10/10. Se la 1.0.0 o la 1.1.0 siano state inviate e approvate non risulta dal repository. Chiedere e scriverlo qui.
+- **Chrome Web Store**: Page Brawl è **pubblicata** in versione 1.1.0, aggiornata il 14/10/2026 (controllato il 16/10 sulla pagina pubblica: <https://chromewebstore.google.com/detail/page-brawl/fhpgfhllcdfbhalcmfbdlolpgbgpnloi>, ID `fhpgfhllcdfbhalcmfbdlolpgbgpnloi`). Google l'ha approvata senza avvisare, cosa normale per lo store: l'esito si legge nella console sviluppatore o sulla pagina pubblica, non sempre arriva un'email. **Page Snow non risulta pubblicata.**
 - **Google Play**: AAB non firmati pronti nelle pre-release GitHub `android-<commit>`. Firma, console e invio a mano. Stato da confermare.
 - **Email di contatto** nell'informativa privacy (`web/static/pagebrawl/privacy.html`, riga «[email di contatto dello sviluppatore]»): manca, serve per entrambi gli store.
 - **Chiave IMEI Check Pro** approvata (secondo fornitore TAC): richiesta da fare, poi `TAC_API_PROVIDER_2` e `TAC_API_KEY_2` su Oracle.
@@ -247,7 +260,7 @@ Guida completa in `estensione/LEGGIMI.md`; testi per lo store, privacy e passi d
 - Permessi minimi: `activeTab`, `scripting`, `storage`. Il permesso su tutti i siti è facoltativo (tasto su ogni pagina).
 - **Premium**: `estensione/premium.json`. Oggi `premium_attivo: false`, tutto gratis («totalmente gratuito per questa versione», 10/10). Il blocco è nel codice del client: barriera per l'utente normale, non protezione. Nessuna verifica di acquisto esiste.
 - **1.1.0 (13/10)**: shadow DOM aperti, sporgenze sulle «scatole», elementi che sobbalzano, volo dopo 8 s, classifica globale dal service worker verso `https://mobileupdatetracker.duckdns.org/api/corsa` senza credenziali, occhi nuovi dei super guerrieri.
-- **Prima di inviare la 1.1.0**: il sito con CORS su `/api/corsa` deve essere in produzione (lo è da `df97c09`), e nella console va aggiornata la scheda privacy, perché ora esce un dato (nome in classifica).
+- **1.1.0 pubblicata** il 14/10/2026. La classifica dell'estensione dipende dalle rotte `/api/corsa` del sito, in produzione da `df97c09`. Verificare nella console che la scheda privacy dichiari il dato che ora esce (il nome in classifica).
 - Pubblicare: `python3 estensione/costruisci.py --zip` → `estensione/zip/page-brawl-<versione>-store.zip`. La console del Web Store la compila Riccardo a mano: Chrome non lascia automatizzarla.
 - Ogni nuova versione: alzare `VERSIONE` in `estensione/costruisci.py`, rigenerare, rifare lo zip.
 
@@ -336,6 +349,7 @@ Dipendenza da ricordare: **estensione e app dipendono dal dominio del tracker**.
 ### 4.10 Miglioramenti possibili
 
 1. Unire `claude/android-ring` (1.5.1) dopo una prova su telefono, poi rendere la prova su telefono vero un passo fisso della checklist.
+1. Riportare a mano «lotte più fitte» (`61f8ca9`, ramo `claude/ultimora-tema-scuro-codice-modello`), dopo aver misurato se i lottatori di `main` restano ancora fermi.
 2. Spostare il motore in una cartella `pagebrawl/` con `ring.js` diviso in moduli (fisica, personaggi, eventi, corsa, interfaccia) e un passo di build che li unisca: 14.500 righe in un file sono il collo di bottiglia di ogni modifica.
 3. Verifica degli acquisti lato server (Play Developer API) prima di vendere davvero.
 4. Classifica: firma o controllo di plausibilità più stretto (durata reale, eventi della partita), e un dominio proprio per Page Brawl, così gli store non dipendono dal tracker.
@@ -396,6 +410,7 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 16/10/2026 | Claude | Controllati tutti i rami remoti contro `main`: 30 cancellabili, 3 da tenere; trovato il lavoro perso `61f8ca9` (lotte più fitte). Verificato che l'estensione 1.1.0 è pubblicata | `claude/exciting-cori-6cwl9m` |
 | 16/10/2026 | Claude | Creato questo documento unico di consegna (tracker + Page Brawl) e la regola di aggiornamento in `CLAUDE.md` | `claude/exciting-cori-6cwl9m` |
 | 15/10/2026 | Claude | Ricerca per codice: niente sostituzioni dall'AI, codice cercato nei TAC | `claude/loving-cannon-1t7wdu` (non unito) |
 | 13/10/2026 | Claude | Android 1.5.1: sospensione a schermo spento, comandi orfani, Leaderboard nel menu | `claude/android-ring` (non unito) |
