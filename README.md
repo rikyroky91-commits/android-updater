@@ -1,5 +1,8 @@
 # Universal Mobile Update Tracker
 
+> **Chi arriva adesso parta da [PASSAGGIO-CONSEGNE.md](PASSAGGIO-CONSEGNE.md)**: stato attuale, regole,
+> build e deploy sia del tracker sia di Page Brawl, tenuto aggiornato a ogni giro.
+
 Monitora i rilasci software reali (major release, feature drop, patch di
 sicurezza) su più brand Android e su iOS, e dice **per ogni modello di
 telefono** quale versione è arrivata e quando — così sai su cosa rilanciare
