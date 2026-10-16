@@ -1,6 +1,6 @@
 # Passaggio di consegne: Mobile Update Tracker e Page Brawl
 
-Documento vivo. Ultimo aggiornamento: **16/10/2026**, su `main` al commit `df97c09`.
+Documento vivo. Ultimo aggiornamento: **16/10/2026**, su `main` dopo l'unione di Android 1.5.1 e della ricerca per codice (base `df97c09`).
 
 Questo file è il punto di ingresso per chiunque lavori sul repository: persone, Claude, Codex o altri agenti. Si tiene **sempre aggiornato** (regola in fondo, sezione 9). I passaggi di consegne dei singoli giri restano in `docs/consegne/` come archivio storico: questo li riassume e li sostituisce come riferimento.
 
@@ -11,7 +11,7 @@ Nel repository convivono **due progetti** che condividono codice, server e deplo
 | Cos'è | Sito che dice, per ogni modello di telefono, quale firmware è uscito e quando, e da un IMEI ricava il modello | Gioco: due lottatori ragdoll che si picchiano usando gli elementi della pagina (o dello schermo) come terreno |
 | Dove vive | `core/`, `web/`, `worker.py`, `data/`, `scripts/` | `web/static/ring.js` (motore), `estensione/`, `android/` |
 | Uscite | Sito su `https://mobileupdatetracker.duckdns.org` | Ring nella home del sito, estensione Chrome, app Android |
-| Stato | In produzione | Estensione 1.1.0 pubblicata sul Chrome Web Store; app Android 1.5.0 su `main`, 1.5.1 su un ramo non unito |
+| Stato | In produzione | Estensione 1.1.0 pubblicata sul Chrome Web Store; app Android 1.5.1 su `main` |
 
 Page Brawl è nato il 30/09/2026 come animazione della home del sito ed è cresciuto fino a diventare un prodotto a sé. Per questo il motore sta ancora sotto `web/static/` e la classifica globale passa dal server del tracker.
 
@@ -29,7 +29,7 @@ Proprietario e unico decisore: **Riccardo** (account GitHub `rikyroky91-commits`
 | `DATA_LOGIC_VERSION` | 34 | `core/config.py` | si alza quando cambia l'interpretazione di una fonte |
 | Estensione Page Brawl | 1.1.0 | `estensione/costruisci.py` → `VERSIONE` | `premium_attivo: false`: tutto gratis. Pubblicata sul Chrome Web Store (aggiornata il 14/10) |
 | Estensione Page Snow | 0.2.0 | `estensione/costruisci.py` → `NATALE_VERSIONE` | tema di Natale, non pubblicata |
-| App Android | 1.5.0, versionCode 7 (lite: 8) | `android/costruisci.py` → `VERSIONE`, `CODICE_VERSIONE` | 1.5.1 su `claude/android-ring`, non in `main` |
+| App Android | 1.5.1, versionCode 9 (lite: 10) | `android/costruisci.py` → `VERSIONE`, `CODICE_VERSIONE` | unita a `main` il 16/10; mai provata su telefono vero da Claude |
 
 ### Rami con lavoro non unito a `main`
 
@@ -37,8 +37,6 @@ Il flusso del repository è **push diretto su `main`** (nessuna PR è mai stata 
 
 | Ramo | Cosa contiene | Da fare |
 | --- | --- | --- |
-| `claude/android-ring` (13/10) | Android 1.5.1: schermo spento sospende il ring invece di chiuderlo, niente comandi orfani dopo `ferma()`, «Leaderboard» nel menu ⋯, APK di prova nella pre-release | Verificare sul telefono e unire. Ha già `main` dentro (merge `875ccc6`) |
-| `claude/loving-cannon-1t7wdu` (15/10) | Ricerca per codice: l'AI non sostituisce più un codice vero con uno simile (caso `SM-A575G` che diventava Galaxy A05s); un codice sconosciuto ai cataloghi si cerca nei TAC come l'IMEI | **CI rossa** (run 148 di `tests.yml`, 15/10): capire cosa rompe, sistemare, poi unire. È la correzione di un difetto sistematico |
 | `claude/ultimora-tema-scuro-codice-modello` (02/10) | Commit `61f8ca9` «Ring: lotte più fitte, meno tempi morti»: risposta alla segnalazione «a volte sembrano fermi», misurata su 46 pagine (da 23 a 34 colpi al minuto, pause lunghe dal 29% al 4%), con lo strumento `tests/misura-lotta.cjs` | **Lavoro perso: non è mai arrivato su `main`.** Il cherry-pick oggi dà 8 conflitti in `ring.js`, quindi va riportato a mano: prima misurare `main` con `misura-lotta.cjs` per vedere se il difetto c'è ancora, poi rifare le modifiche che servono. Non cancellare il ramo finché non è deciso |
 
 ### Pulizia dei rami (verificata il 16/10/2026)
@@ -53,7 +51,9 @@ Controllo fatto su ogni ramo remoto con `git rev-list origin/main..<ramo>`, poi 
 - `agent/fix-imei-note-50-results`: l'ordinamento dei TAC per affidabilità (`_punteggio_affidabilita`, `_ordina_per_affidabilita`) è in `core/imeicheck.py`.
 - `claude/corsa-difficile`: la corsa più difficile del 09/10 è in `main`, poi ritoccata ancora (`ultima: 0.3`, `ricarica`, `salvezze`, cuore +15).
 
-**Da tenere:** `claude/android-ring`, `claude/loving-cannon-1t7wdu`, `claude/ultimora-tema-scuro-codice-modello` (tabella sopra) e il ramo del giro in corso.
+**Unite a `main` il 16/10, ora cancellabili anche loro:** `claude/android-ring` (1.5.1) e `claude/loving-cannon-1t7wdu` (ricerca per codice). La CI rossa di quest'ultimo veniva da due test casuali del ring (`ring.test.cjs` n. 59 «imprevisti a mano» e n. 96 «oggetti dai lati»), non dalla correzione: i test Python erano verdi.
+
+**Da tenere:** `claude/ultimora-tema-scuro-codice-modello` (tabella sopra) e il ramo del giro in corso.
 
 ### Stato dei test (verificato il 16/10/2026)
 
@@ -184,7 +184,7 @@ Elenco e significato in `configurazione.esempio.toml`, `render.yaml` e `deploy/o
 | 26/09 | **Trasloco su Oracle Cloud** (Render sospeso per banda). Controllo notturno, nome M.U.T., novità rifatte, Nothing/CMF |
 | 01-02/10 | Home con ultim'ora, tema scuro, codice modello sempre visibile. Nasce il ring (Page Brawl) |
 | 09-10/10 | Tema di Halloween; `POST /scansione` dietro login con pausa di 10 minuti; correzioni anonime in coda di verifica |
-| 15/10 | Correzione della ricerca per codice (ramo `claude/loving-cannon-1t7wdu`, non ancora unito) |
+| 15/10 | Correzione della ricerca per codice (`SM-A575G` che diventava Galaxy A05s), unita il 16/10 |
 
 Il dettaglio di ogni giro è in `docs/consegne/passaggio-consegne-v<NN>.md`.
 
@@ -192,7 +192,6 @@ Il dettaglio di ogni giro è in `docs/consegne/passaggio-consegne-v<NN>.md`.
 
 - **Fornitore TAC HiCellTek**: risponde con la pagina «Security check» di un antibot (o2switch). Non è dimostrato che la chiave sia valida né che l'API sia raggiungibile dal server. IMEI Check Pro è configurato nel codice ma mai collaudato con una chiave vera.
 - **TAC ambigui**: i database gratuiti si contraddicono e per Motorola scrivono codename (`FOGO5G23`). La traduzione è solo per corrispondenza esatta; i casi ambigui si risolvono con righe curate in `data/tac_modelli.csv`.
-- **Ricerca per codice** sbagliava telefono quando il codice non era nei cataloghi (`SM-A575G`). Corretto solo sul ramo non unito.
 - **Test legati a Linux**: alcune prove di memoria leggono `/proc` e falliscono su Windows; non è un difetto del codice.
 - **Render**: piano gratuito, 512 MB, dorme dopo 15 minuti, banda limitata. Va considerato un ripiego.
 - **`sveglia.yml`** non garantisce nulla: GitHub salta le pianificazioni anche di ore.
@@ -202,7 +201,7 @@ Il dettaglio di ogni giro è in `docs/consegne/passaggio-consegne-v<NN>.md`.
 ### 3.9 Miglioramenti possibili
 
 In ordine di guadagno stimato:
-1. Portare a verde e unire `claude/loving-cannon-1t7wdu`, con i 10 modelli di collaudo che la regola delle fonti chiede.
+1. Aggiungere alla ricerca per codice (unita il 16/10) un collaudo su 10 codici veri che i cataloghi non conoscono ma i TAC sì.
 2. Ottenere e collaudare dal server la chiave IMEI Check Pro (`python scripts/verifica_servizi_tac.py --live`), poi decidere se tenere HiCellTek.
 3. Monitor esterno vero (UptimeRobot o simile) al posto di `sveglia.yml`, che controlli anche il commit.
 4. Spezzare `web/main.py` e `core/sources.py`: oltre 4.000 e 6.000 righe rendono lento ogni giro e alto il rischio di conflitti fra agenti in parallelo.
@@ -330,11 +329,10 @@ Dipendenza da ricordare: **estensione e app dipendono dal dominio del tracker**.
 | 10/10 | Corsa verticale, tastiera, maghi e duellanti rifatti; **estensione 1.0.0 tutta gratis**; iscrizione al Web Store |
 | 11/10 | Super guerrieri rifatti |
 | 12/10 | **App Android** da 1.0 a 1.5.0 in un giorno: quattro modalità, lava, comandi nativi, grafica 30/60/120 fps, target API 36, consenso accessibilità, variante leggera, Billing con Gradle in CI |
-| 13/10 | **Estensione 1.1.0**: la pagina conta di più, classifica globale ovunque. Android 1.5.1 su ramo |
+| 13/10 | **Estensione 1.1.0**: la pagina conta di più, classifica globale ovunque. Android 1.5.1 (unita il 16/10) |
 
 ### 4.9 Problemi noti
 
-- **Android 1.5.1 non è su `main`**: chi costruisce da `main` riprende due difetti già corretti (spegnendo lo schermo il ring si chiude e la corsa riparte da zero; finestre dei comandi che restano orfane).
 - **Mai provato su un telefono vero** in modo sistematico: le prove sono state su emulatore e Chromium. Il controller dell'estensione è stato provato col mouse e col tocco simulato.
 - **Accessibilità e Play Store**: Google può rifiutare un'app non di accessibilità che usa quel servizio. Il piano B (`--leggera`) esiste ma perde blocco schermo, «tutto il telefono» e «solo Chrome».
 - **Premium dell'estensione** senza verifica d'acquisto; Premium dell'app senza verifica lato server dell'acquisto (solo Billing sul dispositivo).
@@ -348,7 +346,7 @@ Dipendenza da ricordare: **estensione e app dipendono dal dominio del tracker**.
 
 ### 4.10 Miglioramenti possibili
 
-1. Unire `claude/android-ring` (1.5.1) dopo una prova su telefono, poi rendere la prova su telefono vero un passo fisso della checklist.
+1. Rendere la prova su telefono vero un passo fisso della checklist Android.
 1. Riportare a mano «lotte più fitte» (`61f8ca9`, ramo `claude/ultimora-tema-scuro-codice-modello`), dopo aver misurato se i lottatori di `main` restano ancora fermi.
 2. Spostare il motore in una cartella `pagebrawl/` con `ring.js` diviso in moduli (fisica, personaggi, eventi, corsa, interfaccia) e un passo di build che li unisca: 14.500 righe in un file sono il collo di bottiglia di ogni modifica.
 3. Verifica degli acquisti lato server (Play Developer API) prima di vendere davvero.
@@ -410,10 +408,11 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 16/10/2026 | Claude | Unite a `main` Android 1.5.1 (`claude/android-ring`) e la correzione della ricerca per codice (`claude/loving-cannon-1t7wdu`), dopo revisione del codice e test della ricerca verdi | `main` |
 | 16/10/2026 | Claude | Controllati tutti i rami remoti contro `main`: 30 cancellabili, 3 da tenere; trovato il lavoro perso `61f8ca9` (lotte più fitte). Verificato che l'estensione 1.1.0 è pubblicata | `claude/exciting-cori-6cwl9m` |
 | 16/10/2026 | Claude | Creato questo documento unico di consegna (tracker + Page Brawl) e la regola di aggiornamento in `CLAUDE.md` | `claude/exciting-cori-6cwl9m` |
-| 15/10/2026 | Claude | Ricerca per codice: niente sostituzioni dall'AI, codice cercato nei TAC | `claude/loving-cannon-1t7wdu` (non unito) |
-| 13/10/2026 | Claude | Android 1.5.1: sospensione a schermo spento, comandi orfani, Leaderboard nel menu | `claude/android-ring` (non unito) |
+| 15/10/2026 | Claude | Ricerca per codice: niente sostituzioni dall'AI, codice cercato nei TAC | `c2d65de` |
+| 13/10/2026 | Claude | Android 1.5.1: sospensione a schermo spento, comandi orfani, Leaderboard nel menu | `d9779b8` |
 | 13/10/2026 | Claude | Page Brawl 1.1.0 estensione, classifica globale con CORS | `df97c09` |
 | 12/10/2026 | Claude | App Android 1.0 → 1.5.0, Billing, Gradle in CI | `86e52de` … `9b746b0` |
 
