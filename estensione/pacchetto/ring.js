@@ -2184,15 +2184,23 @@
     else f.paraT0 = undefined;
   }
   // Il lampo del parry: un anello bianco che si apre, una raggiera d'oro, il tempo fermo.
-  function lampoParry(x, y, grande) {
-    if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "parry", x, y, vx: 0, vy: 0, vita: grande ? 26 : 18, max: grande ? 26 : 18, r: (grande ? 120 : 70) * S, giro: Math.random() * Math.PI });
+  // `dir`: da che parte guarda chi para (verso chi ha attaccato): da lì si aprono le mezzelune.
+  function lampoParry(x, y, grande, dir) {
+    const d = dir || 1;
+    if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "parry", x, y, vx: 0, vy: 0, vita: grande ? 34 : 24, max: grande ? 34 : 24, r: (grande ? 130 : 78) * S, giro: Math.random() * Math.PI, dir: d });
+    // Le righe di velocità: sottili, quasi tutte verso chi ha attaccato e verso il retro.
+    for (let i = 0; i < (grande ? 14 : 9) && particelle.length < MAX_PARTICELLE; i++) {
+      const a = (i % 2 ? 0 : Math.PI) + caso(-0.7, 0.7), v = caso(7, 12) * S;
+      particelle.push({ tipo: "linea", x: x + Math.cos(a) * 12 * S, y: y + Math.sin(a) * 12 * S, vx: Math.cos(a) * v, vy: Math.sin(a) * v,
+                        vita: 11, max: 11, lung: caso(18, 34) * S, colore: i % 3 ? "#ffffff" : "#fff1a8" });
+    }
     scintille(x, y, grande ? 22 : 12, "#ffffff"); scintille(x, y, grande ? 14 : 8, "#ffd84a");
     fermoColpo = Math.max(fermoColpo, grande ? 18 : 12); scossa = Math.max(scossa, grande ? 14 : 6);
   }
   // Parry riuscito contro un lottatore (`da`) o uno zombie (`z`): chi para non prende niente e parte il contrattacco.
   function faiParry(f, da, x, y, z) {
     f.paraT0 = undefined; f.guardia = false; f.paraRiposo = 0;
-    lampoParry(x, y, false);
+    lampoParry(x, y, false, f.dir);
     scrivi("PARRY!", x, y - 22 * S, true);
     impara(f, "para", 1, 2);
     if (corsa && corsa.chi && f.tipo === corsa.chi) { corsa.parry = (corsa.parry || 0) + 1; caricaCorsa(10); corsa.punti += 25; }
@@ -5452,7 +5460,7 @@
     if (inFinestraParry(f) && f.dir === -z.dirL) {
       // PARRY: il contrattacco letale. Lui va giù subito, e l'onda d'urto prende tutti quelli intorno.
       faiParry(f, null, x, y, null);
-      lampoParry(x, y, true);
+      lampoParry(x, y, true, f.dir);
       scrivi("CONTRO LETALE!", f.p.bacino.x, f.base - 120 * S, true);
       z.stato = "va"; z.hp = Math.min(z.hp, 0.5);
       colpisciZombie(z, 9, f.dir, c[0], c[1], f);
@@ -11899,18 +11907,65 @@
       ctx.strokeStyle = q.colore; ctx.lineWidth = 1.4 * S; ctx.lineCap = "round";
       ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x + q.vx / v * q.lung, q.y + q.vy / v * q.lung); ctx.stroke();
     } else if (q.tipo === "parry") {
-      // Il parry: un anello bianco spesso che si apre, dentro un taglio d'oro di traverso, fuori otto raggi.
-      const k = 1 - q.vita / q.max, R = q.r * (0.25 + 0.75 * Math.sqrt(k));
-      ctx.globalAlpha = Math.max(0, 1 - k); ctx.lineCap = "round";
-      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 7 * S * (1 - k) + 1 * S; ctx.beginPath(); ctx.arc(q.x, q.y, R, 0, Math.PI * 2); ctx.stroke();
-      ctx.strokeStyle = "#ffd84a"; ctx.lineWidth = 2.4 * S; ctx.beginPath(); ctx.arc(q.x, q.y, R * 0.8, 0, Math.PI * 2); ctx.stroke();
-      const a = q.giro, L = q.r * 0.55 * Math.min(1, k * 3);
-      ctx.strokeStyle = "#fff6c8"; ctx.lineWidth = 5 * S * (1 - k); ctx.beginPath(); ctx.moveTo(q.x - Math.cos(a) * L, q.y - Math.sin(a) * L); ctx.lineTo(q.x + Math.cos(a) * L, q.y + Math.sin(a) * L); ctx.stroke();
-      for (let i = 0; i < 8; i++) {
-        const b = a + i * Math.PI / 4;
-        ctx.strokeStyle = i % 2 ? "#ffd84a" : "#ffffff"; ctx.lineWidth = 2 * S;
-        ctx.beginPath(); ctx.moveTo(q.x + Math.cos(b) * R * 1.05, q.y + Math.sin(b) * R * 1.05); ctx.lineTo(q.x + Math.cos(b) * R * 1.35, q.y + Math.sin(b) * R * 1.35); ctx.stroke();
+      // Il parry (16/10/2026, dalle immagini di Riccardo): un nucleo bianco accecante, raggi a stella con due
+      // punte lunghe a croce, una bolla dorata trasparente col bordo acceso, e verso chi ha attaccato tre mezzelune
+      // bianche che si aprono come un colpo d'aria. Dura poco: il grosso della luce è nei primi fotogrammi.
+      const k = 1 - q.vita / q.max, svan = Math.max(0, 1 - k), lieve = grafica.dettaglio === "basso";
+      const forte = Math.max(0, 1 - k * 2.2);      // il lampo vero: i primi fotogrammi
+      ctx.save(); ctx.lineCap = "round";
+      // Dietro, un attimo di buio: sulle pagine chiare la luce bianca da sola non si vedrebbe.
+      const buio = Math.max(0, 1 - k * 1.5);
+      if (buio > 0) {
+        if (lieve) { ctx.globalAlpha = 0.45 * buio; ctx.fillStyle = "#141626"; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * 0.9, 0, Math.PI * 2); ctx.fill(); }
+        else {
+          const gd = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, q.r * 1.2);
+          gd.addColorStop(0, "rgba(16,18,38," + (0.7 * buio).toFixed(3) + ")"); gd.addColorStop(0.6, "rgba(16,18,38," + (0.45 * buio).toFixed(3) + ")"); gd.addColorStop(1, "rgba(16,18,38,0)");
+          ctx.globalAlpha = 1; ctx.fillStyle = gd; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * 1.2, 0, Math.PI * 2); ctx.fill();
+        }
       }
+      ctx.globalCompositeOperation = "lighter";
+      if (!lieve) {
+        const Rg = q.r * (0.7 + 0.4 * k), g = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, Rg);
+        g.addColorStop(0, "rgba(255,255,255," + (0.95 * svan).toFixed(3) + ")");
+        g.addColorStop(0.18, "rgba(255,250,215," + (0.75 * svan).toFixed(3) + ")");
+        g.addColorStop(0.5, "rgba(255,226,120," + (0.28 * svan).toFixed(3) + ")");
+        g.addColorStop(1, "rgba(255,200,80,0)");
+        ctx.globalAlpha = 1; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.x, q.y, Rg, 0, Math.PI * 2); ctx.fill();
+      }
+      // La bolla: si gonfia in fretta, bordo sottile acceso, dentro appena velata.
+      const Rb = q.r * (0.42 + 0.5 * Math.sqrt(k));
+      if (!lieve) {
+        const gb = ctx.createRadialGradient(q.x, q.y, Rb * 0.55, q.x, q.y, Rb);
+        gb.addColorStop(0, "rgba(255,240,170,0)"); gb.addColorStop(0.85, "rgba(255,236,150," + (0.22 * svan).toFixed(3) + ")"); gb.addColorStop(1, "rgba(255,248,200," + (0.5 * svan).toFixed(3) + ")");
+        ctx.fillStyle = gb; ctx.beginPath(); ctx.arc(q.x, q.y, Rb, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = svan; ctx.strokeStyle = "#fff4c2"; ctx.lineWidth = (2.6 * (1 - k) + 0.8) * S;
+      ctx.beginPath(); ctx.arc(q.x, q.y, Rb, 0, Math.PI * 2); ctx.stroke();
+      // Le mezzelune, dalla parte di chi ha attaccato: tre archi pieni che si allargano e si assottigliano.
+      for (let m = 0; m < 3; m++) {
+        const km = Math.max(0, Math.min(1, 0.12 + k * 1.4 - m * 0.1));
+        if (km <= 0 || km >= 1) continue;
+        const Rm = q.r * (0.35 + 0.75 * km + m * 0.1), sp = (0.95 - m * 0.18) * (1 - 0.3 * km), spess = (16 - m * 4) * S * (1 - km);
+        const c = q.dir > 0 ? 0 : Math.PI, ox = -q.dir * spess * 0.9;
+        ctx.globalAlpha = (1 - km) * (m ? 0.65 : 0.95); ctx.fillStyle = "#ffffff";
+        ctx.beginPath(); ctx.arc(q.x, q.y, Rm, c - sp, c + sp);
+        ctx.arc(q.x + ox, q.y, Math.max(1, Rm - spess * 0.4), c + sp * 0.92, c - sp * 0.92, true); ctx.closePath(); ctx.fill();
+      }
+      // I raggi: sedici sottili di lunghezza alterna, più le due punte lunghe a croce (di traverso).
+      const raggio = (a, L, w, col) => {
+        const ca = Math.cos(a), sa = Math.sin(a), nx = -sa * w, ny = ca * w;
+        ctx.fillStyle = col; ctx.beginPath();
+        ctx.moveTo(q.x + nx, q.y + ny); ctx.lineTo(q.x + ca * L, q.y + sa * L); ctx.lineTo(q.x - nx, q.y - ny); ctx.closePath(); ctx.fill();
+      };
+      const cresce = 0.85 + 0.15 * Math.min(1, k * 4), Lr = q.r * (0.75 + 0.25 * k) * cresce;   // (il fermo del colpo blocca i primi fotogrammi: si parte già aperti)
+      ctx.globalAlpha = svan * svan;
+      for (let i = 0; i < 16; i++) raggio(q.giro + i * Math.PI / 8, Lr * (i % 2 ? 0.55 : 0.9) * (0.85 + 0.3 * Math.sin(i * 2.3)), (i % 2 ? 1.1 : 1.8) * S, i % 4 === 1 ? "#ffe9a0" : "#ffffff");
+      ctx.globalAlpha = forte;
+      for (let i = 0; i < 4; i++) raggio(q.giro + 0.4 + i * Math.PI / 2, q.r * 1.25 * cresce, 2.6 * S, "#ffffff");
+      // Il nucleo: un disco bianco pieno che si stringe.
+      ctx.globalAlpha = Math.min(1, svan * 1.4); ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(q.x, q.y, (4 + 16 * forte) * S, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
     } else if (q.tipo === "impatto") {
       // La raggiera dei colpi forti: linee che partono dal punto del colpo e si allungano mentre sbiadiscono.
       const k = 1 - q.vita / q.max;

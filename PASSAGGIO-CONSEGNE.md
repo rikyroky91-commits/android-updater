@@ -418,6 +418,7 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 16/10/2026 | Claude | Lampo del parry rifatto dalle immagini di Riccardo: nucleo bianco, raggi a stella con punte a croce, bolla dorata, mezzelune verso chi attacca, righe di velocità, e un attimo di buio dietro perché sulle pagine chiare si veda | `claude/exciting-cori-6cwl9m` |
 | 16/10/2026 | Claude | CI rossa del secondo giro: tre test del ring resi robusti (jetpack dopo la gravità e dopo le gambe, gamba persa prima del test, carica letale a vuoto o con l'eroe invulnerabile). Nessuna modifica al gioco | `claude/exciting-cori-6cwl9m` |
 | 16/10/2026 | Claude | Page Brawl 1.2.0, secondo giro: parry con S (guardia tenuta, finestra di 14 fotogrammi, contrattacco), carica letale degli zombie (scintilla rossa, rincorsa, contrattacco letale ad area), primi round lenti e round più lunghi (13 → 34 s), premio in crediti e allenamento per personaggio. Non su `main` | `claude/exciting-cori-6cwl9m` |
 | 16/10/2026 | Claude | Page Brawl 1.2.0 / Android 1.6.0: tempi morti rifatti da `61f8ca9` e misurati, super guerrieri più fluidi, Limit Break (occhi e capelli sistemati), maghi a distanza con la respinta, missioni, capo ogni cinque round, rimescola. Non su `main` | `claude/exciting-cori-6cwl9m` |
