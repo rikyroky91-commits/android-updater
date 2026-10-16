@@ -2173,7 +2173,8 @@ test("controller: le mosse sono quelle dei personaggi scelti, quelle a energia s
   // Ci sono tutte le mosse della tendina: la presa a distanza, il lampo e l'autodistruzione
   // dei guerrieri, la sparizione e le magie del 10/10/2026 dei maghi, l'incrocio di lame dei duellanti.
   // (dal 16/10/2026 i maghi hanno anche la respinta)
-  const attese = { guerrieri: 12, maghi: 14, lame: 9 }, devono = { guerrieri: ["telecinesi", "lampo", "avvinghia"], maghi: ["teletrasporto", "falene", "catene", "stelle", "smeraldo", "respinta"], lame: ["duello"] };
+  // (e dal 16/10/2026 tutti hanno la parata, per il parry anche senza tastiera)
+  const attese = { guerrieri: 13, maghi: 15, lame: 9 }, devono = { guerrieri: ["telecinesi", "lampo", "avvinghia"], maghi: ["teletrasporto", "falene", "catene", "stelle", "smeraldo", "respinta"], lame: ["duello"] };
   for (const stile of Object.keys(attese)) {
     const amb = ambiente({ memoria: { "mut-ring-stile": stile, "mut-ring-radiale": "on" } });
     amb.avanza(60);
@@ -3579,7 +3580,8 @@ test("la corsa: le monete restano fra una corsa e l'altra, e la bottega le spend
   r.corsa.forziere(); r.corsa.chiudiForziere();
   const monete = amb.stato().corsa.monete;
   r.corsa.finisci();
-  assert.strictEqual(amb.stato().banca, 450 + monete, "a fine corsa le monete vanno in banca");
+  // (dal 16/10/2026 arriva anche il premio della corsa, in crediti)
+  assert.strictEqual(amb.stato().banca, 450 + monete + amb.stato().corsa.premio, "a fine corsa le monete e il premio vanno in banca");
 });
 
 // ·· I NEMICI NUOVI, LE SORPRESE, IL RITMO (09/10/2026, sera) ··
@@ -4338,4 +4340,152 @@ test("la corsa: alle carte di un livello si rimescola una volta, e una in più p
   assert.strictEqual(r.corsa.rimescola(), false, "finiti i rimescoli non si rimescola");
   const { amb: a2 } = corsaAvviata({ memoria: { "mut-ring-bottega": JSON.stringify({ dadi: 2 }) } });
   assert.strictEqual(a2.stato().corsa.rimescola, 3, "con due dadi in bottega i rimescoli sono tre");
+});
+
+// --- 16/10/2026: il parry (S al momento giusto), la carica letale, i primi round lenti ---
+
+test("parry: S premuto appena prima del colpo lo annulla, l'altro resta scoperto e arriva il contrattacco", () => {
+  let riusciti = 0;
+  for (let k = 0; k < 4; k++) {
+    const amb = ambiente(); const r = amb.finestra.__ring;
+    amb.avanza(60); r.comandi.sorprese(false);
+    r.sposta("robot", 500); r.sposta("mela", 528); amb.avanza(2);
+    r.tastoGiu("KeyS");
+    r.ordina("mela", "pugno");
+    const scritte = new Set(); let contro = false, stordita = 0;
+    amb.avanza(50, (s) => {
+      for (const x of s.scritte) scritte.add(x);
+      const R = s.lottatori.find((l) => l.tipo === "robot"), M = s.lottatori.find((l) => l.tipo === "mela");
+      if (R.azione === "contro") contro = true;
+      stordita = Math.max(stordita, M.stordito || 0);
+    });
+    if (scritte.has("PARRY!")) {
+      riusciti++;
+      assert.strictEqual(amb.lottatore("robot").danni, 0, "col parry il colpo non fa niente");
+      assert.ok(contro, "dopo il parry parte il contrattacco");
+      assert.ok(stordita >= 60, "chi ha tirato il colpo resta scoperto");
+      assert.ok(amb.lottatore("mela").danni > 0 || amb.lottatore("mela").ko > 0, "il contrattacco va a segno");
+    }
+  }
+  assert.ok(riusciti >= 3, "il parry al momento giusto riesce solo " + riusciti + " volte su 4");
+});
+
+test("parry: premuto troppo presto è solo una parata; tenuto è guardia, lasciato finisce", () => {
+  const amb = ambiente(); const r = amb.finestra.__ring;
+  amb.avanza(60); r.comandi.sorprese(false);
+  r.sposta("robot", 500); r.sposta("mela", 900); amb.avanza(2);
+  r.tastoGiu("KeyS");
+  amb.avanza(90);
+  assert.strictEqual(amb.lottatore("robot").azione, "para", "tenendo premuto si resta in guardia");
+  r.tastoSu("KeyS");
+  amb.avanza(10);
+  assert.notStrictEqual(amb.lottatore("robot").azione, "para", "lasciato il tasto la guardia finisce");
+  // Troppo presto: la finestra è passata, il colpo è parato e basta.
+  let parry = 0, parato = 0;
+  for (let k = 0; k < 4; k++) {
+    const a2 = ambiente(); const r2 = a2.finestra.__ring;
+    a2.avanza(60); r2.comandi.sorprese(false);
+    // (la mela lontana mentre si aspetta: non deve colpire da sola dentro la finestra)
+    r2.sposta("robot", 500); r2.sposta("mela", 900); a2.avanza(2);
+    r2.tastoGiu("KeyS");
+    a2.avanza(40);
+    if (a2.lottatore("robot").azione !== "para") continue;
+    r2.sposta("mela", 528); a2.avanza(1);
+    r2.ordina("mela", "pugno");
+    const sc = new Set();
+    a2.avanza(40, (s) => { for (const x of s.scritte) sc.add(x); });
+    if (sc.has("PARRY!")) parry++; else if (sc.has("PARATO!")) parato++;
+  }
+  assert.ok(parato > parry, "premuto mezzo secondo prima deve essere una parata, non un parry (parry " + parry + ", parate " + parato + ")");
+});
+
+function corsaConLetale(premi) {
+  const amb = ambiente(); const r = amb.finestra.__ring;
+  amb.avanza(30); r.corsa.apri(503); amb.avanza(20); r.corsa.scegli("robot");
+  let premuto = false, vista = false, hpPrima = null;
+  const scritte = new Set();
+  amb.avanza(60 * 40, (s) => {
+    const c = s.corsa;
+    if (!c) return false;
+    if (c.carte) r.corsa.carta(0);
+    if (c.forziere) r.corsa.chiudiForziere();
+    for (const x of s.scritte) scritte.add(x);
+    const f = s.lottatori.find((l) => l.tipo === "robot");
+    if (s.orda) for (const z of s.orda.zombie) {
+      if (z.stato === "mira") vista = true;
+      if (z.stato === "letale" && hpPrima === null) {
+        const d = Math.abs(z.x - f.bacino.x);
+        if (d < 75 && d > 40) { hpPrima = c.hp; if (premi) premuto = r.tastoGiu("KeyS"); }
+      }
+    }
+    if (hpPrima !== null && (scritte.has("CONTRO LETALE!") || scritte.has("SBAM!") || scritte.has("PARATO!"))) return false;
+  });
+  return { amb, r, premuto, vista, hpPrima, scritte };
+}
+
+test("carica letale: la scintilla rossa, la rincorsa; col parry niente danni e il contrattacco letale ad area", () => {
+  const { amb, premuto, vista, hpPrima, scritte } = corsaConLetale(true);
+  assert.ok(vista, "nei primi round della corsa la carica letale arriva");
+  assert.ok(premuto, "la parata deve partire");
+  assert.ok(scritte.has("CONTRO LETALE!"), "il parry sulla carica dà il contrattacco letale");
+  assert.ok([...scritte].some((x) => /PARRY!$/.test(x) && /S/.test(x)), "la prima carica della corsa insegna il tasto");
+  assert.strictEqual(amb.stato().corsa.hp, hpPrima, "col parry non si prende danno");
+  dentro(amb);
+});
+
+test("carica letale: senza parata fa male", () => {
+  let fatto = false;
+  for (let k = 0; k < 3 && !fatto; k++) {
+    const { amb, hpPrima, scritte } = corsaConLetale(false);
+    if (hpPrima === null || !scritte.has("SBAM!")) continue;          // (l'IA dell'eroe ogni tanto para da sola)
+    assert.ok(amb.stato().corsa.hp < hpPrima, "presa in pieno, la carica letale toglie vita");
+    fatto = true;
+  }
+  assert.ok(fatto, "in tre corse la carica letale non ha mai preso l'eroe in pieno");
+});
+
+test("corsa: i primi round hanno pochi nemici e lenti, poi il ritmo cresce", () => {
+  const { amb, r } = corsaAvviata();
+  avanzaCorsa(amb, r, 80);
+  const primo = amb.stato().orda.ricetta;
+  assert.ok(primo.totale <= 15, "il primo round deve avere pochi nemici: " + primo.totale);
+  assert.ok(primo.insieme <= 6, "pochi alla volta: " + primo.insieme);
+  r.corsa.salta(7); r.corsa.prossimo("ondata"); r.corsa.vinci();
+  avanzaCorsa(amb, r, 140);
+  const ottavo = amb.stato().orda.ricetta;
+  assert.ok(ottavo.totale >= primo.totale * 3, "all'ottavo round molti di più: " + ottavo.totale + " contro " + primo.totale);
+});
+
+test("corsa: a fine corsa il premio in crediti, contato su quello che si è fatto", () => {
+  const { amb, r } = corsaAvviata();
+  r.corsa.banca(0);
+  avanzaCorsa(amb, r, 200);
+  r.corsa.conta("uccisi", 40); r.corsa.conta("parry", 5); r.corsa.conta("capi", 1);
+  r.corsa.finisci();
+  const s = amb.stato();
+  assert.ok(s.corsa.premio >= 12 + 10 + 20 + 30, "il premio conta round, nemici, parry e capi: " + s.corsa.premio);
+  assert.ok(s.banca >= s.corsa.premio, "il premio finisce nei crediti");
+});
+
+test("allenamento: si compra coi crediti, resta per sempre, vale solo per quel personaggio e lo rende più forte", () => {
+  const memoria = {};
+  const amb = ambiente({ memoria }); const r = amb.finestra.__ring;
+  amb.avanza(30); r.corsa.apri(77); amb.avanza(20);
+  r.corsa.banca(5000);
+  for (const id of ["tempra", "tempra", "arsenale", "riflessi", "seconda"]) assert.ok(r.corsa.allena("robot", id), "si allena " + id);
+  assert.strictEqual(r.corsa.allena("robot", "seconda"), false, "oltre il massimo non si compra");
+  r.corsa.banca(0);
+  assert.strictEqual(r.corsa.allena("robot", "colpo"), false, "senza crediti non si compra");
+  assert.ok(r.corsa.scegli("robot"));
+  let s = amb.stato().corsa;
+  assert.strictEqual(s.hpMax, 120 + 24, "la tempra aggiunge vita: " + s.hpMax);
+  const livelli = Object.values(s.armi).sort();
+  assert.strictEqual(JSON.stringify(livelli), "[1,2]", "arsenale (arma di partenza al livello 2) e seconda arma: " + JSON.stringify(s.armi));
+  assert.strictEqual(s.riflessi, 1);
+  // Resta nel browser; e la mela non ne sa niente.
+  const amb2 = ambiente({ memoria: Object.assign({}, memoria) }); const r2 = amb2.finestra.__ring;
+  amb2.avanza(30); r2.corsa.apri(78); amb2.avanza(20);
+  assert.ok(r2.corsa.scegli("mela"));
+  assert.strictEqual(amb2.stato().corsa.hpMax, 120, "l'allenamento del robot non vale per la mela");
+  assert.strictEqual(JSON.stringify(r2.corsa.allenamento()), JSON.stringify(r.corsa.allenamento()), "l'allenamento resta fra un'apertura e l'altra");
 });

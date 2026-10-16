@@ -194,8 +194,11 @@
     const v = parseInt(deposito.getItem("mut-ring-banca"), 10); if (Number.isFinite(v) && v > 0) banca = v;
     const b = JSON.parse(deposito.getItem("mut-ring-bottega") || "{}"); if (b && typeof b === "object") bottega = b;
   } catch (errore) { /* da zero */ }
+  // L'allenamento di ogni personaggio (vedi ALLENAMENTO): { "guerrieri.robot": { tempra: 2, … }, … }.
+  let allenamento = {};
+  try { const a = JSON.parse(deposito.getItem("mut-ring-allenamento") || "{}"); if (a && typeof a === "object") allenamento = a; } catch (errore) { /* da zero */ }
   // Le missioni della corsa (vedi MISSIONI): le tre attive e a che gradino è ogni tipo.
-  let missioni = { attive: ["round", "uccisi", "evo"], gradi: {} };
+  let missioni = { attive: ["round", "parry", "uccisi"], gradi: {} };
   try {
     const m = JSON.parse(deposito.getItem("mut-ring-missioni") || "null");
     if (m && Array.isArray(m.attive) && m.gradi && typeof m.gradi === "object") missioni = { attive: m.attive.slice(0, 3), gradi: m.gradi };
@@ -343,6 +346,7 @@
     [/^(PUFF|COFF|PTUI)!/, "soffio"],
     [/^(DRIIN|TRIIN|BIP|NOTIFICA|BZZT|TIC|CLICK)!/, "bip"],
     [/^(SBONK|SLAP|TONF|CRACK|OPS|SCIVOLONE)!/, "tonfo"],
+    [/^(PARRY|CONTRO)/, "taglio"],
     [/^K\.O\.!/, "ko"],
     [/^PRESO!/, "preso"],
     [/^MANCATO!/, "mancato"],
@@ -1028,6 +1032,21 @@
       case "para":
         q.manoA = [58, 9]; q.gomitoA = [46, 11]; q.manoD = [56, 5]; q.gomitoD = [44, 6];
         q.collo[1] -= 2; q.testa[1] -= 2; q.bacino[0] -= 2; break;
+      case "contro": {
+        // Il parry e il contrattacco (vedi PARRY): il braccio davanti spazza via il colpo dall'alto verso l'esterno,
+        // il corpo si raccoglie; all'ottavo fotogramma l'affondo, a due pugni, con tutto il peso in avanti.
+        if (f.t < 8) {
+          const k = f.t / 8;
+          q.manoA = [70 - 22 * k, 6 + 20 * k]; q.gomitoA = [58 - 6 * k, 8 + 8 * k]; q.manoD = [46, -6]; q.gomitoD = [46, -3];
+          q.bacino[0] -= 3 * k; q.collo[1] -= 3 * k; q.testa[1] -= 3 * k;
+        } else {
+          const k = Math.min(1, (f.t - 8) / 3), r = f.t > 18 ? Math.min(1, (f.t - 18) / 10) : 0;
+          q.manoA = [50, 30 * k - 12 * r + 2]; q.manoD = [47, 28 * k - 12 * r]; q.gomitoA = [49, 16 * k - 6 * r + 2]; q.gomitoD = [46, 14 * k - 6 * r];
+          q.collo[1] += 5 * k * (1 - r); q.testa[1] += 6 * k * (1 - r); q.bacino[1] += 3 * k * (1 - r);
+          q.piedeA = [0, 15]; q.piedeD = [0, -11]; q.ginocchioA = [14, 12]; q.ginocchioD = [13, -7];
+        }
+        break;
+      }
       case "schiva":
         q.piedeA = [10, 6]; q.piedeD = [10, -8]; q.ginocchioA = [20, 6]; q.ginocchioD = [20, -4];
         q.collo[1] -= 6; q.testa[1] -= 8; break;
@@ -1659,7 +1678,7 @@
                    carica: 70, onda: 80, raffica: 40, rush: 44,
                    sfera: 150, disco: 56, lampo: 40, barriera: 110, avvinghia: 96, telecinesi: 124,
                    trasforma: 96, gelo: 44, rimpicciolisci: 40, fulmine: 50, levita: 100,
-                   falene: 46, catene: 40, stelle: 62, smeraldo: 104, respinta: 26,
+                   falene: 46, catene: 40, stelle: 62, smeraldo: 104, respinta: 26, contro: 28,
                    affondo: 24, rovescio: 26, scattoLama: 44, lancioLama: 40, pressa: 50, testata: 22,
                    cavallina: 46, sgabello: 46, trottola: 34, insieme: 38, bolide: 50, fionda: 34 };
 
@@ -1720,6 +1739,8 @@
   function pensaVolo(f, altro) {
     if (f.azione) {
       f.t++;
+      if (f.azione === "para" && f.guardia) f.durata = Math.max(f.durata, f.t + 2);
+      if (f.azione === "contro") eseguiContro(f, altro);
       if (f.azione === "spara" && f.t === 10 && f.arma) spara(f, altro);
       if (f.azione === "fiammata" && f.arma) fiammata(f, altro);
       if (anime) eseguiAnime(f, altro);
@@ -1840,6 +1861,8 @@
     if (f.jet > 0) { pensaVolo(f, altro); return; }
     if (f.azione) {
       f.t++;
+      if (f.azione === "para" && f.guardia) f.durata = Math.max(f.durata, f.t + 2);   // S ancora premuto: si resta in guardia
+      if (f.azione === "contro") eseguiContro(f, altro);
       if (f.coppia) eseguiCoppia(f);
       if (f.azione === "spara" && f.t === 10 && f.arma) spara(f, altro);
       if (f.azione === "fiammata" && f.arma) fiammata(f, altro);
@@ -2140,6 +2163,66 @@
                           bazooka: ["CLONK!", "TONK!"], lanciafiamme: ["CLONK!", "SBONK!"],
                           sasso: ["TONK!", "STOCK!", "SDENG!"] };
 
+  // ·· IL PARRY (16/10/2026, Riccardo: «la possibilità di mettersi in modalità parata con un tasto della tastiera, di standard S, che premuto al tempo giusto con un attacco faccia un parry con animazione particolare e un contrattacco») ··
+  // S (o la Parata del controller, o il tasto dell'app) mette in guardia: la parata di sempre, che con la tastiera
+  // dura finché si tiene premuto (fino a quattro secondi). Se il colpo arriva entro `finestra` fotogrammi dal
+  // momento in cui si è premuto, non è una parata: è un PARRY. Il colpo non fa niente, il tempo si ferma un attimo
+  // con un lampo e la scritta, chi l'ha tirato resta scoperto e chi ha parato risponde da solo: il braccio spazza via
+  // il colpo, poi l'affondo a due pugni (la posa «contro»), che va sempre a segno se l'altro è a portata.
+  // Contro gli zombie vale lo stesso (il morso, e la carica letale: vedi LETALE). Il tempismo conta solo per chi
+  // comanda; l'IA para come prima. Premere a ripetizione non serve: dopo un tentativo a vuoto la finestra si
+  // riapre solo dopo `riposo` fotogrammi.
+  const PARRY = { finestra: 14, guardiaMax: 240, riposo: 40, stordito: 70, forza: 6 };
+  // (i Riflessi dell'allenamento allargano la finestra all'eroe della corsa: vedi ALLENAMENTO)
+  const larghezzaParry = (f) => (corsa && corsa.chi && f.tipo === corsa.chi ? 3 * (corsa.riflessi || 0) : 0);
+  const inFinestraParry = (f) => !!(f && f.azione === "para" && f.paraT0 !== undefined && tempo - f.paraT0 <= PARRY.finestra + larghezzaParry(f));
+  // Si mette in guardia (da un comando di chi gioca): la finestra parte adesso, se non si è appena sbagliato.
+  function inGuardia(f, tenuta) {
+    inizia(f, "para");
+    if (tenuta) { f.durata = PARRY.guardiaMax; f.guardia = true; }
+    if (!(f.paraRiposo > tempo)) { f.paraT0 = tempo; f.paraRiposo = tempo + PARRY.riposo; }
+    else f.paraT0 = undefined;
+  }
+  // Il lampo del parry: un anello bianco che si apre, una raggiera d'oro, il tempo fermo.
+  function lampoParry(x, y, grande) {
+    if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "parry", x, y, vx: 0, vy: 0, vita: grande ? 26 : 18, max: grande ? 26 : 18, r: (grande ? 120 : 70) * S, giro: Math.random() * Math.PI });
+    scintille(x, y, grande ? 22 : 12, "#ffffff"); scintille(x, y, grande ? 14 : 8, "#ffd84a");
+    fermoColpo = Math.max(fermoColpo, grande ? 18 : 12); scossa = Math.max(scossa, grande ? 14 : 6);
+  }
+  // Parry riuscito contro un lottatore (`da`) o uno zombie (`z`): chi para non prende niente e parte il contrattacco.
+  function faiParry(f, da, x, y, z) {
+    f.paraT0 = undefined; f.guardia = false; f.paraRiposo = 0;
+    lampoParry(x, y, false);
+    scrivi("PARRY!", x, y - 22 * S, true);
+    impara(f, "para", 1, 2);
+    if (corsa && corsa.chi && f.tipo === corsa.chi) { corsa.parry = (corsa.parry || 0) + 1; caricaCorsa(10); corsa.punti += 25; }
+    inizia(f, "contro"); f.controDi = da || null; f.controZ = z || null;
+    if (da && da.p) {
+      da.azione = null; da.stordito = Math.max(da.stordito || 0, PARRY.stordito); da.scatto = 0; da.onda = null; da.combo = 0;
+      const s = Math.sign(da.p.bacino.x - f.p.bacino.x) || -f.dir;
+      for (const n in da.p) da.p[n].ox -= s * 3 * S;
+    }
+  }
+  // Il contrattacco: l'affondo all'ottavo fotogramma (prima, se l'altro è un passo più in là, ci si porta sotto).
+  function eseguiContro(f, altro) {
+    const z = f.controZ, da = f.controDi;
+    if (f.t < 8) {
+      const tx = z ? z.x : da && da.p ? da.p.bacino.x : null;
+      if (tx !== null && Math.abs(tx - f.cx) > 30 * S && Math.abs(tx - f.cx) < 90 * S) { const st = Math.sign(tx - f.cx) * 3 * S; for (const n in f.p) { f.p[n].x += st; f.p[n].ox += st; } f.cx += st; }
+      return;
+    }
+    if (f.t !== 8) return;
+    f.controZ = null; f.controDi = null;
+    if (z && vivoZ(z)) {
+      const c = corpoZ(z);
+      colpisciZombie(z, 7.5, f.dir, c[0], c[1], f);
+      if (vivoZ(z)) colpisciZombie(z, 7.5, f.dir, c[0], c[1], f);
+      scrivi("CONTRO!", c[0], c[1] - 30 * S, false);
+    } else if (da && da.p && !da.ko && !da.esploso && Math.abs(da.p.bacino.x - f.p.bacino.x) < 70 * S && Math.abs(da.base - f.base) < 40 * S) {
+      da.azione = null;
+      colpisci(f, da, PARRY.forza * (1 + 0.15 * (corsa && corsa.chi && f.tipo === corsa.chi ? corsa.riflessi || 0 : 0)), da.p.collo.x, da.p.collo.y, "CONTRO!");
+    }
+  }
   function colpisci(f, altro, forza, x, y, suono) {
     if (fatale && altro && altro.tipo) return;                   // durante il colpo finale conta solo la scena
     if (altro && altro.fuoriCampo) return;                       // chi è dentro il buco nero non si può colpire
@@ -2161,6 +2244,7 @@
       fermoColpo = Math.max(fermoColpo, 2);
       return;
     }
+    if (f && f.p && f !== altro && inFinestraParry(altro) && altro.dir === -f.dir) { faiParry(altro, f, x, y, null); return; }
     if (altro.azione === "para" && altro.dir === -f.dir) {
       impara(altro, "para", 1, 1); impara(f, f.azione, -1, 0);
       if (livelloDi(altro.tipo) >= 3 && Math.random() < 0.5) altro.combo = 1;
@@ -2707,7 +2791,7 @@
   function aggiornaParticelle() {
     for (const q of particelle) {
       q.x += q.vx; q.y += q.vy; q.vita--;
-      if (q.tipo === "onda" || q.tipo === "lampo" || q.tipo === "vento" || q.tipo === "zip" || q.tipo === "linea" || q.tipo === "taglio" || q.tipo === "impatto") continue;
+      if (q.tipo === "onda" || q.tipo === "lampo" || q.tipo === "vento" || q.tipo === "zip" || q.tipo === "linea" || q.tipo === "taglio" || q.tipo === "impatto" || q.tipo === "parry") continue;
       if (q.tipo === "mote") {
         // Un granello d'energia che vola verso la sfera che si sta formando.
         const s = q.verso && q.verso.sfera;
@@ -4944,6 +5028,7 @@
     return { n, tema, arrivo, coda, totale: coda.length, insieme: Math.min(10, 4 + n) };
   }
   function avviaOrda(ondate, seme) {
+    prossimaLetale = tempo + (corsa && corsa.chi ? (corsa.round <= 1 ? 420 : attesaLetale()) : 900);
     // Nella corsa si combatte da soli: chi è in panchina non conta.
     const inCampo = lottatori.filter((l) => !l.fuoriCampo), a = inCampo[0], b = inCampo[1] || inCampo[0];
     if (orda || !a || !b) return;
@@ -5067,8 +5152,9 @@
     // Nella corsa contano i minuti di lotta (vedi `pressione`): più vita e più passo, senza tetto alla vita.
     const nellaCorsa = !!(corsa && corsa.chi);
     const oltre = Math.max(0, q.ondata - 8), svelti = nellaCorsa ? Math.min(1.8, 1 + 0.12 * pressione()) : Math.min(1.8, 1 + 0.05 * oltre);
-    const hp = nellaCorsa ? Math.max(1, Math.round(Z.hp * vitaZombie() * 10) / 10) : Z.hp + Math.floor(oltre / 4);
-    q.zombie.push({ x, lato, dir: -lato, tipo: ZOMBI[tipo] ? tipo : "lento", t: 0, s: 0, stato: "esce", hp, vel: caso(Z.vel[0], Z.vel[1]) * svelti,
+    const ini = nellaCorsa ? inizioCorsa(corsa.round || 1) : { duri: 1, lenti: 1 };
+    const hp = nellaCorsa ? Math.max(1, Math.round(Z.hp * vitaZombie() * ini.duri * 10) / 10) : Z.hp + Math.floor(oltre / 4);
+    q.zombie.push({ x, lato, dir: -lato, tipo: ZOMBI[tipo] ? tipo : "lento", t: 0, s: 0, stato: "esce", hp, vel: caso(Z.vel[0], Z.vel[1]) * svelti * ini.lenti,
                     tono: Math.floor(Math.random() * TONI_ZOMBIE.length), fase: caso(0, 6), vx: 0, botta: 0, lampo: 0, cade: 0, occhio: Math.random() < 0.5 ? 1 : -1 });
     q.nati++;
     const z = q.zombie[q.zombie.length - 1];
@@ -5098,7 +5184,8 @@
     }
   }
   // In piedi (o in volo): si può colpire e colpisce. Il salto, lo sputo e la picchiata sono della corsa.
-  const vivoZ = (z) => !z.inBuco && (z.stato === "va" || z.stato === "colpo" || z.stato === "salto" || z.stato === "sputa" || z.stato === "tuffo" || (z.stato === "esce" && z.s > 22));
+  const vivoZ = (z) => !z.inBuco && (z.stato === "va" || z.stato === "colpo" || z.stato === "salto" || z.stato === "sputa" || z.stato === "tuffo" || z.stato === "mira" ||
+                       z.stato === "letale" || z.stato === "barcolla" || (z.stato === "esce" && z.s > 22));
   // Lo zombie vivo più vicino a un punto, entro un raggio; `lato` (facoltativo) chiede quelli da una parte sola.
   function zombieVicino(x, raggio, lato) {
     let scelto = null, d0 = raggio;
@@ -5132,13 +5219,17 @@
     const grosso = pesante(z), forte = forza >= 4.4;
     // Nella corsa: i pugni pesanti dell'eroe contano di più, la corazza ferma metà dei colpi deboli.
     const molt = (corsa && corsa.chi && da && da.tipo === corsa.chi ? forzaCorsa() : 1) * (z.tipo === "corazzato" && !forte ? 0.5 : 1);
-    z.hp -= (forte ? 2 : 1) * molt; z.lampo = 5; z.s = 0;
+    // Chi si carica o corre per la mossa letale non si ferma per i colpi: va parato (vedi LETALE).
+    const lanciato = z.stato === "mira" || z.stato === "letale";
+    z.hp -= (forte ? 2 : 1) * molt; z.lampo = 5;
+    if (!lanciato) z.s = 0;
     // Il grosso barcolla solo ai colpi forti, e quasi non si sposta.
-    z.botta = grosso ? (forte ? 12 : 3) : 18;
-    z.vx = dir * Math.min(8, 2.5 + forza) * 0.55 * S * (grosso ? 0.3 : 1);
+    z.botta = lanciato ? 0 : grosso ? (forte ? 12 : 3) : 18;
+    z.vx = lanciato ? 0 : dir * Math.min(8, 2.5 + forza) * 0.55 * S * (grosso ? 0.3 : 1);
     scintille(x, y, 7, "#ffe27a");
     fermoColpo = Math.max(fermoColpo, 2);
-    if (z.hp > 0) { z.stato = "va"; scrivi(SUONI[Math.floor(Math.random() * SUONI.length)], x, y - 8 * S, false); return true; }
+    if (z.hp > 0) { if (!lanciato) z.stato = "va"; scrivi(SUONI[Math.floor(Math.random() * SUONI.length)], x, y - 8 * S, false); return true; }
+    if (lanciato) prossimaLetale = tempo + attesaLetale();
     z.stato = "giu"; z.cade = dir || 1; orda.uccisi++; orda.uccisiOndata++;
     if (corsa) corsaUcciso(z);
     schegge(x, y, 5, TONI_ZOMBIE[z.tono][0]);
@@ -5293,6 +5384,117 @@
     suona("acqua", x, 0.5);
   }
   // Che cosa fanno di diverso gli zombie nuovi (true: questo passo l'hanno già fatto loro).
+  // ·· LA CARICA LETALE (16/10/2026, Riccardo: «nuove animazioni dei nemici e nuove mosse come una letale dove con una scintilla rossa cominciano una rincorsa che se riesci a fare il parry il personaggio non prende danni e fa un contrattacco letale che fa anche un danno ad area») ··
+  // Uno zombie a terra (non i volanti, non lo strisciante, non chi ha già una mossa sua) si ferma, si carica
+  // all'indietro tremando e gli si accende sopra la testa una scintilla rossa (`mira`, poco meno di un secondo);
+  // poi parte di corsa, piegato in avanti, dritto addosso (`letale`). Mentre si carica e corre i colpi non lo
+  // fermano: va parato. Quando arriva:
+  //  - PARRY (il tasto della parata al momento giusto, vedi PARRY): nessun danno e il contrattacco letale, lui giù
+  //    di colpo e un'onda d'urto che colpisce tutti quelli intorno;
+  //  - parata normale: regge, ma arretra e un po' di danno passa;
+  //  - niente: un colpo pesante, a terra (nella corsa toglie molta vita).
+  // Una alla volta. Nella corsa la prima arriva presto, con l'avviso del tasto, e poi sempre più spesso; nell'orda
+  // del ring libero ogni tanto.
+  const LETALE = { tipi: { lento: 1, svelto: 1, rabbioso: 1, grosso: 1, corazzato: 1, capo: 1 }, mira: 52, corsa: 80, vel: 6.2, danno: 22, raggio: 150 };
+  // (nei primi tre round fa meno male: si sta imparando)
+  const dannoLetale = () => LETALE.danno * (corsa && corsa.chi && corsa.round <= 3 ? 0.65 : 1);
+  let prossimaLetale = 0;
+  function attesaLetale() {
+    if (corsa && corsa.chi) { const n = corsa.round || 1; return Math.round(caso(Math.max(300, 780 - 50 * n), Math.max(480, 1080 - 60 * n))); }
+    return Math.round(caso(720, 1100));
+  }
+  function puoLetale(z, q, f, dx, sopra) {
+    if (!LETALE.tipi[z.tipo] || !sopra || q.fase !== "lotta" || tempo < prossimaLetale || f.ko > 0 || f.esploso || f.preso || !f.p) return false;
+    if (corsa && corsa.chi && (corsa.fase !== "lotta" || f.tipo !== corsa.chi)) return false;
+    const d = Math.abs(dx);
+    if (d < 110 * S || d > 340 * S) return false;
+    return !q.zombie.some((w) => w.stato === "mira" || w.stato === "letale");
+  }
+  function iniziaLetale(z, f) {
+    z.stato = "mira"; z.s = 0; z.preda = f; z.dirL = z.dir;
+    suona("carica", z.x, 0.5);
+    // La prima della corsa insegna il tasto.
+    if (corsa && corsa.chi && !corsa.avvisoParry) {
+      corsa.avvisoParry = true;
+      const tasto = tastoDi("para");
+      // Al centro e per tre secondi abbondanti: è un'istruzione, non un'esclamazione.
+      const testo = (tasto ? dici("Premi") + " " + tasto + " " + dici("al momento giusto") + ": " : "") + "PARRY!";
+      scritte.push({ testo, x: W / 2, y: Math.max(testataBasso + 120 * S, f.base - 150 * S), vita: 200, grande: true, fermo: true });
+    }
+  }
+  function aggiornaLetale(z, q, Z, f, dx, sopra) {
+    const c = corpoZ(z), p = z.preda;
+    if (z.stato === "mira") {
+      if (p && p.p) z.dir = z.dirL = Math.sign(p.p.bacino.x - z.x) || z.dir;                  // la mira segue la preda
+      if (z.s % 3 === 0 && particelle.length < MAX_PARTICELLE) {
+        particelle.push({ tipo: "scintilla", x: c[3] + caso(-3, 3) * S, y: c[4] - 18 * S, vx: caso(-1.6, 1.6) * S, vy: -caso(0.6, 2.2) * S, vita: 12, max: 12, colore: "#ff2a2a" });
+      }
+      if (z.s >= LETALE.mira) { z.stato = "letale"; z.s = 0; polvere(z.x, q.base - 1, 6); scrivi("!!", c[3], c[4] - 34 * S, false); }
+      return;
+    }
+    // La rincorsa: piegato in avanti, una scia rossa dietro.
+    const v = LETALE.vel * S * (pesante(z) ? 0.8 : 1);
+    z.x = Math.max(q.l + 6 * S, Math.min(q.r - 6 * S, z.x + z.dirL * v)); z.fase += 0.5;
+    if (z.s % 2 === 0 && particelle.length < MAX_PARTICELLE) {
+      particelle.push({ tipo: "linea", x: z.x - z.dirL * 14 * S, y: q.base - caso(14, 50) * S, vx: -z.dirL * 3 * S, vy: 0, vita: 9, max: 9, lung: caso(16, 30) * S, colore: "#ff4a4a" });
+    }
+    if (z.s % 6 === 0) polvere(z.x - z.dirL * 8 * S, q.base - 1, 1);
+    if (p && p.p && !(p.ko > 0) && !p.esploso && !p.preso && daTerra(p, q) && Math.abs(p.p.bacino.x - z.x) < ((Z.portata || 27) + 8) * S) { arrivaLetale(z, p, q); return; }
+    if (z.s > LETALE.corsa || z.x <= q.l + 8 * S || z.x >= q.r - 8 * S || (p && p.p && (p.p.bacino.x - z.x) * z.dirL < -20 * S)) {
+      // A vuoto: frena, col fiatone.
+      z.stato = "barcolla"; z.s = 0; z.barcolla = 50; z.vx = z.dirL * 2 * S;
+      prossimaLetale = tempo + attesaLetale();
+    }
+  }
+  function arrivaLetale(z, f, q) {
+    const c = corpoZ(z), x = (z.x + f.p.collo.x) / 2, y = f.p.collo.y + 4 * S, grosso = pesante(z);
+    prossimaLetale = tempo + attesaLetale();
+    if (inFinestraParry(f) && f.dir === -z.dirL) {
+      // PARRY: il contrattacco letale. Lui va giù subito, e l'onda d'urto prende tutti quelli intorno.
+      faiParry(f, null, x, y, null);
+      lampoParry(x, y, true);
+      scrivi("CONTRO LETALE!", f.p.bacino.x, f.base - 120 * S, true);
+      z.stato = "va"; z.hp = Math.min(z.hp, 0.5);
+      colpisciZombie(z, 9, f.dir, c[0], c[1], f);
+      if (vivoZ(z)) { z.hp = 0.01; colpisciZombie(z, 9, f.dir, c[0], c[1], f); }       // anche il capo: lo si finisce
+      for (const w of q.zombie) {
+        if (w === z || !vivoZ(w) || Math.abs(w.x - f.cx) > LETALE.raggio * S) continue;
+        const cw = corpoZ(w), s = Math.sign(w.x - f.cx) || f.dir;
+        if (w.stato === "mira" || w.stato === "letale") w.stato = "va";
+        colpisciZombie(w, 6, s, cw[0], cw[1], f);
+        w.vx = s * 6 * S;
+      }
+      for (const k of [0, 8]) if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "onda", x: f.p.bacino.x, y: q.base - 20 * S, vx: 0, vy: 0, vita: 20 + k, max: 20 + k, colore: k ? "#ffffff" : "#ffd84a" });
+      if (corsa && corsa.chi) { caricaCorsa(20); corsa.punti += 100; corsa.letaliParate = (corsa.letaliParate || 0) + 1; }
+      return;
+    }
+    z.stato = "barcolla"; z.s = 0; z.barcolla = 40;
+    if (f.azione === "para" && f.dir === -z.dirL) {
+      // Parata normale: regge, ma arretra e qualcosa passa.
+      scintille(x, y, 8, "#bfe9ff"); scrivi("PARATO!", x, y - 8 * S, false);
+      for (const n in f.p) f.p[n].ox -= z.dirL * 5 * S;
+      if (corsa && corsa.chi && f.tipo === corsa.chi && !(corsa.invuln > 0 || corsa.scudo > 0)) feritaEroe(dannoLetale() * 0.35, x, y);
+      return;
+    }
+    // Preso in pieno.
+    scrivi("SBAM!", x, y - 10 * S, true); scintille(x, y, 12, "#ff4a4a");
+    scossa = Math.max(scossa, 10); fermoColpo = Math.max(fermoColpo, 6);
+    if (corsa && corsa.chi && f.tipo === corsa.chi) {
+      if (corsa.invuln > 0 || corsa.scudo > 0) { scintille(x, y, 6, "#bfe9ff"); return; }
+      feritaEroe(dannoLetale() * (grosso ? 1.3 : 1), x, y);
+    }
+    if (f.tel) lasciaCadere(f);
+    for (const n in f.p) { f.p[n].ox -= z.dirL * 8 * S; f.p[n].oy += verso * 3 * S; }
+    f.azione = null; f.ko = Math.max(f.ko, 80); f.inVolo = true; f.jet = 0;
+    segna(f, x, y, 3);
+  }
+  // Chi sta per essere investito da una carica letale, se se ne accorge, para (l'IA: senza tempismo, è una parata).
+  function guardiaLetale(f) {
+    const l = orda && orda.zombie.find((w) => w.stato === "letale" && w.preda === f && Math.abs(w.x - f.cx) < 120 * S);
+    if (!l || !braccia(f) || Math.random() > 0.45 * f.furbo) return false;
+    f.dir = l.x >= f.cx ? 1 : -1; inizia(f, "para");
+    return true;
+  }
   function specialeZombie(z, q, Z, f, dx, sopra) {
     const d = Math.abs(dx);
     switch (z.tipo) {
@@ -5383,6 +5585,12 @@
     if (f.coppia || f.riparo > 0) return;              // a metà di una mossa in coppia (e un attimo dopo) non lo prendono
     if (f.schianto) return;                             // l'eroe che piomba sulla folla: arriva lui, non lo mordono
     const x = (z.x + f.p.collo.x) / 2, y = f.p.collo.y + 4 * S, grosso = pesante(z);
+    if (inFinestraParry(f) && f.dir === -z.dir) {
+      // Parry sul morso: lui barcolla, e arriva il contrattacco (vedi PARRY).
+      faiParry(f, null, x, y, z);
+      z.stato = "barcolla"; z.s = 0; z.barcolla = 70; z.vx = -z.dir * 3 * S;
+      return;
+    }
     if (f.azione === "para" && f.dir === -z.dir) {
       scintille(x, y, 5, "#bfe9ff"); scrivi("PARATO!", x, y - 8 * S, false);
       z.botta = 22; z.vx = -z.dir * 2.4 * S;
@@ -5519,8 +5727,13 @@
       if (!f) { z.fase += 0.04; continue; }                  // tutti a terra: ciondola e aspetta
       const dx = f.p.bacino.x - z.x, sopra = daTerra(f, q);
       z.dir = dx >= 0 ? 1 : -1;
+      if (z.stato === "barcolla") { z.fase += 0.03; if (z.s >= (z.barcolla || 50)) { z.stato = "va"; z.s = 0; } continue; }
+      if (z.stato === "mira" || z.stato === "letale") { aggiornaLetale(z, q, Z, f, dx, sopra); continue; }
+      if (z.stato === "va" && puoLetale(z, q, f, dx, sopra)) { iniziaLetale(z, f); continue; }
       if (corsa && specialeZombie(z, q, Z, f, dx, sopra)) continue;
       if (z.stato === "colpo") {
+        // Un lampo bianco sugli occhi, poco prima del morso: è il momento di parare (vedi PARRY).
+        if (z.s === Math.max(1, Z.carica - 10) && particelle.length < MAX_PARTICELLE - 2) { const c = corpoZ(z); scintille(c[3] + z.dir * 3 * S, c[4], 3, "#ffffff"); }
         if (z.s === Z.carica && sopra && Math.abs(dx) < (Z.portata + 7) * S && !f.ko && !f.esploso && !f.preso) morso(z, f);
         if (z.s >= Z.carica + 26) { z.stato = "va"; z.s = 0; }
         continue;
@@ -5581,6 +5794,7 @@
       if (z.tipo === "striscia") { inizia(f, scegli([[5, "calcio"], [3, "pugno"], [2, "diretto"]])); return; }
       if (Math.abs(z.x - f.cx) < 19 * S) { inizia(f, scegli([[3, "montante"], [2, "indietro"]])); return; }
       // Il grosso sta per calare la manata: chi è furbo si para.
+      if (guardiaLetale(f)) return;
       if (pesante(z) && z.stato === "colpo" && z.s < 20 && braccia(f) && Math.random() < 0.3 * f.furbo) { inizia(f, "para"); return; }
       inizia(f, scegli([[28 * pesoMossa(f, "pugno"), "pugno"], [22 * pesoMossa(f, "diretto"), "diretto"],
                         [18 * pesoMossa(f, "montante"), "montante"], [24 * pesoMossa(f, "calcio"), "calcio"]]));
@@ -5877,13 +6091,17 @@
     ctx.translate(z.x, q.base - (z.alzo || 0) + emerge * 62 * S * sc);
     ctx.scale(sc, sc);
     if (z.stato === "salto" && z.salto && z.salto.t <= 16) ctx.scale(1.1, 0.84);          // il saltatore si accovaccia
+    // Le pose nuove (16/10/2026): la carica letale (indietro, tremando; poi tutto in avanti) e il barcollo.
+    if (z.stato === "mira") { const k = Math.min(1, z.s / 14); ctx.rotate(-z.dir * 0.16 * k + Math.sin(z.s * 1.4) * 0.03 * k); ctx.scale(1 + 0.05 * k, 1 - 0.06 * k); }
+    else if (z.stato === "letale") ctx.rotate(z.dir * 0.42);
+    else if (z.stato === "barcolla") ctx.rotate(Math.sin(z.s * 0.22) * 0.2);
     if (z.tipo === "striscia") {
       if (k > 0) { ctx.translate(0, 3 * S * k); ctx.scale(1, 1 - 0.5 * k); }
       disegnaStrisciante(z, T, pelle, scura, nero);
       ctx.restore(); return;
     }
     if (k > 0) ctx.rotate(-z.cade * k * 1.5);
-    const cammina = z.stato === "va" && !(z.botta > 0), ph = z.fase, dond = Math.sin(z.t * 0.07 + z.fase) * 1.4 * S;
+    const cammina = (z.stato === "va" || z.stato === "letale") && !(z.botta > 0), ph = z.fase, dond = Math.sin(z.t * 0.07 + z.fase) * 1.4 * S;
     const colpo = z.stato === "colpo" ? (z.s < Z.carica ? z.s / Z.carica : Math.max(0, 1 - (z.s - Z.carica) / 12)) : 0;
     const indietro = z.botta > 0 ? -d * Math.min(1, z.botta / 10) * 5 * S : 0;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
@@ -6153,10 +6371,34 @@
     ctx.restore();
   }
   // In alto: che ondata è e quanti ne restano (una testina a zombie, piena finché è in piedi).
+  // Sopra la testa: la scintilla rossa di chi carica la mossa letale, le stelline di chi barcolla.
+  function disegnaSegnoZombie(z) {
+    const c = corpoZ(z), x = c[3], y = c[4] - 20 * S * ZOMBI[z.tipo].scala;
+    ctx.save();
+    if (z.stato === "mira") {
+      const k = Math.min(1, z.s / 20), pulsa = 1 + 0.25 * Math.sin(z.s * 0.6), r = (5 + 7 * k) * S * pulsa;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r * 2.4);
+      g.addColorStop(0, "rgba(255,60,60,.75)"); g.addColorStop(1, "rgba(255,60,60,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 2.4, 0, Math.PI * 2); ctx.fill();
+      // Una stella a quattro punte, rossa col cuore bianco, che gira.
+      ctx.translate(x, y); ctx.rotate(z.s * 0.08);
+      for (const [col, f] of [["#ff2a2a", 1], ["#ffffff", 0.45]]) {
+        ctx.fillStyle = col; ctx.beginPath();
+        for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, rr = (i % 2 ? 0.28 : 1) * r * f; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+        ctx.closePath(); ctx.fill();
+      }
+    } else {
+      for (let i = 0; i < 3; i++) {
+        const a = z.s * 0.15 + i * Math.PI * 2 / 3;
+        scriviUI("\u2605", x + Math.cos(a) * 10 * S, y + Math.sin(a) * 3.5 * S, 8 * S, "#ffd84a", "center", 900);
+      }
+    }
+    ctx.restore();
+  }
   function disegnaOrda() {
     const q = orda;
     if (!q) return;
-    for (const z of q.zombie) if (!z.inBuco) disegnaZombie(z);
+    for (const z of q.zombie) if (!z.inBuco) { disegnaZombie(z); if (z.stato === "mira" || z.stato === "barcolla") disegnaSegnoZombie(z); }
     if (lava && elicottero) disegnaElicottero();
     if (q.fase === "festa" || !q.ricetta || corsa) return;      // nella corsa il conto lo tiene il suo cruscotto
     const n = q.ricetta.totale, abbattuti = q.fase === "pausa" ? n : q.uccisiOndata, passo = Math.min(10.5 * S, (W - 150 * S) / n), r = Math.min(3.6 * S, passo * 0.36);
@@ -6199,13 +6441,14 @@
                 ["raffica", "\u2728", "Raffica di sfere", 15], ["rush", "\u{1F44A}", "Raffica di pugni", 8], ["telecinesi", "\u270B", "Presa a distanza", 50],
                 ["lampo", "\u{1F4A1}", "Lampo accecante", 15],
                 ["barriera", "\u{1F6E1}\uFE0F", "Barriera", 20], ["teletrasporto", "\u26A1", "Teletrasporto", 15], ["carica", "\u{1F525}", "Carica l'aura"],
-                ["trasforma", "\u{1F31F}", "Limit Break", 40], ["avvinghia", "\u{1F4A5}", "Autodistruzione", 30]],
+                ["trasforma", "\u{1F31F}", "Limit Break", 40], ["avvinghia", "\u{1F4A5}", "Autodistruzione", 30],
+                ["para", "\u{1F6E1}\uFE0F", "Parata"]],                                      // (16/10/2026: il parry, anche senza tastiera)
     maghi: [["raffica", "\u2728", "Dardi magici", 15], ["onda", "\u{1F300}", "Raggio", 45], ["gelo", "\u2744\uFE0F", "Gelo", 20], ["rimpicciolisci", "\u{1F52E}", "Rimpicciolisci", 25],
             ["fulmine", "\u26A1", "Fulmine", 25], ["levita", "\u{1F388}", "Levitazione", 30],
             ["falene", "\u{1F98B}", "Sciame di falene", 20], ["catene", "\u26D3\uFE0F", "Catene di rune", 30],
             ["stelle", "\u{1F320}", "Pioggia di stelle", 35], ["smeraldo", "\u{1F49A}", "Maledizione di smeraldo", 100],
             ["barriera", "\u{1F6E1}\uFE0F", "Scudo magico", 20], ["respinta", "\u{1F32C}\uFE0F", "Respinta", 10],
-            ["teletrasporto", "\u{1F4A8}", "Sparizione", 15], ["carica", "\u{1F525}", "Carica l'aura"]],
+            ["teletrasporto", "\u{1F4A8}", "Sparizione", 15], ["carica", "\u{1F525}", "Carica l'aura"], ["para", "\u{1F6E1}\uFE0F", "Parata"]],
     lame: [["fendente", "\u2694\uFE0F", "Fendente"], ["affondo", "\u{1F5E1}\uFE0F", "Affondo"], ["rovescio", "\u21A9\uFE0F", "Rovescio"], ["scattoLama", "\u{1F4A8}", "Scatto tagliente"],
            ["lancioLama", "\u{1F3AF}", "Lama lanciata"], ["duello", "\u2716\uFE0F", "Incrocio di lame"],
            ["para", "\u{1F6E1}\uFE0F", "Parata"], ["salto", "\u{1F998}", "Salto"], ["jet", "\u{1F680}", "Jetpack"]],
@@ -6280,6 +6523,7 @@
     }
     if (id === "fendente" && f.arma && f.arma.tipo === "spada") f.colpiArma--;
     if (id === "trasforma") f.ki = 100;
+    if (id === "para") { inGuardia(f, false); f.scatto = 0; return true; }
     inizia(f, id);
     f.scatto = 0;
     return true;
@@ -10871,7 +11115,7 @@
       }
     }
     if (passi % 10 === 0) aggiornaFaccina();
-    for (const s of scritte) { s.vita--; s.y -= 0.35 * S; }
+    for (const s of scritte) { s.vita--; if (!s.fermo) s.y -= 0.35 * S; }
     scritte = scritte.filter((s) => s.vita > 0);
   }
 
@@ -11654,6 +11898,19 @@
       const v = Math.hypot(q.vx, q.vy) || 1;
       ctx.strokeStyle = q.colore; ctx.lineWidth = 1.4 * S; ctx.lineCap = "round";
       ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x + q.vx / v * q.lung, q.y + q.vy / v * q.lung); ctx.stroke();
+    } else if (q.tipo === "parry") {
+      // Il parry: un anello bianco spesso che si apre, dentro un taglio d'oro di traverso, fuori otto raggi.
+      const k = 1 - q.vita / q.max, R = q.r * (0.25 + 0.75 * Math.sqrt(k));
+      ctx.globalAlpha = Math.max(0, 1 - k); ctx.lineCap = "round";
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 7 * S * (1 - k) + 1 * S; ctx.beginPath(); ctx.arc(q.x, q.y, R, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = "#ffd84a"; ctx.lineWidth = 2.4 * S; ctx.beginPath(); ctx.arc(q.x, q.y, R * 0.8, 0, Math.PI * 2); ctx.stroke();
+      const a = q.giro, L = q.r * 0.55 * Math.min(1, k * 3);
+      ctx.strokeStyle = "#fff6c8"; ctx.lineWidth = 5 * S * (1 - k); ctx.beginPath(); ctx.moveTo(q.x - Math.cos(a) * L, q.y - Math.sin(a) * L); ctx.lineTo(q.x + Math.cos(a) * L, q.y + Math.sin(a) * L); ctx.stroke();
+      for (let i = 0; i < 8; i++) {
+        const b = a + i * Math.PI / 4;
+        ctx.strokeStyle = i % 2 ? "#ffd84a" : "#ffffff"; ctx.lineWidth = 2 * S;
+        ctx.beginPath(); ctx.moveTo(q.x + Math.cos(b) * R * 1.05, q.y + Math.sin(b) * R * 1.05); ctx.lineTo(q.x + Math.cos(b) * R * 1.35, q.y + Math.sin(b) * R * 1.35); ctx.stroke();
+      }
     } else if (q.tipo === "impatto") {
       // La raggiera dei colpi forti: linee che partono dal punto del colpo e si allungano mentre sbiadiscono.
       const k = 1 - q.vita / q.max;
@@ -12584,6 +12841,9 @@
     inizia(f, "avanza", x); f.corsa = 24;
     return true;
   }
+  // La parata interrompe quasi tutto: un parry che non parte perché si stava tirando un pugno è frustrante. Non
+  // interrompe le mosse lunghe che sono una scena (la trasformazione, la sfera, la maledizione, la presa…).
+  const NON_INTERROMPIBILI = { trasforma: 1, sfera: 1, smeraldo: 1, avvinghia: 1, telecinesi: 1, presa: 1, levita: 1, balla: 0 };
   // Che cosa fa un'azione adesso (true: fatta, e il tasto non va alla pagina).
   function eseguiTasto(id) {
     const c = corsa;
@@ -12593,7 +12853,7 @@
       return false;
     }
     if (c && c.fase === "scelta") {
-      if (c.bottega) return false;
+      if (c.bottega || c.allena) return false;
       if (id === "sinistra") return scegliEroe("robot");
       if (id === "destra") return scegliEroe("mela");
       return false;
@@ -12618,7 +12878,18 @@
     if (!f) return false;
     if (id === "finale") return comandi.colpo("mira") !== false;
     if (id === "sinistra" || id === "destra") return muoviConTasti(f, id === "sinistra" ? -1 : 1);
-    if (id === "para") { if (!puoMuovere(f) || (f.azione && f.azione !== "avanza")) return false; f.ordine = null; inizia(f, "para"); return true; }
+    if (id === "para") {
+      // (dal 16/10/2026: si para anche a metà di una mossa che si può lasciare, o alla fine di un colpo; e ci si gira
+      // da soli verso chi sta arrivando, che è chi si vuole parare)
+      if (!puoMuovere(f) || (f.azione && NON_INTERROMPIBILI[f.azione])) return false;
+      if (f.azione === "contro") return true;
+      const lanciato = orda && orda.zombie.find((w) => (w.stato === "letale" || w.stato === "mira") && w.preda === f);
+      const minaccia = lanciato || (orda && orda.fase === "lotta" ? zombieVicino(f.cx, 260 * S) : null), altro = lottatori.find((l) => l !== f);
+      const tx = minaccia ? minaccia.x : altro && altro.p ? altro.p.bacino.x : null;
+      if (tx !== null) f.dir = tx >= f.p.bacino.x ? 1 : -1;
+      f.ordine = null; inGuardia(f, true);
+      return true;
+    }
     if (id === "vola") {
       if (!puoMuovere(f) || verso < 0) return false;
       if (f.jet > 0) { f.jet = Math.min(f.jet, 20); f.caccia = false; } else decolla(f, false);
@@ -12657,6 +12928,12 @@
     if (eseguiTasto(id)) { e.preventDefault(); e.stopPropagation(); riparti(); }
   }
   if (window.addEventListener) window.addEventListener("keydown", premiTasto, true);
+  // Lasciato il tasto della parata, la guardia finisce (resta qualche fotogramma, per non sembrare uno scatto).
+  function lasciaTasto(e) {
+    if (!e || !e.code || azioneDi(e.code) !== "para") return;
+    for (const f of lottatori) if (f.guardia) { f.guardia = false; if (f.azione === "para") f.durata = Math.min(f.durata, f.t + 6); }
+  }
+  if (window.addEventListener) window.addEventListener("keyup", lasciaTasto, true);
   // La sezione «Tastiera» della tendina: una riga per azione, col suo tasto. Si clicca il tasto e si
   // preme quello nuovo. Le mosse dicono il nome della mossa dei personaggi in campo.
   function disegnaListaTasti() {
@@ -12741,7 +13018,13 @@
   // Il compagno che non lotta sta «in panchina»: fuori campo, come chi è dentro
   // il buco nero, e torna solo per i duelli, da avversario.
   const CORSA = { vite: 3, viteMax: 5, hp: 100, ultima: 0.3, lento: 0.55, energia: 100, perUcciso: 4, perColpo: 5, ricarica: 0.12,
-                  intro: 50, vinto: 35, invulnerabile: 110, cura: 0.04, tempo: [16, 22], calamita: 70, maxGemme: 140, maxZombie: 34 };
+                  intro: 50, vinto: 35, invulnerabile: 110, cura: 0.04, tempo: [34, 46], calamita: 70, maxGemme: 140, maxZombie: 34 };
+  // IL RITMO DEI ROUND (16/10/2026, Riccardo: «i round durano troppo poco e non si ha tempo di giocare» e «magari iniziare con pochi nemici e rallentare i primi round allungandoli e enfatizzando l'utilità del parry»). Misurato con tests/misura-corsa.cjs: un'ondata durava in media 13
+  // secondi (a volte 4), un duello 9, la sopravvivenza 19. Ora i primi round hanno POCHI nemici, che arrivano
+  // distanziati, più lenti e più duri (`inizioCorsa`): ognuno è un piccolo duello in cui si vede arrivare il morso e
+  // si ha il tempo di pararlo; poi il ritmo cresce round dopo round. La difficoltà vera resta legata ai MINUTI di
+  // lotta (`pressione`): con round più lunghi si cade più o meno allo stesso minuto, con meno round fatti.
+  const inizioCorsa = (n) => ({ duri: 1 + 1.6 * Math.max(0, (5 - n) / 4), lenti: 0.68 + 0.08 * Math.min(4, Math.max(0, n - 1)) });
   const TIPI_ROUND = { ondata: ["\u{1F9DF}", "Ondata"], duello: ["⚔️", "Duello"], tempo: ["⏱️", "Sopravvivenza"], boss: ["\u{1F480}", "Il capo"] };
   // I potenziamenti che escono a ogni livello. `abbinata` delle armi indica quale serve per l'evoluzione.
   const POTERI = {
@@ -12802,14 +13085,47 @@
   //  - RIMESCOLA: alle carte di un livello, una volta per corsa (più i dadi comprati in bottega), tre carte nuove.
   //    Una corsa non si butta più per tre carte sbagliate.
   const MISSIONI = {
-    round: { icona: "\u{1F3C1}", testo: (n) => dici("Arriva al round") + " " + n, gradini: [6, 10, 15, 20, 30], premio: [40, 80, 150, 250, 400], misura: (c) => c.round },
+    round: { icona: "\u{1F3C1}", testo: (n) => dici("Arriva al round") + " " + n, gradini: [4, 7, 10, 14, 20], premio: [40, 80, 150, 250, 400], misura: (c) => c.round },
     uccisi: { icona: "\u{1F9DF}", testo: (n) => dici("Abbatti") + " " + n + " " + dici("nemici in una corsa"), gradini: [80, 200, 400, 800], premio: [40, 90, 160, 300], misura: (c) => c.uccisi },
     capi: { icona: "\u{1F480}", testo: (n) => dici("Sconfiggi") + " " + n + " " + dici(n > 1 ? "capi in una corsa" : "capo"), gradini: [1, 2, 3, 5], premio: [50, 100, 180, 320], misura: (c) => c.capi || 0 },
     evo: { icona: "\u{1F31F}", testo: (n) => (n > 1 ? dici("Evolvi") + " " + n + " " + dici("armi in una corsa") : dici("Evolvi un'arma")), gradini: [1, 2, 3], premio: [70, 150, 300], misura: (c) => c.evoluzioni || 0 },
-    puliti: { icona: "\u2728", testo: (n) => dici("Vinci") + " " + n + " " + dici("round senza danni"), gradini: [2, 4, 7], premio: [40, 90, 180], misura: (c) => c.puliti || 0 },
+    parry: { icona: "\u{1F6E1}\uFE0F", testo: (n) => dici("Fai") + " " + n + " parry " + dici("in una corsa"), gradini: [3, 10, 25, 50], premio: [50, 100, 200, 350], misura: (c) => c.parry || 0 },
+    puliti: { icona: "\u2728", testo: (n) => dici("Vinci") + " " + n + " " + dici("round senza danni"), gradini: [1, 3, 5], premio: [40, 90, 180], misura: (c) => c.puliti || 0 },
     punti: { icona: "\u{1F4AF}", testo: (n) => dici("Fai") + " " + cifre(n) + " " + dici("punti"), gradini: [3000, 10000, 30000, 80000], premio: [40, 90, 180, 350], misura: (c) => c.punti },
   };
-  const ORDINE_MISSIONI = ["round", "uccisi", "evo", "capi", "puliti", "punti"];
+  // ·· I CREDITI E L'ALLENAMENTO (16/10/2026, Riccardo: «un premio in crediti di gioco che possono servire per sbloccare caratteristiche perenni nel personaggio, così da poter arrivare più lontano la prossima volta») ··
+  // I crediti sono le monete in banca (quelle della bottega). Prima una corsa ne portava a casa solo le monete
+  // raccolte a terra, poche. Ora a fine corsa c'è anche il PREMIO DELLA CORSA, contato su quello che si è fatto
+  // (round, nemici, capi, parry, round puliti), e i crediti si spendono anche nell'ALLENAMENTO: caratteristiche
+  // perenni di QUEL personaggio (Zefir allenato non allena Brasa), che restano per sempre e fanno arrivare più
+  // lontano la volta dopo. La bottega resta per i potenziamenti di tutti.
+  const ALLENAMENTO = {
+    tempra: { icona: "\u2764\uFE0F", nome: "Tempra", max: 5, costo: 60, testo: "+12 vita all'inizio" },
+    colpo: { icona: "\u{1F44A}", nome: "Colpo", max: 5, costo: 80, testo: "+8% danni" },
+    riflessi: { icona: "\u26A1", nome: "Riflessi", max: 3, costo: 100, testo: "Parry più facile, contrattacco più forte" },
+    arsenale: { icona: "\u{1F5E1}\uFE0F", nome: "Arsenale", max: 3, costo: 120, testo: "L'arma di partenza parte un livello più su" },
+    seconda: { icona: "\u2728", nome: "Seconda arma", max: 1, costo: 260, testo: "Si parte con una seconda arma" },
+  };
+  const chiaveAllenamento = (st, tipo) => (st || "classici") + "." + tipo;
+  const allenato = (tipo, id, st) => ((allenamento[chiaveAllenamento(st === undefined ? stile : st, tipo)] || {})[id]) || 0;
+  const costoAllenamento = (tipo, id) => Math.round(ALLENAMENTO[id].costo * Math.pow(1.6, allenato(tipo, id)));
+  function allena(tipo, id) {
+    if (!ALLENAMENTO[id] || (tipo !== "robot" && tipo !== "mela") || allenato(tipo, id) >= ALLENAMENTO[id].max) return false;
+    const prezzo = costoAllenamento(tipo, id);
+    if (banca < prezzo) return false;
+    banca -= prezzo;
+    const k = chiaveAllenamento(stile, tipo), a = allenamento[k] = allenamento[k] || {};
+    a[id] = (a[id] || 0) + 1;
+    try { deposito.setItem("mut-ring-allenamento", JSON.stringify(allenamento)); } catch (errore) { /* pazienza */ }
+    salvaBottega(); suona("moneta");
+    return true;
+  }
+  // Il premio della corsa, in crediti: quello che si è fatto, più l'avidità della bottega.
+  function premioCorsa(c) {
+    const base = 12 * c.round + Math.floor(c.uccisi / 4) + 30 * (c.capi || 0) + 4 * (c.parry || 0) + 15 * (c.puliti || 0) + 25 * (c.letaliParate || 0);
+    return Math.round(base * (1 + 0.1 * (bottega.avidita || 0)));
+  }
+  const ORDINE_MISSIONI = ["round", "parry", "uccisi", "evo", "capi", "puliti", "punti"];
   const OGNI_CAPO = 5;
   const prossimoCapo = (n) => Math.ceil((n + 1) / OGNI_CAPO) * OGNI_CAPO;
   // La missione attiva di quel tipo: quanto chiede e quanto paga (null se il tipo è finito).
@@ -12871,7 +13187,7 @@
   const nemicoCorsa = () => (corsa && corsa.chi ? lottatori.find((l) => l.tipo !== corsa.chi) || null : null);
   const eDellaCorsa = (f) => !!(corsa && corsa.chi && f && f.tipo === corsa.chi);
   const livello = (id) => (corsa && corsa.livelli[id]) || 0;
-  const forzaCorsa = () => (1 + 0.15 * livello("forza")) * (1 + 0.06 * (bottega.forza || 0));
+  const forzaCorsa = () => (1 + 0.15 * livello("forza")) * (1 + 0.06 * (bottega.forza || 0)) * (1 + 0.08 * ((corsa && corsa.colpoAll) || 0));
   // La pressione: i minuti di lotta della corsa (le carte e i forzieri non contano). Da lì crescono la
   // vita degli zombie, i danni che si prendono e il loro passo: poco nel primo minuto, molto al quarto.
   // Lasciando fare all'eroe e alle armi si cade fra il secondo e il quinto minuto (misurato); giocando
@@ -12934,8 +13250,8 @@
   function scegliEroe(tipo) {
     if (!corsa || corsa.fase !== "scelta" || corsa.bottega || (tipo !== "robot" && tipo !== "mela")) return false;
     const seme = corsa.semeVoluto || Math.floor(Math.random() * 1e9) + 1;
-    // Classici e duellanti non hanno l'energia delle onde: partono con più vita.
-    const hp0 = (anime ? CORSA.hp : CORSA.hp + 20) + 10 * (bottega.vita || 0);
+    // Classici e duellanti non hanno l'energia delle onde: partono con più vita. (e l'allenamento ne aggiunge)
+    const hp0 = (anime ? CORSA.hp : CORSA.hp + 20) + 10 * (bottega.vita || 0) + 12 * allenato(tipo, "tempra");
     Object.assign(corsa, {
       chi: tipo, stile, seme, rng: generatore(seme), round: 0, tipo: null, tipi: [], vite: CORSA.vite + (bottega.rinascita || 0), energia: 30,
       hp: hp0, hpMax: hp0, ultima: false, salvezze: 0, monete: 0, punti: 0, uccisi: 0, livelli: {}, slot: [null, null, null],
@@ -12947,7 +13263,13 @@
       capi: 0, evoluzioni: 0, puliti: 0, annunciate: [], rimescola: 1 + (bottega.dadi || 0), missioniFatte: [],
     });
     try { corsa.nome = deposito.getItem("mut-ring-nome") || ""; } catch (errore) { /* niente nome */ }
-    corsa.armi[(ARMA_DI_PARTENZA[stile] || ARMA_DI_PARTENZA[""])[tipo]] = 1;
+    const partenza = (ARMA_DI_PARTENZA[stile] || ARMA_DI_PARTENZA[""])[tipo];
+    corsa.armi[partenza] = 1 + allenato(tipo, "arsenale");
+    if (allenato(tipo, "seconda")) {
+      const altre = Object.keys(ARMI_CORSA).filter((id) => id !== partenza);
+      corsa.armi[altre[Math.floor(corsa.rng() * altre.length)]] = 1;
+    }
+    corsa.colpoAll = allenato(tipo, "colpo"); corsa.riflessi = allenato(tipo, "riflessi");
     panchina(nemicoCorsa());
     const f = eroe();
     f.dir = 1; f.pensa = 20; f.danni = 0; f.soglia = 99;
@@ -12967,7 +13289,8 @@
     const n = nemicoCorsa();
     if (n && !n.panchina) panchina(n);
     corsa.inBanca = Math.round(corsa.monete * (1 + 0.1 * (bottega.avidita || 0)));
-    banca += corsa.inBanca;
+    corsa.premio = premioCorsa(corsa);
+    banca += corsa.inBanca + corsa.premio;
     corsa.missioniFatte = chiudiMissioni(corsa);
     salvaBottega();
     if (corsa.punti > recordCorsa) {
@@ -13098,7 +13421,7 @@
       for (const t of lista) if ((x -= pesi[t]) <= 0) return t;
       return lista[lista.length - 1];
     };
-    const totale = Math.min(120, Math.round((12 + 3.2 * n) * (molt || 1)));
+    const totale = Math.min(170, Math.round((8 + 5 * n + 0.3 * n * n) * (molt || 1)));
     const maxGrossi = 1 + Math.floor(n / 4);
     let grossi = 0;
     const tipi = [];
@@ -13114,7 +13437,7 @@
       else if (i > 2) { tipi[i] = tipi[j]; tipi[j] = c.nuovo; }
     }
     const arrivo = n === 1 ? "lati" : ARRIVI[Math.floor(rng() * ARRIVI.length)];
-    const passo = Math.max(9, 30 - 1.6 * n) / (1 + 0.3 * k);
+    const passo = Math.max(16, 170 / (1 + 0.4 * (n - 1))) / (1 + 0.3 * k);
     let lato = rng() < 0.5 ? -1 : 1;
     const coda = tipi.map((tipo, i) => {
       let attesa = Math.round(passo * (0.6 + 0.8 * rng()));
@@ -13125,7 +13448,7 @@
       return { tipo, lato, attesa: Math.max(4, attesa) };
     });
     coda[0].attesa = 10;
-    return { n, tema: pro.join("+"), arrivo, coda, totale: coda.length, insieme: Math.min(CORSA.maxZombie, 10 + 2 * n + Math.floor(4 * k)), maxVolo: Math.min(8, 3 + Math.floor(n / 3)) };
+    return { n, tema: pro.join("+"), arrivo, coda, totale: coda.length, insieme: Math.min(CORSA.maxZombie, 3 + 2 * n + Math.floor(4 * k)), maxVolo: Math.min(8, 3 + Math.floor(n / 3)) };
   }
   // Il duello: l'altro personaggio entra dal lato opposto, potenziato a seconda del round.
   function entraNemico() {
@@ -13135,7 +13458,7 @@
     const n = corpoNuovo(tipo, x, -lato, f.base);
     n.supporto = f.supporto;
     const v = c.variante || [];
-    n.soglia = Math.round((5 + 0.6 * c.round) * (v.indexOf("gigante") >= 0 ? 1.4 : 1) * (v.length > 1 ? 1.15 : 1));
+    n.soglia = Math.round((11 + 1.1 * c.round) * (v.indexOf("gigante") >= 0 ? 1.4 : 1) * (v.length > 1 ? 1.15 : 1));
     n.danni = 0; n.pensa = 30; n.dir = -lato; n.cdArmi = {};
     if (v.indexOf("furioso") >= 0) n.furia = 1e7;
     if (v.indexOf("armato") >= 0) { daiArma(n, c.round >= 6 ? "lanciafiamme" : "bazooka"); n.riarma = 900; }
@@ -13862,6 +14185,7 @@
       if (lamaPronta(f)) { inizia(f, scegli([[3, "fendente"], [2, "affondo"], [2, "rovescio"]])); return; }
       if (z.tipo === "striscia") { inizia(f, scegli([[5, "calcio"], [3, "pugno"], [2, "diretto"]])); return; }
       if (Math.abs(z.x - f.cx) < 19 * S) { inizia(f, scegli([[3, "montante"], [2, "indietro"]])); return; }
+      if (guardiaLetale(f)) return;
       if (pesante(z) && z.stato === "colpo" && z.s < 20 && braccia(f) && Math.random() < 0.35 * f.furbo) { inizia(f, "para"); return; }
       inizia(f, scegli([[28 * pesoMossa(f, "pugno"), "pugno"], [22 * pesoMossa(f, "diretto"), "diretto"],
                         [18 * pesoMossa(f, "montante"), "montante"], [24 * pesoMossa(f, "calcio"), "calcio"]]));
@@ -14406,6 +14730,9 @@
       if (!f.p || f.fuoriCampo) continue;
       const x = f.p.testa.x, y = Math.max(top + 130 * S, f.p.testa.y - 52 * S), w = 140 * S;
       tastoUI(x - w / 2, y - 17 * S, w, 34 * S, dici("Gioca con") + " " + nomeDi(f.tipo), () => scegliEroe(f.tipo), { brilla: true, px: 13 * S });
+      const liv = Object.keys(ALLENAMENTO).reduce((n, id) => n + allenato(f.tipo, id), 0);
+      tastoUI(x - 50 * S, y - 46 * S, 100 * S, 24 * S, "\u2B06 " + dici("Allena") + (liv ? " · " + liv : ""), () => { c.allena = f.tipo; },
+              { colore: "#2a2735", scritta: "#ffffff", bordo: "rgba(255,216,74,.6)", px: 11 * S });
     }
     const yb = pavimento - 34 * S;
     if (recordCorsa) scriviUI(dici("Il tuo record") + ": " + cifre(recordCorsa), W / 2, yb - 26 * S, 12 * S, ORO, "center");
@@ -14415,6 +14742,7 @@
     const wb = Math.min(140 * S, (W - 32 - (tasti.length - 1) * 10) / tasti.length), xb = W / 2 - (tasti.length * wb + (tasti.length - 1) * 10) / 2;
     tasti.forEach(([t, fa], i) => tastoUI(xb + i * (wb + 10), yb - 14 * S, wb, 30 * S, t, fa, { colore: "#2a2735", scritta: "#ffffff", bordo: "rgba(255,255,255,.3)", px: 12 * S }));
     if (c.bottega) { tastiUI = []; disegnaBottega(); }            // la bottega copre tutto: sotto non si tocca niente
+    else if (c.allena) { tastiUI = []; disegnaAllenamento(c.allena); }
   }
   // Una carta: il premio o l'oggetto del negozio.
   function carta(x, y, w, h, icona, nome, sopra, testo, bordo) {
@@ -14498,6 +14826,24 @@
     });
     tastoUI(W / 2 - 60 * S, y + h - 42 * S, 120 * S, 30 * S, dici("Chiudi"), () => { corsa.bottega = false; }, { colore: "#2a2735", scritta: "#ffffff", bordo: "rgba(255,255,255,.3)", px: 12 * S });
   }
+  // L'allenamento di un personaggio: come la bottega, ma suo.
+  function disegnaAllenamento(tipo) {
+    const ids = Object.keys(ALLENAMENTO), w = Math.min(460 * S, W - 24), rh = 40 * S, h = 84 * S + ids.length * rh + 50 * S;
+    const x = W / 2 - w / 2, y = Math.max(testataBasso + 10 * S, H / 2 - h / 2), col = COLORI_ANIME[tipo] || ORO;
+    velo(0.5);
+    pannelloUI(x, y, w, h, 14 * S, col);
+    scriviUI(dici("Allenamento") + ": " + nomeDi(tipo), W / 2, y + 24 * S, 20 * S, col, "center", 900);
+    scriviUI(dici("Per sempre, solo per questo personaggio") + "  ·  " + dici("Crediti") + ": \u{1FA99} " + cifre(banca), W / 2, y + 50 * S, 12 * S, "#ffffff", "center", 700);
+    ids.forEach((id, i) => {
+      const A = ALLENAMENTO[id], l = allenato(tipo, id), yy = y + 74 * S + i * rh, pieno = l >= A.max, prezzo = costoAllenamento(tipo, id);
+      scriviUI(A.icona, x + 22 * S, yy + rh / 2, 16 * S, "#ffffff", "center");
+      scriviUI(dici(A.nome), x + 40 * S, yy + rh / 2 - 7 * S, 12 * S, "#ffffff", "left", 800);
+      scriviUI(dici(A.testo), x + 40 * S, yy + rh / 2 + 8 * S, 10 * S, GRIGIO_UI, "left", 600);
+      for (let k = 0; k < A.max; k++) { ctx.fillStyle = k < l ? col : "rgba(255,255,255,.2)"; ctx.fillRect(x + w - 150 * S + k * 9 * S, yy + rh / 2 - 3 * S, 6 * S, 6 * S); }
+      tastoUI(x + w - 92 * S, yy + 7 * S, 80 * S, rh - 14 * S, pieno ? dici("Al massimo") : "\u{1FA99} " + cifre(prezzo), () => allena(tipo, id), { spento: pieno || banca < prezzo, px: 11 * S });
+    });
+    tastoUI(W / 2 - 60 * S, y + h - 42 * S, 120 * S, 30 * S, dici("Chiudi"), () => { corsa.allena = null; }, { colore: "#2a2735", scritta: "#ffffff", bordo: "rgba(255,255,255,.3)", px: 12 * S });
+  }
   function titoloMenu(t, y) {
     caratteri(24 * S, 900); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineWidth = 5 * S; ctx.strokeStyle = "#17171c"; ctx.fillStyle = "#ffffff";
     ctx.strokeText(t, W / 2, y); ctx.fillText(t, W / 2, y);
@@ -14529,7 +14875,7 @@
     scriviUI(c.record ? dici("Nuovo record!") : dici("Il tuo record") + ": " + cifre(recordCorsa) +
              (recordCorsa > c.punti ? "  ·  " + dici("mancavano") + " " + cifre(recordCorsa - c.punti) + " " + dici("punti") : ""),
              W / 2, y + 72 * S, 12 * S, c.record ? "#7dffb0" : GRIGIO_UI, "center", 700);
-    scriviUI(dici("Liv.") + " " + c.liv + "  ·  +" + (c.inBanca || 0) + " \u{1FA99} " + dici("in banca") + " (" + cifre(banca) + ")", W / 2, y + 92 * S, 12 * S, ORO, "center", 700);
+    scriviUI(dici("Premio della corsa") + ": +" + cifre(c.premio || 0) + " \u{1FA99}  ·  " + dici("raccolte") + " +" + (c.inBanca || 0) + "  ·  " + dici("Crediti") + " " + cifre(banca), W / 2, y + 92 * S, 12 * S, ORO, "center", 800);
     let yy = y + 112 * S;
     if (conClassifica()) {
       c.yNome = yy - 4 * S; posizionaNome();
@@ -14539,7 +14885,7 @@
       disegnaClassifica(W / 2, yy + 62 * S, w - 24 * S, false);
       yy += 70 * S + lista * 20 * S + 26 * S;
     } else {
-      scriviUI(dici("La classifica globale è sul sito."), W / 2, yy + 4 * S, 11 * S, GRIGIO_UI, "center", 600);
+      scriviUI(dici("Spendi i crediti in «Allena» prima della prossima corsa: arriverai più lontano."), W / 2, yy + 4 * S, 11 * S, GRIGIO_UI, "center", 600);
       yy += 30 * S;
     }
     tastoUI(W / 2 - 130 * S, yy, 120 * S, 34 * S, dici("Ancora"), () => ricominciaCorsa(), { brilla: true, px: 14 * S });
@@ -14621,6 +14967,7 @@
     sceltaModo: (si) => { if (si !== undefined) { sceltaModo = !!si; aggiornaInterruttori(); } return sceltaModo; },
     // Solo per i test: un tasto premuto (il codice fisico, come `e.code`), e la mappa dei tasti.
     tastoGiu: (code, opz) => { let fermato = false; premiTasto(Object.assign({ code, repeat: false, target: null, preventDefault() {}, stopPropagation() { fermato = true; } }, opz || {})); return fermato; },
+    tastoSu: (code) => { lasciaTasto({ code }); },
     mappaTasti: () => Object.assign({}, mappaTasti),
     rimappa: (id) => { rimappa = id; },
     // Solo per i test: il conto dei K.O., una creatura, una nube.
@@ -14740,6 +15087,7 @@
       sorpresa: (nome) => sorpresa(nome), minuti: (m) => { if (corsa && corsa.chi) corsa.tLotta = Math.round(m * 3600); },
       senzaVolo: () => { if (corsa) corsa.cdVolo = 1e9; },
       rimescola: () => rimescolaCarte(), apriLivello: () => { if (corsa && corsa.chi) apriLivello(); },
+      allena: (tipo, id) => allena(tipo, id), allenamento: () => JSON.parse(JSON.stringify(allenamento)), apriAllena: (tipo) => { if (corsa) corsa.allena = tipo || null; },
       missioni: (m) => { if (m) { missioni = m; salvaMissioni(); } return JSON.parse(JSON.stringify(missioni)); },
       conta: (cosa, n) => { if (corsa && corsa.chi) corsa[cosa] = n; },
       tiri: () => (corsa && corsa.tiri ? corsa.tiri.map((t) => ({ tipo: t.tipo, x: t.x, y: t.y, t: t.t })) : []),
@@ -14774,6 +15122,7 @@
                      tiri: (corsa.tiri || []).length, pozze: (corsa.pozze || []).length, sbloccati: (corsa.sbloccati || []).slice(), nuovo: corsa.nuovo || null,
                      protagonisti: (corsa.protagonisti || []).slice(), frenesia: corsa.frenesia || 0, gelato: corsa.gelato || 0, minuti: (corsa.tLotta || 0) / 3600, sorprese: corsa.sorprese || 0, schianti: corsa.schianti || 0, cdVolo: corsa.cdVolo || 0,
                      tasti: tastiUI.length, modale: corsaModale(), rimescola: corsa.rimescola || 0, capi: corsa.capi || 0, evoluzioni: corsa.evoluzioni || 0,
+                     premio: corsa.premio || 0, parry: corsa.parry || 0, riflessi: corsa.riflessi || 0, colpoAll: corsa.colpoAll || 0,
                      puliti: corsa.puliti || 0, annunciate: (corsa.annunciate || []).slice(), missioniFatte: (corsa.missioniFatte || []).map((m) => m.tipo + ":" + m.n) } : null,
     classifica: { aperta: classifica.aperta, voci: classifica.voci ? classifica.voci.length : null }, recordCorsa, banca, bottega: Object.assign({}, bottega),
     audio: { acceso: audio.acceso, pronto: !!audio.ctx, anelli: Object.keys(audio.anelli).filter((k) => audio.anelli[k]) },

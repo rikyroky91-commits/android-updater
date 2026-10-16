@@ -321,7 +321,7 @@ Dipendenza da ricordare: **estensione e app dipendono dal dominio del tracker**.
 
 `tests/ring.test.cjs` (circa 180 prove; con gli altri file Node sono 193) simula il motore in Node; `tests/test_estensione.py` controlla che le cartelle generate siano allineate e che i ritocchi reggano. Sono simulazioni col caso dentro: una caduta isolata si riprova, due di fila vanno indagate.
 
-Due strumenti di misura, che non sono test: `tests/misura-posture.cjs` e `tests/misura-lotta.cjs` (quanto si lotta davvero su 46 pagine vere: colpi al minuto, pause lunghe, cosa fanno i lottatori; `STILI=maghi SECONDI=60 node tests/misura-lotta.cjs`, `RING_JS=altro-ring.js` per confrontare con una versione vecchia). Ogni modifica a IA, ritmo o movimento si misura prima e dopo con `misura-lotta`.
+Tre strumenti di misura, che non sono test: `tests/misura-posture.cjs`, `tests/misura-corsa.cjs` (quanto durano i round della corsa e quanto dura una corsa, con l'eroe che gioca da solo; `PARRY=1` simula chi fa il parry alle cariche letali) e `tests/misura-lotta.cjs` (quanto si lotta davvero su 46 pagine vere: colpi al minuto, pause lunghe, cosa fanno i lottatori; `STILI=maghi SECONDI=60 node tests/misura-lotta.cjs`, `RING_JS=altro-ring.js` per confrontare con una versione vecchia). Ogni modifica a IA, ritmo o movimento si misura prima e dopo con `misura-lotta`.
 
 **Trappola già presa:** `ring.js` è un'unica funzione enorme, quindi due `function` con lo stesso nome non danno errore, l'ultima vince in silenzio. Il 16/10 una `sparisci` nuova dei maghi ha sostituito quella vecchia (che fa sparire chi esce dal ring o cade nella lava) e ha rotto tre test che non c'entravano. Prima di aggiungere una funzione: `grep -n "function nome" web/static/ring.js`.
 
@@ -355,7 +355,8 @@ Due strumenti di misura, che non sono test: `tests/misura-posture.cjs` e `tests/
 
 1. Rendere la prova su telefono vero un passo fisso della checklist Android.
 1. Tempi morti, il resto: la lotta classica passa ancora il 31% del tempo in piedi in pause lunghe, quasi tutte con i due su piani diversi o uno in volo col jetpack che l'altro non raggiunge. È il prossimo punto da misurare e sistemare (con l'accordo di Riccardo, perché tocca robot e mela).
-1. Il cruscotto nativo della corsa nell'app (Comandi.java) non mostra missioni e prossimo capo.
+1. Il cruscotto nativo della corsa nell'app (Comandi.java) non mostra missioni e prossimo capo, e non ha un tasto fisso per la parata: il parry sul telefono passa dalla voce «Parata» del controller, che i quattro tasti nativi non sempre mostrano. Un tasto Parata fisso nei comandi nativi è il prossimo passo per l'app.
+1. Corse lasciate all'eroe automatico: con la carica letale finiscono un po' prima (2-4 minuti invece di 2-6), perché l'IA para ma non fa il parry. Chi gioca e fa il parry arriva più lontano: è voluto, ma va tenuto d'occhio.
 2. Spostare il motore in una cartella `pagebrawl/` con `ring.js` diviso in moduli (fisica, personaggi, eventi, corsa, interfaccia) e un passo di build che li unisca: 14.500 righe in un file sono il collo di bottiglia di ogni modifica.
 3. Verifica degli acquisti lato server (Play Developer API) prima di vendere davvero.
 4. Classifica: firma o controllo di plausibilità più stretto (durata reale, eventi della partita), e un dominio proprio per Page Brawl, così gli store non dipendono dal tracker.
@@ -416,6 +417,7 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 16/10/2026 | Claude | Page Brawl 1.2.0, secondo giro: parry con S (guardia tenuta, finestra di 14 fotogrammi, contrattacco), carica letale degli zombie (scintilla rossa, rincorsa, contrattacco letale ad area), primi round lenti e round più lunghi (13 → 34 s), premio in crediti e allenamento per personaggio. Non su `main` | `claude/exciting-cori-6cwl9m` |
 | 16/10/2026 | Claude | Page Brawl 1.2.0 / Android 1.6.0: tempi morti rifatti da `61f8ca9` e misurati, super guerrieri più fluidi, Limit Break (occhi e capelli sistemati), maghi a distanza con la respinta, missioni, capo ogni cinque round, rimescola. Non su `main` | `claude/exciting-cori-6cwl9m` |
 | 16/10/2026 | Claude | Unite a `main` Android 1.5.1 (`claude/android-ring`) e la correzione della ricerca per codice (`claude/loving-cannon-1t7wdu`), dopo revisione del codice e test della ricerca verdi | `main` |
 | 16/10/2026 | Claude | Controllati tutti i rami remoti contro `main`: 30 cancellabili, 3 da tenere; trovato il lavoro perso `61f8ca9` (lotte più fitte). Verificato che l'estensione 1.1.0 è pubblicata | `claude/exciting-cori-6cwl9m` |

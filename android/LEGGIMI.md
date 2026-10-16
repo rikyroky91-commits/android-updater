@@ -83,7 +83,7 @@ Gratis con sblocco Premium a acquisto unico (Riccardo: «facciamo gratuito con s
 ## 1.5.1 e 1.6.0
 
 - **1.5.1** (13/10/2026, su `main` dal 16/10): spegnendo lo schermo il ring si **sospende** invece di chiudersi (la partita o la corsa riprende da dov'era), niente più comandi rimasti sullo schermo dopo la chiusura, «Leaderboard» nel menu ⋯, l'APK di prova esce nella pre-release insieme agli AAB.
-- **1.6.0** (16/10/2026, versionCode 11, lite 12): il motore della 1.2.0 dell'estensione (meno tempi morti, super guerrieri più fluidi, Limit Break, maghi a distanza con la respinta, missioni, capo ogni cinque round, rimescola carte; vedi `estensione/LEGGIMI.md`, «La 1.2.0»). Niente di nuovo lato Java: il cruscotto nativo della corsa non mostra ancora missioni e prossimo capo, che si vedono nelle schermate del motore (scelta, carte, riepilogo).
+- **1.6.0** (16/10/2026, versionCode 11, lite 12): il motore della 1.2.0 dell'estensione (meno tempi morti, super guerrieri più fluidi, Limit Break, maghi a distanza con la respinta, missioni, capo ogni cinque round, rimescola carte; vedi `estensione/LEGGIMI.md`, «La 1.2.0»). Nel secondo giro: parry, carica letale, round più lunghi, crediti e allenamento (stesso dettaglio). Senza tastiera il parry passa dalla voce «Parata», che ora hanno tutti gli stili; non è detto che i quattro tasti nativi la mostrino sempre (`Comandi.java` sceglie le abilità da mostrare), da provare sul telefono. Niente di nuovo lato Java: il cruscotto nativo della corsa non mostra ancora missioni e prossimo capo, che si vedono nelle schermate del motore (scelta, carte, riepilogo).
 
 ## Installare
 
