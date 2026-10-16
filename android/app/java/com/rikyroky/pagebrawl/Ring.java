@@ -65,8 +65,19 @@ import java.util.List;
  * Il ring è una WebView trasparente col ring.js dell'estensione (assets/web).
  * Si accende dalla bolla, dal riquadro delle impostazioni rapide, dall'app, o
  * da solo quando si accende lo schermo (se l'utente l'ha chiesto).
- * Si spegne con ✕, col tasto Indietro, spegnendo le lotte dalla tendina,
- * spegnendo lo schermo, o sbloccando il telefono se era partito da solo.
+ * Si spegne con ✕ o spegnendo le lotte dalla tendina.
+ *
+ * SPEGNERE LO SCHERMO NON CHIUDE PIÙ IL RING (13/10/2026, Riccardo: «quando
+ * spengo e riaccendo lo schermo ricomincia la run invece di continuare quella
+ * vecchia»). Il ring si SOSPENDE: comandi tolti, pagina nascosta e in pausa,
+ * ma la stessa WebView resta viva con la partita (o la corsa) com'era.
+ * Riaccendendo lo schermo riprende da lì:
+ *  - tutto il telefono: subito, anche sul blocco schermo;
+ *  - solo blocco schermo: sul blocco schermo; sbloccando si sospende di nuovo
+ *    e torna alla prossima accensione;
+ *  - solo Chrome: dopo lo sblocco, se Chrome è in primo piano (altrimenti si chiude).
+ * Sospeso, il ring non legge lo schermo e non disegna. Se Android chiede
+ * memoria (onTrimMemory) un ring sospeso si chiude davvero.
  */
 public class Ring extends AccessibilityService {
     private static final String TAG = "PageBrawl";
@@ -83,6 +94,7 @@ public class Ring extends AccessibilityService {
             "com.android.chrome", "com.chrome.beta", "com.chrome.dev", "com.chrome.canary"));
 
     private Comandi comandi;
+    private OspiteFinestre ospite;
     private int bassoPx;
     private boolean inChrome;
     private String modo = "sistema";
@@ -99,6 +111,9 @@ public class Ring extends AccessibilityService {
     private WindowManager.LayoutParams lpArena;
     private boolean inAvvio;
     private boolean apertoDaBlocco;
+    private boolean sospeso;            // schermo spento (o sbloccato in modalità blocco): partita tenuta, niente a schermo
+    private boolean pausaUtente;        // la partita era già in pausa prima della sospensione: resta in pausa
+    private Runnable avvio;             // l'accensione in attesa, da annullare se intanto si chiude
     private volatile String schermo = "{}";
     private String ultimiNodi = "";
     private int ox, oy, alto;
@@ -121,18 +136,33 @@ public class Ring extends AccessibilityService {
             @Override
             public void onReceive(Context c, Intent i) {
                 String a = i.getAction();
+                String m = Memoria.modo(Ring.this);
                 if (Intent.ACTION_SCREEN_ON.equals(a)) {
-                    // Modalità «solo blocco schermo»: il ring compare appena si accende lo schermo.
-                    if ("blocco".equals(Memoria.modo(Ring.this)) && bloccato() && arena == null && Memoria.consenso(Ring.this)) {
+                    if (sospeso) {
+                        // La partita di prima riprende da dov'era.
+                        if (!Memoria.consenso(Ring.this) || "app".equals(m)) chiudi();
+                        else if ("sistema".equals(m) || ("blocco".equals(m) && bloccato())) riprendi(650);
+                        else if ("chrome".equals(m) && !bloccato()) { if (inChrome) riprendi(650); else chiudi(); }
+                        // chrome sul blocco schermo: si aspetta lo sblocco
+                    } else if ("blocco".equals(m) && bloccato() && arena == null && Memoria.consenso(Ring.this)) {
+                        // Modalità «solo blocco schermo»: il ring compare appena si accende lo schermo.
                         apertoDaBlocco = true;
                         avvia(650);
                     } else aggiornaBolla();
                 } else if (Intent.ACTION_USER_PRESENT.equals(a)) {
-                    if (apertoDaBlocco || ("blocco".equals(Memoria.modo(Ring.this)) && arena != null)) chiudi();
+                    if (sospeso) {
+                        if ("chrome".equals(m)) { if (inChrome) riprendi(400); else chiudi(); }
+                        else if ("sistema".equals(m)) riprendi(400);
+                        // blocco: resta sospeso fino alla prossima accensione
+                    } else if (arena != null && "blocco".equals(m)) {
+                        sospendi();                     // la partita torna sul prossimo blocco schermo
+                    } else if (apertoDaBlocco) {
+                        apertoDaBlocco = false;         // acceso dal riquadro sul blocco schermo: continua sopra le app
+                    }
                     aggiornaBolla();
                 } else if (Intent.ACTION_SCREEN_OFF.equals(a)) {
                     bollaNascosta = false;
-                    if (arena != null) chiudi();
+                    if (arena != null) sospendi();
                     aggiornaBolla();
                 }
             }
@@ -171,6 +201,19 @@ public class Ring extends AccessibilityService {
     @Override
     public void onInterrupt() { }
 
+    /** Android chiede memoria: una partita sospesa (WebView viva, invisibile) si lascia andare. */
+    @Override
+    public void onTrimMemory(int livello) {
+        super.onTrimMemory(livello);
+        if (sospeso && (livello == TRIM_MEMORY_RUNNING_CRITICAL || livello >= TRIM_MEMORY_MODERATE)) chiudi();
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        if (sospeso) chiudi();
+    }
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent e) {
         if (e == null || !Memoria.consenso(this)) return;     // senza consenso nell'app non si guarda niente
@@ -185,14 +228,14 @@ public class Ring extends AccessibilityService {
                 boolean era = inChrome;
                 inChrome = CHROME.contains(pk);
                 if (era != inChrome) {
-                    if ("chrome".equals(modo) && !inChrome && arena != null) chiudi();
+                    if ("chrome".equals(modo) && !inChrome && arena != null && !sospeso) chiudi();
                     else aggiornaBolla();
                 }
             }
         }
         // Lo schermo sotto è cambiato (una notifica, l'orologio, un'altra app):
         // i solidi si rileggono, al massimo una volta ogni 1,2 secondi.
-        if (arena == null || web == null) return;
+        if (arena == null || web == null || sospeso) return;
         if (scansioneProgrammata) return;
         scansioneProgrammata = true;
         h.postDelayed(riscansiona, 1200);
@@ -201,12 +244,13 @@ public class Ring extends AccessibilityService {
     @Override
     public void onConfigurationChanged(Configuration nuova) {
         super.onConfigurationChanged(nuova);
-        if (arena != null) h.postDelayed(ridimensiona, 400);
+        if (arena != null && !sospeso) h.postDelayed(ridimensiona, 400);
     }
 
     // ----------------------------------------------------------- accensione
     /** Accende il ring sullo schermo che c'è adesso. */
     void avvia(long ritardo) {
+        if (sospeso && Memoria.consenso(this)) { riprendi(ritardo); return; }     // c'è già una partita: si riprende quella
         if (arena != null || inAvvio || wm == null) return;
         if (!Memoria.consenso(this)) {
             // Servizio acceso dalle impostazioni senza passare dall'avviso: prima l'avviso, nell'app.
@@ -215,8 +259,9 @@ public class Ring extends AccessibilityService {
         }
         inAvvio = true;
         nascondiBolla();
-        h.postDelayed(new Runnable() {
+        avvio = new Runnable() {
             @Override public void run() {
+                avvio = null;
                 inAvvio = false;
                 try {
                     apriArena();
@@ -225,7 +270,55 @@ public class Ring extends AccessibilityService {
                     chiudi();
                 }
             }
-        }, ritardo);
+        };
+        h.postDelayed(avvio, ritardo);
+    }
+
+    // ------------------------------------------------- sospensione e ripresa
+    /** Schermo spento: via dallo schermo, partita in pausa, ma tutto resta com'è per `riprendi`. */
+    private void sospendi() {
+        if (arena == null || sospeso) return;
+        if (comandi == null) { chiudi(); return; }         // la pagina non era ancora pronta: niente da tenere
+        sospeso = true;
+        h.removeCallbacks(riscansiona);
+        h.removeCallbacks(ridimensiona);
+        h.removeCallbacks(riprendiOra);
+        scansioneProgrammata = false;
+        pausaUtente = comandi.inPausa();
+        comandi.sospendi();
+        for (int i = 0; i < 2; i++) { zonaPremuta[i] = false; nascondiZona(i); }
+        seguendo = false;
+        arena.setVisibility(View.INVISIBLE);
+        if (lpArena != null && lpArena.flags != FINESTRA_PASSA) {
+            lpArena.flags = FINESTRA_PASSA;
+            try { wm.updateViewLayout(arena, lpArena); } catch (Exception ignorata) { }
+        }
+        if (web != null) {
+            web.evaluateJavascript("window.__ring&&__ring.pausa(true)", null);
+            web.onPause();
+        }
+    }
+
+    private final Runnable riprendiOra = new Runnable() {
+        @Override public void run() {
+            if (!sospeso || arena == null || web == null || comandi == null) { if (sospeso) chiudi(); return; }
+            sospeso = false;
+            modo = Memoria.modo(Ring.this);
+            nascondiBolla();
+            web.onResume();
+            arena.setVisibility(View.VISIBLE);
+            if (!pausaUtente) web.evaluateJavascript("window.__ring&&__ring.pausa(false)", null);
+            comandi.riprendi();
+            // Sotto adesso c'è un altro schermo (il blocco schermo, un'altra app, forse ruotato): si rilegge.
+            h.post(ridimensiona);
+        }
+    };
+
+    /** Riprende la partita sospesa dopo `ritardo` ms (il tempo che il blocco schermo o la tendina si sistemino). */
+    private void riprendi(long ritardo) {
+        if (!sospeso) return;
+        h.removeCallbacks(riprendiOra);
+        h.postDelayed(riprendiOra, ritardo);
     }
 
     /** Dal riquadro delle impostazioni rapide: prima si chiude la tendina. */
@@ -277,8 +370,9 @@ public class Ring extends AccessibilityService {
 
             @Override
             public void onPageFinished(WebView v, String url) {
-                if (v != web || comandi != null) return;
-                comandi = new Comandi(Ring.this, new OspiteFinestre(), web);
+                if (v != web || comandi != null || arena == null) return;
+                ospite = new OspiteFinestre(arena);
+                comandi = new Comandi(Ring.this, ospite, web);
                 comandi.avvia();
             }
 
@@ -430,11 +524,16 @@ public class Ring extends AccessibilityService {
         if (h != null) {
             h.removeCallbacks(riscansiona);
             h.removeCallbacks(ridimensiona);
+            h.removeCallbacks(riprendiOra);
+            if (avvio != null) h.removeCallbacks(avvio);
         }
+        avvio = null;
         scansioneProgrammata = false;
         inAvvio = false;
         apertoDaBlocco = false;
+        sospeso = false;
         if (comandi != null) { comandi.ferma(); comandi = null; }
+        if (ospite != null) { ospite.togliTutte(); ospite = null; }     // rete di sicurezza: nessun comando resta orfano
         togliZone();
         if (arena != null) {
             try { wm.removeView(arena); } catch (Exception ignorata) { }
@@ -447,7 +546,7 @@ public class Ring extends AccessibilityService {
         aggiornaBolla();
     }
 
-    boolean acceso() { return arena != null; }
+    boolean acceso() { return arena != null && !sospeso; }
 
     // ------------------------------------------------- gli elementi a schermo
     /**
@@ -552,7 +651,8 @@ public class Ring extends AccessibilityService {
         modo = Memoria.modo(this);
         boolean serve = Memoria.consenso(this)
                 && ("sistema".equals(modo) || ("chrome".equals(modo) && inChrome) || ("blocco".equals(modo) && bloccato()));
-        if (serve && !bollaNascosta && arena == null && !inAvvio) mostraBolla();
+        // Con una partita sospesa la bolla c'è lo stesso: un tocco la riprende (avvia → riprendi).
+        if (serve && !bollaNascosta && (arena == null || sospeso) && !inAvvio) mostraBolla();
         else nascondiBolla();
     }
 
@@ -676,7 +776,20 @@ public class Ring extends AccessibilityService {
     // ---------------------------------------------- i comandi in finestre loro
     /** Ogni pezzo dei comandi è una finestra di accessibilità piccola quanto lui: il resto dello schermo resta del telefono. */
     private final class OspiteFinestre implements Comandi.Ospite {
+        /** Il ring a cui appartengono: chiuso quello, non si mette più niente. */
+        private final FrameLayout suo;
+        /** Ogni finestra messa e non ancora tolta, per toglierle tutte alla chiusura. */
+        private final java.util.Set<View> messe = new java.util.HashSet<View>();
+
+        OspiteFinestre(FrameLayout suo) { this.suo = suo; }
+
+        void togliTutte() {
+            for (View v : messe) { try { wm.removeView(v); } catch (Exception ignorata) { } }
+            messe.clear();
+        }
+
         @Override public void metti(View v, int gravita, int x, int y, int w, int hh, boolean tocchiFuori) {
+            if (arena != suo || arena == null || messe.contains(v)) return;
             WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
                     w == -2 ? WindowManager.LayoutParams.WRAP_CONTENT : w, hh == -2 ? WindowManager.LayoutParams.WRAP_CONTENT : hh,
                     WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
@@ -687,7 +800,7 @@ public class Ring extends AccessibilityService {
             lp.gravity = gravita; lp.x = x; lp.y = y;
             if (Build.VERSION.SDK_INT >= 28) lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
             v.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
-            try { wm.addView(v, lp); } catch (Exception e) { Log.w(TAG, "comandi", e); }
+            try { wm.addView(v, lp); messe.add(v); } catch (Exception e) { Log.w(TAG, "comandi", e); }
         }
         @Override public void sposta(View v, int gravita, int x, int y, int w, int hh) {
             try {
@@ -696,10 +809,13 @@ public class Ring extends AccessibilityService {
                 wm.updateViewLayout(v, lp);
             } catch (Exception ignorata) { }
         }
-        @Override public void togli(View v) { try { wm.removeView(v); } catch (Exception ignorata) { } }
+        @Override public void togli(View v) {
+            if (!messe.remove(v)) return;
+            try { wm.removeView(v); } catch (Exception ignorata) { }
+        }
         @Override public void superficieToccabile(boolean si) {
             // La tendina del ring aperta: la finestra dei lottatori prende i tocchi finché si chiude.
-            if (arena == null || lpArena == null) return;
+            if (arena != suo || arena == null || lpArena == null) return;
             lpArena.flags = si ? (FINESTRA_PASSA & ~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE) : FINESTRA_PASSA;
             try { wm.updateViewLayout(arena, lpArena); } catch (Exception ignorata) { }
         }
@@ -711,7 +827,7 @@ public class Ring extends AccessibilityService {
             lpArena.preferredRefreshRate = hz;
             try { wm.updateViewLayout(arena, lpArena); } catch (Exception ignorata) { }
         }
-        @Override public void chiudiGioco() { chiudi(); }
+        @Override public void chiudiGioco() { if (arena == suo) chiudi(); else togliTutte(); }
         @Override public int margineAlto() { return Math.max(alto, dimensioneDiSistema("status_bar_height")); }
         @Override public int margineBasso() { return bassoPx; }
     }
@@ -815,7 +931,7 @@ public class Ring extends AccessibilityService {
         @JavascriptInterface public void compra(String gruppo) { Acquisto.apri(Ring.this, gruppo); }
         @JavascriptInterface public String schermo() { return schermo; }
         @JavascriptInterface public void corpi(final String json) {
-            h.post(new Runnable() { @Override public void run() { aggiornaZone(json); } });
+            h.post(new Runnable() { @Override public void run() { if (!sospeso) aggiornaZone(json); } });
         }
 
         @JavascriptInterface public void chiudi() {

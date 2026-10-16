@@ -49,6 +49,7 @@
   var ultimiCorpi = "";
   setInterval(function () {
     try {
+      if (document.hidden) return;        // ring sospeso (schermo spento): niente da seguire
       if (!window.PB || !window.PB.corpi || !window.__ring || !window.__ring.corpi) return;
       var c = JSON.stringify(window.__ring.corpi());
       if (c !== ultimiCorpi) { ultimiCorpi = c; window.PB.corpi(c); }

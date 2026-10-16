@@ -85,7 +85,8 @@ final class Comandi {
     private final Disegni.Tasto[] tasti = new Disegni.Tasto[4];
     private final String[] posti = new String[4];
 
-    private boolean attivo, visibili, ridotto, mostraTasti, mostraLottatori, inPausa, pannello, menuAperto;
+    private int giro;
+    private boolean attivo, finito, visibili, ridotto, mostraTasti, mostraLottatori, inPausa, pannello, menuAperto;
     private String chi = "robot", tipoA = "robot", tipoB = "mela";
     private int coloreChi = Color.WHITE;
     private String firmaVoci = "";
@@ -114,16 +115,45 @@ final class Comandi {
     }
 
     void avvia() {
+        if (finito) return;
         attivo = true;
         h.post(leggi);
     }
 
+    /**
+     * Toglie i comandi e smette di leggere il motore, per sempre.
+     *
+     * 13/10/2026 (Riccardo: «si è creato un layer di gioco bloccato che non si toglie con niente»): la lettura
+     * del motore è asincrona e la sua risposta poteva arrivare DOPO `ferma()` (spegnendo lo schermo il ring si
+     * chiudeva a metà di una lettura): `applica` → `dispone` rimetteva capsula e tasti in finestre nuove che
+     * nessuno conosceva più, e restavano sullo schermo, ferme, finché non si spegneva il servizio. Ora, da
+     * fermi, ogni risposta in ritardo si butta e `dispone` non mette più niente.
+     */
     void ferma() {
+        finito = true;
+        sospendi();
+    }
+
+    /** Toglie i comandi e smette di leggere il motore, ma tiene lo stato: `riprendi()` li rimette com'erano. */
+    void sospendi() {
         attivo = false;
+        giro++;                              // le letture già partite non valgono più
+
         if (seguendo) { seguendo = false; ospite.seguiLottatori(false); }
+        if (superficie) { superficie = false; ospite.superficieToccabile(false); }
         h.removeCallbacksAndMessages(null);
         togliTutto();
     }
+
+    void riprendi() {
+        if (finito || attivo) return;
+        attivo = true;
+        dispone();
+        h.post(leggi);
+    }
+
+    /** Il gioco era in pausa (dall'utente o dal motore). */
+    boolean inPausa() { return inPausa; }
 
     private int px(float dp) { return Math.round(dp * d); }
 
@@ -212,6 +242,15 @@ final class Comandi {
                 web.evaluateJavascript("window.__ring&&__ring.pannello(true)", null);
             }
         });
+        // La classifica globale (13/10/2026, Riccardo: «manca la classifica»): a portata dal menu, non solo
+        // dentro la tendina del motore o a fine corsa.
+        voceMenu("Leaderboard", new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                apriMenu(false);
+                if (inPausa) pausa(false);       // in pausa il motore non ridisegna: la classifica non si vedrebbe arrivare
+                web.evaluateJavascript("window.__ring&&__ring.comandi&&__ring.comandi.classifica(true)", null);
+            }
+        });
         voceMenu("Open Page Brawl", new View.OnClickListener() {
             @Override public void onClick(View v) { apriMenu(false); ospite.apriApp(); }
         });
@@ -262,6 +301,7 @@ final class Comandi {
 
     /** Mette o toglie ogni pezzo secondo lo stato. */
     private void dispone() {
+        if (!attivo) return;                 // fermi o sospesi: niente finestre nuove (vedi `ferma`)
         boolean vedoCapsula = visibili && !ridotto;
         boolean vedoTasti = visibili && !ridotto && mostraTasti && !inPausa && mostraLottatori;
         int alto = ospite.margineAlto() + px(8);
@@ -397,6 +437,7 @@ final class Comandi {
     private final Runnable leggi = new Runnable() {
         @Override public void run() {
             if (!attivo) return;
+            final int questo = giro;
             // La grafica scelta nell'app vale subito, anche a partita aperta.
             String g = Memoria.graficaJs(ctx), prima = "";
             if (!g.equals(graficaData)) {
@@ -407,6 +448,7 @@ final class Comandi {
             web.evaluateJavascript(prima + "(function(){try{return window.__ring&&window.__ring.mosse?JSON.stringify({m:__ring.mosse(),p:__ring.pannello(),z:__ring.pausa()}):''}catch(e){return ''}})()",
                     new ValueCallback<String>() {
                         @Override public void onReceiveValue(String s) {
+                            if (!attivo || questo != giro) return;      // arrivata dopo ferma()/sospendi(): si butta
                             try { applica(s); } catch (Exception ignorata) { /* il prossimo giro */ }
                             if (attivo) h.postDelayed(leggi, ridotto ? 400 : OGNI);
                         }
