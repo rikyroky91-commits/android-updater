@@ -62,6 +62,13 @@ Su richiesta di Riccardo: «un lavoro ex novo su tempi morti, animazioni e comba
 - **Crediti e allenamento.** A fine corsa il **premio della corsa** in crediti (round, nemici, capi, parry, round puliti, cariche letali parate) si aggiunge alle monete raccolte. Coi crediti, oltre alla bottega, c'è l'**allenamento** di ogni personaggio (tasto «Allena» sopra «Gioca con»): Tempra, Colpo, Riflessi (parry più facile e contrattacco più forte), Arsenale, Seconda arma. Vale per sempre e solo per quel personaggio.
 - **Missioni** ricalibrate sui round più lunghi, e una nuova: «Fai N parry in una corsa».
 
+**Terzo giro della 1.2.0 (16/10/2026)**, su richiesta di Riccardo («nemici armati che lanciano anche con lancia granate una mossa da poter parare in parry e rimandare indietro, e quando muoiono rilasciano un fucile con motosega integrata che il protagonista può utilizzare per smembrare i nemici»; «scintilla parry quando si para», con due immagini di riferimento):
+
+- **Il lampo del parry**, rifatto: nucleo bianco accecante, raggi a stella con due punte lunghe a croce, una bolla dorata trasparente, tre mezzelune bianche verso chi ha attaccato, righe di velocità e, dietro, un attimo di buio perché sulle pagine chiare si veda.
+- **Il bruto armato** (nella corsa, quarto nemico nuovo, al massimo due insieme): grosso, grigio, corazzato, col lanciagranate all'anca. Tiene la distanza, punta (puntino rosso sulla canna), tira una granata a parabola che rimbalza e scoppia. Poco prima che arrivi la granata fa un **lampo bianco**: S premuto da lì in poi è un parry, la granata torna dritta sul bruto e scoppia fra gli zombie (forte, ad area); premuto prima del lampo è una parata (rimbalza via, arriva poco); presa in pieno toglie 10 di vita. La prima granata della corsa mostra il tasto.
+- **Il fucile-sega**: il bruto morendo lo lascia sempre, e passandoci sopra lo si prende in mano (14 colpi; se lo si ha già, si ricarica). L'eroe spara da lontano e da vicino **sega**: lo zombie segato perde la testa e un braccio, che volano via («SQUARCH!»). Con gli schizzi spenti si sega lo stesso, ma senza pezzi.
+- Premio della corsa: +10 crediti per granata rimandata.
+
 ### Le due varianti
 
 | Cartella | A cosa serve | Premium |

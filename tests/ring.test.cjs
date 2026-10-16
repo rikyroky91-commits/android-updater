@@ -3610,15 +3610,16 @@ test("la corsa: a ogni round con l'orda un nemico nuovo, e i protagonisti cambia
   const { amb, r } = corsaAvviata({}, "robot", 31);
   inLotta(amb, r);
   const nuovi = [], protagonisti = [amb.stato().corsa.protagonisti];
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 15; i++) {
     r.corsa.prossimo(i === 5 ? "duello" : "ondata"); r.corsa.vinci();
     avanzaCorsa(amb, r, 400, (s) => s.corsa.fase !== "lotta" || !s.orda && s.corsa.tipo !== "duello");
     const c = amb.stato().corsa;
     if (c.tipo === "duello") { assert.strictEqual(c.nuovo, null, "nel duello niente novità"); continue; }
     nuovi.push(c.nuovo); protagonisti.push(c.protagonisti);
   }
-  assert.deepStrictEqual(nuovi.slice(0, 12), ["striscia", "botto", "dragoFuoco", "gonfio", "saltatore", "dragoFulmine", "corazzato", "gelido", "grosso", "dragoVeleno", "sputatore", "rabbioso"]);
-  assert.strictEqual(nuovi[12], null, "finiti i nuovi, i round mescolano quelli già visti");
+  // (dal 16/10/2026 il bruto armato è il quarto)
+  assert.deepStrictEqual(nuovi.slice(0, 13), ["striscia", "botto", "dragoFuoco", "bruto", "gonfio", "saltatore", "dragoFulmine", "corazzato", "gelido", "grosso", "dragoVeleno", "sputatore", "rabbioso"]);
+  assert.strictEqual(nuovi[13], null, "finiti i nuovi, i round mescolano quelli già visti");
   for (let i = 1; i < protagonisti.length; i++) {
     assert.ok(protagonisti[i].length >= 2, "due o tre protagonisti a round");
     // (al secondo round i tipi visti sono solo tre: lì uno può tornare)
@@ -4506,4 +4507,101 @@ test("allenamento: si compra coi crediti, resta per sempre, vale solo per quel p
   assert.ok(r2.corsa.scegli("mela"));
   assert.strictEqual(amb2.stato().corsa.hpMax, 120, "l'allenamento del robot non vale per la mela");
   assert.strictEqual(JSON.stringify(r2.corsa.allenamento()), JSON.stringify(r.corsa.allenamento()), "l'allenamento resta fra un'apertura e l'altra");
+});
+
+// ·· Il bruto armato e il fucile-sega (16/10/2026) ··
+// Una corsa al primo round con l'orda, e un bruto a qualche passo dall'eroe.
+function corsaColBruto(seme, dx = 230) {
+  const { amb, r } = corsaAvviata({}, "robot", seme);
+  avanzaCorsa(amb, r, 60 * 10, (s) => (s.orda && s.corsa.fase === "lotta" ? false : undefined));
+  const f = amb.lottatore("robot");
+  r.zombie("bruto", Math.min(1100, f.bacino.x + dx));
+  return { amb, r };
+}
+// Segue la prima granata del bruto finché scoppia (o esce); `premi`: S quando sta per arrivare.
+function seguiGranata(amb, r, premi) {
+  let vista = false, hpPrima = null, rimandata = false, finita = false, protetto = false, premuto = false;
+  const scritte = new Set();
+  avanzaCorsa(amb, r, 60 * 14, (s) => {
+    for (const x of s.scritte) scritte.add(x);
+    const g = r.corsa.tiri().find((t) => t.tipo === "granata");
+    if (g && !vista) { vista = true; hpPrima = s.corsa.hp; }
+    if (g && g.rimandata) rimandata = true;
+    // (al lampo bianco sulla granata, e una volta sola, come un giocatore: premuto a ripetizione il parry si chiude)
+    if (g && premi && !premuto && !g.rimandata && !g.parata && g.avvisata) premuto = r.tastoGiu("KeyS");
+    if (vista && !g) { finita = true; protetto = s.corsa.invuln > 0 || s.corsa.scudo > 0; return false; }
+  });
+  return { vista, hpPrima, rimandata, finita, protetto, scritte, hp: amb.stato().corsa.hp };
+}
+
+test("bruto armato: tiene la distanza, tira la granata a parabola, e presa in pieno fa male", () => {
+  let colpito = false, viste = 0;
+  for (let k = 0; k < 4 && !colpito; k++) {
+    const { amb, r } = corsaColBruto(900 + k);
+    const g = seguiGranata(amb, r, false);
+    if (!g.vista) continue;
+    viste++;
+    assert.ok([...g.scritte].some((x) => /rimandala/.test(x)), "la prima granata della corsa insegna il tasto");
+    // (se la granata è scoppiata lontano, o l'eroe era appena stato colpito, non conta)
+    if (g.finita && !g.protetto && g.hp < g.hpPrima) colpito = true;
+    dentro(amb);
+  }
+  assert.ok(viste > 0, "il bruto non ha mai tirato una granata");
+  assert.ok(colpito, "in quattro corse la granata non ha mai fatto male");
+});
+
+test("bruto armato: col parry al momento giusto la granata torna indietro e scoppia fra gli zombie", () => {
+  let fatto = false;
+  for (let k = 0; k < 4 && !fatto; k++) {
+    const { amb, r } = corsaColBruto(920 + k);
+    const g = seguiGranata(amb, r, true);
+    if (!g.rimandata) continue;
+    assert.ok(amb.stato().corsa.granateRimandate >= 1, "la granata rimandata va contata");
+    assert.ok([...g.scritte].some((x) => /RIMANDATA/.test(x)), "si scrive che è stata rimandata");
+    fatto = true;
+    dentro(amb);
+  }
+  assert.ok(fatto, "in quattro corse il parry non ha mai rimandato la granata");
+});
+
+test("bruto armato: morendo lascia il fucile-sega, e l'eroe lo prende in mano", () => {
+  let preso = false, lasciato = false;
+  for (let k = 0; k < 3 && !preso; k++) {
+    const { amb, r } = corsaColBruto(940 + k, 45);           // (addosso: da lontano il bruto tiene la distanza)
+    avanzaCorsa(amb, r, 60 * 60, (s) => {
+      if ((s.corsa.aTerra || []).indexOf("motosega") >= 0) lasciato = true;
+      if (s.lottatori.find((l) => l.tipo === "robot").arma === "motosega") { preso = true; return false; }
+    });
+    dentro(amb);
+  }
+  // (accanto al bruto l'eroe lo prende nello stesso fotogramma in cui cade: preso vuol dire anche lasciato)
+  assert.ok(lasciato || preso, "il bruto non ha lasciato il fucile-sega");
+  assert.ok(preso, "l'eroe non ha preso il fucile-sega");
+});
+
+test("fucile-sega: da vicino sega, e lo zombie segato va in pezzi", () => {
+  const { amb, r } = corsaAvviata({}, "robot", 960);
+  avanzaCorsa(amb, r, 60 * 10, (s) => (s.orda && s.corsa.fase === "lotta" ? false : undefined));
+  r.corsa.lascia("motosega");
+  const f = amb.lottatore("robot");
+  for (const dx of [60, 95, -70]) r.zombie("lento", f.bacino.x + dx);
+  let sega = false, pezzi = false, inMano = false;
+  avanzaCorsa(amb, r, 60 * 15, (s) => {
+    const e = s.lottatori.find((l) => l.tipo === "robot");
+    if (e.arma === "motosega") inMano = true;
+    if (e.azione === "sega") sega = true;
+    if (s.scritte.some((x) => x === "SQUARCH!")) { pezzi = true; return false; }
+  });
+  assert.ok(inMano, "passandoci sopra il fucile-sega va in mano");
+  assert.ok(sega, "da vicino l'eroe deve segare");
+  assert.ok(pezzi, "lo zombie segato deve andare in pezzi");
+  dentro(amb);
+});
+
+test("ring.js: nessuna funzione dichiarata due volte allo stesso livello (la seconda copre la prima senza errori)", () => {
+  // Successo due volte: `sparisci` dei maghi copriva quella del volo fuori, e il getto del jetpack (`fiammata`)
+  // era coperto dal lanciafiamme, sicché non si vedeva.
+  const nomi = SORGENTE.match(/^  function [A-Za-z0-9_]+/gm).map((x) => x.slice(11));
+  const doppi = nomi.filter((n, i) => nomi.indexOf(n) !== i);
+  assert.deepStrictEqual(doppi, [], "funzioni doppie: " + doppi.join(", "));
 });
