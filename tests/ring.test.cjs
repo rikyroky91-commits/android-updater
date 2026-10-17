@@ -4213,10 +4213,11 @@ test("super guerrieri: la trasformazione si chiama Limit Break, e lo scrive", ()
   amb.avanza(30);
   const r = amb.finestra.__ring;
   r.comandi.stile("guerrieri");
-  let visto = false, ordinato = false;
+  let visto = false, ordinato = false, quando = -1e9;
   amb.avanza(60 * 40, (s) => {
     const f = s.lottatori.find((l) => l.tipo === "robot");
-    if (!ordinato && f.ki >= 40 && !f.ko && r.ordina("robot", "trasforma")) ordinato = true;
+    // (richiesto di nuovo ogni quattro secondi: un colpo a metà carica la interrompe, circa una volta su dieci)
+    if (s.tempo - quando > 240 && f.ki >= 40 && !f.ko && r.ordina("robot", "trasforma")) { ordinato = true; quando = s.tempo; }
     if (s.scritte.some((x) => /^LIMIT BREAK/.test(x))) { visto = true; return false; }
     if (s.scritte.some((x) => /SOVRACCARICO/.test(x))) assert.fail("si chiama ancora sovraccarico");
   });
@@ -4369,7 +4370,7 @@ test("parry: S premuto appena prima del colpo lo annulla, l'altro resta scoperto
       if (R.azione === "contro") contro = true;
       stordita = Math.max(stordita, M.stordito || 0);
     });
-    if (scritte.has("PARRY!")) {
+    if ([...scritte].some((x) => /^PARRY/.test(x))) {
       riusciti++;
       assert.strictEqual(amb.lottatore("robot").danni, 0, "col parry il colpo non fa niente");
       assert.ok(contro, "dopo il parry parte il contrattacco");
@@ -4404,7 +4405,7 @@ test("parry: premuto troppo presto è solo una parata; tenuto è guardia, lascia
     r2.ordina("mela", "pugno");
     const sc = new Set();
     a2.avanza(40, (s) => { for (const x of s.scritte) sc.add(x); });
-    if (sc.has("PARRY!")) parry++; else if (sc.has("PARATO!")) parato++;
+    if ([...sc].some((x) => /^PARRY/.test(x))) parry++; else if (sc.has("PARATO!")) parato++;
   }
   assert.ok(parato > parry, "premuto mezzo secondo prima deve essere una parata, non un parry (parry " + parry + ", parate " + parato + ")");
 });
@@ -4673,7 +4674,7 @@ test("parry a vista: l'anello conta i fotogrammi del morso, il parry rallenta il
       ralenti = Math.max(ralenti, s.ralenti);
       if (scritte.has("CONTRO!")) return false;
     });
-    if (!scritte.has("PARRY!")) continue;
+    if (![...scritte].some((x) => /^PARRY/.test(x))) continue;
     assert.ok(visto !== null && visto > 6, "l'anello si vede prima del morso: " + visto);
     assert.ok(ralenti > 0, "il parry rallenta il tempo");
     assert.ok(scritte.has("CONTRO!"), "e il contrattacco si vede");
@@ -4702,6 +4703,106 @@ test("parata premuta troppo presto: «TROPPO PRESTO!»; presa e premuta subito d
   }
   assert.ok(presto, "nessun «TROPPO PRESTO!»");
   assert.ok(tardi, "nessun «TROPPO TARDI!»");
+});
+
+// ·· Il parry, seconda volta (17/10/2026) ··
+// Un parry sul morso di uno zombie, premendo S quando mancano `quando` fotogrammi; torna le scritte viste.
+function parryZombie(tipo, seme, quando, fine, opz = {}) {
+  const { amb, r } = corsaAvviata(opz, "robot", seme);
+  avanzaCorsa(amb, r, 60 * 10, (s) => (s.orda && s.corsa.fase === "lotta" ? false : undefined));
+  const f0 = amb.lottatore("robot");
+  r.zombie(tipo, f0.bacino.x + 40);
+  const scritte = new Set();
+  let premuto = -1, piu = { lampo: 0, zoom: false, equil: 0 };
+  avanzaCorsa(amb, r, 60 * 10, (s) => {
+    for (const x of s.scritte) scritte.add(x);
+    piu.lampo = Math.max(piu.lampo, s.parata.lampo); piu.zoom = piu.zoom || s.parata.zoom;
+    for (const z of s.orda ? s.orda.zombie : []) piu.equil = Math.max(piu.equil, z.equil);       // (anche uno della corsa)
+    const m = r.minacciaParry();
+    // (una pressione per colpo, come un giocatore: lasciato e ripremuto)
+    if (m !== null && m <= quando && s.tempo - premuto > 12) { r.tastoSu("KeyS"); r.tastoGiu("KeyS"); premuto = s.tempo; }
+    if (fine && fine(scritte, s)) return false;
+  });
+  r.tastoSu("KeyS");
+  return { amb, r, scritte, piu };
+}
+
+test("parry perfetto: premuto all'ultimo è «PARRY PERFETTO!», con lampo a schermo, zoom ed equilibrio tolto", () => {
+  let fatto = false;
+  for (let k = 0; k < 6 && !fatto; k++) {
+    const { amb, scritte, piu } = parryZombie("corazzato", 2100 + k, 2, (sc) => sc.has("PARRY PERFETTO!") && sc.has("CONTRO!"));
+    if (!scritte.has("PARRY PERFETTO!")) continue;
+    assert.ok(piu.lampo > 0.3, "il lampo a schermo: " + piu.lampo);
+    assert.ok(piu.zoom, "lo zoom sul punto");
+    assert.ok(piu.equil >= 0.7 || scritte.has("SBILANCIATO!"), "il parry perfetto toglie equilibrio: " + piu.equil);
+    fatto = true;
+    dentro(amb);
+  }
+  assert.ok(fatto, "in sei corse nessun parry perfetto");
+});
+
+test("parry normale: premuto a metà finestra è «PARRY!» e non perfetto", () => {
+  let fatto = false;
+  for (let k = 0; k < 6 && !fatto; k++) {
+    const { scritte } = parryZombie("corazzato", 2200 + k, 11, (sc) => sc.has("PARRY!") || sc.has("PARRY PERFETTO!"));
+    if (scritte.has("PARRY!")) { assert.ok(!scritte.has("PARRY PERFETTO!")); fatto = true; }
+  }
+  assert.ok(fatto, "in sei corse nessun parry normale");
+});
+
+test("sbilanciato: parry dopo parry lo zombie perde l'equilibrio e il colpo dopo è il colpo di grazia", () => {
+  let fatto = false;
+  for (let k = 0; k < 8 && !fatto; k++) {
+    const { amb, scritte } = parryZombie("corazzato", 2300 + k, 3, (sc) => sc.has("COLPO DI GRAZIA!"));
+    if (!scritte.has("COLPO DI GRAZIA!")) continue;
+    assert.ok(scritte.has("SBILANCIATO!"), "prima sbilanciato, poi la grazia");
+    assert.ok(amb.stato().corsa.grazie >= 1, "contato nella corsa");
+    fatto = true;
+  }
+  assert.ok(fatto, "in otto corse nessun colpo di grazia");
+});
+
+test("le tre manate del capo: si parano una per una, e tutte e tre danno il «CONTRO TOTALE!»", () => {
+  let fatto = false, serie = false;
+  for (let k = 0; k < 8 && !fatto; k++) {
+    const { amb, scritte } = parryZombie("capo", 2400 + k, 3, (sc) => sc.has("CONTRO TOTALE!"), {});
+    if (amb.stato().parata.catena >= 2) serie = true;
+    if (!scritte.has("CONTRO TOTALE!")) continue;
+    assert.ok(scritte.has("SBILANCIATO!"), "il capo va giù sbilanciato");
+    fatto = true;
+    dentro(amb);
+  }
+  assert.ok(serie, "nessuna catena di parry sul capo");
+  assert.ok(fatto, "in otto corse nessun contro totale");
+});
+
+test("guardia: tenere S para tutto, ma i colpi la consumano; a zero «GUARDIA ROTTA!» e si resta scoperti", () => {
+  let fatto = false;
+  for (let k = 0; k < 6 && !fatto; k++) {
+    const { amb, r } = corsaAvviata({}, "robot", 2500 + k);
+    avanzaCorsa(amb, r, 60 * 10, (s) => (s.orda && s.corsa.fase === "lotta" ? false : undefined));
+    const x = amb.lottatore("robot").bacino.x;
+    r.zombie("grosso", x + 40); r.zombie("grosso", x - 40); r.zombie("corazzato", x + 50);
+    let minima = 100, vista = false;
+    avanzaCorsa(amb, r, 60 * 12, (s) => {
+      // (tenuto: rilasciato e ripremuto ogni tanto, perché la guardia tenuta dura quattro secondi)
+      if (s.tempo % 200 === 0) r.tastoSu("KeyS");
+      r.tastoGiu("KeyS");
+      if (s.parata.guardia !== null) minima = Math.min(minima, s.parata.guardia);
+      if (s.scritte.includes("GUARDIA ROTTA!")) { vista = s.parata.stordito > 0; return false; }
+    });
+    r.tastoSu("KeyS");
+    if (!vista) continue;
+    assert.ok(minima <= 0, "la guardia arriva a zero: " + minima);
+    fatto = true;
+  }
+  assert.ok(fatto, "in sei corse la guardia non si è mai rotta");
+});
+
+test("con la scossa spenta niente zoom: il lampo resta, più tenue", () => {
+  const s = fs.readFileSync(path.join(__dirname, "..", "web", "static", "ring.js"), "utf8");
+  assert.ok(/if \(zoomParry\) \{\s*if \(fattoreScossa\(\) > 0\)/.test(s), "lo zoom dipende dalla scossa");
+  assert.ok(/lampoSchermo \* \(fattoreScossa\(\) > 0 \? 1 : 0\.4\)/.test(s), "il lampo si attenua con la scossa spenta");
 });
 
 test("aggancio: un clic su uno zombie lo aggancia, l'eroe va da lui; un altro clic lo sgancia", () => {

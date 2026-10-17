@@ -1,6 +1,6 @@
 # Passaggio di consegne: Mobile Update Tracker e Page Brawl
 
-Documento vivo. Ultimo aggiornamento: **17/10/2026**, su `main` dopo l'unione di Page Brawl 1.2.0 / Android 1.6.0 (ramo `claude/exciting-cori-6cwl9m`, avanti veloce fino a `83ec0ee` più questo aggiornamento).
+Documento vivo. Ultimo aggiornamento: **17/10/2026**, sul ramo `claude/exciting-cori-6cwl9m` (il parry, seconda volta), dopo l'unione a `main` di Page Brawl 1.2.0 / Android 1.6.0 (`f8d3910`).
 
 Questo file è il punto di ingresso per chiunque lavori sul repository: persone, Claude, Codex o altri agenti. Si tiene **sempre aggiornato** (regola in fondo, sezione 9). I passaggi di consegne dei singoli giri restano in `docs/consegne/` come archivio storico: questo li riassume e li sostituisce come riferimento.
 
@@ -37,7 +37,7 @@ Il flusso del repository è **push diretto su `main`** (nessuna PR è mai stata 
 
 | Ramo | Cosa contiene | Da fare |
 | --- | --- | --- |
-| `claude/exciting-cori-6cwl9m` (16-17/10) | Page Brawl 1.2.0 / Android 1.6.0 (dettaglio in `estensione/LEGGIMI.md`, «La 1.2.0» e i giri dopo) | **Unito a `main` il 17/10** (avanti veloce, su richiesta di Riccardo: «unisci»). Cancellabile |
+| `claude/exciting-cori-6cwl9m` (16-17/10) | Page Brawl 1.2.0 / Android 1.6.0, unito a `main` il 17/10 (`f8d3910`); dopo, **il parry, seconda volta** (parry perfetto, equilibrio e colpo di grazia, catena, attacchi rossi, tre manate del capo, guardia che si consuma) | Il parry nuovo **non è su `main`**: si unisce quando Riccardo lo dice |
 | `claude/ultimora-tema-scuro-codice-modello` (02/10) | Commit `61f8ca9` «lotte più fitte, meno tempi morti», mai arrivato su `main` | **Rifatto a mano il 16/10** sul ramo qui sopra (con lo strumento `tests/misura-lotta.cjs` che stava lì). Cancellabile (quello nuovo è su `main` dal 17/10) |
 
 ### Pulizia dei rami (verificata il 16/10/2026)
@@ -353,6 +353,7 @@ Tre strumenti di misura, che non sono test: `tests/misura-posture.cjs`, `tests/m
 - Maghi senza trasformazione vera (solo trance e aura).
 - **Corsa a flusso (17/10)**: senza round la classifica tiene nel campo `round` il livello di minaccia raggiunto (il server lo controlla come prima: una fase dura ~30 s, sopra i 5 s per round del controllo). Le voci vecchie in classifica restano coi round veri. Non provato a mano.
 - **Bruto armato (16/10)**: l'eroe automatico non para le granate, quindi chi lascia giocare l'eroe da solo arriva un po' meno lontano (misurato con `misura-corsa`, 4 corse: round 4-7 e 2,0-3,1 minuti, contro 5-6 e 2,6-3,2 senza bruto; con la granata a 10 invece di 12). Contro la granata il parry non è «14 fotogrammi prima del colpo» ma «premuto dopo il lampo bianco» (`aggiornaGranata`): quanto vola dipende da come si sposta l'eroe, e coi fotogrammi un giocatore non ce la faceva. Provato solo in Chromium e coi test, non a mano su un telefono.
+- **Parry, seconda volta (17/10)**: tarature (equilibrio per parry 0,45, perfetto 0,7; guardia 100 con morso 22, grosso 34, carica 50; capo con tre colpi a 18 fotogrammi l'uno dall'altro) scelte a occhio e coi test, non provate a mano da una persona. Il colpo di grazia vale anche per i colpi automatici dell'eroe, non solo per quelli comandati. Le tre manate del capo sono più difficili sul telefono, dove la parata passa dal controller.
 - Traduzioni ES/FR/DE del gioco non riviste da madrelingua.
 - Il tema di Halloween si spegne da solo il 2 novembre; Page Snow e il tema di Natale del sito vanno ricontrollati prima di dicembre.
 
@@ -422,6 +423,7 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 17/10/2026 | Claude | Il parry, seconda volta (spunti da Sekiro, God of War, Expedition 33, Lies of P; il video indicato da Riccardo non si è potuto scaricare, viste solo le anteprime): parry perfetto negli ultimi 5 fotogrammi, lampo bianco e zoom sull'impatto, equilibrio dei nemici e colpo di grazia, catena ×N, anello rosso e «!!» sulla carica letale, tre manate del capo con «CONTRO TOTALE», guardia che si consuma e si rompe, barra dell'equilibrio sotto quella del capo, pagina nuova nella guida, 12 traduzioni. Provato coi test e in Chromium, non a mano | `claude/exciting-cori-6cwl9m` |
 | 17/10/2026 | Claude | **Unito a `main`** il ramo `claude/exciting-cori-6cwl9m` (Page Brawl 1.2.0 / Android 1.6.0, donazioni Ko-fi, corsa a flusso, parry al centro, menu): il push pubblica il sito su Oracle. Da fare a mano: caricare la 1.2.0 sul Chrome Web Store, l'AAB su Play, l'account Ko-fi | `main` |
 | 17/10/2026 | Claude | CI rossa sul menu: il test «super guerrieri… restano stabili» cadeva circa una volta su 25 anche prima (provato col commit precedente). Causa vera nel gioco: nei colpi finali chi vola (mulinello, orbita…) contro un bordo usciva di qualche pixel con la testa. Corretto: margine del mulinello a 64 px, chi prende il colpo spostato via dal bordo all'inizio, e `tieniDentroFatale` a ogni passo. 360 prove senza uscite | `claude/exciting-cori-6cwl9m` |
 | 17/10/2026 | Claude | Menu nuovo sul canvas: principale (al posto della scelta del modo), guida in sei pagine, impostazioni (volume, anello e aiuto al parry, rallentatore, scossa, difficoltà, tasti), pausa con Esc o ⏸; tasto «Menu» nella tendina; 89 traduzioni | `claude/exciting-cori-6cwl9m` |
