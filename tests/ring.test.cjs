@@ -4730,3 +4730,48 @@ test("aggancio: un clic su uno zombie lo aggancia, l'eroe va da lui; un altro cl
   }
   dentro(amb);
 });
+
+// ·· Il menu (17/10/2026) ··
+test("menu principale: frecce e Invio, la guida si sfoglia, le impostazioni si cambiano e restano", () => {
+  const amb = ambiente({});
+  const r = amb.finestra.__ring;
+  r.sceltaModo(true);
+  amb.avanza(10);
+  assert.strictEqual(amb.stato().tastiera.menu, "principale", "all'accensione nell'estensione c'è il menu");
+  r.tastoGiu("ArrowDown"); r.tastoGiu("ArrowDown"); r.tastoGiu("Enter");
+  assert.strictEqual(amb.stato().tastiera.menu, "guida", "la terza voce è la guida");
+  r.tastoGiu("ArrowRight"); r.tastoGiu("ArrowRight");
+  amb.avanza(2);
+  r.tastoGiu("Escape");
+  assert.strictEqual(amb.stato().tastiera.menu, "principale", "Esc torna indietro");
+  r.tastoGiu("ArrowDown"); r.tastoGiu("Enter");
+  assert.strictEqual(amb.stato().tastiera.menu, "impostazioni");
+  r.tastoGiu("ArrowDown"); r.tastoGiu("ArrowLeft");                  // il volume, giù di uno
+  amb.avanza(2);
+  assert.strictEqual(JSON.parse(amb.memoria["mut-ring-impostazioni"]).volume, 6, "il volume cambiato si ricorda");
+  r.tastoGiu("Escape"); r.tastoGiu("Escape");
+  assert.strictEqual(amb.stato().tastiera.menu, "principale", "dalla prima scelta si va solo avanti");
+  r.tastoGiu("ArrowUp"); r.tastoGiu("ArrowUp"); r.tastoGiu("ArrowUp"); r.tastoGiu("Enter");
+  amb.avanza(5);
+  assert.ok(amb.stato().corsa, "Corsa infinita apre la corsa");
+  assert.strictEqual(amb.stato().tastiera.menu, null);
+  dentro(amb);
+});
+
+test("pausa: Esc nella corsa ferma il tempo; Riprendi riparte; Abbandona chiede conferma", () => {
+  const { amb, r } = corsaAvviata();
+  avanzaCorsa(amb, r, 200);
+  r.tastoGiu("Escape");
+  assert.strictEqual(amb.stato().tastiera.menu, "pausa");
+  assert.ok(amb.stato().corsa.pausa, "il tempo è fermo");
+  const t0 = amb.stato().corsa.minuti;
+  r.tastoGiu("Enter");                                                // Riprendi
+  assert.strictEqual(amb.stato().tastiera.menu, null);
+  assert.ok(!amb.stato().corsa.pausa, "riparte");
+  r.tastoGiu("Escape");
+  r.tastoGiu("ArrowUp"); r.tastoGiu("Enter");                         // Abbandona: la prima volta chiede
+  assert.strictEqual(amb.stato().corsa.fase, "lotta", "la prima volta chiede conferma");
+  r.tastoGiu("Enter");
+  assert.strictEqual(amb.stato().corsa.fase, "fine", "la seconda la corsa finisce");
+  void t0;
+});

@@ -229,6 +229,23 @@
   //    prima di AUDIO.pausa millisecondi: in una mischia con l'orda sennò è rumore.
   // (tempi in passi di fisica: la stessa famiglia non prima di 3 passi, cioè 50 ms)
   const AUDIO = { volume: 0.42, voci: 14, pausa: 3 };
+  // Le impostazioni del menu (17/10/2026, Riccardo: «più istruzioni e più impostazioni»), in `mut-ring-impostazioni`.
+  // Quelle che c'erano già (audio, schizzi, barre, dettaglio, tastiera) restano dove stavano; queste sono nuove.
+  //   volume        0-10 (7 = com'era)
+  //   anello        l'anello del tempo del parry: "sempre", "corsa" (solo nella corsa), "mai"
+  //   aiutoParry    finestra del parry più larga di quattro fotogrammi
+  //   rallentatore  il rallentatore dopo il parry
+  //   scossa        lo schermo che trema: "piena", "ridotta", "spenta"
+  //   difficolta    nella corsa, quanto fanno male i colpi: "facile" (×0,7), "normale", "difficile" (×1,35)
+  const IMPOSTAZIONI_BASE = { volume: 7, anello: "sempre", aiutoParry: false, rallentatore: true, scossa: "piena", difficolta: "normale" };
+  const imp = Object.assign({}, IMPOSTAZIONI_BASE);
+  try {
+    const t = JSON.parse(deposito.getItem("mut-ring-impostazioni") || "null");
+    if (t && typeof t === "object") for (const k in IMPOSTAZIONI_BASE) if (typeof t[k] === typeof IMPOSTAZIONI_BASE[k]) imp[k] = t[k];
+  } catch (errore) { /* quelle di base */ }
+  function salvaImp() { try { deposito.setItem("mut-ring-impostazioni", JSON.stringify(imp)); } catch (errore) { /* pazienza */ } }
+  const volumeAudio = () => AUDIO.volume * Math.max(0, Math.min(10, imp.volume)) / 7;
+  const fattoreScossa = () => (imp.scossa === "spenta" ? 0 : imp.scossa === "ridotta" ? 0.4 : 1);
   const audio = { acceso: false, ctx: null, uscita: null, rumore: null, finiscono: [], ultimo: {}, anelli: {} };
   try { audio.acceso = deposito.getItem("mut-ring-audio") === "on"; } catch (errore) { /* resta spento */ }
   // Il contesto audio nasce al primo gesto (i browser non lasciano suonare prima).
@@ -240,7 +257,7 @@
       try {
         const c = new Ctx();
         const comp = c.createDynamicsCompressor ? c.createDynamicsCompressor() : null;
-        const g = c.createGain(); g.gain.value = AUDIO.volume;
+        const g = c.createGain(); g.gain.value = volumeAudio();
         if (comp) { g.connect(comp); comp.connect(c.destination); } else g.connect(c.destination);
         // Un secondo di rumore bianco, riusato da tutti i suoni di rumore.
         const n = Math.floor(c.sampleRate || 44100), buf = c.createBuffer(1, n, c.sampleRate || 44100), d = buf.getChannelData(0);
@@ -2194,7 +2211,8 @@
   // riapre solo dopo `riposo` fotogrammi.
   const PARRY = { finestra: 14, guardiaMax: 240, riposo: 40, stordito: 70, forza: 6 };
   // (i Riflessi dell'allenamento allargano la finestra all'eroe della corsa: vedi ALLENAMENTO)
-  const larghezzaParry = (f) => (corsa && corsa.chi && f.tipo === corsa.chi ? 3 * (corsa.riflessi || 0) : 0);
+  // (i Riflessi dell'allenamento, e l'aiuto delle impostazioni per chi gioca)
+  const larghezzaParry = (f) => (corsa && corsa.chi && f.tipo === corsa.chi ? 3 * (corsa.riflessi || 0) : 0) + (imp.aiutoParry && f === chiPara() ? 4 : 0);
   const inFinestraParry = (f) => !!(f && f.azione === "para" && f.paraT0 !== undefined && tempo - f.paraT0 <= PARRY.finestra + larghezzaParry(f));
   // Si mette in guardia (da un comando di chi gioca): la finestra parte adesso, se non si è appena sbagliato.
   function inGuardia(f, tenuta) {
@@ -2253,6 +2271,7 @@
   function disegnaTempoParry() {
     const f = chiPara();
     if (!f || !f.p || f.esploso || f.fuoriCampo || (corsa && corsa.fase !== "lotta")) return;
+    const conAnello = imp.anello === "sempre" || (imp.anello === "corsa" && corsa && corsa.chi);
     const c = { x: (f.p.collo.x + f.p.bacino.x) / 2, y: (f.p.collo.y + f.p.bacino.y) / 2 }, R0 = 30 * S;
     ctx.save(); ctx.lineCap = "round";
     // Lo scudo, in guardia.
@@ -2264,7 +2283,7 @@
       ctx.globalAlpha = k * 0.35; ctx.lineWidth = 12 * S; ctx.stroke();
     }
     // L'anello del tempo.
-    const m = minacciaParry(f);
+    const m = conAnello ? minacciaParry(f) : null;
     if (m) {
       const fin = PARRY.finestra + larghezzaParry(f), dentro = m.fot <= fin, R = R0 + m.fot * 2.4 * S;
       ctx.globalAlpha = Math.min(1, 0.35 + (45 - m.fot) / 40);
@@ -2302,7 +2321,7 @@
     scrivi("PARRY!", x, y - 22 * S, true);
     suona("parry", x, 1);
     // Il rallentatore: il tempo a un terzo per mezzo secondo, così il contrattacco si vede (vedi `eseguiContro`).
-    ralenti = Math.max(ralenti, 30);
+    if (imp.rallentatore) ralenti = Math.max(ralenti, 30);
     impara(f, "para", 1, 2);
     if (corsa && corsa.chi && f.tipo === corsa.chi) { corsa.parry = (corsa.parry || 0) + 1; caricaCorsa(10); corsa.punti += 25; }
     inizia(f, "contro"); f.controDi = da || null; f.controZ = z || null;
@@ -2569,7 +2588,7 @@
       return;
     }
     // La corsa: i suoi tasti, e nei menu ogni tocco è suo.
-    if (corsa || classifica.aperta || sceltaModo) {
+    if (menu || corsa || classifica.aperta || sceltaModo) {
       const t = tastoCorsa(evento.clientX, evento.clientY);
       if (t) { suona("clic"); t.fa(); }
       else if (corsa && corsa.fase === "scelta") {
@@ -12797,7 +12816,7 @@
     ctx.clearRect(0, 0, W, H);
     disegnaScenario();
     ctx.save();
-    if (scossa > 0) ctx.translate(caso(-1, 1) * Math.min(4, scossa) * S, caso(-1, 1) * Math.min(4, scossa) * S);
+    if (scossa > 0 && fattoreScossa() > 0) ctx.translate(caso(-1, 1) * Math.min(4, scossa) * S * fattoreScossa(), caso(-1, 1) * Math.min(4, scossa) * S * fattoreScossa());
     disegnaDanni();
     disegnaBordi();
     for (const m of macchie) {
@@ -13258,6 +13277,7 @@
     for (const b of dentroPannello("[data-metti]")) b.addEventListener("click", () => comandi.metti(b.getAttribute("data-metti")));
     for (const b of dentroPannello("[data-colpo]")) b.addEventListener("click", () => comandi.colpo(b.getAttribute("data-colpo")));
     // La corsa si gioca sul canvas: il pannello si chiude, sennò la copre.
+    for (const b of dentroPannello("[data-menu]")) b.addEventListener("click", () => { apriPannello(false); assicuraAcceso(); apriMenu(corsa && corsa.chi ? "pausa" : "principale"); riparti(); });
     for (const b of dentroPannello("[data-corsa]")) b.addEventListener("click", () => { apriPannello(false); sceltaModo = false; if (!corsa) comandi.corsa(); aggiornaInterruttori(); });
     // Il combattimento libero: si esce dalla corsa (o dalla scelta del modo) e si torna al ring di sempre.
     for (const b of dentroPannello("[data-libero]")) b.addEventListener("click", () => { if (corsa) chiudiCorsa(); sceltaModo = false; aggiornaInterruttori(); riparti(); });
@@ -13507,6 +13527,7 @@
       return;
     }
     if (!tastiera || scrivendo(e.target) || !e.code) return;
+    if (!fermo && tastiMenu(e)) { e.preventDefault(); e.stopPropagation(); riparti(); return; }
     if (tastiCarte(e)) { e.preventDefault(); e.stopPropagation(); return; }
     const id = azioneDi(e.code);
     if (!id) return;
@@ -14452,7 +14473,7 @@
     const c = corsa, f = eroe();
     if (!c || c.fase !== "lotta" || !f || c.pausa) return false;
     if (c.invuln > 0 || c.scudo > 0) { scintille(x, y, 6, "#bfe9ff"); return false; }
-    danno = Math.max(1, Math.round(danno * crescita() * pelleCorsa()));
+    danno = Math.max(1, Math.round(danno * crescita() * pelleCorsa() * (imp.difficolta === "facile" ? 0.7 : imp.difficolta === "difficile" ? 1.35 : 1)));
     c.hp -= danno; c.danniRound += danno;
     caricaCorsa(Math.min(danno, 30) * 0.25);                       // un colpo enorme non riempie il colpo finale
     c.lampo = 8;
@@ -15182,10 +15203,369 @@
       tastiUI.push({ x, y, w, h, fa: () => scegliModo(modo) });
     });
   }
+  // ·· IL MENU (17/10/2026) ··
+  // Riccardo: «un ripensamento dei menu e della UI: deve accoglierti ed essere facile da capire, voglio più istruzioni
+  // e più impostazioni, deve sembrare un gioco tripla A». Un menu solo, disegnato sul canvas come la corsa:
+  //  - PRINCIPALE: all'accensione nell'estensione (al posto dei due riquadri di prima), dal tasto «Menu» della tendina
+  //    e da Esc fuori dalla corsa. Corsa infinita, Combattimento libero, Come si gioca, Impostazioni, Classifica.
+  //  - GUIDA («Come si gioca»): sei pagine illustrate; quella del parry ha l'anello che si stringe, dal vivo.
+  //  - IMPOSTAZIONI: audio e volume, grafica, aiuti al parry, rallentatore, scossa, difficoltà, schizzi, barre,
+  //    tastiera, e la pagina dei TASTI (si rimappano da qui come dalla tendina).
+  //  - PAUSA: Esc o ⏸ durante la corsa; il tempo si ferma.
+  // Mouse o tocco, oppure tastiera: ↑ ↓ sceglie, ← → cambia o sfoglia, Invio conferma, Esc torna indietro.
+  let menu = null;
+  let primaVolta = true;
+  try { primaVolta = deposito.getItem("mut-ring-benvenuto") !== "visto"; } catch (errore) { /* resta la prima volta */ }
+  function apriMenu(pagina) {
+    menu = { pagina, pila: [], sel: 0, t: 0, guida: 0, conferma: 0 };
+    if (corsa && corsa.chi && pagina === "pausa") corsa.pausa = true;
+    suona("clic", W / 2, 0.5);
+    return true;
+  }
+  function vaiA(pagina) {
+    menu.pila.push({ pagina: menu.pagina, sel: menu.sel });
+    menu.pagina = pagina; menu.sel = 0; menu.t = 0; menu.guida = 0;
+    if (pagina === "guida" && primaVolta) { primaVolta = false; try { deposito.setItem("mut-ring-benvenuto", "visto"); } catch (errore) { /* pazienza */ } }
+    suona("clic", W / 2, 0.5);
+    return true;
+  }
+  function chiudiMenu() {
+    if (!menu) return false;
+    rimappa = null;
+    if (menu.pila.length) { const p = menu.pila.pop(); menu.pagina = p.pagina; menu.sel = p.sel; menu.t = 0; suona("clic", W / 2, 0.4); return true; }
+    if (menu.pagina === "principale" && sceltaModo && !corsa) return true;       // (la prima scelta: da qui si va solo avanti)
+    menu = null;
+    if (corsa && corsa.chi) corsa.pausa = !!(corsa.scelta || corsa.forziere);
+    return true;
+  }
+  // Le voci della pagina principale.
+  function vociPrincipale() {
+    const v = [
+      { icona: "\u{1F3C3}", nome: "Corsa infinita", testo: "Il cuore del gioco: un'orda che cresce senza fermarsi. Para al momento giusto, sali di livello, scegli armi e poteri, batti un capo ogni cinque livelli di minaccia.", fa: () => { menu = null; if (sceltaModo) scegliModo("corsa"); else if (!corsa) comandi.corsa(); return true; } },
+      { icona: "\u{1F94A}", nome: "Combattimento libero", testo: "Due lottatori sulla pagina che si picchiano da soli. Comandi chi vuoi, scegli i personaggi, lanci oggetti e scateni imprevisti dalla tendina.", fa: () => { menu = null; if (sceltaModo) scegliModo("libero"); else if (corsa) chiudiCorsa(); return true; } },
+      { icona: "\u{1F4D6}", nome: "Come si gioca", testo: "Sei pagine per imparare tutto: muoversi, attaccare, la parata e il parry col contrattacco, la corsa infinita, l'aggancio, crescere fra una corsa e l'altra.", fa: () => vaiA("guida"), nuovo: primaVolta },
+      { icona: "⚙️", nome: "Impostazioni", testo: "Audio e volume, dettaglio grafico, aiuti al parry, rallentatore, scossa dello schermo, difficoltà della corsa, tasti.", fa: () => vaiA("impostazioni") },
+    ];
+    if (conClassifica()) v.push({ icona: "\u{1F3C6}", nome: "Classifica", testo: "I migliori della corsa infinita, da tutto il mondo.", fa: () => { menu = null; apriClassifica(true); return true; } });
+    return v;
+  }
+  function vociPausa() {
+    return [
+      { icona: "▶️", nome: "Riprendi", testo: "Si torna alla lotta da dove si era rimasti.", fa: () => { menu.pila = []; return chiudiMenu(); } },
+      { icona: "\u{1F4D6}", nome: "Come si gioca", testo: "La guida, mentre la corsa aspetta.", fa: () => vaiA("guida") },
+      { icona: "⚙️", nome: "Impostazioni", testo: "Audio, grafica, aiuti al parry, difficoltà, tasti.", fa: () => vaiA("impostazioni") },
+      { icona: "\u{1F6AA}", nome: menu && menu.conferma > passi ? "Sicuro? Premi ancora" : "Abbandona la corsa", testo: "La corsa finisce qui: il premio in crediti e il riepilogo arrivano lo stesso.",
+        fa: () => { if (!(menu.conferma > passi)) { menu.conferma = passi + 180; return true; } menu = null; corsa.pausa = false; finisciCorsa(); return true; }, rossa: true },
+    ];
+  }
+  // Le impostazioni: nome, valore scritto, come si cambia (verso: +1 / -1).
+  const SCELTE = (lista, attuale, verso) => lista[(lista.indexOf(attuale) + verso + lista.length) % lista.length];
+  function vociImpostazioni() {
+    const si = (b) => (b ? "Sì" : "No");
+    return [
+      { nome: "Audio", valore: () => (audio.acceso ? "Acceso" : "Spento"), cambia: () => accendiAudio(!audio.acceso) },
+      { nome: "Volume", barra: () => imp.volume / 10, valore: () => String(imp.volume), cambia: (v) => { imp.volume = Math.max(0, Math.min(10, imp.volume + v)); if (audio.uscita) audio.uscita.gain.value = volumeAudio(); suona("clic", W / 2, 0.6); } },
+      { nome: "Dettaglio grafico", valore: () => ({ basso: "Basso", medio: "Medio", alto: "Alto" })[grafica.dettaglio], cambia: (v) => impostaGrafica({ dettaglio: SCELTE(["basso", "medio", "alto"], grafica.dettaglio, v) }),
+        nota: "Basso: meno particelle e niente ombre sfumate, per i computer lenti." },
+      { nome: "Anello del parry", valore: () => ({ sempre: "Sempre", corsa: "Solo nella corsa", mai: "Mai" })[imp.anello], cambia: (v) => { imp.anello = SCELTE(["sempre", "corsa", "mai"], imp.anello, v); },
+        nota: "L'anello che si stringe intorno a te e diventa d'oro quando è il momento del parry." },
+      { nome: "Aiuto al parry", valore: () => si(imp.aiutoParry), cambia: () => { imp.aiutoParry = !imp.aiutoParry; }, nota: "La finestra del parry dura quattro fotogrammi in più." },
+      { nome: "Rallentatore del parry", valore: () => si(imp.rallentatore), cambia: () => { imp.rallentatore = !imp.rallentatore; }, nota: "Dopo un parry il tempo rallenta per mezzo secondo." },
+      { nome: "Scossa dello schermo", valore: () => ({ piena: "Piena", ridotta: "Ridotta", spenta: "Spenta" })[imp.scossa], cambia: (v) => { imp.scossa = SCELTE(["piena", "ridotta", "spenta"], imp.scossa, v); } },
+      { nome: "Difficoltà della corsa", valore: () => ({ facile: "Facile", normale: "Normale", difficile: "Difficile" })[imp.difficolta], cambia: (v) => { imp.difficolta = SCELTE(["facile", "normale", "difficile"], imp.difficolta, v); },
+        nota: "Quanto fanno male i colpi nella corsa: facile un terzo meno, difficile un terzo più." },
+      { nome: "Schizzi e arti staccati", valore: () => si(cruento), cambia: () => comandi.cruento(!cruento) },
+      { nome: "Barre della vita", valore: () => si(barreVita), cambia: () => comandi.barre(!barreVita) },
+      { nome: "Tastiera", valore: () => (tastiera ? "Accesa" : "Spenta"), cambia: () => { tastiera = !tastiera; rimappa = null; salvaTasti(); } },
+      { nome: "Tasti", valore: () => "›", vai: "tasti", nota: "Ogni azione e il suo tasto: Invio su una riga, poi il tasto nuovo." },
+      { nome: "Ripristina", valore: () => "↺", fa: () => { Object.assign(imp, IMPOSTAZIONI_BASE); if (audio.uscita) audio.uscita.gain.value = volumeAudio(); suona("clic"); } },
+    ];
+  }
+  function vociTasti() {
+    const voci = VOCI_RADIALE[stile] || VOCI_RADIALE[""], out = [];
+    for (const [id] of AZIONI_TASTI) {
+      const m = /^mossa(\d+)$/.exec(id), o = /^oggetto(\d)$/.exec(id);
+      if (m && !voci[Number(m[1]) - 1]) continue;
+      if (MOSSE_TASTO[id] && !voci.some((v) => v[0] === MOSSE_TASTO[id])) continue;
+      out.push({ id, nome: m ? voci[Number(m[1]) - 1][1] + " " + dici(voci[Number(m[1]) - 1][2]) : o ? dici("Oggetto") + " " + o[1] : dici(NOMI_AZIONI[id]) });
+    }
+    return out;
+  }
+  // Le pagine della guida: un titolo, le righe (icona, testo) e, a volte, una scenetta dal vivo.
+  const PAGINE_GUIDA = [
+    { icona: "\u{1F44B}", titolo: "Benvenuto in Page Brawl", righe: [
+      ["\u{1F4C4}", "La pagina che stai guardando è il ring: titoli, tasti e immagini sono piattaforme su cui salire."],
+      ["\u{1F916}", "Due lottatori di pezza si picchiano da soli. Tu puoi comandarne uno, quando vuoi."],
+      ["\u{1F3C3}", "Nella corsa infinita affronti un'orda che non finisce mai: il segreto è parare al momento giusto."],
+      ["\u{1F4A1}", "Questa guida si riapre dal menu (Esc) o dalla tendina, quando vuoi."]] },
+    { icona: "\u{1F3AE}", titolo: "Muoversi e attaccare", righe: [
+      ["← →", "Camminare."],
+      ["W  D  A", "Aura, raffica di pugni, onda energetica (super guerrieri; aura e onda anche i maghi)."],
+      ["Q E R…", "Le altre mosse del controller, nell'ordine dei suoi spicchi. H apre il controller."],
+      ["F  G", "Volare o atterrare; passare all'altro lottatore."],
+      ["\u{1F5B1}", "Col mouse prendi e lanci lottatori e oggetti. Ogni tasto si cambia nelle impostazioni."]] },
+    { icona: "\u{1F6E1}️", titolo: "Parata e parry", demo: "anello", righe: [
+      ["S", "Para. Tenuto è guardia: lo scudo davanti a te."],
+      ["⭕", "Quando arriva un colpo, un anello si stringe verso di te. Quando diventa d'oro, premi S: PARRY."],
+      ["✨", "Col parry non prendi danno, il tempo rallenta e parte il contrattacco."],
+      ["❗", "Il «!» sopra chi sta per colpire. Premuto troppo presto o troppo tardi, te lo dice il gioco."]] },
+    { icona: "\u{1F3C3}", titolo: "La corsa infinita", righe: [
+      ["⚠️", "La minaccia cresce da sola: più nemici, tipi nuovi, un capo ogni cinque livelli."],
+      ["\u{1F48E}", "Le gemme danno esperienza: a ogni livello una carta da scegliere (1 2 3, o frecce e Invio)."],
+      ["Z", "Il colpo finale, quando la barra è piena. X C V usano gli oggetti raccolti."],
+      ["❤️", "Tre vite. Finite, l'ultima possibilità: un colpo finale a segno ti rimette in piedi."]] },
+    { icona: "\u{1F3AF}", titolo: "Aggancio, cariche e granate", righe: [
+      ["\u{1F5B1}", "Clic su un nemico: lo agganci (mirino rosso) e il tuo eroe pensa prima a lui. Clic di nuovo, o sul vuoto, per sganciare."],
+      ["\u{1F534}", "La carica letale: scintilla rossa, poi la rincorsa. Col parry, contrattacco ad area."],
+      ["\u{1F4A3}", "Il bruto armato tira granate: al lampo bianco premi S e gliela rimandi. Morendo lascia il fucile-sega."]] },
+    { icona: "\u{1F4AA}", titolo: "Crescere fra una corsa e l'altra", righe: [
+      ["\u{1FA99}", "Monete e premio della corsa diventano crediti."],
+      ["\u{1F3EA}", "Bottega: potenziamenti per tutti. Allena: caratteristiche per un personaggio solo."],
+      ["\u{1F3C1}", "Missioni: tre alla volta, pagano crediti e salgono di gradino."],
+      ["\u{1F3C6}", "A fine corsa metti un nome e finisci nella classifica globale."]] },
+  ];
+  // I tasti del menu (true: il tasto era suo). Esc apre la pausa nella corsa e il menu fuori (solo dove c'è la scelta
+  // del modo, cioè nell'estensione: sul sito Esc resta alla pagina).
+  function tastiMenu(e) {
+    const c = e.code;
+    if (!menu) {
+      if (c !== "Escape") return false;
+      if (corsa && corsa.chi && corsa.fase === "lotta" && !corsa.scelta) return apriMenu("pausa");
+      if (window.__ringSceltaModo && !corsa) return apriMenu("principale");
+      return false;
+    }
+    if (e.repeat && c !== "ArrowUp" && c !== "ArrowDown" && c !== "ArrowLeft" && c !== "ArrowRight") return true;
+    if (c === "Escape" || c === "Backspace") return chiudiMenu();
+    const p = menu.pagina;
+    if (p === "guida") {
+      if (c === "ArrowLeft") menu.guida = Math.max(0, menu.guida - 1);
+      else if (c === "ArrowRight" || c === "Enter" || c === "Space") { if (menu.guida < PAGINE_GUIDA.length - 1) menu.guida++; else if (c !== "ArrowRight") chiudiMenu(); }
+      return true;
+    }
+    const voci = p === "principale" ? vociPrincipale() : p === "pausa" ? vociPausa() : p === "impostazioni" ? vociImpostazioni() : vociTasti();
+    const n = voci.length;
+    if (c === "ArrowUp" || c === "KeyW") { menu.sel = (menu.sel - 1 + n) % n; suona("clic", W / 2, 0.3); return true; }
+    if (c === "ArrowDown" || c === "KeyS") { menu.sel = (menu.sel + 1) % n; suona("clic", W / 2, 0.3); return true; }
+    const v = voci[menu.sel];
+    if (p === "impostazioni" && (c === "ArrowLeft" || c === "ArrowRight")) { if (v.cambia) { v.cambia(c === "ArrowLeft" ? -1 : 1); salvaImp(); } return true; }
+    if (c === "Enter" || c === "Space" || c === "NumpadEnter") { attivaVoce(p, v); return true; }
+    return p !== "principale";                 // (nel principale A e D scelgono ancora il modo, come prima)
+  }
+  function attivaVoce(p, v) {
+    if (!v) return;
+    if (p === "tasti") { rimappa = rimappa === v.id ? null : v.id; return; }
+    if (v.vai) { vaiA(v.vai); return; }
+    if (v.cambia) { v.cambia(1); salvaImp(); return; }
+    if (v.fa) { v.fa(); salvaImp(); }
+  }
+  // ·· Il disegno ··
+  function sfondoMenu(a) {
+    ctx.save();
+    ctx.fillStyle = "rgba(8,7,16," + (0.84 * a).toFixed(3) + ")"; ctx.fillRect(0, 0, W, H);
+    // Fasci di luce di traverso che scorrono piano, e una vignetta.
+    ctx.globalAlpha = 0.07 * a; ctx.fillStyle = "#ffd84a";
+    for (let i = 0; i < 5; i++) {
+      const x = ((i * 260 + passi * 0.7) % (W + 400)) - 200;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 70 * S, 0); ctx.lineTo(x - 140 * S, H); ctx.lineTo(x - 210 * S, H); ctx.closePath(); ctx.fill();
+    }
+    const v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.max(W, H) * 0.75);
+    v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0," + (0.55 * a).toFixed(3) + ")");
+    ctx.globalAlpha = 1; ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+    // Le braci che salgono.
+    for (let i = 0; i < 26; i++) {
+      const x = (i * 137 + Math.sin(passi * 0.01 + i) * 30) % W, y = H - ((i * 97 + passi * (0.5 + (i % 4) * 0.25)) % (H + 40));
+      ctx.globalAlpha = a * (0.25 + 0.35 * Math.abs(Math.sin(passi * 0.05 + i)));
+      tondo(x, y, (1 + (i % 3)) * S, i % 3 ? "#ff8a3a" : "#ffd84a");
+    }
+    ctx.restore();
+  }
+  function logoMenu(x, y, px, allinea) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(-0.04);
+    caratteri(px, 900); ctx.textBaseline = "middle"; ctx.textAlign = allinea || "left"; ctx.lineJoin = "round";
+    const a = largoTesto("PAGE ", px), b = largoTesto("BRAWL", px), tot = a + b, x0 = allinea === "center" ? -tot / 2 : 0;
+    // La sciabolata rossa dietro.
+    ctx.fillStyle = "#e0443a"; ctx.globalAlpha = 0.9;
+    ctx.beginPath(); ctx.moveTo(x0 - 8 * S, px * 0.42); ctx.lineTo(x0 + tot + 14 * S, px * 0.22); ctx.lineTo(x0 + tot + 8 * S, px * 0.36); ctx.lineTo(x0 - 4 * S, px * 0.56); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1; ctx.textAlign = "left";
+    ctx.lineWidth = px * 0.16; ctx.strokeStyle = "#17171c";
+    ctx.strokeText("PAGE", x0, 0); ctx.fillStyle = "#ffffff"; ctx.fillText("PAGE", x0, 0);
+    ctx.save(); ctx.shadowColor = ORO; ctx.shadowBlur = (10 + 6 * Math.sin(passi * 0.06)) * S;
+    ctx.strokeText("BRAWL", x0 + a, 0); ctx.fillStyle = ORO; ctx.fillText("BRAWL", x0 + a, 0);
+    ctx.restore();
+    ctx.restore();
+  }
+  // Un tasto della tastiera disegnato (per i suggerimenti in fondo): torna la larghezza.
+  function tastoDisegnato(x, y, t) {
+    caratteri(10 * S, 900);
+    const w = Math.max(18 * S, largoTesto(t, 10 * S) + 10 * S);
+    pannelloUI(x, y - 9 * S, w, 18 * S, 4 * S, "rgba(255,255,255,.45)", "rgba(255,255,255,.08)");
+    scriviUI(t, x + w / 2, y, 10 * S, "#ffffff", "center", 900);
+    return w;
+  }
+  function suggerimenti(lista) {
+    let x = 16 * S;
+    const y = Math.min(H, pavimento) - 16 * S;                       // (sopra la barra in fondo alla pagina)
+    ctx.save(); ctx.globalAlpha = 0.9;
+    for (const [tasti, cosa] of lista) {
+      for (const t of tasti) x += tastoDisegnato(x, y, t) + 4 * S;
+      scriviUI(dici(cosa), x + 2 * S, y, 11 * S, "rgba(255,255,255,.8)", "left", 700);
+      x += largoTesto(dici(cosa), 11 * S) + 18 * S;
+    }
+    ctx.restore();
+  }
+  // Una colonna di voci grandi, con la descrizione della scelta accanto (o sotto, sugli schermi stretti).
+  function colonnaVoci(voci, x, y, w, rh, descr) {
+    voci.forEach((v, i) => {
+      const yy = y + i * (rh + 8 * S), scelta = menu.sel === i, entra = Math.min(1, Math.max(0, (menu.t - i * 3) / 10));
+      const dx = (1 - entra) * -30 * S + (scelta ? 10 * S : 0);
+      ctx.save(); ctx.globalAlpha = entra;
+      if (scelta) {
+        const g = ctx.createLinearGradient(x + dx, 0, x + dx + w, 0);
+        g.addColorStop(0, v.rossa ? "#e0443a" : ORO); g.addColorStop(1, v.rossa ? "rgba(224,68,58,.15)" : "rgba(255,216,74,.12)");
+        ctx.fillStyle = g; rettangoloTondo(x + dx, yy, w, rh, 8 * S); ctx.fill();
+        ctx.fillStyle = "#17171c"; ctx.beginPath(); ctx.moveTo(x + dx + 10 * S, yy + rh / 2 - 6 * S); ctx.lineTo(x + dx + 18 * S, yy + rh / 2); ctx.lineTo(x + dx + 10 * S, yy + rh / 2 + 6 * S); ctx.closePath(); ctx.fill();
+      } else pannelloUI(x + dx, yy, w, rh, 8 * S, "rgba(255,255,255,.12)", "rgba(20,18,32,.7)");
+      scriviUI(v.icona || "", x + dx + 36 * S, yy + rh / 2, 17 * S, "#ffffff", "center");
+      scriviUI(dici(v.nome).toUpperCase(), x + dx + 56 * S, yy + rh / 2 + 1, 15 * S, scelta ? "#17171c" : "#ffffff", "left", 900);
+      if (v.nuovo) {
+        ctx.globalAlpha = entra; ctx.save(); ctx.shadowColor = "#56e1ff"; ctx.shadowBlur = (6 + 6 * Math.sin(passi * 0.15)) * S;
+        pannelloUI(x + dx + w - 92 * S, yy + rh / 2 - 9 * S, 82 * S, 18 * S, 9 * S, null, "#56e1ff"); ctx.restore();
+        scriviUI(dici("INIZIA QUI"), x + dx + w - 51 * S, yy + rh / 2 + 1, 10 * S, "#17171c", "center", 900);
+      }
+      ctx.restore();
+      tastiUI.push({ x: x + dx, y: yy, w, h: rh, fa: () => { menu.sel = i; attivaVoce(menu.pagina, v); } });
+    });
+    if (descr && voci[menu.sel]) {
+      const v = voci[menu.sel];
+      pannelloUI(descr.x, descr.y, descr.w, descr.h, 12 * S, "rgba(255,216,74,.35)", "rgba(20,18,32,.82)");
+      scriviUI(v.icona || "", descr.x + 26 * S, descr.y + 28 * S, 24 * S, "#ffffff", "center");
+      scriviUI(dici(v.nome), descr.x + 48 * S, descr.y + 28 * S, 18 * S, ORO, "left", 900);
+      righeUI(dici(v.testo || ""), descr.w - 36 * S, 13 * S).forEach((r, k) => scriviUI(r, descr.x + 18 * S, descr.y + 62 * S + k * 19 * S, 13 * S, "#ffffff", "left", 600));
+    }
+  }
+  function disegnaMenu() {
+    if (!menu) return;
+    menu.t++;
+    const a = Math.min(1, menu.t / 10), p = menu.pagina, stretto = W < 720 * S;
+    sfondoMenu(menu.pila.length || p === "pausa" || p === "principale" ? 1 : a);
+    tastiUI = [];
+    // (nella corsa sotto il cruscotto, che resta visibile dietro)
+    const top = Math.max(testataBasso + 18 * S, H * 0.08) + (corsa && corsa.chi ? 70 * S : 0);
+    if (p === "principale" || p === "pausa") {
+      const voci = p === "principale" ? vociPrincipale() : vociPausa();
+      if (menu.sel >= voci.length) menu.sel = 0;
+      const px = Math.min(64 * S, (stretto ? W - 40 : W * 0.5) / 5.2);
+      if (p === "principale") {
+        logoMenu(stretto ? W / 2 : 40 * S, top + px * 0.6, px, stretto ? "center" : "left");
+        scriviUI(dici("Il ring è la pagina che stai guardando."), stretto ? W / 2 : 44 * S, top + px * 1.35, 13 * S, "rgba(255,255,255,.75)", stretto ? "center" : "left", 700);
+      } else {
+        titoloGrande(dici("PAUSA"), stretto ? W / 2 : 40 * S, top + 30 * S, stretto ? "center" : "left");
+        if (corsa && corsa.chi) scriviUI("⚠️ " + dici("Minaccia") + " " + corsa.round + "  ·  " + dici("Liv.") + " " + corsa.liv + "  ·  " + cifre(corsa.punti) + " " + dici("punti"), stretto ? W / 2 : 44 * S, top + 62 * S, 13 * S, "rgba(255,255,255,.8)", stretto ? "center" : "left", 700);
+      }
+      const y0 = top + (p === "principale" ? px * 1.35 + 34 * S : 92 * S), rh = 44 * S;
+      if (stretto) {
+        const w = Math.min(360 * S, W - 32);
+        colonnaVoci(voci, W / 2 - w / 2, y0, w, rh, { x: W / 2 - w / 2, y: y0 + voci.length * (rh + 8 * S) + 8 * S, w, h: 120 * S });
+      } else {
+        const w = Math.min(340 * S, W * 0.36);
+        colonnaVoci(voci, 40 * S, y0, w, rh, { x: 40 * S + w + 40 * S, y: y0, w: Math.min(420 * S, W - w - 120 * S), h: 170 * S });
+      }
+      suggerimenti([[["↑", "↓"], "Scegli"], [["Invio"], "Conferma"]].concat(p === "pausa" ? [[["Esc"], "Riprendi"]] : []));
+      scriviUI("v" + (window.__ringVersione || "1.2"), W - 16 * S, H - 18 * S, 10 * S, "rgba(255,255,255,.45)", "right", 700);
+      return;
+    }
+    if (p === "guida") { disegnaGuida(top, stretto); return; }
+    // Impostazioni e tasti: una lista a due colonne (nome, valore) con le frecce per cambiare.
+    const tasti = p === "tasti", voci = tasti ? vociTasti() : vociImpostazioni();
+    if (menu.sel >= voci.length) menu.sel = 0;
+    titoloGrande(dici(tasti ? "Tasti" : "Impostazioni"), W / 2, top + 26 * S, "center");
+    const w = Math.min(560 * S, W - 32), x = W / 2 - w / 2, rh = 30 * S, y0 = top + 64 * S;
+    const quante = Math.max(4, Math.floor((H - y0 - 90 * S) / (rh + 4 * S))), da = Math.max(0, Math.min(voci.length - quante, menu.sel - Math.floor(quante / 2)));
+    voci.slice(da, da + quante).forEach((v, k) => {
+      const i = da + k, yy = y0 + k * (rh + 4 * S), scelta = menu.sel === i;
+      pannelloUI(x, yy, w, rh, 7 * S, scelta ? ORO : "rgba(255,255,255,.1)", scelta ? "rgba(255,216,74,.16)" : "rgba(20,18,32,.75)");
+      scriviUI(dici(v.nome), x + 14 * S, yy + rh / 2 + 1, 13 * S, scelta ? ORO : "#ffffff", "left", 800);
+      if (tasti) {
+        const t = rimappa === v.id ? dici("Premi un tasto…") : nomeTasto(mappaTasti[v.id]);
+        pannelloUI(x + w - 130 * S, yy + 4 * S, 116 * S, rh - 8 * S, 5 * S, "rgba(255,255,255,.4)", rimappa === v.id ? "#56e1ff" : "rgba(255,255,255,.08)");
+        scriviUI(t, x + w - 72 * S, yy + rh / 2 + 1, 12 * S, rimappa === v.id ? "#17171c" : "#ffffff", "center", 900);
+      } else if (v.barra) {
+        barraUI(x + w - 190 * S, yy + rh / 2 - 4 * S, 150 * S, 8 * S, v.barra(), ORO);
+        scriviUI(v.valore(), x + w - 16 * S, yy + rh / 2 + 1, 12 * S, "#ffffff", "right", 900);
+      } else {
+        const val = dici(v.valore());
+        scriviUI((v.cambia ? "‹  " : "") + val + (v.cambia ? "  ›" : ""), x + w - 16 * S, yy + rh / 2 + 1, 13 * S, scelta ? "#ffffff" : "rgba(255,255,255,.85)", "right", 800);
+      }
+      tastiUI.push({ x, y: yy, w, h: rh, fa: () => { menu.sel = i; attivaVoce(p, v); } });
+    });
+    const v = voci[menu.sel];
+    if (v && v.nota) righeUI(dici(v.nota), w, 12 * S).forEach((r, k) => scriviUI(r, W / 2, y0 + quante * (rh + 4 * S) + 14 * S + k * 16 * S, 12 * S, "rgba(255,255,255,.7)", "center", 600));
+    tastoUI(16 * S, top + 10 * S, 90 * S, 30 * S, "‹ " + dici("Indietro"), () => chiudiMenu(), { colore: "#2a2735", scritta: "#ffffff", bordo: "rgba(255,255,255,.3)", px: 12 * S });
+    suggerimenti(tasti ? [[["↑", "↓"], "Scegli"], [["Invio"], "Cambia il tasto"], [["Esc"], "Indietro"]] : [[["↑", "↓"], "Scegli"], [["←", "→"], "Cambia"], [["Esc"], "Indietro"]]);
+  }
+  function titoloGrande(t, x, y, allinea) {
+    caratteri(32 * S, 900); ctx.textAlign = allinea || "left"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    ctx.lineWidth = 6 * S; ctx.strokeStyle = "#17171c"; ctx.strokeText(t, x, y); ctx.fillStyle = "#ffffff"; ctx.fillText(t, x, y);
+    const w = largoTesto(t, 32 * S), x0 = allinea === "center" ? x - w / 2 : x;
+    ctx.fillStyle = ORO; ctx.fillRect(x0, y + 20 * S, Math.min(w, 80 * S), 4 * S);
+  }
+  function disegnaGuida(top, stretto) {
+    const g = PAGINE_GUIDA[menu.guida], w = Math.min(640 * S, W - 32), x = W / 2 - w / 2, y = top + 50 * S;
+    titoloGrande(dici("Come si gioca"), W / 2, top + 20 * S, "center");
+    const demo = g.demo && !stretto, wt = demo ? w * 0.6 : w, h = Math.min(H - y - 90 * S, 330 * S);
+    pannelloUI(x, y, w, h, 14 * S, "rgba(255,216,74,.4)", "rgba(20,18,32,.86)");
+    scriviUI(g.icona, x + 30 * S, y + 32 * S, 24 * S, "#ffffff", "center");
+    scriviUI(dici(g.titolo), x + 54 * S, y + 32 * S, 19 * S, ORO, "left", 900);
+    let yy = y + 70 * S;
+    for (const [ic, testo] of g.righe) {
+      const lab = ic.length > 2 && /[A-Za-zÉ←→]/.test(ic);
+      if (lab) tastoDisegnato(x + 18 * S, yy + 1 * S, ic); else scriviUI(ic, x + 30 * S, yy, 15 * S, "#ffffff", "center");
+      const righe = righeUI(dici(testo), wt - (lab ? 110 : 70) * S, 13 * S);
+      righe.forEach((r, k) => scriviUI(r, x + (lab ? 96 : 54) * S, yy + k * 18 * S, 13 * S, "#ffffff", "left", 600));
+      yy += Math.max(1, righe.length) * 18 * S + 12 * S;
+    }
+    if (demo) disegnaDemoAnello(x + wt, y + 40 * S, w - wt, h - 60 * S);
+    // Le pagine: pallini, e le frecce.
+    const n = PAGINE_GUIDA.length, yp = y + h + 22 * S;
+    for (let i = 0; i < n; i++) tondo(W / 2 + (i - (n - 1) / 2) * 16 * S, yp, (i === menu.guida ? 5 : 3.5) * S, i === menu.guida ? ORO : "rgba(255,255,255,.35)");
+    if (menu.guida > 0) tastoUI(x, yp - 15 * S, 110 * S, 30 * S, "‹ " + dici("Indietro"), () => { menu.guida--; }, { colore: "#2a2735", scritta: "#ffffff", bordo: "rgba(255,255,255,.3)", px: 12 * S });
+    const ultima = menu.guida === n - 1;
+    tastoUI(x + w - 130 * S, yp - 15 * S, 130 * S, 30 * S, ultima ? dici("Ho capito!") : dici("Avanti") + " ›", () => { if (ultima) chiudiMenu(); else menu.guida++; }, { brilla: true, px: 13 * S });
+    tastoUI(16 * S, top + 10 * S, 90 * S, 30 * S, "‹ " + dici("Menu"), () => chiudiMenu(), { colore: "#2a2735", scritta: "#ffffff", bordo: "rgba(255,255,255,.3)", px: 12 * S });
+    suggerimenti([[["←", "→"], "Sfoglia"], [["Esc"], "Indietro"]]);
+  }
+  // La scenetta del parry nella guida: un lottatore stilizzato, l'anello che si stringe, d'oro al momento giusto,
+  // e il «PARRY!» quando tocca. Gira da sola, ogni due secondi.
+  function disegnaDemoAnello(x, y, w, h) {
+    const cx = x + w / 2, cy = y + h * 0.5, R0 = 26 * S, ciclo = 120, t = passi % ciclo, fot = 45 - t;
+    ctx.save(); ctx.lineCap = "round";
+    // il lottatore: testa, busto, braccia in guardia
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 5 * S;
+    ctx.beginPath(); ctx.moveTo(cx, cy - 14 * S); ctx.lineTo(cx, cy + 22 * S); ctx.moveTo(cx, cy + 22 * S); ctx.lineTo(cx - 10 * S, cy + 44 * S); ctx.moveTo(cx, cy + 22 * S); ctx.lineTo(cx + 10 * S, cy + 44 * S); ctx.stroke();
+    tondo(cx, cy - 24 * S, 10 * S, "#ffffff");
+    // chi attacca, da destra, col «!»
+    const ax = cx + 70 * S - Math.max(0, Math.min(1, t / 45)) * 26 * S;
+    ctx.strokeStyle = "#9dbf8c"; ctx.beginPath(); ctx.moveTo(ax, cy - 10 * S); ctx.lineTo(ax, cy + 22 * S); ctx.moveTo(ax, cy - 4 * S); ctx.lineTo(ax - 18 * S, cy - 6 * S); ctx.stroke();
+    tondo(ax, cy - 20 * S, 9 * S, "#9dbf8c");
+    if (fot >= 0) {
+      const dentro = fot <= PARRY.finestra, R = R0 + fot * 2.4 * S;
+      ctx.strokeStyle = dentro ? "#ffd84a" : "#ffffff"; ctx.lineWidth = (dentro ? 3.6 : 2) * S; ctx.globalAlpha = Math.min(1, 0.35 + (45 - fot) / 40);
+      ctx.beginPath(); ctx.arc(cx, cy + 4 * S, R, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1; scriviUI("!", ax, cy - 44 * S, 20 * S, dentro ? "#ffd84a" : "#ffffff", "center", 900);
+      if (dentro) scriviUI(dici("ADESSO!"), cx, y + h - 14 * S, 16 * S, "#ffd84a", "center", 900);
+    } else if (t < 75) {
+      const k = (t - 45) / 30;
+      ctx.globalAlpha = 1 - k; tondo(cx + 14 * S, cy, (16 + 30 * k) * S, "#fff6c8");
+      ctx.globalAlpha = 1; scriviUI("PARRY!", cx, y + 10 * S, 20 * S, ORO, "center", 900);
+    }
+    ctx.restore();
+  }
   // Sopra a tutto: l'interfaccia della corsa, i menu, la classifica.
   function disegnaCorsa() {
     tastiUI = [];
-    if (sceltaModo && !corsa) { ctx.save(); disegnaSceltaModo(); ctx.restore(); return; }
+    // (dal 17/10/2026 la scelta del modo è il menu principale: vedi «IL MENU»)
+    if (sceltaModo && !corsa && !menu) menu = { pagina: "principale", pila: [], sel: 0, t: 0, guida: 0, conferma: 0 };
+    if (menu && !(corsa && corsa.chi)) { ctx.save(); disegnaMenu(); ctx.restore(); return; }
     const c = corsa;
     if (c) {
       ctx.save(); ctx.lineJoin = "round"; ctx.lineCap = "round";
@@ -15202,6 +15582,7 @@
       }
       ctx.restore();
     }
+    if (menu) { ctx.save(); disegnaMenu(); ctx.restore(); }
     if (classifica.aperta) { ctx.save(); disegnaClassifica(W / 2, testataBasso + 40 * S, Math.min(420 * S, W - 32), true); ctx.restore(); }
   }
   function disegnaScudoEroe() {
@@ -15281,6 +15662,8 @@
     scriviUI(obiettivo(), x2 + 10 * S, y0 + 54 * S, 12 * S, ORO);
     let xi = x2 + w2 - 12 * S;
     for (let i = c.imprevisti.length - 1; i >= 0; i--) { scriviUI(IMPREVISTI_CORSA[c.imprevisti[i]][0], xi, y0 + 34 * S, 14 * S, "#ffffff", "right"); xi -= 20 * S; }
+    // La pausa (anche col dito: sui telefoni non c'è Esc), col menu.
+    tastoUI(x2 + w2 - (c.esci > passi ? 136 : 90) * S, y0 + 6 * S, 26 * S, 22 * S, "\u23F8", () => apriMenu("pausa"), { colore: "#3a3647", scritta: "#ffffff", px: 12 * S });
     // L'audio si accende e si spegne anche da qui, senza aprire il pannello.
     tastoUI(x2 + w2 - (c.esci > passi ? 106 : 60) * S, y0 + 6 * S, 26 * S, 22 * S, audio.acceso ? "🔊" : "🔇", () => accendiAudio(!audio.acceso), { colore: "#3a3647", scritta: "#ffffff", px: 12 * S });
     // L'uscita chiede conferma: un tocco la arma, il secondo (entro tre secondi) chiude la corsa.
@@ -15611,7 +15994,7 @@
     return null;
   }
   // I menu prendono tutti i tocchi: sotto non si afferra nessuno.
-  const corsaModale = () => !!(classifica.aperta || (sceltaModo && !corsa) || (corsa && (corsa.fase === "scelta" || corsa.fase === "fine" || corsa.scelta || corsa.forziere)));
+  const corsaModale = () => !!(menu || classifica.aperta || (sceltaModo && !corsa) || (corsa && (corsa.fase === "scelta" || corsa.fase === "fine" || corsa.scelta || corsa.forziere)));
 
   if (window.__ringSceltaModo) { sceltaModo = true; assicuraAcceso(); }
   window.__ring = {
@@ -15620,7 +16003,7 @@
     mosse: () => {
       const f = comandato();
       return {
-        chi: radiale.chi, acceso: !fermo, scelta: !!(sceltaModo && !corsa), corsa: !!corsa, lava: !!lava,
+        chi: radiale.chi, acceso: !fermo, scelta: !!(sceltaModo && !corsa), menu: menu ? menu.pagina : null, corsa: !!corsa, lava: !!lava,
         // Momenti che si giocano toccando il canvas (scelta del modo, corsa, mira, scontro di energie):
         // sopra lo schermo del telefono la finestra del ring deve prendere i tocchi finché durano.
         vuoleTocchi: !!((sceltaModo && !corsa) || (corsa && (corsa.fase !== "lotta" || corsa.bottega || corsaModale())) || mira || sfida || classifica.aperta),
@@ -15822,7 +16205,7 @@
                      puliti: corsa.puliti || 0, annunciate: (corsa.annunciate || []).slice(), missioniFatte: (corsa.missioniFatte || []).map((m) => m.tipo + ":" + m.n) } : null,
     classifica: { aperta: classifica.aperta, voci: classifica.voci ? classifica.voci.length : null }, recordCorsa, banca, bottega: Object.assign({}, bottega),
     audio: { acceso: audio.acceso, pronto: !!audio.ctx, anelli: Object.keys(audio.anelli).filter((k) => audio.anelli[k]) },
-    tastiera: { attiva: tastiera, rimappa, chi: radiale.chi, controller: radiale.aperto },
+    tastiera: { attiva: tastiera, rimappa, chi: radiale.chi, controller: radiale.aperto, menu: menu ? menu.pagina : null },
     mira: mira ? (() => { const o = origineMira(mira), e = fineMira(o, mira.dir, mira.a);
                           return { a: mira.a, v: mira.v, dir: mira.dir, t: mira.t, da: mira.da.tipo, resta: Math.max(0, MIRA.attesa - mira.t), ox: o.x, oy: o.y, fx: e.x, fy: e.y }; })() : null,
     lampoMira: lampoMira ? { ox: lampoMira.ox, oy: lampoMira.oy, fx: lampoMira.fx, fy: lampoMira.fy, t: lampoMira.t, preso: lampoMira.preso } : null,

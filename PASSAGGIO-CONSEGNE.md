@@ -422,6 +422,7 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 17/10/2026 | Claude | Menu nuovo sul canvas: principale (al posto della scelta del modo), guida in sei pagine, impostazioni (volume, anello e aiuto al parry, rallentatore, scossa, difficoltà, tasti), pausa con Esc o ⏸; tasto «Menu» nella tendina; 89 traduzioni | `claude/exciting-cori-6cwl9m` |
 | 17/10/2026 | Claude | Parry al centro: anello del tempo, scudo in guardia, rallentatore e suono del parry, contrattacco visibile, «troppo presto / troppo tardi», morsi che non si interrompono vicino al colpo, cariche letali più frequenti; aggancio col mouse | `claude/exciting-cori-6cwl9m` |
 | 17/10/2026 | Claude | Corsa a flusso (niente round: fasi di «minaccia» attaccate, capo ogni cinque, forziere senza pausa, livelli un quarto più lenti), tasti fissi W aura / D pugni / A onda con la camminata sulle frecce (migrazione dei tasti salvati), carte e forziere da tastiera (1 2 3, frecce e Invio, R) | `claude/exciting-cori-6cwl9m` |
 | 16/10/2026 | Claude | Donazione libera con Ko-fi, solo nell'estensione (scelta di Riccardo): tasto «Sostieni Page Brawl» nella tendina (`url_donazione` in `premium.json`), webhook `/api/kofi` col token, tabella `donazioni` (nome, importo, messaggio; niente email), pagina `/admin/donazioni`; informativa aggiornata. Manca l'account Ko-fi | `claude/exciting-cori-6cwl9m` |

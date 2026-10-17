@@ -626,6 +626,7 @@ PREPARA = """/* GENERATO da estensione/costruisci.py: non modificare a mano.
   // All'accensione si sceglie il modo (10/10/2026, Riccardo: «endless run e free combat»):
   // la corsa infinita o il combattimento libero, con personaggi e imprevisti nella tendina.
   window.__ringSceltaModo = true;
+  window.__ringVersione = "__VERSIONE__";             // (la scrive il menu, in basso a destra)
   function ricorda(k, v) {
     memoria[k] = String(v);
     try { var o = {}; o[k] = String(v); chrome.storage.local.set(o); } catch (e) { /* resta in memoria */ }
@@ -877,7 +878,7 @@ def file_attesi(variante: str) -> dict:
     if "style=" in html:
         raise SystemExit("la tendina ha stili in linea: una CSP severa li bloccherebbe")
     config = dict(scelte, premiumDiProva=interruttore)
-    prepara = (PREPARA
+    prepara = (PREPARA.replace("__VERSIONE__", VERSIONE)
                .replace("__CONFIG__", json.dumps(config, ensure_ascii=False))
                .replace("__STILE__", json.dumps(STILE_BASE + stile_tendina(), ensure_ascii=False))
                .replace("__HTML__", json.dumps(html, ensure_ascii=False)))
