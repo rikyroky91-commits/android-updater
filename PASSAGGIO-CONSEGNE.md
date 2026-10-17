@@ -1,6 +1,6 @@
 # Passaggio di consegne: Mobile Update Tracker e Page Brawl
 
-Documento vivo. Ultimo aggiornamento: **17/10/2026**, su `main` dopo l'unione di Android 1.5.1 e della ricerca per codice (base `df97c09`).
+Documento vivo. Ultimo aggiornamento: **17/10/2026**, su `main` dopo l'unione di Page Brawl 1.2.0 / Android 1.6.0 (ramo `claude/exciting-cori-6cwl9m`, avanti veloce fino a `83ec0ee` più questo aggiornamento).
 
 Questo file è il punto di ingresso per chiunque lavori sul repository: persone, Claude, Codex o altri agenti. Si tiene **sempre aggiornato** (regola in fondo, sezione 9). I passaggi di consegne dei singoli giri restano in `docs/consegne/` come archivio storico: questo li riassume e li sostituisce come riferimento.
 
@@ -27,9 +27,9 @@ Proprietario e unico decisore: **Riccardo** (account GitHub `rikyroky91-commits`
 | --- | --- | --- | --- |
 | Sito M.U.T. | commit su `main` | `/health` → `versione.commit` | deploy automatico su Oracle a ogni push su `main` |
 | `DATA_LOGIC_VERSION` | 34 | `core/config.py` | si alza quando cambia l'interpretazione di una fonte |
-| Estensione Page Brawl | 1.2.0 sul ramo `claude/exciting-cori-6cwl9m`; 1.1.0 su `main` e nello store | `estensione/costruisci.py` → `VERSIONE` | `premium_attivo: false`: tutto gratis. La 1.1.0 è pubblicata sul Chrome Web Store (aggiornata il 14/10); la 1.2.0 non è ancora stata caricata |
+| Estensione Page Brawl | 1.2.0 su `main` (unita il 17/10); 1.1.0 nello store | `estensione/costruisci.py` → `VERSIONE` | `premium_attivo: false`: tutto gratis. La 1.1.0 è pubblicata sul Chrome Web Store (aggiornata il 14/10); **la 1.2.0 va caricata a mano** (`python3 estensione/costruisci.py --zip`) |
 | Estensione Page Snow | 0.2.0 | `estensione/costruisci.py` → `NATALE_VERSIONE` | tema di Natale, non pubblicata |
-| App Android | 1.6.0, versionCode 11 (lite: 12) sul ramo; 1.5.1, versionCode 9 su `main` | `android/costruisci.py` → `VERSIONE`, `CODICE_VERSIONE` | la 1.5.1 è unita a `main` il 16/10; nessuna delle due provata da Claude su un telefono vero |
+| App Android | 1.6.0, versionCode 11 (lite: 12) su `main` (unita il 17/10) | `android/costruisci.py` → `VERSIONE`, `CODICE_VERSIONE` | AAB e APK nelle pre-release `android-<commit>`; mai provata da Claude su un telefono vero |
 
 ### Rami con lavoro non unito a `main`
 
@@ -37,8 +37,8 @@ Il flusso del repository è **push diretto su `main`** (nessuna PR è mai stata 
 
 | Ramo | Cosa contiene | Da fare |
 | --- | --- | --- |
-| `claude/exciting-cori-6cwl9m` (16/10) | Page Brawl 1.2.0 / Android 1.6.0: tempi morti, super guerrieri più fluidi, Limit Break, maghi a distanza, ciclo della corsa (dettaglio in `estensione/LEGGIMI.md`, «La 1.2.0») | Riccardo lo prova (sito in locale, estensione dallo zip di prova, APK dalla pre-release), poi si unisce a `main`: l'unione pubblica il ring nuovo sulla home del sito |
-| `claude/ultimora-tema-scuro-codice-modello` (02/10) | Commit `61f8ca9` «lotte più fitte, meno tempi morti», mai arrivato su `main` | **Rifatto a mano il 16/10** sul ramo qui sopra (con lo strumento `tests/misura-lotta.cjs` che stava lì). Il ramo vecchio si può cancellare quando quello nuovo è su `main` |
+| `claude/exciting-cori-6cwl9m` (16-17/10) | Page Brawl 1.2.0 / Android 1.6.0 (dettaglio in `estensione/LEGGIMI.md`, «La 1.2.0» e i giri dopo) | **Unito a `main` il 17/10** (avanti veloce, su richiesta di Riccardo: «unisci»). Cancellabile |
+| `claude/ultimora-tema-scuro-codice-modello` (02/10) | Commit `61f8ca9` «lotte più fitte, meno tempi morti», mai arrivato su `main` | **Rifatto a mano il 16/10** sul ramo qui sopra (con lo strumento `tests/misura-lotta.cjs` che stava lì). Cancellabile (quello nuovo è su `main` dal 17/10) |
 
 ### Pulizia dei rami (verificata il 16/10/2026)
 
@@ -54,7 +54,7 @@ Controllo fatto su ogni ramo remoto con `git rev-list origin/main..<ramo>`, poi 
 
 **Unite a `main` il 16/10, ora cancellabili anche loro:** `claude/android-ring` (1.5.1) e `claude/loving-cannon-1t7wdu` (ricerca per codice). La CI rossa di quest'ultimo veniva da due test casuali del ring (`ring.test.cjs` n. 59 «imprevisti a mano» e n. 96 «oggetti dai lati»), non dalla correzione: i test Python erano verdi.
 
-**Da tenere:** il ramo del giro in corso finché non è su `main`; dopo, anche `claude/ultimora-tema-scuro-codice-modello` è cancellabile.
+**Da tenere:** nessuno. Dal 17/10 anche `claude/exciting-cori-6cwl9m` e `claude/ultimora-tema-scuro-codice-modello` sono su `main` e si possono cancellare.
 
 ### Stato dei test (verificato il 16/10/2026)
 
@@ -422,6 +422,7 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 17/10/2026 | Claude | **Unito a `main`** il ramo `claude/exciting-cori-6cwl9m` (Page Brawl 1.2.0 / Android 1.6.0, donazioni Ko-fi, corsa a flusso, parry al centro, menu): il push pubblica il sito su Oracle. Da fare a mano: caricare la 1.2.0 sul Chrome Web Store, l'AAB su Play, l'account Ko-fi | `main` |
 | 17/10/2026 | Claude | CI rossa sul menu: il test «super guerrieri… restano stabili» cadeva circa una volta su 25 anche prima (provato col commit precedente). Causa vera nel gioco: nei colpi finali chi vola (mulinello, orbita…) contro un bordo usciva di qualche pixel con la testa. Corretto: margine del mulinello a 64 px, chi prende il colpo spostato via dal bordo all'inizio, e `tieniDentroFatale` a ogni passo. 360 prove senza uscite | `claude/exciting-cori-6cwl9m` |
 | 17/10/2026 | Claude | Menu nuovo sul canvas: principale (al posto della scelta del modo), guida in sei pagine, impostazioni (volume, anello e aiuto al parry, rallentatore, scossa, difficoltà, tasti), pausa con Esc o ⏸; tasto «Menu» nella tendina; 89 traduzioni | `claude/exciting-cori-6cwl9m` |
 | 17/10/2026 | Claude | Parry al centro: anello del tempo, scudo in guardia, rallentatore e suono del parry, contrattacco visibile, «troppo presto / troppo tardi», morsi che non si interrompono vicino al colpo, cariche letali più frequenti; aggancio col mouse | `claude/exciting-cori-6cwl9m` |
