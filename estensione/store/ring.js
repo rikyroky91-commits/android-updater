@@ -155,6 +155,12 @@
   // barattoli e, con Premium, le armi. Sul sito i telefoni restano.
   const senzaTelefoni = !!ospite;
   let fermoColpo = 0, scossa = 0, moltG = 1, ritmo = 1, daSpawnare = 0;
+  // Il rallentatore del parry (17/10/2026): per `ralenti` fotogrammi veri il tempo va a un terzo, così si vede il contrattacco.
+  let ralenti = 0;
+  // Chi gioca ha già usato la parata (S o la voce del controller): da lì l'anello del tempo si vede anche fuori dalla corsa.
+  let usatoS = false;
+  // Il nemico agganciato col mouse (vedi «L'AGGANCIO»).
+  let aggancio = null;
   let prossimoEvento = 700, prossimoTelefono = 360;
   // La corsa infinita (vedi «LA CORSA INFINITA»): lo stato sta qui in cima perché
   // il pannello e il primo disegno lo leggono mentre lo script si avvia.
@@ -314,6 +320,8 @@
     gelo: [0.6, (c, o, t, k) => { for (let i = 0; i < 5; i++) notaAudio(c, o, t + i * 0.05, varia(2400, 0.2), varia(2600, 0.2), 0.12, "sine", 0.1 * k); soffioAudio(c, o, t, 0.5, 0.15 * k, "highpass", 4000, 6000); }],
     fiamma: [0.8, (c, o, t, k) => { soffioAudio(c, o, t, 0.75, 0.55 * k, "lowpass", 700, 1500, 0.9); }],
     onda: [1, (c, o, t, k) => { notaAudio(c, o, t, 140, 70, 0.95, "sawtooth", 0.16 * k, 0.04); soffioAudio(c, o, t, 0.9, 0.35 * k, "bandpass", 1200, 400, 1.2); }],
+    // Il parry: un «ting» metallico alto e un riverbero chiaro, diverso da ogni colpo.
+    parry: [0.9, (c, o, t, k) => { notaAudio(c, o, t, 2100, 1700, 0.5, "triangle", 0.32 * k, 0.002); notaAudio(c, o, t, 3150, 2900, 0.35, "sine", 0.16 * k, 0.002); notaAudio(c, o, t + 0.04, 1050, 980, 0.6, "sine", 0.12 * k, 0.01); }],
     jet: [0.7, (c, o, t, k) => { soffioAudio(c, o, t, 0.65, 0.4 * k, "bandpass", 400, 1600, 1); }],
     tuono: [2.2, (c, o, t, k) => { soffioAudio(c, o, t, 0.12, 0.8 * k, "highpass", 2000, 2000); soffioAudio(c, o, t + 0.05, 2, 0.9 * k, "lowpass", 500, 50, 0.5); }],
     clic: [0.06, (c, o, t, k) => { notaAudio(c, o, t, 1500, 1100, 0.04, "square", 0.08 * k); }],
@@ -2190,6 +2198,7 @@
   const inFinestraParry = (f) => !!(f && f.azione === "para" && f.paraT0 !== undefined && tempo - f.paraT0 <= PARRY.finestra + larghezzaParry(f));
   // Si mette in guardia (da un comando di chi gioca): la finestra parte adesso, se non si è appena sbagliato.
   function inGuardia(f, tenuta) {
+    f.premutoS = tempo; usatoS = true;                   // (la parata la chiede chi gioca: tastiera o controller)
     inizia(f, "para");
     if (tenuta) { f.durata = PARRY.guardiaMax; f.guardia = true; }
     if (!(f.paraRiposo > tempo)) { f.paraT0 = tempo; f.paraRiposo = tempo + PARRY.riposo; }
@@ -2209,11 +2218,91 @@
     scintille(x, y, grande ? 22 : 12, "#ffffff"); scintille(x, y, grande ? 14 : 8, "#ffd84a");
     fermoColpo = Math.max(fermoColpo, grande ? 18 : 12); scossa = Math.max(scossa, grande ? 14 : 6);
   }
+  // ·· IL TEMPO DEL PARRY, A VISTA (17/10/2026) ··
+  // Riccardo: «non riesco a comprendere bene il parry e il contrattacco, non si capisce bene quando avviene» e
+  // «incentriamo il gioco sulla tempistica della parata e del parry: massima attenzione sulle animazioni e i feedback».
+  // Per chi gioca (l'eroe della corsa, o il lottatore del controller dopo la prima parata) si calcola il colpo parabile
+  // che arriva per primo (`minacciaParry`: un morso, una carica letale, una granata, un colpo dell'avversario) e quanti
+  // fotogrammi mancano. Intorno a lui un ANELLO si stringe e tocca il corpo quando arriva il colpo: quando diventa d'oro
+  // (dentro la finestra del parry) è il momento di premere. Sopra chi colpisce, un «!». In guardia, davanti, un arco di
+  // scudo: d'oro finché la finestra del parry è aperta, azzurro dopo (parata e basta).
+  const chiPara = () => (corsa && corsa.chi ? eroe() : usatoS ? comandato() : null);
+  function minacciaParry(f) {
+    if (!f || !f.p || f.esploso || f.fuoriCampo) return null;
+    let meglio = null;
+    const conta = (fot, x, y, da) => { if (fot >= 0 && fot <= 45 && (!meglio || fot < meglio.fot)) meglio = { fot, x, y, da }; };
+    const fx = f.p.bacino.x;
+    if (orda) for (const z of orda.zombie) {
+      if (z.volo || !vivoZ(z)) continue;
+      const Z = ZOMBI[z.tipo], dx = Math.abs(z.x - fx), c = corpoZ(z);
+      if (z.stato === "colpo" && z.s < Z.carica && dx < (Z.portata + 12) * S && (fx - z.x) * z.dir > 0) conta(Z.carica - z.s, c[3], c[4], z);
+      else if (z.stato === "letale" && z.preda === f) conta(Math.max(0, (dx - ((Z.portata || 27) + 8) * S) / (LETALE.vel * S)), c[3], c[4], z);
+    }
+    if (corsa && corsa.tiri) for (const t of corsa.tiri) {
+      if (t.tipo !== "granata" || t.rimandata || t.parata || (fx - t.x) * t.vx <= 0) continue;
+      const dd = Math.min(lontanoDalCorpo(f, t.x, t.y), Math.hypot(t.x - fx, t.y - (f.base - 8 * S))), v = Math.hypot(t.vx, t.vy) || 1;
+      conta(Math.max(0, (dd - (t.r + 32 * S)) / v), t.x, t.y, null);
+    }
+    for (const a of lottatori) {
+      if (a === f || !a.p || a.esploso || !COLPI[a.azione] || a.dir !== (fx >= a.p.bacino.x ? 1 : -1)) continue;
+      if (Math.abs(a.p.bacino.x - fx) > 60 * S || Math.abs(a.base - f.base) > 40 * S || (orda && !corsa)) continue;
+      conta(COLPI[a.azione][1] - a.t, a.p.collo.x, a.p.collo.y, a);
+    }
+    return meglio;
+  }
+  function disegnaTempoParry() {
+    const f = chiPara();
+    if (!f || !f.p || f.esploso || f.fuoriCampo || (corsa && corsa.fase !== "lotta")) return;
+    const c = { x: (f.p.collo.x + f.p.bacino.x) / 2, y: (f.p.collo.y + f.p.bacino.y) / 2 }, R0 = 30 * S;
+    ctx.save(); ctx.lineCap = "round";
+    // Lo scudo, in guardia.
+    if (f.azione === "para") {
+      const aperta = f.paraT0 !== undefined && tempo - f.paraT0 <= PARRY.finestra + larghezzaParry(f);
+      const a0 = f.dir > 0 ? 0 : Math.PI, k = aperta ? 0.75 + 0.25 * Math.sin(passi * 0.6) : 0.55;
+      ctx.globalAlpha = k; ctx.strokeStyle = aperta ? "#ffd84a" : "#8fd3ff"; ctx.lineWidth = (aperta ? 5 : 3.5) * S;
+      ctx.beginPath(); ctx.arc(c.x, c.y, R0 + 6 * S, a0 - 0.9, a0 + 0.9); ctx.stroke();
+      ctx.globalAlpha = k * 0.35; ctx.lineWidth = 12 * S; ctx.stroke();
+    }
+    // L'anello del tempo.
+    const m = minacciaParry(f);
+    if (m) {
+      const fin = PARRY.finestra + larghezzaParry(f), dentro = m.fot <= fin, R = R0 + m.fot * 2.4 * S;
+      ctx.globalAlpha = Math.min(1, 0.35 + (45 - m.fot) / 40);
+      ctx.strokeStyle = dentro ? "#ffd84a" : "#ffffff"; ctx.lineWidth = (dentro ? 3.6 : 2) * S;
+      ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, Math.PI * 2); ctx.stroke();
+      // Il bersaglio: il bordo del corpo, dove l'anello deve arrivare.
+      ctx.globalAlpha = 0.5; ctx.strokeStyle = dentro ? "#ffd84a" : "rgba(255,255,255,.7)"; ctx.lineWidth = 1.4 * S; ctx.setLineDash([4 * S, 5 * S]);
+      ctx.beginPath(); ctx.arc(c.x, c.y, R0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      // Da che parte arriva: una punta sull'anello.
+      const ang = Math.atan2(m.y - c.y, m.x - c.x);
+      ctx.globalAlpha = 1; ctx.fillStyle = dentro ? "#ffd84a" : "#ffffff";
+      ctx.beginPath(); ctx.moveTo(c.x + Math.cos(ang) * (R + 8 * S), c.y + Math.sin(ang) * (R + 8 * S));
+      ctx.lineTo(c.x + Math.cos(ang + 0.18) * R, c.y + Math.sin(ang + 0.18) * R); ctx.lineTo(c.x + Math.cos(ang - 0.18) * R, c.y + Math.sin(ang - 0.18) * R); ctx.closePath(); ctx.fill();
+      // Il «!» sopra chi colpisce, d'oro nella finestra.
+      if (m.da) {
+        const tx = m.x, ty = m.y - 26 * S - Math.abs(Math.sin(passi * 0.3)) * 3 * S;
+        ctx.globalAlpha = 1; ctx.fillStyle = dentro ? "#ffd84a" : "#ffffff"; ctx.strokeStyle = "#17171c"; ctx.lineWidth = 3 * S;
+        ctx.font = "900 " + Math.round(20 * S) + "px Archivo, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.strokeText("!", tx, ty); ctx.fillText("!", tx, ty);
+      }
+    }
+    ctx.restore();
+  }
+  // Parata normale dopo una pressione di S: era troppo presto per il parry. Lo si dice, così si impara il tempo.
+  function troppoPresto(f, x, y) {
+    if (f.premutoS === undefined || tempo - f.premutoS > 50 || f.tPresto === f.premutoS) return;
+    f.tPresto = f.premutoS;
+    scrivi(dici("TROPPO PRESTO!"), x, y - 30 * S, false);
+  }
   // Parry riuscito contro un lottatore (`da`) o uno zombie (`z`): chi para non prende niente e parte il contrattacco.
   function faiParry(f, da, x, y, z) {
-    f.paraT0 = undefined; f.guardia = false; f.paraRiposo = 0;
+    f.paraT0 = undefined; f.guardia = false; f.paraRiposo = 0; f.parryT = tempo; f.premutoS = undefined;
+    f.riparo = Math.max(f.riparo || 0, 2);              // (durante il contrattacco i morsi non lo prendono: vedi `morso`)
     lampoParry(x, y, false, f.dir);
     scrivi("PARRY!", x, y - 22 * S, true);
+    suona("parry", x, 1);
+    // Il rallentatore: il tempo a un terzo per mezzo secondo, così il contrattacco si vede (vedi `eseguiContro`).
+    ralenti = Math.max(ralenti, 30);
     impara(f, "para", 1, 2);
     if (corsa && corsa.chi && f.tipo === corsa.chi) { corsa.parry = (corsa.parry || 0) + 1; caricaCorsa(10); corsa.punti += 25; }
     inizia(f, "contro"); f.controDi = da || null; f.controZ = z || null;
@@ -2231,17 +2320,37 @@
       if (tx !== null && Math.abs(tx - f.cx) > 30 * S && Math.abs(tx - f.cx) < 90 * S) { const st = Math.sign(tx - f.cx) * 3 * S; for (const n in f.p) { f.p[n].x += st; f.p[n].ox += st; } f.cx += st; }
       return;
     }
+    // Lo scatto verso chi ha attaccato: righe di velocità dietro.
+    if (f.t < 8 && f.t % 2 === 0 && particelle.length < MAX_PARTICELLE) {
+      particelle.push({ tipo: "linea", x: f.p.bacino.x - f.dir * 10 * S, y: f.p.bacino.y - caso(-14, 14) * S, vx: -f.dir * 4 * S, vy: 0, vita: 10, max: 10, lung: caso(16, 30) * S, colore: "#ffe27a" });
+    }
     if (f.t !== 8) return;
     f.controZ = null; f.controDi = null;
+    // Il colpo del contrattacco (17/10/2026, Riccardo: «non vedo un contrattacco»): un fendente d'oro di traverso,
+    // la raggiera, «CONTRO!» grande, chi lo prende vola via. Arriva nel rallentatore del parry: si vede bene.
+    const fendente = (x, y) => {
+      if (particelle.length < MAX_PARTICELLE - 3) {
+        particelle.push({ tipo: "taglio", x, y, vx: 0, vy: 0, vita: 16, max: 16, ang: -f.dir * 0.6, lung: 46 * S, colore: "#ffd84a" });
+        particelle.push({ tipo: "taglio", x: x + f.dir * 6 * S, y: y + 6 * S, vx: 0, vy: 0, vita: 12, max: 12, ang: f.dir * 0.5, lung: 34 * S, colore: "#ffffff" });
+        particelle.push({ tipo: "impatto", x, y, vx: 0, vy: 0, vita: 14, max: 14, r: 46 * S, giro: Math.random() * 6, colore: "#ffd84a" });
+      }
+      scintille(x, y, 14, "#ffd84a");
+      scrivi("CONTRO!", x, y - 64 * S, true);                       // (sopra il «PARRY!», che è ancora lì)
+      scossa = Math.max(scossa, 10); fermoColpo = Math.max(fermoColpo, 6);
+      suona("taglio", x, 1);
+    };
     if (z && vivoZ(z)) {
       const c = corpoZ(z);
+      fendente(c[0], c[1]);
       colpisciZombie(z, 7.5, f.dir, c[0], c[1], f);
       if (vivoZ(z)) colpisciZombie(z, 7.5, f.dir, c[0], c[1], f);
-      scrivi("CONTRO!", c[0], c[1] - 30 * S, false);
+      z.vx = f.dir * 8 * S * (pesante(z) ? 0.3 : 1);
     } else if (da && da.p && !da.ko && !da.esploso && Math.abs(da.p.bacino.x - f.p.bacino.x) < 70 * S && Math.abs(da.base - f.base) < 40 * S) {
       da.azione = null;
+      fendente(da.p.collo.x, da.p.collo.y);
       colpisci(f, da, PARRY.forza * (1 + 0.15 * (corsa && corsa.chi && f.tipo === corsa.chi ? corsa.riflessi || 0 : 0)), da.p.collo.x, da.p.collo.y, "CONTRO!");
-    }
+      for (const n in da.p) da.p[n].ox -= f.dir * 6 * S;
+    } else fendente(f.p.bacino.x + f.dir * 30 * S, f.p.collo.y + 6 * S);      // (andato via: il fendente a vuoto si vede lo stesso)
   }
   function colpisci(f, altro, forza, x, y, suono) {
     if (fatale && altro && altro.tipo) return;                   // durante il colpo finale conta solo la scena
@@ -2269,7 +2378,7 @@
       impara(altro, "para", 1, 1); impara(f, f.azione, -1, 0);
       if (livelloDi(altro.tipo) >= 3 && Math.random() < 0.5) altro.combo = 1;
       scrivi(taglio || suono === "BANG!" ? "CLANG!" : "PARATO!", x, y - 6 * S, false);
-      scintille(x, y, 5, "#bfe9ff");
+      scintille(x, y, 5, "#bfe9ff"); troppoPresto(altro, x, y);
       for (const n in altro.p) altro.p[n].ox -= f.dir * forza * 0.12 * S;
       fermoColpo = 2;
       return;
@@ -2496,6 +2605,26 @@
       if (evento.stopPropagation) evento.stopPropagation();
       riparti();
       return;
+    }
+    // L'aggancio: un clic su uno zombie (durante un'orda) lo aggancia o lo sgancia (vedi «L'AGGANCIO»).
+    if (orda && orda.fase !== "festa") {
+      const zx = evento.clientX, zy = evento.clientY;
+      let preso = null, d0 = (evento.pointerType === "touch" ? 40 : 30) * S;
+      for (const z of orda.zombie) {
+        if (!vivoZ(z) || (z.volo && !dragoBasso(z))) continue;
+        const c = corpoZ(z), d = Math.min(Math.hypot(c[0] - zx, c[1] - zy) - c[2], Math.hypot(c[3] - zx, c[4] - zy) - c[5]);
+        if (d < d0) { d0 = d; preso = z; }
+      }
+      if (preso) {
+        aggancio = aggancio === preso ? null : preso;
+        if (aggancio) { suona("clic", zx, 0.6); scintille(zx, zy, 6, "#ff4a3a"); }
+        clicMio = true;
+        if (evento.preventDefault) evento.preventDefault();
+        if (evento.stopPropagation) evento.stopPropagation();
+        riparti();
+        return;
+      }
+      if (aggancio) aggancio = null;                                   // (un clic sul vuoto sgancia)
     }
     raggioPresa = evento.pointerType === "touch" ? 30 : 16;
     const tel = telefonoSotto(evento.clientX, evento.clientY);
@@ -5262,6 +5391,58 @@
   // In piedi (o in volo): si può colpire e colpisce. Il salto, lo sputo e la picchiata sono della corsa.
   const vivoZ = (z) => !z.inBuco && (z.stato === "va" || z.stato === "colpo" || z.stato === "salto" || z.stato === "sputa" || z.stato === "granata" || z.stato === "tuffo" || z.stato === "mira" ||
                        z.stato === "letale" || z.stato === "barcolla" || (z.stato === "esce" && z.s > 22));
+  // ·· L'AGGANCIO (17/10/2026, Riccardo: «con il mouse posso cliccare su un nemico e attivare un soft lock-on, in modo
+  // che se ci si vuole concentrare su un nemico specifico si può fare») ··
+  // Un clic su uno zombie lo aggancia (mirino che gira intorno); un altro clic su di lui, o sul vuoto, lo sgancia; morto
+  // lui, l'aggancio finisce. È morbido: l'eroe (e chi si comanda, nell'orda del ring libero) va da lui e lo colpisce, ma
+  // se un altro lo sta mordendo in quel momento prima si difende.
+  function agganciato() {
+    if (aggancio && (!orda || !orda.zombie.includes(aggancio) || !vivoZ(aggancio) || (aggancio.volo && !dragoBasso(aggancio)))) aggancio = null;
+    return aggancio;
+  }
+  function chiAggancia() { return corsa && corsa.chi ? eroe() : comandato(); }
+  // Qualcuno sta per mordere `f` proprio adesso.
+  const morsoInArrivo = (f) => !!(orda && orda.zombie.some((z) => z !== aggancio && z.stato === "colpo" && vivoZ(z) && Math.abs(z.x - f.cx) < (ZOMBI[z.tipo].portata + 8) * S));
+  // Verso l'agganciato, se è lontano (true: questo pensiero l'ha già fatto l'aggancio).
+  // L'eroe che gioca da solo si para (parata, non parry) dal morso in arrivo; quando chi gioca usa la parata, la
+  // difesa è sua e l'eroe smette di farla (sennò il parry lo farebbe il gioco al posto suo).
+  function paraDaSolo(f) {
+    if (usatoS || !braccia(f) || f.azione === "para") return false;
+    const m = minacciaParry(f);
+    if (!m || m.fot > 10 || Math.random() > 0.35 * f.furbo) return false;
+    f.dir = m.x >= f.cx ? 1 : -1; inizia(f, "para");
+    return true;
+  }
+  function versoAgganciato(f) {
+    const z = agganciato();
+    if (!z || f !== chiAggancia() || morsoInArrivo(f)) return false;
+    const d = Math.abs(z.x - f.cx);
+    if (d <= 40 * S) return false;                                       // a portata: lo prende `zombieVicino` qui sotto
+    f.dir = z.x >= f.cx ? 1 : -1; f.zMira = z;
+    if (f.arma && SPARANO[f.arma.tipo] && f.colpiArma > 0 && !(f.arma.tipo === "motosega" && d < 150 * S)) { inizia(f, azioneArma(f.arma)); return true; }
+    if (anime && braccia(f) && f.ki >= 15 && d > 120 * S && Math.random() < 0.4) { inizia(f, "raffica"); return true; }
+    inizia(f, "avanza", z.x - f.dir * 28 * S); f.corsa = 30;
+    return true;
+  }
+  // Lo zombie da colpire a portata: l'agganciato, se è lì; sennò il più vicino.
+  function zombieDaColpire(f) {
+    const z = agganciato();
+    if (z && f === chiAggancia() && Math.abs(z.x - f.cx) <= 40 * S && !morsoInArrivo(f)) return z;
+    return zombieVicino(f.cx, 40 * S);
+  }
+  function disegnaAggancio() {
+    const z = agganciato();
+    if (!z || !orda) return;
+    const c = corpoZ(z), r = c[2] * 2.2 + 8 * S, a = passi * 0.05;
+    ctx.save(); ctx.translate(c[0], (c[1] + c[4]) / 2); ctx.rotate(a);
+    ctx.strokeStyle = "#ff4a3a"; ctx.lineWidth = 2.6 * S; ctx.lineCap = "round";
+    for (let i = 0; i < 4; i++) {
+      ctx.rotate(Math.PI / 2);
+      ctx.beginPath(); ctx.moveTo(r, -r * 0.45); ctx.lineTo(r, -r); ctx.lineTo(r * 0.55, -r); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.save(); ctx.globalAlpha = 0.85; scriviUI("\u{1F3AF}", c[0], c[4] - c[5] - 18 * S, 13 * S, "#ffffff", "center"); ctx.restore();
+  }
   // Lo zombie vivo più vicino a un punto, entro un raggio; `lato` (facoltativo) chiede quelli da una parte sola.
   function zombieVicino(x, raggio, lato) {
     let scelto = null, d0 = raggio;
@@ -5295,8 +5476,11 @@
     const grosso = pesante(z), forte = forza >= 4.4;
     // Nella corsa: i pugni pesanti dell'eroe contano di più, la corazza ferma metà dei colpi deboli.
     const molt = (corsa && corsa.chi && da && da.tipo === corsa.chi ? forzaCorsa() : 1) * ((z.tipo === "corazzato" || z.tipo === "bruto") && !forte ? 0.5 : 1);
-    // Chi si carica o corre per la mossa letale non si ferma per i colpi: va parato (vedi LETALE).
-    const lanciato = z.stato === "mira" || z.stato === "letale";
+    // Chi si carica o corre per la mossa letale non si ferma per i colpi: va parato (vedi LETALE). E dal 17/10/2026
+    // anche il morso, negli ultimi sedici fotogrammi (quando l'anello del parry è d'oro): un colpo debole non lo
+    // ferma più, va parato o lo si prende. Uno forte sì.
+    const Zc = ZOMBI[z.tipo];
+    const lanciato = z.stato === "mira" || z.stato === "letale" || (z.stato === "colpo" && !forte && z.s >= Zc.carica - 16 && z.s < Zc.carica);
     z.hp -= (forte ? 2 : 1) * molt; z.lampo = 5;
     if (!lanciato) z.s = 0;
     // Il grosso barcolla solo ai colpi forti, e quasi non si sposta.
@@ -5582,7 +5766,8 @@
   const dannoLetale = () => LETALE.danno * (corsa && corsa.chi && corsa.round <= 3 ? 0.65 : 1);
   let prossimaLetale = 0;
   function attesaLetale() {
-    if (corsa && corsa.chi) { const n = corsa.round || 1; return Math.round(caso(Math.max(300, 780 - 50 * n), Math.max(480, 1080 - 60 * n))); }
+    // (dal 17/10/2026 il gioco gira intorno al parry: più cariche, da dieci-quindici secondi all'inizio a quattro-sette poi)
+    if (corsa && corsa.chi) { const n = corsa.round || 1; return Math.round(caso(Math.max(240, 600 - 45 * n), Math.max(400, 900 - 55 * n))); }
     return Math.round(caso(720, 1100));
   }
   function puoLetale(z, q, f, dx, sopra) {
@@ -5789,7 +5974,7 @@
       return;
     }
     if (f.azione === "para" && f.dir === -z.dir) {
-      scintille(x, y, 5, "#bfe9ff"); scrivi("PARATO!", x, y - 8 * S, false);
+      scintille(x, y, 5, "#bfe9ff"); scrivi("PARATO!", x, y - 8 * S, false); troppoPresto(f, x, y);
       z.botta = 22; z.vx = -z.dir * 2.4 * S;
       if (grosso) for (const n in f.p) f.p[n].ox -= z.dir * 4 * S;
       return;
@@ -5802,7 +5987,7 @@
       if (z.tipo === "gelido") { corsa.gelato = 150; suona("gelo", x, 0.6); scintille(x, y, 8, "#dff6ff"); }
       if (z.tipo === "capo") { scossa = Math.max(scossa, 12); if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "onda", x: z.x, y: orda.base - 4 * S, vx: 0, vy: 0, vita: 18, max: 18, colore: "#c9a0ff" }); }
     }
-    f.morsiZ = (f.morsiZ || 0) + 1;
+    f.morsiZ = (f.morsiZ || 0) + 1; f.colpitoT = tempo;
     scintille(x, y, 6, "#b6e36a");
     scrivi(grosso ? "SBAM!" : ["GNAM!", "GRAH!", "CHOMP!"][f.morsiZ % 3], x, y - 10 * S, false);
     for (const n in f.p) f.p[n].ox -= z.dir * (grosso ? 7 : 2.6) * S;
@@ -5931,6 +6116,9 @@
       if (z.stato === "va" && puoLetale(z, q, f, dx, sopra)) { iniziaLetale(z, f); continue; }
       if (corsa && specialeZombie(z, q, Z, f, dx, sopra)) continue;
       if (z.stato === "colpo") {
+        // Il morso caricato insegue di qualche passo chi arretra (anche in guardia): un attacco annunciato dall'anello
+        // del parry deve arrivare, non andare a vuoto per due pixel (17/10/2026).
+        if (z.s < Z.carica && sopra && Math.abs(dx) > (Z.portata - 4) * S && Math.abs(dx) < (Z.portata + 30) * S) z.x += z.dir * Math.min(1.8 * S, Math.abs(dx) - (Z.portata - 4) * S);
         // Un lampo bianco sugli occhi, poco prima del morso: è il momento di parare (vedi PARRY).
         if (z.s === Math.max(1, Z.carica - 10) && particelle.length < MAX_PARTICELLE - 2) { const c = corpoZ(z); scintille(c[3] + z.dir * 3 * S, c[4], 3, "#ffffff"); }
         if (z.s === Z.carica && sopra && Math.abs(dx) < (Z.portata + 7) * S && !f.ko && !f.esploso && !f.preso) morso(z, f);
@@ -5983,8 +6171,9 @@
     }
     // 0. Una mossa in due, se è il momento (vedi «LE MOSSE IN COPPIA»).
     if (q.fase === "lotta" && !(q.coppiaAttesa > 0) && pensaCoppia(f, altro, lato)) return;
-    // 1. Uno zombie a portata di braccio: lo si colpisce, da qualunque parte arrivi.
-    const z = zombieVicino(f.cx, 40 * S);
+    // 1. Uno zombie a portata di braccio: lo si colpisce, da qualunque parte arrivi (l'agganciato prima; se è lontano, ci si va).
+    if (paraDaSolo(f) || versoAgganciato(f)) return;
+    const z = zombieDaColpire(f);
     if (z) {
       f.dir = z.x >= f.cx ? 1 : -1; f.zMira = z;
       if (f.arma && f.arma.tipo === "spada" && f.colpiArma > 0) { f.colpiArma--; inizia(f, "fendente"); return; }
@@ -12632,6 +12821,7 @@
     for (const f of lottatori) disegnaCratere(f.cratere);
     disegnaScie();
     disegnaOrda();
+    disegnaAggancio();
     disegnaFondoCorsa();
     const ordine = lottatori.slice().sort((x, y) => (y.ko ? 1 : 0) - (x.ko ? 1 : 0));
     for (const f of ordine) {
@@ -12661,6 +12851,7 @@
         stella(f.p.testa.x + Math.cos(ang) * 11 * S, f.p.testa.y - 12 * S + Math.sin(ang) * 3.5 * S, 2.6 * S, "#ffd84a");
       }
     }
+    disegnaTempoParry();
     for (const f of lottatori) {
       if (f.esploso) continue;
       if (f.tenuto && f.tenuto.tele !== undefined) (f.tenuto.magia ? disegnaLevitazione : disegnaTelecinesi)(f);
@@ -12710,7 +12901,8 @@
     if (!ultimo) ultimo = adesso;
     // Nella corsa si tiene il conto di quanto dura un fotogramma: se il telefono fatica, meno zombie insieme.
     if (corsa && corsa.chi && ultimo && adesso > ultimo) corsa.dtMedio = (corsa.dtMedio || 16.7) * 0.97 + Math.min(200, adesso - ultimo) * 0.03;
-    riserva += Math.min(100, adesso - ultimo) * ritmo;
+    riserva += Math.min(100, adesso - ultimo) * ritmo * (ralenti > 0 ? 0.32 : 1);
+    if (ralenti > 0) ralenti--;
     ultimo = adesso;
     let giri = 0;
     // Un colpo secco ferma l'azione per qualche fotogramma: si sente di più.
@@ -13243,10 +13435,14 @@
       // da soli verso chi sta arrivando, che è chi si vuole parare)
       if (!puoMuovere(f) || (f.azione && NON_INTERROMPIBILI[f.azione])) return false;
       if (f.azione === "contro") return true;
+      // (preso un attimo fa: era troppo tardi)
+      if (f.colpitoT !== undefined && tempo - f.colpitoT <= 10 && f.tTardi !== f.colpitoT) { f.tTardi = f.colpitoT; scrivi(dici("TROPPO TARDI!"), f.p.testa.x, f.p.testa.y - 40 * S, false); }
       const lanciato = orda && orda.zombie.find((w) => (w.stato === "letale" || w.stato === "mira") && w.preda === f);
       // (prima di tutto una granata in arrivo: è quella da rimandare)
       const granata = corsa && (corsa.tiri || []).find((t) => t.tipo === "granata" && !t.rimandata && Math.abs(t.x - f.p.bacino.x) < 200 * S && (f.p.bacino.x - t.x) * t.vx > 0);
-      const minaccia = granata || lanciato || (orda && orda.fase === "lotta" ? zombieVicino(f.cx, 260 * S) : null), altro = lottatori.find((l) => l !== f);
+      // (prima di tutto il colpo che arriva per primo, quello dell'anello: vedi `minacciaParry`)
+      const imminente = minacciaParry(f);
+      const minaccia = imminente || granata || lanciato || (orda && orda.fase === "lotta" ? zombieVicino(f.cx, 260 * S) : null), altro = lottatori.find((l) => l !== f);
       const tx = minaccia ? minaccia.x : altro && altro.p ? altro.p.bacino.x : null;
       if (tx !== null) f.dir = tx >= f.p.bacino.x ? 1 : -1;
       f.ordine = null; inGuardia(f, true);
@@ -14631,7 +14827,8 @@
     const q = orda;
     if (q.fase !== "lotta") { f.pensa = 10; return; }
     if (puoDecollareCorsa(f)) { decollaCorsa(f); return; }
-    const z = zombieVicino(f.cx, 40 * S);
+    if (paraDaSolo(f) || versoAgganciato(f)) return;
+    const z = zombieDaColpire(f);
     if (z) {
       f.dir = z.x >= f.cx ? 1 : -1; f.zMira = z;
       if (f.arma && f.arma.tipo === "spada" && f.colpiArma > 0) { f.colpiArma--; inizia(f, "fendente"); return; }
@@ -15462,6 +15659,8 @@
     },
     sceltaModo: (si) => { if (si !== undefined) { sceltaModo = !!si; aggiornaInterruttori(); } return sceltaModo; },
     // Solo per i test: un tasto premuto (il codice fisico, come `e.code`), e la mappa dei tasti.
+    // Quanti fotogrammi mancano al colpo parabile che arriva per primo su chi gioca (null: nessuno). Per i test.
+    minacciaParry: () => { const m = minacciaParry(chiPara()); return m ? Math.round(m.fot) : null; },
     tastoGiu: (code, opz) => { let fermato = false; premiTasto(Object.assign({ code, repeat: false, target: null, preventDefault() {}, stopPropagation() { fermato = true; } }, opz || {})); return fermato; },
     tastoSu: (code) => { lasciaTasto({ code }); },
     mappaTasti: () => Object.assign({}, mappaTasti),
@@ -15628,13 +15827,14 @@
                           return { a: mira.a, v: mira.v, dir: mira.dir, t: mira.t, da: mira.da.tipo, resta: Math.max(0, MIRA.attesa - mira.t), ox: o.x, oy: o.y, fx: e.x, fy: e.y }; })() : null,
     lampoMira: lampoMira ? { ox: lampoMira.ox, oy: lampoMira.oy, fx: lampoMira.fx, fy: lampoMira.fy, t: lampoMira.t, preso: lampoMira.preso } : null,
     buco: buco ? { x: buco.x, y: buco.y, r: buco.r, fase: buco.fase, dentro: buco.dentro.map((d) => d.tipo), passati: buco.passati, uscita: doveEsce(buco.x, buco.y) } : null,
-    arti: arti.length, macchie: macchie.length, acquazzone, natale, uragano: !!uragano, cruento, ritmo,
+    arti: arti.length, macchie: macchie.length, acquazzone, natale, uragano: !!uragano, cruento, ritmo, ralenti,
     pioggia: gocce.length, pioggiaInFondo: gocce.reduce((n, g) => n + (g.y > pavimento * 0.7 ? 1 : 0), 0), piovendo, bagnato, sisma: sisma ? { t: sisma.t, x: sisma.x, alto: sisma.alto, forza: sisma.k } : null,
     lapilli: lapilli.length, colate: colate.length, meteore: meteore.map((m) => ({ x: m.x, y: m.y, bx: m.bx, by: m.by, grossa: m.grossa })),
     sciame: sciame ? sciame.resta : 0, bruciature: bruciature.length, trema: radiceTrema(),
     orda: orda ? { fase: orda.fase, t: orda.t, base: orda.base, cx: orda.cx, nati: orda.nati, uccisi: orda.uccisi, lati: Object.assign({}, orda.lati),
                    ondata: orda.ondata, ondate: orda.ondate, superate: orda.superate, seme: orda.seme, vite: orda.vite, traslochi: orda.traslochi || 0, l: orda.l, r: orda.r,
                    coppie: Object.assign({}, orda.coppie), coppiaAttesa: orda.coppiaAttesa, latiDi: Object.assign({}, orda.lati),
+                   aggancio: agganciato() ? orda.zombie.indexOf(aggancio) : -1,
                    ricetta: orda.ricetta ? { tema: orda.ricetta.tema, arrivo: orda.ricetta.arrivo, totale: orda.ricetta.totale, insieme: orda.ricetta.insieme, restano: orda.ricetta.coda.length } : null,
                    zombie: orda.zombie.map((z) => ({ x: z.x, y: z.volo ? z.y : orda.base - (z.alzo || 0), volo: z.volo || null, stato: z.stato, hp: z.hp, lato: z.lato, tipo: z.tipo })) } : null, primatoOrda,
     radiale: (() => { const g = lottatori.length ? geometriaRadiale() : { x: 0, y: 0, centro: 0, spicchi: [], largo: 0 };

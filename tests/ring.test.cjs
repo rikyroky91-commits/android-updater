@@ -4654,3 +4654,79 @@ test("le carte del livello si scelgono da tastiera: 1 2 3, oppure le frecce e In
   assert.ok(prendi(["ArrowRight", "ArrowRight", "Enter"]), "le frecce scelgono e Invio prende");
   dentro(amb);
 });
+
+// ·· Il parry al centro (17/10/2026) ··
+test("parry a vista: l'anello conta i fotogrammi del morso, il parry rallenta il tempo e il contrattacco si vede", () => {
+  let fatto = false;
+  for (let k = 0; k < 6 && !fatto; k++) {
+    const { amb, r } = corsaAvviata({}, "robot", 1700 + k);
+    avanzaCorsa(amb, r, 60 * 10, (s) => (s.orda && s.corsa.fase === "lotta" ? false : undefined));
+    const f0 = amb.lottatore("robot");
+    r.zombie("corazzato", f0.bacino.x + 40);       // (corazzato: regge i pugni e arriva a mordere)
+    let visto = null, premuto = false, ralenti = 0;
+    const scritte = new Set();
+    avanzaCorsa(amb, r, 60 * 8, (s) => {
+      for (const x of s.scritte) scritte.add(x);
+      const m = r.minacciaParry();
+      if (m !== null && visto === null) visto = m;
+      if (m !== null && m <= 6 && !premuto) premuto = r.tastoGiu("KeyS");
+      ralenti = Math.max(ralenti, s.ralenti);
+      if (scritte.has("CONTRO!")) return false;
+    });
+    if (!scritte.has("PARRY!")) continue;
+    assert.ok(visto !== null && visto > 6, "l'anello si vede prima del morso: " + visto);
+    assert.ok(ralenti > 0, "il parry rallenta il tempo");
+    assert.ok(scritte.has("CONTRO!"), "e il contrattacco si vede");
+    fatto = true;
+    dentro(amb);
+  }
+  assert.ok(fatto, "in sei corse nessun parry sul morso");
+});
+
+test("parata premuta troppo presto: «TROPPO PRESTO!»; presa e premuta subito dopo: «TROPPO TARDI!»", () => {
+  let presto = false, tardi = false;
+  for (let k = 0; k < 7 && !(presto && tardi); k++) {
+    const { amb, r } = corsaAvviata({}, "robot", 1800 + k);
+    avanzaCorsa(amb, r, 60 * 10, (s) => (s.orda && s.corsa.fase === "lotta" ? false : undefined));
+    const f0 = amb.lottatore("robot");
+    r.zombie("corazzato", f0.bacino.x + 40);       // (corazzato: regge i pugni e arriva a mordere)
+    let premuto = false, preso = false;
+    avanzaCorsa(amb, r, 60 * 8, (s) => {
+      const m = r.minacciaParry();
+      // troppo presto: S tenuto da ben prima che arrivi il morso
+      if (!presto && m !== null && m >= 17 && !premuto) premuto = r.tastoGiu("KeyS");      // (la finestra è di 14)
+      if (s.scritte.some((x) => /PRESTO/.test(x))) presto = true;
+      if (presto && !preso && s.scritte.some((x) => /GNAM|GRAH|CHOMP/.test(x))) { preso = true; r.tastoSu("KeyS"); r.tastoGiu("KeyS"); }
+      if (s.scritte.some((x) => /TARDI/.test(x))) { tardi = true; return false; }
+    });
+  }
+  assert.ok(presto, "nessun «TROPPO PRESTO!»");
+  assert.ok(tardi, "nessun «TROPPO TARDI!»");
+});
+
+test("aggancio: un clic su uno zombie lo aggancia, l'eroe va da lui; un altro clic lo sgancia", () => {
+  const { amb, r } = corsaAvviata({}, "robot", 1900);
+  avanzaCorsa(amb, r, 60 * 10, (s) => (s.orda && s.corsa.fase === "lotta" ? false : undefined));
+  const f0 = amb.lottatore("robot");
+  const lontano = Math.max(60, Math.min(1140, f0.bacino.x + (f0.bacino.x < 600 ? 360 : -360)));
+  r.zombie("lento", lontano);
+  amb.avanza(2);
+  const s = amb.stato(), i = s.orda.zombie.length - 1, z = s.orda.zombie[i], yz = s.orda.base - 34 * s.scala;
+  amb.premi(z.x, yz); amb.rilascia(z.x, yz);
+  assert.strictEqual(amb.stato().orda.aggancio, i, "agganciato");
+  const d0 = Math.abs(f0.bacino.x - z.x);
+  let vicino = false;
+  avanzaCorsa(amb, r, 60 * 6, (st) => {
+    const zz = st.orda && st.orda.zombie[i];
+    if (!zz || zz.stato === "giu") { vicino = true; return false; }
+    if (Math.abs(st.lottatori.find((l) => l.tipo === "robot").bacino.x - zz.x) < d0 * 0.4) { vicino = true; return false; }
+  });
+  assert.ok(vicino, "l'eroe va verso l'agganciato");
+  const zz = amb.stato().orda.zombie[i];
+  if (zz && zz.stato !== "giu") {
+    const y2 = amb.stato().orda.base - 34 * amb.stato().scala;
+    amb.premi(zz.x, y2); amb.rilascia(zz.x, y2);
+    assert.strictEqual(amb.stato().orda.aggancio, -1, "un altro clic sgancia");
+  }
+  dentro(amb);
+});

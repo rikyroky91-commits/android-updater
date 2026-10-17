@@ -500,6 +500,8 @@
     "NOTIFICA!": ["PING!", "¡AVISO!", "NOTIF !", "PLING!"],
     "CTRL+ALT+CANC!": ["CTRL+ALT+DEL!", "¡CTRL+ALT+SUPR!", "CTRL+ALT+SUPPR !", "STRG+ALT+ENTF!"],
     "Come funziona": ["How it works", "Cómo funciona", "Comment ça marche", "So funktioniert es"],
+    "TROPPO PRESTO!": ["TOO EARLY!", "¡DEMASIADO PRONTO!", "TROP TÔT !", "ZU FRÜH!"],
+    "TROPPO TARDI!": ["TOO LATE!", "¡DEMASIADO TARDE!", "TROP TARD !", "ZU SPÄT!"],
     "Minaccia": ["Threat", "Amenaza", "Menace", "Bedrohung"],
     "Capo a": ["Boss at", "Jefe en", "Boss à", "Boss bei"],
     "Arriva alla minaccia": ["Reach threat", "Llega a la amenaza", "Atteins la menace", "Erreiche Bedrohung"],
