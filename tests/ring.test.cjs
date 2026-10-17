@@ -3248,10 +3248,12 @@ test("la mira: chi non spara, spara da solo; gli zombie si falciano lungo la lin
   r.comandi.colpo("zombie");
   amb.avanza(400);
   // Uno zombie in piedi (non uno che sta ancora uscendo dal terreno), e la mira sul piano dove combatte l'orda.
-  amb.avanza(60 * 20, (st) => !(st.orda && st.orda.zombie.some((q) => q.stato === "va" || q.stato === "colpo")));
+  // (e non addosso al robot: la linea parte dalle mani, uno zombie dietro di esse non lo prende)
+  const lontano = (st) => (q) => (q.stato === "va" || q.stato === "colpo") && Math.abs(q.x - st.lottatori.find((l) => l.tipo === "robot").bacino.x) > 80;
+  amb.avanza(60 * 20, (st) => !(st.orda && st.orda.zombie.some(lontano(st))));
   const prima = amb.stato().orda.uccisi;
   r.mira("robot");
-  const s = amb.stato(), z = s.orda.zombie.find((q) => q.stato === "va" || q.stato === "colpo");
+  const s = amb.stato(), z = s.orda.zombie.find(lontano(s));
   r.miraA(z.x, s.orda.base - 30);
   const esito = r.spara();
   assert.ok(esito.zombie > 0, "la linea deve falciare gli zombie che attraversa");
