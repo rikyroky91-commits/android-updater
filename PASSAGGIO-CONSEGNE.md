@@ -1,6 +1,6 @@
 # Passaggio di consegne: Mobile Update Tracker e Page Brawl
 
-Documento vivo. Ultimo aggiornamento: **17/10/2026**, su `main` dopo l'unione del parry, seconda volta (ramo `claude/exciting-cori-6cwl9m`, avanti veloce fino a `3299d9f` più questo aggiornamento).
+Documento vivo. Ultimo aggiornamento: **17/10/2026**, su `main` dopo l'unione del parry, seconda volta (ramo `claude/exciting-cori-6cwl9m`, avanti veloce fino a `d970a2d`) e i due test instabili sistemati.
 
 Questo file è il punto di ingresso per chiunque lavori sul repository: persone, Claude, Codex o altri agenti. Si tiene **sempre aggiornato** (regola in fondo, sezione 9). I passaggi di consegne dei singoli giri restano in `docs/consegne/` come archivio storico: questo li riassume e li sostituisce come riferimento.
 
@@ -423,6 +423,7 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 17/10/2026 | Claude | CI rossa su `main` (anche sull'unione di prima, `f8d3910`) per due test instabili già noti, sistemati: l'arena di lava (3 su 20) ora spegne gli imprevisti, tiene fermo il robot lontano dal bordo mentre prova la lava e guarda dove la mela ricompare appena rientra; «gli oggetti entrano dai lati» (1 su 20: dall'alto ne arriva meno di uno su due, a caso) guarda altri 150 s se non li ha visti tutti e due. Dopo: 0 su 40 e 0 su 20, suite Node 214 su 214. Nessuna modifica al gioco | `main` |
 | 17/10/2026 | Claude | **Unito a `main`** il parry, seconda volta (avanti veloce del ramo `claude/exciting-cori-6cwl9m`, CI verde sul ramo): il push pubblica il sito su Oracle. Da fare a mano, come prima: caricare la 1.2.0 sul Chrome Web Store, l'AAB su Play, l'account Ko-fi | `main` |
 | 17/10/2026 | Claude | CI rossa sul parry nuovo: «la mira… gli zombie si falciano» è caduto una volta in CI (0 su 30 in locale). Il test sceglieva anche uno zombie addosso al robot, dietro l'origine della linea: ora ne sceglie uno ad almeno 80 px. Reso robusto anche il test del Limit Break (la trasformazione si richiede di nuovo se un colpo la interrompe). Nessuna modifica al gioco | `claude/exciting-cori-6cwl9m` |
 | 17/10/2026 | Claude | Il parry, seconda volta (spunti da Sekiro, God of War, Expedition 33, Lies of P; il video indicato da Riccardo non si è potuto scaricare, viste solo le anteprime): parry perfetto negli ultimi 5 fotogrammi, lampo bianco e zoom sull'impatto, equilibrio dei nemici e colpo di grazia, catena ×N, anello rosso e «!!» sulla carica letale, tre manate del capo con «CONTRO TOTALE», guardia che si consuma e si rompe, barra dell'equilibrio sotto quella del capo, pagina nuova nella guida, 12 traduzioni. Provato coi test e in Chromium, non a mano | `claude/exciting-cori-6cwl9m` |

@@ -1654,6 +1654,11 @@ test("gli oggetti entrano anche dai lati, e quelli rimasti dove nessuno arriva s
       }
       for (const k of fermi.keys()) if (!visti.has(k)) fermi.delete(k);
     });
+    // (dall'alto ne arriva poco meno di uno su due, a caso: con pochi oggetti capita che entrino tutti dai lati; si guarda ancora)
+    if (dallAlto === 0 || dalLato === 0) amb.avanza(60 * 150, (s) => {
+      for (const t of s.telefoni) { if (t.y < 0) dallAlto++; if ((t.x <= 1 || t.x >= s.larghezza - 1) && t.y > 20) dalLato++; }
+      if (dallAlto > 0 && dalLato > 0) return false;
+    });
     assert.ok(dalLato > 0, "nessun oggetto è entrato da un lato");
     assert.ok(dallAlto > 0, "nessun oggetto è caduto dall'alto");
     assert.ok(inCampo > 60, "in campo, all'altezza dei lottatori, non arriva quasi niente");
@@ -4093,25 +4098,30 @@ test("l'arena di lava: si parte sulla piattaforma, chi cade nella lava dà il pu
     assert.ok(Math.abs(f.base - pedana[1]) < 4, `${f.tipo} poggia sulla piattaforma (base ${f.base})`);
   }
   assert.strictEqual(r.mosse().lava, true);
+  // (senza imprevisti, e col robot tenuto all'altro capo, lontano dal bordo: qui si prova la lava, non un fulmine
+  // o un pugno a mezz'aria)
+  r.comandi.sorprese(false);
+  const fermo = () => r.sposta("robot", 300);
   // La mela spinta di peso oltre il bordo con la vita piena: vola in tempo e torna sulla piattaforma.
-  r.sposta("mela", 20);
+  fermo(); r.sposta("mela", 20);
   let salvata = false, bruciata = false;
-  amb.avanza(300, (st) => { const m = st.lottatori.find((f) => f.tipo === "mela"); if (m.esploso) bruciata = true; if (m.vola) salvata = true; });
+  amb.avanza(300, (st) => { fermo(); const m = st.lottatori.find((f) => f.tipo === "mela"); if (m.esploso) bruciata = true; if (m.vola) salvata = true; });
   assert.ok(salvata && !bruciata, "con più di un quarto di vita si salva in volo (volata " + salvata + ", bruciata " + bruciata + ")");
-  let mela = amb.lottatore("mela");
+  const mela = amb.lottatore("mela");
   assert.ok(mela.cx > pedana[0] && mela.cx < pedana[2], `torna sopra la piattaforma (x ${mela.cx})`);
   // Agli sgoccioli (un quarto di vita o meno) non ce la fa: cade, brucia, e il punto (o il K.O.) è del robot.
   amb.avanza(60);
   r.ferisci("mela", 0.8);
   assert.ok(r.mosse().lottatori[1].vita <= 0.25, "un quinto di vita");
-  r.sposta("mela", 20);
+  fermo(); r.sposta("mela", 20);
   bruciata = false;
-  amb.avanza(300, (st) => { if (st.lottatori.find((f) => f.tipo === "mela").esploso) bruciata = true; });
+  amb.avanza(300, (st) => { fermo(); if (st.lottatori.find((f) => f.tipo === "mela").esploso) bruciata = true; });
   assert.ok(bruciata, "chi ha poca vita e tocca la lava sparisce");
   assert.ok(amb.stato().punteggio.robot >= 1, "il punto è dell'altro: " + JSON.stringify(amb.stato().punteggio) + " finale " + JSON.stringify(amb.stato().finale) + " fatale " + JSON.stringify(amb.stato().fatale || null));
-  amb.avanza(260);
-  mela = amb.lottatore("mela");
-  assert.ok(!mela.esploso && mela.cx > pedana[0] && mela.cx < pedana[2], `rientra sulla piattaforma (x ${mela.cx})`);
+  // (dove ricompare, appena rientra: dopo torna a lottare e può anche ricadere)
+  let rientro = null;
+  amb.avanza(400, (st) => { const m = st.lottatori.find((f) => f.tipo === "mela"); if (!m.esploso && !m.fuori) { rientro = m.cx; return false; } });
+  assert.ok(rientro !== null && rientro > pedana[0] && rientro < pedana[2], `rientra sulla piattaforma (x ${rientro})`);
   // Un minuto e mezzo di lotta, anche coi super guerrieri che volano: nessuno resta nella lava (nemmeno
   // volando a filo), nessuna coordinata impazzita.
   r.comandi.stile("guerrieri");
