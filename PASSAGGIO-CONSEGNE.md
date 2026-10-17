@@ -1,6 +1,6 @@
 # Passaggio di consegne: Mobile Update Tracker e Page Brawl
 
-Documento vivo. Ultimo aggiornamento: **17/10/2026**, sul ramo `claude/exciting-cori-6cwl9m` (il parry, seconda volta), dopo l'unione a `main` di Page Brawl 1.2.0 / Android 1.6.0 (`f8d3910`).
+Documento vivo. Ultimo aggiornamento: **17/10/2026**, su `main` dopo l'unione del parry, seconda volta (ramo `claude/exciting-cori-6cwl9m`, avanti veloce fino a `3299d9f` più questo aggiornamento).
 
 Questo file è il punto di ingresso per chiunque lavori sul repository: persone, Claude, Codex o altri agenti. Si tiene **sempre aggiornato** (regola in fondo, sezione 9). I passaggi di consegne dei singoli giri restano in `docs/consegne/` come archivio storico: questo li riassume e li sostituisce come riferimento.
 
@@ -37,7 +37,7 @@ Il flusso del repository è **push diretto su `main`** (nessuna PR è mai stata 
 
 | Ramo | Cosa contiene | Da fare |
 | --- | --- | --- |
-| `claude/exciting-cori-6cwl9m` (16-17/10) | Page Brawl 1.2.0 / Android 1.6.0, unito a `main` il 17/10 (`f8d3910`); dopo, **il parry, seconda volta** (parry perfetto, equilibrio e colpo di grazia, catena, attacchi rossi, tre manate del capo, guardia che si consuma) | Il parry nuovo **non è su `main`**: si unisce quando Riccardo lo dice |
+| `claude/exciting-cori-6cwl9m` (16-17/10) | Page Brawl 1.2.0 / Android 1.6.0, unito a `main` il 17/10 (`f8d3910`); dopo, **il parry, seconda volta** (parry perfetto, equilibrio e colpo di grazia, catena, attacchi rossi, tre manate del capo, guardia che si consuma) | **Unito a `main` il 17/10**, anche il parry nuovo (avanti veloce, su richiesta di Riccardo: «unisci»). Cancellabile |
 | `claude/ultimora-tema-scuro-codice-modello` (02/10) | Commit `61f8ca9` «lotte più fitte, meno tempi morti», mai arrivato su `main` | **Rifatto a mano il 16/10** sul ramo qui sopra (con lo strumento `tests/misura-lotta.cjs` che stava lì). Cancellabile (quello nuovo è su `main` dal 17/10) |
 
 ### Pulizia dei rami (verificata il 16/10/2026)
@@ -423,6 +423,7 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 17/10/2026 | Claude | **Unito a `main`** il parry, seconda volta (avanti veloce del ramo `claude/exciting-cori-6cwl9m`, CI verde sul ramo): il push pubblica il sito su Oracle. Da fare a mano, come prima: caricare la 1.2.0 sul Chrome Web Store, l'AAB su Play, l'account Ko-fi | `main` |
 | 17/10/2026 | Claude | CI rossa sul parry nuovo: «la mira… gli zombie si falciano» è caduto una volta in CI (0 su 30 in locale). Il test sceglieva anche uno zombie addosso al robot, dietro l'origine della linea: ora ne sceglie uno ad almeno 80 px. Reso robusto anche il test del Limit Break (la trasformazione si richiede di nuovo se un colpo la interrompe). Nessuna modifica al gioco | `claude/exciting-cori-6cwl9m` |
 | 17/10/2026 | Claude | Il parry, seconda volta (spunti da Sekiro, God of War, Expedition 33, Lies of P; il video indicato da Riccardo non si è potuto scaricare, viste solo le anteprime): parry perfetto negli ultimi 5 fotogrammi, lampo bianco e zoom sull'impatto, equilibrio dei nemici e colpo di grazia, catena ×N, anello rosso e «!!» sulla carica letale, tre manate del capo con «CONTRO TOTALE», guardia che si consuma e si rompe, barra dell'equilibrio sotto quella del capo, pagina nuova nella guida, 12 traduzioni. Provato coi test e in Chromium, non a mano | `claude/exciting-cori-6cwl9m` |
 | 17/10/2026 | Claude | **Unito a `main`** il ramo `claude/exciting-cori-6cwl9m` (Page Brawl 1.2.0 / Android 1.6.0, donazioni Ko-fi, corsa a flusso, parry al centro, menu): il push pubblica il sito su Oracle. Da fare a mano: caricare la 1.2.0 sul Chrome Web Store, l'AAB su Play, l'account Ko-fi | `main` |
