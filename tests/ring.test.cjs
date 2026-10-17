@@ -3366,38 +3366,42 @@ test("la corsa: gemme e livelli a metà lotta, col tempo fermo mentre si sceglie
   dentro(amb);
 });
 
-test("la corsa: i round si susseguono senza menu, e ognuno è più grande", () => {
+test("la corsa a flusso: le fasi si attaccano senza fermarsi, e ognuna è più grande", () => {
+  // (dal 16/10/2026 niente round: una fase finita, la dopo arriva in coda all'orda, senza intro né «Fatto!»)
   const { amb, r } = corsaAvviata();
   avanzaCorsa(amb, r, 200);
-  const primo = amb.stato().orda.ricetta.totale;
+  const primo = amb.stato().orda.ricetta.insieme;
   r.corsa.vinci();
-  avanzaCorsa(amb, r, 70);
+  avanzaCorsa(amb, r, 5);
   let s = amb.stato().corsa;
-  assert.strictEqual(s.round, 2, "dopo un secondo il round dopo, senza fermarsi");
-  assert.strictEqual(s.fase, "intro");
-  r.corsa.salta(8); r.corsa.prossimo("ondata");
-  avanzaCorsa(amb, r, 100);
+  assert.strictEqual(s.round, 2, "la minaccia sale");
+  assert.strictEqual(s.fase, "lotta", "e non si ferma niente");
+  r.corsa.salta(8);
   r.corsa.vinci();
-  avanzaCorsa(amb, r, 70 + 100);
+  avanzaCorsa(amb, r, 100);
   s = amb.stato();
   assert.strictEqual(s.corsa.round, 8);
-  assert.ok(s.orda.ricetta.totale > primo * 2, "all'ottavo round l'ondata è molto più grande: " + s.orda.ricetta.totale + " contro " + primo);
+  assert.strictEqual(s.corsa.fase, "lotta");
+  assert.ok(s.orda.ricetta.insieme > primo * 2, "a minaccia 8 ce ne sono molti di più insieme: " + s.orda.ricetta.insieme + " contro " + primo);
+  // Da sola, la coda finisce e arriva la fase dopo.
+  const r0 = s.corsa.round;
+  avanzaCorsa(amb, r, 60 * 90, (st) => st.corsa.fase === "fine" || st.corsa.round > r0 ? false : undefined);
+  assert.ok(amb.stato().corsa.round > r0 || amb.stato().corsa.fase === "fine", "la minaccia sale da sola");
   dentro(amb);
 });
 
-test("la corsa: il duello finisce col K.O., e l'avversario lascia un forziere", () => {
+test("la corsa a flusso: niente duelli né sopravvivenza a tempo, e i forzieri non fermano la lotta", () => {
   const { amb, r } = corsaAvviata();
   avanzaCorsa(amb, r, 200);
   r.corsa.prossimo("duello");
   r.corsa.vinci();
-  avanzaCorsa(amb, r, 70 + 100);
-  assert.strictEqual(amb.stato().corsa.tipo, "duello");
-  assert.ok(!amb.lottatore("mela").fuoriCampo, "nel duello l'altro entra, da avversario");
-  let forzieri = 0;
-  avanzaCorsa(amb, r, 60 * 120, (st) => { if (st.corsa.forziere) forzieri++; return st.corsa.fase === "lotta"; });
+  avanzaCorsa(amb, r, 30);
   const s = amb.stato().corsa;
-  assert.ok(s.fase === "vinto" || s.fase === "intro" || s.fase === "fine", "il duello finisce: " + s.fase);
-  if (s.fase !== "fine") assert.ok(s.forzieri > 0 || forzieri > 0 || s.forziere > 0 || amb.stato().corsa.fase === "intro", "e lascia un forziere");
+  assert.strictEqual(s.tipo, "ondata", "anche chiesto, il duello non c'è più");
+  assert.ok(amb.lottatore("mela").fuoriCampo, "l'altro resta in panchina");
+  r.corsa.forziere();
+  const d = amb.stato().corsa;
+  assert.ok(d.bottino >= 1 && !d.pausa && d.forziere === 0, "il forziere si apre al volo, senza pausa");
   dentro(amb);
 });
 
@@ -3438,11 +3442,11 @@ test("la corsa: la mossa finale parte con la mira, e all'ultima possibilità sal
   r.miraA(z.x, amb.stato().pavimento - 30);
   r.spara();
   s = amb.stato().corsa;
-  assert.strictEqual(s.fase, "vinto", "preso qualcuno: il round è vinto");
+  assert.strictEqual(s.fase, "lotta", "preso qualcuno: salvo, e la lotta continua (a flusso non c'è un round da vincere)");
   assert.strictEqual(s.vite, 1, "e una vita torna");
   assert.ok(!s.ultima);
   // E se all'ultima possibilità si va giù di nuovo, la corsa finisce.
-  avanzaCorsa(amb, r, 60 + 100 + 20, (st) => st.corsa.fase !== "lotta");
+  avanzaCorsa(amb, r, 60);
   for (let i = 0; i < 2; i++) r.corsa.ferisci(9999);
   assert.ok(amb.stato().corsa.ultima || amb.stato().corsa.fase === "fine");
   r.corsa.ferisci(9999);
@@ -3555,10 +3559,8 @@ test("la corsa: forzieri, oggetti a terra nei tre posti, e la calamita", () => {
   const m0 = amb.stato().corsa.monete;
   r.corsa.forziere();
   let s = amb.stato().corsa;
-  assert.ok(s.forziere >= 1 && s.pausa, "il forziere si apre e ferma il gioco");
-  r.corsa.chiudiForziere();
-  s = amb.stato().corsa;
-  assert.ok(!s.pausa && s.monete > m0, "e lascia monete");
+  assert.ok(s.bottino >= 1 && !s.pausa, "il forziere si apre al volo (a flusso non ferma il gioco)");
+  assert.ok(s.monete > m0, "e lascia monete");
   r.corsa.lascia("pozione"); r.corsa.lascia("bomba");
   avanzaCorsa(amb, r, 40);
   s = amb.stato().corsa;
@@ -3816,7 +3818,7 @@ test("la corsa: col passare dei minuti gli zombie reggono di più e mordono più
 });
 
 // ·· LA TASTIERA (09/10/2026) ··
-test("la tastiera: Q W E… fanno le mosse del controller, A e D camminano, Z mira e spara; mai mentre si scrive", () => {
+test("la tastiera: Q E R… fanno le mosse del controller, le frecce camminano, Z mira e spara; mai mentre si scrive", () => {
   const amb = ambiente({});
   const r = amb.finestra.__ring;
   amb.avanza(60);
@@ -3830,15 +3832,15 @@ test("la tastiera: Q W E… fanno le mosse del controller, A e D camminano, Z mi
   assert.strictEqual(r.tastoGiu("KeyQ", { ctrlKey: true }), false, "con Ctrl i tasti sono del browser");
   assert.strictEqual(r.tastoGiu("KeyM"), false, "un tasto senza azione resta alla pagina");
   amb.avanza(60);
-  // A: verso sinistra.
+  // ←: verso sinistra (dal 16/10/2026 si cammina con le frecce: A, W e D sono l'onda, l'aura e i pugni).
   let x0 = null, mosso = false;
   for (let i = 0; i < 80 && !mosso; i++) {
     const f = amb.lottatore(chi);
-    if (x0 === null && r.tastoGiu("KeyA")) x0 = f.bacino.x;
-    else if (x0 !== null) { r.tastoGiu("KeyA", { repeat: true }); mosso = f.bacino.x < x0 - 25; }
+    if (x0 === null && r.tastoGiu("ArrowLeft")) x0 = f.bacino.x;
+    else if (x0 !== null) { r.tastoGiu("ArrowLeft", { repeat: true }); mosso = f.bacino.x < x0 - 25; }
     amb.avanza(4);
   }
-  assert.ok(mosso, "A tenuto premuto: si cammina a sinistra");
+  assert.ok(mosso, "← tenuto premuto: si cammina a sinistra");
   // G cambia chi si comanda; H apre il controller.
   r.tastoGiu("KeyG");
   assert.notStrictEqual(amb.stato().tastiera.chi, chi, "G: si passa all'altro");
@@ -3905,23 +3907,24 @@ test("la tastiera si rimappa: il tasto nuovo si scambia col vecchio, e resta nel
   const r = amb.finestra.__ring;
   amb.avanza(30);
   assert.strictEqual(r.mappaTasti().mossa1, "KeyQ", "di serie: Q");
-  assert.strictEqual(r.mappaTasti().sinistra, "KeyA");
+  assert.strictEqual(r.mappaTasti().sinistra, "ArrowLeft");
+  assert.strictEqual(r.mappaTasti().aura, "KeyW");
   assert.strictEqual(r.mappaTasti().finale, "KeyZ");
   r.rimappa("mossa1");
-  r.tastoGiu("KeyL");
-  assert.strictEqual(r.mappaTasti().mossa1, "KeyL");
+  r.tastoGiu("KeyM");
+  assert.strictEqual(r.mappaTasti().mossa1, "KeyM");
   r.rimappa("mossa1");
-  r.tastoGiu("KeyW");
-  assert.strictEqual(r.mappaTasti().mossa1, "KeyW");
-  assert.strictEqual(r.mappaTasti().mossa2, "KeyL", "W era della seconda mossa: le due si scambiano");
+  r.tastoGiu("KeyE");
+  assert.strictEqual(r.mappaTasti().mossa1, "KeyE");
+  assert.strictEqual(r.mappaTasti().mossa2, "KeyM", "E era della seconda mossa: le due si scambiano");
   r.rimappa("finale");
   r.tastoGiu("Escape");
   assert.strictEqual(r.mappaTasti().finale, "KeyZ", "Esc annulla");
   const salvati = JSON.parse(amb.memoria["mut-ring-tasti"]);
-  assert.strictEqual(salvati.mossa1, "KeyW");
+  assert.strictEqual(salvati.mossa1, "KeyE");
   const dopo = ambiente({ memoria: { "mut-ring-tasti": amb.memoria["mut-ring-tasti"] } });
   dopo.avanza(10);
-  assert.strictEqual(dopo.finestra.__ring.mappaTasti().mossa2, "KeyL", "alla visita dopo i tasti sono quelli scelti");
+  assert.strictEqual(dopo.finestra.__ring.mappaTasti().mossa2, "KeyM", "alla visita dopo i tasti sono quelli scelti");
 });
 
 // ·· L'AUDIO (09/10/2026) ··
@@ -4244,13 +4247,14 @@ test("maghi: lottano a distanza (fascia di tiro), senza raffiche di pugni", () =
 
 test("maghi: la sparizione porta lontano dall'avversario, la respinta lo butta via", () => {
   let sparito = false, respinto = false;
-  for (let prova = 0; prova < 8 && !(sparito && respinto); prova++) {
+  for (let prova = 0; prova < 20 && !(sparito && respinto); prova++) {
     const amb = ambiente();
     amb.avanza(30);
     const r = amb.finestra.__ring;
     r.comandi.stile("maghi");
     amb.avanza(60 * 8);                                  // il mana si ricarica
-    for (const [mossa, prova2] of [["teletrasporto", 0], ["respinta", 1]]) {
+    // (una mossa per prova, a mana pieno: dopo la sparizione il mana spesso non bastava più per la respinta)
+    for (const [mossa, prova2] of [[prova % 2 ? "respinta" : "teletrasporto", 0]]) {
       r.sposta("robot", 560); r.sposta("mela", 600);
       amb.avanza(2);
       const s0 = amb.stato(), d0 = Math.abs(s0.lottatori[0].bacino.x - s0.lottatori[1].bacino.x);
@@ -4289,7 +4293,7 @@ test("chi sta su un elemento largo e l'altro sotto non può salire: scende attra
 
 // --- 16/10/2026: il ciclo della corsa (missioni, il capo ogni cinque round, rimescola) ---
 
-test("la corsa: ogni cinque round arriva il capo, mai a ridosso, e il suo forziere ha tre premi", () => {
+test("la corsa: ogni cinque livelli di minaccia arriva il capo, e il suo forziere ha tre premi", () => {
   const { amb, r } = corsaAvviata();
   const tipi = [];
   for (let i = 0; i < 11; i++) {
@@ -4298,15 +4302,13 @@ test("la corsa: ogni cinque round arriva il capo, mai a ridosso, e il suo forzie
     tipi[s.round - 1] = s.tipo;
     if (s.round === 5) {
       r.corsa.forziere();
-      assert.ok(amb.stato().corsa.forziere >= 3, "il forziere del capo della tappa ha tre premi");
-      r.corsa.chiudiForziere();
+      assert.ok(amb.stato().corsa.bottino >= 3, "il forziere del capo ha tre premi");
     }
     r.corsa.vinci();
-    avanzaCorsa(amb, r, 45);
   }
-  assert.strictEqual(tipi[4], "boss", "il round 5 è del capo: " + tipi.join(","));
-  assert.strictEqual(tipi[9], "boss", "il round 10 è del capo: " + tipi.join(","));
-  for (const i of [3, 5, 8, 10]) assert.notStrictEqual(tipi[i], "boss", "a ridosso della tappa un capo a sorte: round " + (i + 1) + " " + tipi.join(","));
+  assert.strictEqual(tipi[4], "boss", "a minaccia 5 il capo: " + tipi.join(","));
+  assert.strictEqual(tipi[9], "boss", "a minaccia 10 il capo: " + tipi.join(","));
+  for (const i of [0, 1, 2, 3, 5, 6, 7, 8, 10]) assert.notStrictEqual(tipi[i], "boss", "il capo solo ogni cinque: " + tipi.join(","));
   dentro(amb);
 });
 
@@ -4604,4 +4606,51 @@ test("ring.js: nessuna funzione dichiarata due volte allo stesso livello (la sec
   const nomi = SORGENTE.match(/^  function [A-Za-z0-9_]+/gm).map((x) => x.slice(11));
   const doppi = nomi.filter((n, i) => nomi.indexOf(n) !== i);
   assert.deepStrictEqual(doppi, [], "funzioni doppie: " + doppi.join(", "));
+});
+
+test("tasti fissi: W l'aura, D la raffica di pugni, A l'onda (super guerrieri), e i tasti salvati di prima si aggiornano", () => {
+  const amb = ambiente({ memoria: { "mut-ring-stile": "guerrieri" } });
+  const r = amb.finestra.__ring;
+  amb.avanza(60);
+  const chi = amb.stato().tastiera.chi;
+  const prova = (code, attese) => {
+    let ok = false;
+    for (let i = 0; i < 80 && !ok; i++) {
+      if (r.tastoGiu(code)) ok = attese.includes(amb.lottatore(chi).azione);
+      amb.avanza(6);
+    }
+    return ok;
+  };
+  assert.ok(prova("KeyW", ["carica"]), "W: carica l'aura");
+  assert.ok(prova("KeyD", ["rush", "avanza"]), "D: la raffica di pugni (o la corsa per arrivarci)");
+  // (l'onda vuole 45 di energia: se non basta, A non parte e si ricarica con W)
+  let onda = false;
+  for (let i = 0; i < 150 && !onda; i++) {
+    if (r.tastoGiu("KeyA")) onda = amb.lottatore(chi).azione === "onda";
+    else r.tastoGiu("KeyW");
+    amb.avanza(6);
+  }
+  assert.ok(onda, "A: l'onda energetica");
+  // Chi aveva salvato i tasti di prima (A e D per camminare, W per la seconda mossa) prende quelli nuovi.
+  const vecchi = JSON.stringify({ mossa1: "KeyQ", mossa2: "KeyW", sinistra: "KeyA", destra: "KeyD", finale: "KeyB" });
+  const dopo = ambiente({ memoria: { "mut-ring-tasti": vecchi } });
+  dopo.avanza(10);
+  const m = dopo.finestra.__ring.mappaTasti();
+  assert.strictEqual(m.sinistra, "ArrowLeft"); assert.strictEqual(m.aura, "KeyW"); assert.strictEqual(m.mossa2, "KeyE");
+  assert.strictEqual(m.finale, "KeyB", "quelli cambiati a mano restano");
+});
+
+test("le carte del livello si scelgono da tastiera: 1 2 3, oppure le frecce e Invio", () => {
+  const { amb, r } = corsaAvviata();
+  avanzaCorsa(amb, r, 200);
+  const prendi = (tasti) => {
+    r.corsa.esperienza(9999);
+    amb.avanza(3, (s) => !s.corsa.carte);
+    assert.ok(amb.stato().corsa.carte, "le carte del livello sono aperte");
+    for (const t of tasti) r.tastoGiu(t);
+    return !amb.stato().corsa.carte;
+  };
+  assert.ok(prendi(["Digit2"]), "2 prende la seconda carta");
+  assert.ok(prendi(["ArrowRight", "ArrowRight", "Enter"]), "le frecce scelgono e Invio prende");
+  dentro(amb);
 });

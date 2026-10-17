@@ -113,7 +113,7 @@ FREE COMBAT
 • Items, creature jars, a black hole, meteorites, zombie hordes where the two team up, energy clashes, finishing moves and a corner controller for every move.
 
 KEYBOARD AND SOUND
-• Q W E R T Y for moves, A and D to walk, F to fly, Z for the finishing move, X C V for items. Every key can be remapped.
+• W charges the aura, D throws a punch flurry, A fires the energy wave; Q E R T Y for the other moves, arrow keys to walk, S to block and parry, F to fly, Z for the finishing move, X C V for items. Every key can be remapped.
 • Optional synthesized sound.
 
 Free. No account, no ads, nothing to buy.
@@ -154,7 +154,7 @@ COMBATTIMENTO LIBERO
 • Oggetti, barattoli con le creature, buco nero, meteoriti, orde di zombie in cui i due si alleano, scontri di energie, colpi finali e un controller nell'angolo per ogni mossa.
 
 TASTIERA E AUDIO
-• Q W E R T Y le mosse, A e D per camminare, F per volare, Z il colpo finale, X C V gli oggetti. Ogni tasto si cambia.
+• W carica l'aura, D la raffica di pugni, A l'onda energetica; Q E R T Y le altre mosse, le frecce per camminare, S para e fa il parry, F per volare, Z il colpo finale, X C V gli oggetti. Ogni tasto si cambia.
 • Audio facoltativo, sintetizzato al momento.
 
 Gratis. Niente account, niente pubblicità, niente da comprare.

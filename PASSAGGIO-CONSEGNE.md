@@ -1,6 +1,6 @@
 # Passaggio di consegne: Mobile Update Tracker e Page Brawl
 
-Documento vivo. Ultimo aggiornamento: **16/10/2026**, su `main` dopo l'unione di Android 1.5.1 e della ricerca per codice (base `df97c09`).
+Documento vivo. Ultimo aggiornamento: **17/10/2026**, su `main` dopo l'unione di Android 1.5.1 e della ricerca per codice (base `df97c09`).
 
 Questo file è il punto di ingresso per chiunque lavori sul repository: persone, Claude, Codex o altri agenti. Si tiene **sempre aggiornato** (regola in fondo, sezione 9). I passaggi di consegne dei singoli giri restano in `docs/consegne/` come archivio storico: questo li riassume e li sostituisce come riferimento.
 
@@ -351,6 +351,7 @@ Tre strumenti di misura, che non sono test: `tests/misura-posture.cjs`, `tests/m
 - La docstring di `android/costruisci.py` parla ancora di piattaforma 34 in un punto; la build usa la 36.
 - Nome «Page Brawl» provvisorio: mai verificato fra i marchi registrati. Robot e mela possono ricordare due marchi noti.
 - Maghi senza trasformazione vera (solo trance e aura).
+- **Corsa a flusso (17/10)**: senza round la classifica tiene nel campo `round` il livello di minaccia raggiunto (il server lo controlla come prima: una fase dura ~30 s, sopra i 5 s per round del controllo). Le voci vecchie in classifica restano coi round veri. Non provato a mano.
 - **Bruto armato (16/10)**: l'eroe automatico non para le granate, quindi chi lascia giocare l'eroe da solo arriva un po' meno lontano (misurato con `misura-corsa`, 4 corse: round 4-7 e 2,0-3,1 minuti, contro 5-6 e 2,6-3,2 senza bruto; con la granata a 10 invece di 12). Contro la granata il parry non è «14 fotogrammi prima del colpo» ma «premuto dopo il lampo bianco» (`aggiornaGranata`): quanto vola dipende da come si sposta l'eroe, e coi fotogrammi un giocatore non ce la faceva. Provato solo in Chromium e coi test, non a mano su un telefono.
 - Traduzioni ES/FR/DE del gioco non riviste da madrelingua.
 - Il tema di Halloween si spegne da solo il 2 novembre; Page Snow e il tema di Natale del sito vanno ricontrollati prima di dicembre.
@@ -421,6 +422,7 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 17/10/2026 | Claude | Corsa a flusso (niente round: fasi di «minaccia» attaccate, capo ogni cinque, forziere senza pausa, livelli un quarto più lenti), tasti fissi W aura / D pugni / A onda con la camminata sulle frecce (migrazione dei tasti salvati), carte e forziere da tastiera (1 2 3, frecce e Invio, R) | `claude/exciting-cori-6cwl9m` |
 | 16/10/2026 | Claude | Donazione libera con Ko-fi, solo nell'estensione (scelta di Riccardo): tasto «Sostieni Page Brawl» nella tendina (`url_donazione` in `premium.json`), webhook `/api/kofi` col token, tabella `donazioni` (nome, importo, messaggio; niente email), pagina `/admin/donazioni`; informativa aggiornata. Manca l'account Ko-fi | `claude/exciting-cori-6cwl9m` |
 | 16/10/2026 | Claude | Bruto armato (granata parabile e rimandabile col parry, al lampo bianco), fucile-sega che lascia morendo (spara e sega, zombie in pezzi), +10 crediti a granata rimandata. Corretto un difetto vecchio: il getto del jetpack (`fiammata`) era coperto dal lanciafiamme con lo stesso nome e non si vedeva; tolta una `disegnaAlbero` morta; nuovo test contro le funzioni doppie | `claude/exciting-cori-6cwl9m` |
 | 16/10/2026 | Claude | Lampo del parry rifatto dalle immagini di Riccardo: nucleo bianco, raggi a stella con punte a croce, bolla dorata, mezzelune verso chi attacca, righe di velocità, e un attimo di buio dietro perché sulle pagine chiare si veda | `claude/exciting-cori-6cwl9m` |

@@ -5845,6 +5845,8 @@
     else if (q.fase === "lotta") {
       const R = q.ricetta, vivi = q.zombie.reduce((n, z) => n + (z.stato !== "giu" ? 1 : 0), 0);
       q.dallUltimo = (q.dallUltimo || 0) + 1;
+      // Nella corsa (a flusso) la coda non si svuota mai: agli ultimi due arriva la fase dopo.
+      if (corsa && corsa.chi && corsa.fase === "lotta" && R.coda.length <= 2) prossimaFase();
       if (R.coda.length && vivi < R.insieme && --q.prossimo <= 0) {
         // Troppi in volo insieme: passa avanti il primo da terra della coda.
         if (R.maxVolo && ZOMBI[R.coda[0].tipo].volo && q.zombie.filter((z) => z.volo && z.stato !== "giu").length >= R.maxVolo) {
@@ -6900,7 +6902,7 @@
         ctx.fillText(String(voce[3]), q.x, q.y + 13 * U);
       }
       // Il tasto che la fa partire, piccolo, verso l'orlo esterno dello spicchio.
-      const chiave = tastoDi("mossa" + (q.i + 1));
+      const chiave = tastoSpicchio(q.i);
       if (chiave) {
         const kx = q.x + q.dx * (q.r1 - q.r0) * 0.36, ky = q.y + q.dy * (q.r1 - q.r0) * 0.36;
         ctx.globalAlpha = vivo * entra * (ok ? 0.9 : 0.4);
@@ -13114,20 +13116,40 @@
   // tastiera francese o tedesca sono gli stessi posti. Mai mentre si scrive in un campo, mai con
   // Ctrl, Alt o Cmd, e a ring spento la tastiera resta della pagina. Si rimappa dalla tendina
   // (sezione «Tastiera»); i tasti stanno in `mut-ring-tasti`, l'interruttore in `mut-ring-tastiera`.
+  // Dal 16/10/2026 (Riccardo: «metti come standard W per l'aura e D per scarica di pugni e A per l'onda energetica»)
+  // tre tasti hanno una mossa fissa, qualunque sia il suo spicchio: W l'aura, D la raffica di pugni, A l'onda (se i
+  // personaggi in campo ce l'hanno). Si cammina con le frecce, e gli spicchi saltano la W: Q E R T Y U I O P J K L.
   const AZIONI_TASTI = [
-    ["mossa1", "KeyQ"], ["mossa2", "KeyW"], ["mossa3", "KeyE"], ["mossa4", "KeyR"], ["mossa5", "KeyT"], ["mossa6", "KeyY"],
-    ["mossa7", "KeyU"], ["mossa8", "KeyI"], ["mossa9", "KeyO"], ["mossa10", "KeyP"], ["mossa11", "KeyJ"], ["mossa12", "KeyK"],
-    ["sinistra", "KeyA"], ["para", "KeyS"], ["destra", "KeyD"], ["vola", "KeyF"], ["cambia", "KeyG"], ["controller", "KeyH"],
+    ["aura", "KeyW"], ["pugni", "KeyD"], ["onda", "KeyA"],
+    ["mossa1", "KeyQ"], ["mossa2", "KeyE"], ["mossa3", "KeyR"], ["mossa4", "KeyT"], ["mossa5", "KeyY"], ["mossa6", "KeyU"],
+    ["mossa7", "KeyI"], ["mossa8", "KeyO"], ["mossa9", "KeyP"], ["mossa10", "KeyJ"], ["mossa11", "KeyK"], ["mossa12", "KeyL"],
+    ["sinistra", "ArrowLeft"], ["para", "KeyS"], ["destra", "ArrowRight"], ["vola", "KeyF"], ["cambia", "KeyG"], ["controller", "KeyH"],
     ["finale", "KeyZ"], ["oggetto1", "KeyX"], ["oggetto2", "KeyC"], ["oggetto3", "KeyV"],
   ];
+  // Le mosse dei tre tasti fissi (l'id della mossa nel controller).
+  const MOSSE_TASTO = { aura: "carica", pugni: "rush", onda: "onda" };
+  // I tasti di prima del 16/10: chi li ha salvati così com'erano prende quelli nuovi (chi li aveva cambiati li tiene).
+  const TASTI_VECCHI = { mossa2: "KeyW", mossa3: "KeyE", mossa4: "KeyR", mossa5: "KeyT", mossa6: "KeyY", mossa7: "KeyU", mossa8: "KeyI",
+                         mossa9: "KeyO", mossa10: "KeyP", mossa11: "KeyJ", mossa12: "KeyK", sinistra: "KeyA", destra: "KeyD" };
   const NOMI_AZIONI = { sinistra: "Cammina a sinistra", destra: "Cammina a destra", para: "Parata", vola: "Vola / atterra", cambia: "Cambia personaggio",
-                        controller: "Apri il controller", finale: "Colpo finale / mira" };
+                        controller: "Apri il controller", finale: "Colpo finale / mira", aura: "Carica l'aura", pugni: "Raffica di pugni", onda: "Onda energetica" };
   const mappaTasti = {};
   let tastiera = true, rimappa = null;
   for (const [id, code] of AZIONI_TASTI) mappaTasti[id] = code;
   try {
     const t = JSON.parse(deposito.getItem("mut-ring-tasti") || "null");
-    if (t && typeof t === "object") for (const id in mappaTasti) if (typeof t[id] === "string" && /^[A-Za-z0-9]{2,20}$/.test(t[id])) mappaTasti[id] = t[id];
+    if (t && typeof t === "object") {
+      const vecchio = !("aura" in t);
+      for (const id in mappaTasti) {
+        if (typeof t[id] !== "string" || !/^[A-Za-z0-9]{2,20}$/.test(t[id])) continue;
+        if (vecchio && TASTI_VECCHI[id] === t[id]) continue;                    // era il tasto di prima: vale quello nuovo
+        mappaTasti[id] = t[id];
+      }
+      // Due azioni sullo stesso tasto (un tasto cambiato a mano prima che arrivassero i nuovi): tornano ai loro di base.
+      const usati = {};
+      for (const id in mappaTasti) (usati[mappaTasti[id]] = usati[mappaTasti[id]] || []).push(id);
+      for (const code in usati) if (usati[code].length > 1) for (const [id, base] of AZIONI_TASTI) if (usati[code].indexOf(id) >= 0) mappaTasti[id] = base;
+    }
     if (deposito.getItem("mut-ring-tastiera") === "off") tastiera = false;
   } catch (errore) { /* i tasti di sempre */ }
   function salvaTasti() {
@@ -13145,6 +13167,12 @@
     return N[code] || code;
   }
   const tastoDi = (id) => (tastiera ? nomeTasto(mappaTasti[id]) : "");
+  // Il tasto di uno spicchio del controller: quello fisso se la sua mossa ne ha uno, sennò quello dello spicchio.
+  function tastoSpicchio(i) {
+    const voce = vociRadiale()[i];
+    for (const id in MOSSE_TASTO) if (voce && MOSSE_TASTO[id] === voce[0]) return tastoDi(id);
+    return tastoDi("mossa" + (i + 1));
+  }
   // Chi scrive in un campo non comanda il ring. Ma la home mette il cursore nel campo di ricerca appena
   // si apre: con la corsa aperta o il controller aperto, un campo VUOTO non conta (e si lascia andare),
   // tranne quello del nome per la classifica.
@@ -13179,14 +13207,15 @@
   function eseguiTasto(id) {
     const c = corsa;
     if (sceltaModo && !c) {
-      if (id === "sinistra" || id === "mossa1") return scegliModo("corsa");
-      if (id === "destra" || id === "mossa2") return scegliModo("libero");
+      if (id === "sinistra" || id === "onda" || id === "mossa1") return scegliModo("corsa");
+      if (id === "destra" || id === "pugni" || id === "mossa2") return scegliModo("libero");
       return false;
     }
     if (c && c.fase === "scelta") {
       if (c.bottega || c.allena) return false;
-      if (id === "sinistra") return scegliEroe("robot");
-      if (id === "destra") return scegliEroe("mela");
+      // (anche A e D, i tasti di sempre)
+      if (id === "sinistra" || id === "onda") return scegliEroe("robot");
+      if (id === "destra" || id === "pugni") return scegliEroe("mela");
       return false;
     }
     if (c && c.scelta) { const i = ["mossa1", "mossa2", "mossa3"].indexOf(id); return i >= 0 ? prendiCarta(i) : true; }
@@ -13229,13 +13258,41 @@
       return true;
     }
     const m = /^mossa(\d+)$/.exec(id);
-    if (m) {
-      const voce = vociRadiale()[Number(m[1]) - 1];
+    // (W, D, A: la mossa fissa, dovunque stia nel controller; se questi personaggi non ce l'hanno, niente)
+    const fissa = MOSSE_TASTO[id] ? vociRadiale().findIndex((v) => v[0] === MOSSE_TASTO[id]) : -1;
+    if (m || fissa >= 0) {
+      const i = m ? Number(m[1]) - 1 : fissa, voce = vociRadiale()[i];
       if (!voce) return false;
       const ok = ordina(f, voce[0]);
-      if (ok) radiale.detto = { i: Number(m[1]) - 1, fino: tempo + 18 };           // lo spicchio si accende, come al tocco
+      if (ok) radiale.detto = { i, fino: tempo + 18 };           // lo spicchio si accende, come al tocco
       return ok;
     }
+    return false;
+  }
+  // Le carte del livello e il forziere, da tastiera (16/10/2026, Riccardo: «la possibilità di scegliere le ricompense
+  // tramite tastiera»). Tasti fisici, non rimappabili: 1 2 3 (anche del tastierino) o Q W E prendono la carta; le
+  // frecce spostano la scelta e Invio o Spazio la prendono; R rimescola. Il forziere si chiude con Invio, Spazio, Z o 1.
+  const CARTE_TASTI = { Digit1: 0, Digit2: 1, Digit3: 2, Numpad1: 0, Numpad2: 1, Numpad3: 2, KeyQ: 0, KeyW: 1, KeyE: 2 };
+  function tastiCarte(e) {
+    const c = corsa;
+    if (!c || !c.chi) return false;
+    if (c.forziere) {
+      if (["Enter", "NumpadEnter", "Space", "KeyZ", "Digit1", "Numpad1"].indexOf(e.code) < 0) return false;
+      if (!e.repeat) chiudiForziere();
+      return true;
+    }
+    if (!c.scelta) return false;
+    const n = c.scelta.carte.length;
+    if (e.repeat && e.code !== "ArrowLeft" && e.code !== "ArrowRight") return true;
+    if (e.code in CARTE_TASTI) { if (CARTE_TASTI[e.code] < n) prendiCarta(CARTE_TASTI[e.code]); return true; }
+    if (e.code === "ArrowLeft" || e.code === "ArrowRight") {
+      const sel = c.scelta.sel === undefined ? (e.code === "ArrowLeft" ? n : -1) : c.scelta.sel;
+      c.scelta.sel = (sel + (e.code === "ArrowLeft" ? -1 : 1) + n) % n;
+      suona("clic", W / 2, 0.4);
+      return true;
+    }
+    if (e.code === "Enter" || e.code === "NumpadEnter" || e.code === "Space") { prendiCarta(c.scelta.sel || 0); return true; }
+    if (e.code === "KeyR") { rimescolaCarte(); return true; }
     return false;
   }
   function premiTasto(e) {
@@ -13254,6 +13311,7 @@
       return;
     }
     if (!tastiera || scrivendo(e.target) || !e.code) return;
+    if (tastiCarte(e)) { e.preventDefault(); e.stopPropagation(); return; }
     const id = azioneDi(e.code);
     if (!id) return;
     if (fermo && !corsa) return;                                  // ring spento: i tasti sono della pagina
@@ -13280,6 +13338,7 @@
     for (const [id] of AZIONI_TASTI) {
       const m = /^mossa(\d+)$/.exec(id), o = /^oggetto(\d)$/.exec(id);
       if (m && !voci[Number(m[1]) - 1]) continue;                     // questi personaggi non hanno tante mosse
+      if (MOSSE_TASTO[id] && !voci.some((v) => v[0] === MOSSE_TASTO[id])) continue;        // né questa mossa
       const nome = m ? voci[Number(m[1]) - 1][1] + " " + dici(voci[Number(m[1]) - 1][2]) : o ? dici("Oggetto") + " " + o[1] + " (" + dici("Corsa infinita") + ")" : dici(NOMI_AZIONI[id]);
       const riga = document.createElement("div");
       riga.className = "ring-tasti-riga";
@@ -13420,12 +13479,12 @@
   //  - RIMESCOLA: alle carte di un livello, una volta per corsa (più i dadi comprati in bottega), tre carte nuove.
   //    Una corsa non si butta più per tre carte sbagliate.
   const MISSIONI = {
-    round: { icona: "\u{1F3C1}", testo: (n) => dici("Arriva al round") + " " + n, gradini: [4, 7, 10, 14, 20], premio: [40, 80, 150, 250, 400], misura: (c) => c.round },
+    round: { icona: "\u{1F3C1}", testo: (n) => dici("Arriva alla minaccia") + " " + n, gradini: [4, 7, 10, 14, 20], premio: [40, 80, 150, 250, 400], misura: (c) => c.round },
     uccisi: { icona: "\u{1F9DF}", testo: (n) => dici("Abbatti") + " " + n + " " + dici("nemici in una corsa"), gradini: [80, 200, 400, 800], premio: [40, 90, 160, 300], misura: (c) => c.uccisi },
     capi: { icona: "\u{1F480}", testo: (n) => dici("Sconfiggi") + " " + n + " " + dici(n > 1 ? "capi in una corsa" : "capo"), gradini: [1, 2, 3, 5], premio: [50, 100, 180, 320], misura: (c) => c.capi || 0 },
     evo: { icona: "\u{1F31F}", testo: (n) => (n > 1 ? dici("Evolvi") + " " + n + " " + dici("armi in una corsa") : dici("Evolvi un'arma")), gradini: [1, 2, 3], premio: [70, 150, 300], misura: (c) => c.evoluzioni || 0 },
     parry: { icona: "\u{1F6E1}\uFE0F", testo: (n) => dici("Fai") + " " + n + " parry " + dici("in una corsa"), gradini: [3, 10, 25, 50], premio: [50, 100, 200, 350], misura: (c) => c.parry || 0 },
-    puliti: { icona: "\u2728", testo: (n) => dici("Vinci") + " " + n + " " + dici("round senza danni"), gradini: [1, 3, 5], premio: [40, 90, 180], misura: (c) => c.puliti || 0 },
+    puliti: { icona: "\u2728", testo: (n) => dici("Passa") + " " + n + " " + dici("livelli di minaccia senza danni"), gradini: [1, 3, 5], premio: [40, 90, 180], misura: (c) => c.puliti || 0 },
     punti: { icona: "\u{1F4AF}", testo: (n) => dici("Fai") + " " + cifre(n) + " " + dici("punti"), gradini: [3000, 10000, 30000, 80000], premio: [40, 90, 180, 350], misura: (c) => c.punti },
   };
   // ·· I CREDITI E L'ALLENAMENTO (16/10/2026, Riccardo: «un premio in crediti di gioco che possono servire per sbloccare caratteristiche perenni nel personaggio, così da poter arrivare più lontano la prossima volta») ··
@@ -13540,7 +13599,8 @@
   const ricaricaCorsa = () => (1 - 0.08 * livello("ricarica")) * (1 - 0.04 * (bottega.ricarica || 0));
   const raggioCalamita = () => CORSA.calamita * S * (1 + 0.4 * livello("calamita") + 0.25 * (bottega.calamita || 0));
   const nomeDi = (tipo) => (stile ? nomeProprio(tipo) : dici(tipo === "robot" ? "Robot" : "Mela"));
-  const xpPerLivello = (l) => Math.round(3 + 2.2 * l + Math.pow(l, 1.4));
+  // (dal 16/10/2026, con la corsa a flusso, un quarto più lenta: le carte sono l'unica pausa che resta)
+  const xpPerLivello = (l) => Math.round(1.25 * (3 + 2.2 * l + Math.pow(l, 1.4)));
   function salvaBottega() {
     try { deposito.setItem("mut-ring-banca", String(banca)); deposito.setItem("mut-ring-bottega", JSON.stringify(bottega)); } catch (errore) { /* pazienza */ }
   }
@@ -13683,29 +13743,77 @@
     for (const v of voci) if ((x -= v[0]) <= 0) return v[1];
     return "ondata";
   }
-  function nuovoRound() {
-    const c = corsa;
+  // ·· LA CORSA A FLUSSO (16/10/2026) ··
+  // Riccardo: «avere aumento di livello e fine round rallenta troppo il gioco. Quindi metterei solo l'aumento di
+  // livello (leggermente più lento rispetto adesso) e toglierei i round con un aumento fluido di nemici e meno
+  // interruzioni». Non ci sono più round: dopo il «Pronti…» iniziale l'orda non finisce mai. Quando la sua coda
+  // sta per finire arriva la FASE dopo (`prossimaFase`), attaccata: un'altra coda un po' più grande, il nemico nuovo
+  // annunciato in alto senza fermare niente, ogni cinque fasi il capo in mezzo agli altri, gli imprevisti della fase,
+  // un sorso di vita. Niente intro fra una fase e l'altra, niente «Fatto!», niente duelli né sopravvivenza a tempo,
+  // e il forziere si apre al volo senza fermare la lotta. A fermarla restano solo le carte del livello (un po' più
+  // rare: `xpPerLivello`). `c.round` resta il numero della fase: lo usano la ricetta, le missioni e la classifica.
+  function preparaFase() {
+    const c = corsa, primo = !c.round;
+    if (!primo) {
+      // Il premio della fase appena passata, al volo (era quello di fine round).
+      const punti = 50 * c.round + (c.danniRound === 0 ? 50 * c.round : 0);
+      c.punti += punti;
+      if (c.danniRound === 0) c.puliti = (c.puliti || 0) + 1;
+      c.ultimoPremio = { punti, pulito: c.danniRound === 0 };
+    }
     c.round++;
-    c.tipo = scegliTipoRound(c.round);
+    c.tipo = c.prossimoTipo === "boss" || (c.round >= OGNI_CAPO && c.round % OGNI_CAPO === 0) ? "boss" : "ondata";
+    c.prossimoTipo = null;
     c.tipi.push(c.tipo);
-    c.fase = "intro"; c.t = 0; c.nemicoGiu = false; c.danniRound = 0; c.variante = null; c.scadenza = 0;
-    c.tappa = c.tipo === "boss" && c.round % OGNI_CAPO === 0;
-    // Il nemico nuovo di questo round (solo dove c'è l'orda).
+    c.danniRound = 0; c.nemicoGiu = false; c.variante = null; c.scadenza = 0;
+    c.tappa = c.tipo === "boss";
     c.nuovo = null; c.vistoNuovo = false;
-    if (c.tipo !== "duello" && c.round > 1 && c.novita < NOVITA_CORSA.length) { c.nuovo = NOVITA_CORSA[c.novita++]; c.sbloccati.push(c.nuovo); }
-    // Un po' di fiato fra un round e l'altro (le vite, quelle, non tornano).
-    if (!c.ultima) c.hp = Math.min(c.hpMax, c.hp + Math.round(c.hpMax * CORSA.cura));
-    // Gli imprevisti: dal secondo round, sempre più spesso.
+    if (c.round > 1 && c.novita < NOVITA_CORSA.length) { c.nuovo = NOVITA_CORSA[c.novita++]; c.sbloccati.push(c.nuovo); }
+    if (!primo && !c.ultima) c.hp = Math.min(c.hpMax, c.hp + Math.round(c.hpMax * CORSA.cura));
+    // Gli imprevisti della fase: dalla seconda, sempre più spesso.
     c.imprevisti = []; c.lanciati = 0;
     const quanti = c.round < 2 ? 0 : c.rng() < Math.min(0.75, 0.25 + 0.06 * c.round) ? (c.round >= 6 && c.rng() < 0.4 ? 2 : 1) : 0;
     const nomi = Object.keys(IMPREVISTI_CORSA);
     while (c.imprevisti.length < quanti) {
       const nome = nomi[Math.floor(c.rng() * nomi.length)];
-      if (c.imprevisti.indexOf(nome) < 0 && !(nome === "buco" && c.tipo === "duello")) c.imprevisti.push(nome);
+      if (c.imprevisti.indexOf(nome) < 0) c.imprevisti.push(nome);
     }
     c.prossimoImprevisto = 200;
-    if (c.tipo === "duello") c.variante = scegliVariante(c.round);
+  }
+  // La prima fase: il «Pronti…», poi la lotta (`iniziaLotta`).
+  function nuovoRound() {
+    const c = corsa;
+    preparaFase();
+    c.fase = "intro"; c.t = 0;
     suona("via");
+  }
+  // La coda di una fase: la ricetta di sempre, col capo a metà quando è la sua.
+  function ricettaFase() {
+    const c = corsa, ricetta = ricettaCorsa(c.round, 1);
+    if (c.tipo === "boss") {
+      ricetta.coda.splice(Math.floor(ricetta.coda.length * 0.4), 0, { tipo: "capo", lato: c.rng() < 0.5 ? -1 : 1, attesa: 60 });
+      ricetta.totale = ricetta.coda.length;
+    }
+    return ricetta;
+  }
+  // La fase dopo, attaccata alla coda di questa: l'orda non si ferma.
+  function prossimaFase() {
+    const c = corsa, q = orda;
+    if (!c || !c.chi || c.fase !== "lotta" || !q || !q.ricetta) return false;
+    preparaFase();
+    const r = ricettaFase(), R = q.ricetta;
+    R.coda.push(...r.coda);
+    R.totale += r.totale; R.n = r.n; R.tema = r.tema; R.arrivo = r.arrivo; R.maxVolo = r.maxVolo;
+    R.insieme = R.insiemeBase = r.insieme;
+    if (!q.prossimo || q.prossimo <= 0) q.prossimo = R.coda.length ? R.coda[0].attesa : 0;
+    q.tOndata = 0;
+    // L'annuncio, in alto e senza fermare niente: il nemico nuovo, o il capo.
+    const y = Math.max(testataBasso + 96 * S, H * 0.2);
+    if (c.nuovo && NEMICI_CORSA[c.nuovo]) scritte.push({ testo: dici("Nuovo nemico") + ": " + NEMICI_CORSA[c.nuovo][0] + " " + dici(NEMICI_CORSA[c.nuovo][1]), x: W / 2, y, vita: 150, grande: true, fermo: true });
+    else if (c.tipo === "boss") scritte.push({ testo: "\u{1F480} " + dici("Arriva il capo!"), x: W / 2, y, vita: 150, grande: true, fermo: true });
+    if (c.ultimoPremio) scrivi("+" + c.ultimoPremio.punti + (c.ultimoPremio.pulito ? " · " + dici("senza danni") : ""), W / 2, y + 30 * S, false);
+    suona("premio", W / 2, 0.5);
+    return true;
   }
   function scegliVariante(n) {
     const r = corsa.rng, v = [];
@@ -13720,17 +13828,7 @@
     // L'orda del round prima può essere ancora nella sua festa: via, sennò il round nuovo risulterebbe già vinto
     // (e nel duello la tregua dell'orda impedirebbe ai due di colpirsi).
     if (orda) { orda = null; for (const l of lottatori) { l.zMira = null; l.cinque = false; } }
-    if (c.tipo === "duello") { entraNemico(); return; }
-    let ricetta = ricettaCorsa(c.round, c.tipo === "tempo" ? 2 : 1);
-    if (c.tipo === "tempo") {
-      ricetta.insieme = Math.min(CORSA.maxZombie, ricetta.insieme + 4);
-      c.scadenza = Math.round((CORSA.tempo[0] + c.rng() * (CORSA.tempo[1] - CORSA.tempo[0])) * 60);
-    }
-    if (c.tipo === "boss") {
-      // Il capo arriva a metà dell'ondata, in mezzo agli altri.
-      ricetta.coda.splice(Math.floor(ricetta.coda.length * 0.4), 0, { tipo: "capo", lato: c.rng() < 0.5 ? -1 : 1, attesa: 60 });
-      ricetta.totale = ricetta.coda.length;
-    }
+    const ricetta = ricettaFase();
     avviaOrda(1, Math.floor(c.rng() * 1e9) + 1);
     if (orda) { orda.corsa = ricetta; orda.pausa = 10; }
   }
@@ -13815,6 +13913,15 @@
   function vinciRound(come) {
     const c = corsa;
     if (!c || c.fase !== "lotta") return;
+    // A flusso non si vince un round: la salvezza dell'ultima possibilità rimette in piedi e si continua; la prova
+    // dei test salta alla fase dopo (quel che resta della coda non arriva).
+    if (come === "salvezza") {
+      c.ultima = false; c.vite = 1; c.hp = Math.round(c.hpMax * 0.5); c.salvezze++;
+      suona("salvo");
+      if (eroe()) scrivi("SALVO!", eroe().p.bacino.x, eroe().base - 120 * S, true);
+      return;
+    }
+    if (orda && orda.ricetta) { orda.ricetta.coda = []; prossimaFase(); return; }
     c.fase = "vinto"; c.t = 0;
     if (mira) chiudiMira(false);
     if (orda && orda.fase !== "festa") fineOrda(true);
@@ -13925,8 +14032,8 @@
     const monete = Math.round((10 + c.rng() * 15) * (1 + 0.2 * fortuna));
     for (const k of premi) applicaCarta(k);
     c.monete += monete;
-    c.forziere = { premi, monete, t: 0 };
-    c.pausa = true;
+    // (a flusso il forziere non ferma la lotta: i premi si vedono in alto per qualche secondo)
+    c.bottino = { premi, monete, t: 0 };
     suona("salvo");
   }
   function chiudiForziere() {
@@ -13985,7 +14092,8 @@
     });
     // I forzieri: si aprono toccandoli, o comunque a fine round.
     if (!c.pausa && !mira) {
-      const i = c.forzieri.findIndex((z) => tutte || Math.hypot(hx - z.x, hy - z.y) < 40 * S);
+      // (a flusso non c'è più la fine del round che li apriva tutti: a terra da tre secondi si aprono da soli)
+      const i = c.forzieri.findIndex((z) => tutte || Math.hypot(hx - z.x, hy - z.y) < 40 * S || (!z.paracadute && (z.t = (z.t || 0) + 1) > 180));
       if (i >= 0) { c.forzieri.splice(i, 1); apriForziere(); }
     }
     // (quello col paracadute scende piano e va verso l'eroe)
@@ -14399,11 +14507,8 @@
         if (!evento && !fatale) { avviaEvento(c.imprevisti[c.lanciati] || c.imprevisti[0]); c.lanciati++; }
         c.prossimoImprevisto = c.lanciati >= c.imprevisti.length ? 1e9 : 600;
       }
-      if (c.tipo === "tempo") {
-        if (orda) orda.tOndata = 0;
-        if (--c.scadenza <= 0) { vinciRound("tempo"); return; }
-      }
-      if (c.tipo !== "duello" && c.t > 30 && (!orda || (orda.fase === "festa" && orda.vinta))) { vinciRound("ondata"); return; }
+      // (l'orda finita per conto suo, per esempio sbriciolata dal buco nero: ne riparte una, con la fase dopo)
+      if (c.t > 30 && (!orda || orda.fase === "festa")) { preparaFase(); iniziaLotta(); return; }
       if (c.tipo === "duello") {
         const n = nemicoCorsa();
         // Chi è armato, ogni tanto, si ricarica.
@@ -14896,6 +15001,7 @@
         else if (c.fase === "fine") disegnaFine();
         if (c.scelta) disegnaLivello();
         else if (c.forziere) disegnaForziere();
+        if (c.bottino && c.fase === "lotta") disegnaBottino();
       }
       ctx.restore();
     }
@@ -14972,8 +15078,9 @@
     // In alto a destra: il round, che cosa c'è da fare, gli imprevisti, l'uscita.
     const w2 = Math.min(210 * S, W * 0.5 - 2 * m), x2 = W - m - w2, T = TIPI_ROUND[c.tipo] || ["", ""];
     pannelloUI(x2, y0, w2, h, 10 * S, "rgba(255,255,255,.25)");
-    scriviUI(dici("Round") + " " + c.round, x2 + 10 * S, y0 + 14 * S, 15 * S, "#ffffff");
-    scriviUI(T[0] + " " + dici(T[1]) + (c.tipo === "boss" ? "" : "  ·  \u{1F480} " + dici("Round") + " " + prossimoCapo(c.round)), x2 + 10 * S, y0 + 34 * S, 11 * S, GRIGIO_UI, "left", 700);
+    // (a flusso: niente round, la «minaccia» cresce da sola; il capo arriva ogni cinque)
+    scriviUI("\u26A0\uFE0F " + dici("Minaccia") + " " + c.round, x2 + 10 * S, y0 + 14 * S, 14 * S, "#ffffff");
+    scriviUI(c.tipo === "boss" ? "\u{1F480} " + dici("Il capo") : "\u{1F480} " + dici("Capo a") + " " + prossimoCapo(c.round), x2 + 10 * S, y0 + 34 * S, 11 * S, GRIGIO_UI, "left", 700);
     scriviUI(obiettivo(), x2 + 10 * S, y0 + 54 * S, 12 * S, ORO);
     let xi = x2 + w2 - 12 * S;
     for (let i = c.imprevisti.length - 1; i >= 0; i--) { scriviUI(IMPREVISTI_CORSA[c.imprevisti[i]][0], xi, y0 + 34 * S, 14 * S, "#ffffff", "right"); xi -= 20 * S; }
@@ -14996,6 +15103,7 @@
   function obiettivo() {
     const c = corsa;
     if (c.fase === "intro") return dici("Pronti…");
+    if (c.fase === "lotta") { const sec = Math.floor((c.tLotta || 0) / 60); return "\u23F1 " + Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); }
     if (c.fase !== "lotta") return dici("Fatto!");
     if (c.tipo === "tempo") { const s = Math.max(0, Math.ceil(c.scadenza / 60)); return "⏳ " + Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
     if (c.tipo === "duello") return dici("Mandalo K.O.");
@@ -15062,8 +15170,8 @@
     const w = Math.min(380 * S, W - 32), h = (100 + 22 * righe + (righe ? 6 : 0)) * S, x = W / 2 - w / 2, y = H * 0.32 - h / 2;
     ctx.save(); ctx.globalAlpha = Math.max(0, a);
     pannelloUI(x, y, w, h, 14 * S, coloreCorsa());
-    scriviUI(dici("Round") + " " + c.round, W / 2, y + 30 * S, 30 * S, "#ffffff", "center", 900);
-    scriviUI(T[0] + "  " + dici(T[1]), W / 2, y + 62 * S, 17 * S, ORO, "center");
+    scriviUI(dici("Pronti…"), W / 2, y + 30 * S, 30 * S, "#ffffff", "center", 900);
+    scriviUI("\u{1F6E1}\uFE0F " + dici("Para al momento giusto") + (tastoDi("para") ? ": " + tastoDi("para") : ""), W / 2, y + 62 * S, 15 * S, ORO, "center");
     let riga = y + 92 * S;
     if (c.tipo === "duello") { scriviUI(dici("Contro") + " " + nomeNemicoAtteso(), W / 2, riga, 12 * S, GRIGIO_UI, "center", 700); riga += 20 * S; }
     if (c.nuovo && NEMICI_CORSA[c.nuovo]) { scriviUI(dici("Nuovo nemico") + ": " + NEMICI_CORSA[c.nuovo][0] + " " + dici(NEMICI_CORSA[c.nuovo][1]), W / 2, riga, 13 * S, "#7dffb0", "center", 800); riga += 22 * S; }
@@ -15147,15 +15255,31 @@
     velo(0.55);
     titoloMenu(dici("Livello") + " " + c.scelta.liv + "!", y - 30 * S);
     carte.forEach((k, i) => {
-      const I = infoCarta(k), x = x0 + i * (w + gap);
+      const I = infoCarta(k), x = x0 + i * (w + gap), scelta = c.scelta.sel === i;
       ctx.save();
       if (k.evo) { ctx.shadowColor = "#ff62d6"; ctx.shadowBlur = (14 + 8 * Math.sin(passi * 0.2)) * S; }
-      carta(x, y, w, h, I.icona, I.nome, I.sopra, I.testo, I.bordo);
+      if (scelta) { ctx.shadowColor = ORO; ctx.shadowBlur = (18 + 6 * Math.sin(passi * 0.25)) * S; }
+      carta(x, y - (scelta ? 6 * S : 0), w, h, I.icona, I.nome, I.sopra, I.testo, scelta ? ORO : I.bordo);
       ctx.restore();
+      // Il tasto della carta, sul bordo alto (con la tastiera accesa).
+      if (tastiera) { pannelloUI(x + w / 2 - 13 * S, y - (scelta ? 6 * S : 0) - 11 * S, 26 * S, 20 * S, 6 * S, scelta ? ORO : "#2a2735"); scriviUI(String(i + 1), x + w / 2, y - (scelta ? 6 * S : 0) - 1 * S, 12 * S, scelta ? "#17171c" : "#ffffff", "center", 900); }
       tastiUI.push({ x, y, w, h, fa: () => prendiCarta(i) });
     });
-    if (c.rimescola > 0) tastoUI(W / 2 - 80 * S, y + h + 14 * S, 160 * S, 30 * S, "\u{1F3B2} " + dici("Rimescola") + " (" + c.rimescola + ")", () => rimescolaCarte(),
+    if (c.rimescola > 0) tastoUI(W / 2 - 80 * S, y + h + 14 * S, 160 * S, 30 * S, "\u{1F3B2} " + dici("Rimescola") + " (" + c.rimescola + ")" + (tastiera ? "  · R" : ""), () => rimescolaCarte(),
                                  { colore: "#2a2735", scritta: "#ffffff", bordo: "rgba(255,255,255,.35)", px: 12 * S });
+    if (tastiera) scriviUI(dici("Tastiera: 1 2 3, oppure ← → e Invio"), W / 2, y + h + (c.rimescola > 0 ? 60 : 24) * S, 11 * S, "rgba(255,255,255,.75)", "center", 600);
+  }
+  // I premi del forziere, al volo: una striscia in alto che entra, resta tre secondi ed esce.
+  function disegnaBottino() {
+    const B = corsa.bottino;
+    if (++B.t > 200) { corsa.bottino = null; return; }
+    const righe = B.premi.map(infoCarta), w = Math.min(320 * S, W - 32), h = (30 + 22 * righe.length) * S;
+    const a = Math.min(1, B.t / 12, (200 - B.t) / 20), x = W / 2 - w / 2, y = testataBasso + 90 * S - (1 - a) * 20 * S;
+    ctx.save(); ctx.globalAlpha = Math.max(0, a);
+    pannelloUI(x, y, w, h, 10 * S, ORO);
+    scriviUI("\u{1F381} " + dici("Forziere!") + "   +" + B.monete + " \u{1FA99}", W / 2, y + 15 * S, 13 * S, ORO, "center", 900);
+    righe.forEach((I, i) => scriviUI(I.icona + "  " + I.nome + (I.sopra ? "  ·  " + I.sopra : ""), W / 2, y + (36 + 22 * i) * S, 11.5 * S, "#ffffff", "center", 800));
+    ctx.restore();
   }
   function disegnaForziere() {
     tastiUI = [];
@@ -15179,7 +15303,7 @@
     });
     const yb = cy + 50 * S + righe.length * 34 * S;
     scriviUI("+" + F.monete + " \u{1FA99}", cx, yb + 4 * S, 14 * S, ORO, "center");
-    if (F.t > 14 + righe.length * 10) tastoUI(cx - 70 * S, yb + 22 * S, 140 * S, 34 * S, dici("Avanti") + " ▶", () => chiudiForziere(), { brilla: true, px: 14 * S });
+    if (F.t > 14 + righe.length * 10) tastoUI(cx - 70 * S, yb + 22 * S, 140 * S, 34 * S, dici("Avanti") + " ▶" + (tastiera ? "  ⏎" : ""), () => chiudiForziere(), { brilla: true, px: 14 * S });
   }
   function disegnaBottega() {
     const ids = Object.keys(BOTTEGA), w = Math.min(460 * S, W - 24), rh = 38 * S, h = 70 * S + ids.length * rh + 50 * S;
@@ -15243,7 +15367,7 @@
     disegnaMissioni(W / 2, y + h + 20 * S, c.missioniFatte);
     pannelloUI(x, y, w, h, 14 * S, coloreCorsa());
     scriviUI(dici("La corsa è finita"), W / 2, y + 26 * S, 22 * S, "#ffffff", "center", 900);
-    scriviUI(dici("Round") + " " + c.round + "  ·  " + cifre(c.punti) + " " + dici("punti") + "  ·  " + c.uccisi + " " + dici("nemici"), W / 2, y + 52 * S, 13 * S, ORO, "center");
+    scriviUI(dici("Minaccia") + " " + c.round + "  ·  " + cifre(c.punti) + " " + dici("punti") + "  ·  " + c.uccisi + " " + dici("nemici"), W / 2, y + 52 * S, 13 * S, ORO, "center");
     scriviUI(c.record ? dici("Nuovo record!") : dici("Il tuo record") + ": " + cifre(recordCorsa) +
              (recordCorsa > c.punti ? "  ·  " + dici("mancavano") + " " + cifre(recordCorsa - c.punti) + " " + dici("punti") : ""),
              W / 2, y + 72 * S, 12 * S, c.record ? "#7dffb0" : GRIGIO_UI, "center", 700);
@@ -15488,7 +15612,7 @@
                      energia: corsa.energia, ultima: corsa.ultima, monete: corsa.monete, punti: corsa.punti, uccisi: corsa.uccisi, livelli: Object.assign({}, corsa.livelli),
                      slot: (corsa.slot || []).slice(), variante: corsa.variante ? corsa.variante.slice() : null, liv: corsa.liv, xp: corsa.xp, pausa: !!corsa.pausa,
                      armi: Object.assign({}, corsa.armi || {}), carte: corsa.scelta ? corsa.scelta.carte.map((k) => k.arma ? (k.evo ? "evo:" : "arma:") + k.arma : k.potere ? "potere:" + k.potere : k.monete ? "monete" : k.vita ? "vita" : "cura") : null,
-                     forziere: corsa.forziere ? corsa.forziere.premi.length : 0, gemme: (corsa.gemme || []).length, aTerra: (corsa.aTerra || []).map((o) => o.id), forzieri: (corsa.forzieri || []).length,
+                     forziere: corsa.forziere ? corsa.forziere.premi.length : 0, bottino: corsa.bottino ? corsa.bottino.premi.length : 0, gemme: (corsa.gemme || []).length, aTerra: (corsa.aTerra || []).map((o) => o.id), forzieri: (corsa.forzieri || []).length,
                      onde: (corsa.onde || []).length, dardi: (corsa.dardi || []).length, lame: (corsa.lame || []).length, telefoni: corsa.telefoni ? corsa.telefoni.length : 0, bottega: !!corsa.bottega,
                      imprevisti: (corsa.imprevisti || []).slice(), invuln: corsa.invuln || 0, scudo: corsa.scudo || 0, scadenza: corsa.scadenza || 0,
                      tiri: (corsa.tiri || []).length, pozze: (corsa.pozze || []).length, sbloccati: (corsa.sbloccati || []).slice(), nuovo: corsa.nuovo || null,

@@ -495,7 +495,8 @@ final class Comandi {
                 float k = (float) (ch.optDouble("hp", 0) / Math.max(1, ch.optDouble("hpMax", 1)));
                 avatarA.imposta(e.optString("nome"), coloreChi, k, false, true);
                 String ob = ch.optString("obiettivo", "");
-                aggiornaPunti("♥" + ch.optInt("vite") + "  ·  R" + ch.optInt("round") + (ob.isEmpty() ? "" : "  ·  " + ob));
+                // (dal 16/10/2026 niente round: il numero è la minaccia, che cresce da sola)
+                aggiornaPunti("♥" + ch.optInt("vite") + "  ·  ⚠" + ch.optInt("round") + (ob.isEmpty() ? "" : "  ·  " + ob));
             }
         }
         punti.setVisibility(gioco || ch != null || inPausa ? View.VISIBLE : View.GONE);
