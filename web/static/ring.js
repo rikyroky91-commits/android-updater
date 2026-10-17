@@ -10033,6 +10033,12 @@
       l.azione = null; l.onda = null; l.sfera = null; l.scatto = 0; l.ordine = null; l.fuga = null; l.combo = 0; l.dopo = null; l.prendiTel = null;
     }
     da.dir = a.cx >= da.cx ? 1 : -1; a.dir = -da.dir;
+    // Chi lo prende, se è schiacciato contro un bordo, si sposta di un corpo verso l'interno: girando o volando
+    // (il mulinello, l'orbita) la testa usciva dalla finestra (17/10/2026).
+    if (a.p) {
+      const bx = a.p.bacino.x, dentro = Math.max(64 * S, Math.min(W - 64 * S, bx));
+      if (dentro !== bx) muoviTutto(a, dentro - bx, 0);
+    }
     fatale = { da, a, tipo, t: 0, fase: "annuncio", m: 0, dir: da.dir, contato: false, d: {} };
     scrivi("COLPO FINALE!", (da.p.testa.x + a.p.testa.x) / 2, Math.min(da.p.testa.y, a.p.testa.y) - 44 * S, true);
     fermoColpo = Math.max(fermoColpo, 6);
@@ -10319,6 +10325,15 @@
     if (annullato && !F.contato) fataleRound = true;            // non si è fatta: resta buona per dopo
     for (const l of [F.da, F.a]) if (!l.ko && !l.esploso) { l.azione = null; l.pensa = 12; }
   }
+  // Chi vola per un colpo finale resta dentro i bordi di lato (sopra no: l'«orbita» esce dall'alto apposta). Spostati
+  // insieme x e ox, così non nasce una spinta (17/10/2026: contro un bordo la testa usciva di qualche pixel).
+  function tieniDentroFatale() {
+    const a = fatale && fatale.a;
+    if (!a || !a.p || !a.fatVola) return;
+    let dx = 0;
+    for (const n in a.p) { const q = a.p[n]; if (q.x < 3 * S) dx = Math.max(dx, 3 * S - q.x); else if (q.x > W - 3 * S) dx = Math.min(dx, W - 3 * S - q.x); }
+    if (dx) for (const n in a.p) { a.p[n].x += dx; a.p[n].ox += dx; }
+  }
   function aggiornaFatale() {
     fataleBuio += ((fatale ? FATALE.buio : 0) - fataleBuio) * 0.12;
     if (fataleVoluto && !fatale) vogliaFatale();
@@ -10453,7 +10468,8 @@
         const quanto = Math.min(W * 0.3, 240 * S);
         D.cx = Math.max(70 * S, Math.min(W - 70 * S, D.x0 + Math.sin(k * Math.PI * 2) * quanto * dir));
         const x = D.cx + Math.cos(D.ang) * D.r, y = D.base - D.alto + Math.sin(D.ang) * D.r * 0.28;
-        muoviTutto(a, Math.max(26 * S, Math.min(W - 26 * S, x)) - a.p.bacino.x, Math.max(testataBasso + 30 * S, Math.min(pavimento - 20 * S, y)) - a.p.bacino.y);
+        // (il bacino a più di un corpo dal bordo: girando, la testa resta dentro la finestra; prima a 26 px usciva)
+        muoviTutto(a, Math.max(64 * S, Math.min(W - 64 * S, x)) - a.p.bacino.x, Math.max(testataBasso + 30 * S, Math.min(pavimento - 20 * S, y)) - a.p.bacino.y);
         ruotaTutto(a, 0.2 * dir);
         scossa = Math.max(scossa, 5);
         // Il piede del mulinello raschia il pavimento e la striscia, e tira a sé quello che trova.
@@ -11567,7 +11583,7 @@
     colpoDaMano(a, b); colpoDaMano(b, a);
     aggiornaLame(); aggiornaFulmini(); aggiornaMagie();
     aggiornaTelefoni(); aggiornaCreature(); aggiornaNubi(); aggiornaFinale(); aggiornaProiettili(); aggiornaParticelle(); aggiornaEventi(); aggiornaDanni();
-    aggiornaArti(); aggiornaMeteo(); aggiornaSisma(); aggiornaMeteore(); aggiornaBuco(); aggiornaFatale(); aggiornaMira(); aggiornaCorsa(); aggiornaAudio(); aggiornaOrda(); aggiornaOnde(); aggiornaVite();
+    aggiornaArti(); aggiornaMeteo(); aggiornaSisma(); aggiornaMeteore(); aggiornaBuco(); aggiornaFatale(); tieniDentroFatale(); aggiornaMira(); aggiornaCorsa(); aggiornaAudio(); aggiornaOrda(); aggiornaOnde(); aggiornaVite();
     if (anime) controllaScontro();
     for (const sc of scie) sc.vita--;
     if (scie.length && scie[0].vita <= 0) scie = scie.filter((sc) => sc.vita > 0);

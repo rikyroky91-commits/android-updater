@@ -422,6 +422,7 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 17/10/2026 | Claude | CI rossa sul menu: il test «super guerrieri… restano stabili» cadeva circa una volta su 25 anche prima (provato col commit precedente). Causa vera nel gioco: nei colpi finali chi vola (mulinello, orbita…) contro un bordo usciva di qualche pixel con la testa. Corretto: margine del mulinello a 64 px, chi prende il colpo spostato via dal bordo all'inizio, e `tieniDentroFatale` a ogni passo. 360 prove senza uscite | `claude/exciting-cori-6cwl9m` |
 | 17/10/2026 | Claude | Menu nuovo sul canvas: principale (al posto della scelta del modo), guida in sei pagine, impostazioni (volume, anello e aiuto al parry, rallentatore, scossa, difficoltà, tasti), pausa con Esc o ⏸; tasto «Menu» nella tendina; 89 traduzioni | `claude/exciting-cori-6cwl9m` |
 | 17/10/2026 | Claude | Parry al centro: anello del tempo, scudo in guardia, rallentatore e suono del parry, contrattacco visibile, «troppo presto / troppo tardi», morsi che non si interrompono vicino al colpo, cariche letali più frequenti; aggancio col mouse | `claude/exciting-cori-6cwl9m` |
 | 17/10/2026 | Claude | Corsa a flusso (niente round: fasi di «minaccia» attaccate, capo ogni cinque, forziere senza pausa, livelli un quarto più lenti), tasti fissi W aura / D pugni / A onda con la camminata sulle frecce (migrazione dei tasti salvati), carte e forziere da tastiera (1 2 3, frecce e Invio, R) | `claude/exciting-cori-6cwl9m` |
