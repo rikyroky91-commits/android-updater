@@ -4376,7 +4376,8 @@ test("parry: S premuto appena prima del colpo lo annulla, l'altro resta scoperto
     r.tastoGiu("KeyS");
     r.ordina("mela", "pugno");
     const scritte = new Set(); let contro = false, stordita = 0;
-    amb.avanza(50, (s) => {
+    // (dal 18/10/2026 il contrattacco di chi gioca è la sequenza in scena a rallentatore: il primo colpo arriva più tardi)
+    amb.avanza(170, (s) => {
       for (const x of s.scritte) scritte.add(x);
       const R = s.lottatori.find((l) => l.tipo === "robot"), M = s.lottatori.find((l) => l.tipo === "mela");
       if (R.azione === "contro") contro = true;

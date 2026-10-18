@@ -329,6 +329,28 @@ CREATE TABLE IF NOT EXISTS donazioni (
     ricevuta_il TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_donazioni_data ON donazioni(ricevuta_il DESC);
+-- Gli account dei giocatori di Parry Brawl Survivor (18/10/2026), il sito del gioco su GitHub Pages.
+-- Tabelle SEPARATE da `utenti`: un giocatore non è un utente del tracker e non ne riceve mai i permessi.
+-- `nick_chiave` ed `email` sono in minuscolo per l'unicità senza distinguere maiuscole; la password è
+-- l'hash scrypt di core/auth.py; il salvataggio è il JSON che manda il gioco. Dei gettoni si tiene solo
+-- lo SHA-256, mai il gettone.
+CREATE TABLE IF NOT EXISTS giocatori (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    nick            TEXT NOT NULL,
+    nick_chiave     TEXT NOT NULL UNIQUE,
+    email           TEXT NOT NULL UNIQUE,
+    password_hash   TEXT NOT NULL,
+    salvataggio     TEXT,
+    aggiornato_il   TEXT,
+    creato_il       TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS gettoni_giocatori (
+    gettone_hash    TEXT PRIMARY KEY,
+    giocatore_id    INTEGER NOT NULL,
+    scade_il        TEXT NOT NULL,
+    creato_il       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gettoni_giocatore ON gettoni_giocatori(giocatore_id);
 """
 
 
@@ -1363,6 +1385,76 @@ def donazioni(limit: int = 200) -> list[dict]:
 def segna_donazione(id_donazione: int, letta: bool) -> None:
     with transaction() as conn:
         conn.execute("UPDATE donazioni SET letta = ? WHERE id = ?", (1 if letta else 0, int(id_donazione)))
+
+
+# --- Gli account dei giocatori di Parry Brawl Survivor ------------------------
+# Le regole (nick, email, password, misura del salvataggio) le controlla `web/giocatori.py`:
+# qui si legge e si scrive e basta. Nessuna di queste funzioni tocca la tabella `utenti`.
+def crea_giocatore(nick: str, email: str, password_hash: str) -> int | None:
+    """Crea l'account. None se il nick (senza distinguere maiuscole) o l'email ci sono già."""
+    try:
+        with transaction() as conn:
+            cur = conn.execute(
+                """INSERT INTO giocatori (nick, nick_chiave, email, password_hash, creato_il)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (nick, nick.lower(), email.lower(), password_hash, now_iso()),
+            )
+            return int(cur.lastrowid)
+    except sqlite3.IntegrityError:
+        return None
+
+
+def giocatore_occupato(nick: str, email: str) -> str | None:
+    """Quale dei due è già preso: "nick", "email" o None."""
+    conn = connect()
+    if conn.execute("SELECT 1 FROM giocatori WHERE nick_chiave = ?", (nick.lower(),)).fetchone():
+        return "nick"
+    if conn.execute("SELECT 1 FROM giocatori WHERE email = ?", (email.lower(),)).fetchone():
+        return "email"
+    return None
+
+
+def giocatore_per_accesso(login: str) -> dict | None:
+    """Il giocatore col nick o con l'email indicati (senza distinguere maiuscole)."""
+    chiave = login.strip().lower()
+    riga = connect().execute(
+        "SELECT * FROM giocatori WHERE nick_chiave = ? OR email = ? LIMIT 1", (chiave, chiave)
+    ).fetchone()
+    return dict(riga) if riga else None
+
+
+def crea_gettone_giocatore(giocatore_id: int, gettone_hash: str, scade_il: str) -> None:
+    with transaction() as conn:
+        # Si buttano qui i gettoni scaduti di tutti: la tabella non cresce senza fine.
+        conn.execute("DELETE FROM gettoni_giocatori WHERE scade_il < ?", (now_iso(),))
+        conn.execute(
+            "INSERT INTO gettoni_giocatori (gettone_hash, giocatore_id, scade_il, creato_il) VALUES (?, ?, ?, ?)",
+            (gettone_hash, int(giocatore_id), scade_il, now_iso()),
+        )
+
+
+def giocatore_per_gettone(gettone_hash: str) -> dict | None:
+    """Il giocatore del gettone, se il gettone esiste e non è scaduto."""
+    riga = connect().execute(
+        """SELECT g.* FROM gettoni_giocatori t JOIN giocatori g ON g.id = t.giocatore_id
+           WHERE t.gettone_hash = ? AND t.scade_il > ?""",
+        (gettone_hash, now_iso()),
+    ).fetchone()
+    return dict(riga) if riga else None
+
+
+def elimina_gettone_giocatore(gettone_hash: str) -> None:
+    with transaction() as conn:
+        conn.execute("DELETE FROM gettoni_giocatori WHERE gettone_hash = ?", (gettone_hash,))
+
+
+def salva_salvataggio_giocatore(giocatore_id: int, salvataggio_json: str) -> str:
+    """Scrive il salvataggio (già serializzato e controllato). Torna l'ora dell'aggiornamento."""
+    quando = now_iso()
+    with transaction() as conn:
+        conn.execute("UPDATE giocatori SET salvataggio = ?, aggiornato_il = ? WHERE id = ?",
+                     (salvataggio_json, quando, int(giocatore_id)))
+    return quando
 
 
 def clear_search_history() -> None:

@@ -163,6 +163,9 @@
   let aggancio = null;
   // Il parry, seconda volta (17/10/2026): l'impatto a schermo (zoom sul punto e lampo bianco) e la catena di parry.
   let zoomParry = null, lampoSchermo = 0;
+  // Il contrattacco in scena dopo un parry di chi gioca (vedi «IL CONTRATTACCO IN SCENA»): chi, su chi, la camera.
+  let cinema = null;
+  const camCinema = { x: 0, y: 0, k: 1, barre: 0 };
   const catenaParry = { n: 0, t: -1e9 };
   let prossimoEvento = 700, prossimoTelefono = 360;
   // La corsa infinita (vedi «LA CORSA INFINITA»): lo stato sta qui in cima perché
@@ -1348,6 +1351,7 @@
         q.manoA = [58, 9]; q.gomitoA = [46, 11]; q.manoD = [56, 5]; q.gomitoD = [44, 6];
         q.collo[1] -= 2; q.testa[1] -= 2; q.bacino[0] -= 2; break;
       case "contro": {
+        if (f.cinema) { posaCinema(q, f.t); break; }
         // Il parry e il contrattacco (vedi PARRY): il braccio davanti spazza via il colpo dall'alto verso l'esterno,
         // il corpo si raccoglie; all'ottavo fotogramma l'affondo, a due pugni, con tutto il peso in avanti.
         if (f.t < 8) {
@@ -2786,6 +2790,13 @@
     }
     if (combo) { inizia(f, "para"); f.paraT0 = undefined; return; }
     inizia(f, "contro"); f.controDi = da || null; f.controZ = z || null;
+    // Chi gioca: il contrattacco in scena, tre colpi a rallentatore (vedi «IL CONTRATTACCO IN SCENA»).
+    if (mio && imp.rallentatore !== false) {
+      f.durata = CINEMA.durata; f.cinema = true; f.riparo = Math.max(f.riparo || 0, CINEMA.durata + 6);
+      cinema = { f, z: z || null, da: da || null, colpi: 0 };
+      zoomParry = null; ralenti = 0;
+      if (z) { z.botta = Math.max(z.botta || 0, CINEMA.durata); z.vx = 0; }
+    } else f.cinema = false;
     if (da && da.p) {
       da.azione = null; da.stordito = Math.max(da.stordito || 0, PARRY.stordito); da.scatto = 0; da.onda = null; da.combo = 0;
       const s = Math.sign(da.p.bacino.x - f.p.bacino.x) || -f.dir;
@@ -2794,6 +2805,7 @@
   }
   // Il contrattacco: l'affondo all'ottavo fotogramma (prima, se l'altro è un passo più in là, ci si porta sotto).
   function eseguiContro(f, altro) {
+    if (f.cinema) { eseguiCinema(f); return; }
     const z = f.controZ, da = f.controDi;
     if (f.t < 8) {
       const tx = z ? z.x : da && da.p ? da.p.bacino.x : null;
@@ -2831,6 +2843,192 @@
       colpisci(f, da, PARRY.forza * (1 + 0.15 * (corsa && corsa.chi && f.tipo === corsa.chi ? corsa.riflessi || 0 : 0)), da.p.collo.x, da.p.collo.y, "CONTRO!");
       for (const n in da.p) da.p[n].ox -= f.dir * 6 * S;
     } else fendente(f.p.bacino.x + f.dir * 30 * S, f.p.collo.y + 6 * S);      // (andato via: il fendente a vuoto si vede lo stesso)
+  }
+  // ·· IL CONTRATTACCO IN SCENA (18/10/2026, Riccardo: «ogni volta che faccio un parry voglio che parta un contrattacco a
+  // rallentatore, ma le animazioni devono essere fluide e fatte bene tra personaggio e nemico») ··
+  // Spunti da Prince of Persia: The Lost Crown (il video indicato da Riccardo) e dai metroidvania col parry: il parry
+  // ferma il colpo, la camera stringe sui due con le bande nere, e parte una sequenza in tre tempi a rallentatore «a
+  // rampa» (lentissimo sui colpi, più svelto fra uno e l'altro):
+  //   1. lo scatto: dietro restano le immagini residue, ci si porta addosso a chi ha attaccato;
+  //   2. il montante: un fendente dal basso in alto che lo solleva da terra;
+  //   3. il fendente girato: di traverso, mentre è in aria;
+  //   4. il colpo finale: a due mani in avanti, lo scaraventa via e giù, e il terreno si apre dove atterra.
+  // Se il nemico cade prima, la sequenza passa al più vicino (entro un balzo), sennò si chiude in anticipo.
+  // Solo per chi gioca: le lotte fra due lottatori automatici restano col contrattacco breve di prima.
+  const CINEMA = { durata: 46, scatto: [6, 11], colpi: [12, 22, 33], fine: 38, zoom: 0.16, danni: [4.5, 4.5, 9] };
+  const liscio = (u) => { u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); };
+  const mescola = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+  function posaCinema(q, t) {
+    const [s0, s1] = CINEMA.scatto, [c1, c2, c3] = CINEMA.colpi;
+    if (t < s0) {
+      // la parata che spazza via il colpo
+      const k = liscio(t / s0);
+      q.manoA = mescola([58, 9], [80, 20], k); q.gomitoA = mescola([46, 11], [62, 12], k); q.manoD = [50, -4]; q.gomitoD = [44, -2];
+      q.bacino[0] -= 3 * k; q.collo[1] -= 3 * k; q.testa[1] -= 3 * k;
+    } else if (t < c1) {
+      // lo scatto: basso, in avanti, braccia dietro
+      const k = liscio((t - s0) / (s1 - s0));
+      q.manoA = mescola([80, 20], [40, -16], k); q.gomitoA = mescola([62, 12], [46, -8], k);
+      q.manoD = mescola([50, -4], [38, -20], k); q.gomitoD = mescola([44, -2], [44, -10], k);
+      q.bacino[0] -= 8 * k; q.collo[0] -= 6 * k; q.collo[1] += 10 * k; q.testa[0] -= 6 * k; q.testa[1] += 12 * k;
+      q.piedeA = [0, 18]; q.piedeD = [0, -18]; q.ginocchioA = [16, 16]; q.ginocchioD = [12, -10];
+    } else if (t < c2) {
+      // il montante: dal basso in alto, sulle punte
+      const k = liscio((t - c1 + 2) / 5), r = liscio((t - c1 - 4) / 5);
+      q.manoA = mescola(mescola([30, 22], [104, 14], k), [86, 4], r); q.gomitoA = mescola(mescola([40, 12], [80, 12], k), [70, 6], r);
+      q.manoD = [56, 6]; q.gomitoD = [46, 4];
+      q.collo[1] += 4 - 2 * k; q.testa[0] += 3 * k; q.bacino[0] += 4 * k;
+      q.piedeA = [4 * k, 12]; q.piedeD = [0, -12]; q.ginocchioA = [18, 10]; q.ginocchioD = [13, -7];
+    } else if (t < c3) {
+      // il fendente girato: da dietro in alto a davanti in basso, il busto ruota
+      const k = liscio((t - c2 + 2) / 5), r = liscio((t - c2 - 4) / 6);
+      q.manoA = mescola(mescola([84, -14], [50, 36], k), [56, 18], r); q.gomitoA = mescola(mescola([70, -8], [58, 20], k), [52, 10], r);
+      q.manoD = mescola([72, -22], [46, 24], k); q.gomitoD = mescola([62, -12], [50, 12], k);
+      q.collo[1] += -4 + 10 * k; q.testa[1] += -4 + 11 * k; q.bacino[1] += 3 * k;
+      q.piedeA = [0, 16]; q.piedeD = [0, -14]; q.ginocchioA = [15, 13]; q.ginocchioD = [13, -8];
+    } else if (t < CINEMA.fine + 2) {
+      // il colpo finale: tutto il peso in avanti, a due mani
+      const k = liscio((t - c3 + 3) / 4);
+      q.manoA = mescola([62, -10], [52, 40], k); q.manoD = mescola([58, -14], [48, 38], k);
+      q.gomitoA = mescola([54, -4], [52, 24], k); q.gomitoD = mescola([50, -8], [48, 22], k);
+      q.collo[1] += 12 * k; q.testa[1] += 14 * k; q.bacino[1] += 6 * k; q.bacino[0] -= 4 * k;
+      q.piedeA = [0, 24]; q.piedeD = [0, -18]; q.ginocchioA = [16, 18]; q.ginocchioD = [12, -12];
+    } else {
+      // si ricompone in guardia
+      const k = liscio((t - CINEMA.fine - 2) / 6);
+      q.manoA = mescola([52, 40], [58, 9], k); q.manoD = mescola([48, 38], [56, 5], k);
+      q.gomitoA = mescola([52, 24], [46, 11], k); q.gomitoD = mescola([48, 22], [44, 6], k);
+      q.collo[1] += 12 * (1 - k); q.testa[1] += 14 * (1 - k);
+    }
+  }
+  // Su chi va il prossimo colpo: quello di prima se è ancora in piedi, sennò il più vicino davanti (entro un balzo).
+  function bersaglioCinema(f) {
+    const c = cinema;
+    if (!c || c.chiusa) return null;
+    if (c.z && vivoZ(c.z) && !c.z.volo) return c.z;
+    if (c.da && c.da.p && !c.da.ko && !c.da.esploso && !c.da.fuoriCampo) return c.da;
+    if (!orda) return null;
+    let meglio = null, dm = 150 * S;
+    for (const z of orda.zombie) {
+      if (!vivoZ(z) || z.volo || z.inBuco) continue;
+      const d = Math.abs(z.x - f.p.bacino.x);
+      if (d < dm) { dm = d; meglio = z; }
+    }
+    if (meglio) { c.z = meglio; meglio.botta = Math.max(meglio.botta || 0, CINEMA.durata - f.t); meglio.vx = 0; }
+    return meglio;
+  }
+  const xBersaglio = (b) => (b.p ? b.p.bacino.x : b.x);
+  function eseguiCinema(f) {
+    const t = f.t, [s0, s1] = CINEMA.scatto, b = bersaglioCinema(f);
+    if (!b && cinema.chiusa) return;                 // (il bersaglio è giù: la sequenza finisce di suo, col colpo finale a vuoto)
+    if (!b && t >= s0 && t < CINEMA.fine) {
+      // nessuno da colpire: un fendente a vuoto e si chiude
+      if (t < CINEMA.colpi[0]) fendenteCinema(f, f.p.bacino.x + f.dir * 30 * S, f.p.collo.y + 4 * S, 0);
+      f.t = CINEMA.fine; return;
+    }
+    if (b) f.dir = xBersaglio(b) >= f.p.bacino.x ? 1 : -1;
+    // lo scatto: addosso, con le immagini residue
+    if (b && t >= s0 && t <= s1) {
+      const meta = xBersaglio(b) - f.dir * 30 * S, dx = meta - f.cx, st = dx * (t === s1 ? 1 : 0.42);
+      if (Math.abs(dx) > 2 * S) { for (const n in f.p) { f.p[n].x += st; f.p[n].ox += st; } f.cx += st; f.meta = f.cx; }
+      residua(f);
+      if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "linea", x: f.p.bacino.x - f.dir * 14 * S, y: f.p.bacino.y - caso(-16, 16) * S, vx: -f.dir * 5 * S, vy: 0, vita: 10, max: 10, lung: caso(18, 34) * S, colore: "#ffe27a" });
+      if (t === s0) suona("soffio", f.cx, 0.7);
+    }
+    if (t > s1 && t < CINEMA.fine && t % 3 === 0) residua(f);
+    const i = CINEMA.colpi.indexOf(t);
+    if (i === CINEMA.colpi.length - 1 && !b && cinema.chiusa) { scrivi("CONTRO!", f.p.bacino.x, Math.max(testataBasso + 40 * S, f.p.testa.y - 46 * S), true); fendenteCinema(f, f.p.bacino.x + f.dir * 34 * S, f.p.collo.y + 6 * S, i); fermoColpo = Math.max(fermoColpo, 6); scossa = Math.max(scossa, 8); return; }
+    if (i < 0 || !b) return;
+    // un colpo della sequenza
+    const ultimo = i === CINEMA.colpi.length - 1;
+    if (b.p) {
+      fendenteCinema(f, b.p.collo.x, b.p.collo.y, i);
+      colpisci(f, b, PARRY.forza * (ultimo ? 0.8 : 0.35) * (1 + 0.15 * (corsa && corsa.chi && f.tipo === corsa.chi ? corsa.riflessi || 0 : 0)), b.p.collo.x, b.p.collo.y, ultimo ? "CONTRO!" : null);
+      for (const n in b.p) { b.p[n].ox -= f.dir * (ultimo ? 8 : 2) * S; if (i === 0) b.p[n].oy += 6 * S; }
+      b.azione = null; b.stordito = Math.max(b.stordito || 0, ultimo ? 40 : 30);
+    } else {
+      const c = corpoZ(b);
+      fendenteCinema(f, c[0], c[1], i);
+      // (all'orlo dell'equilibrio: questo colpo lo sbilancia e diventa il colpo di grazia, invece di finirlo da colpo normale)
+      if (!(b.sbilanciato > 0) && (b.equil || 0) + EQUILIBRIO.colpo >= 1) sbilancia(b, EQUILIBRIO.colpo, c[0], c[1]);
+      colpisciZombie(b, CINEMA.danni[i], f.dir, c[0], c[1], f);
+      if (b.hp > 0 && !b.volo && !pesante(b)) {
+        // in aria: su col montante, tenuto su dal secondo, giù di schianto col terzo
+        if (i === 0) b.vAlzo = 7 * S; else if (i === 1) b.vAlzo = Math.max(b.vAlzo || 0, 3.5 * S); else { b.vAlzo = -6 * S; b.vx = f.dir * 9 * S; b.schianto = true; }
+        b.ruota = (b.ruota || 0) + f.dir * (ultimo ? 1.4 : 0.6);
+      } else if (b.hp > 0) b.vx = f.dir * (ultimo ? 6 : 2) * S;
+      if (b.hp > 0) b.botta = Math.max(b.botta || 0, ultimo ? 40 : CINEMA.durata - f.t);
+      else if (!b.volo) {
+        // Giù al primo o al secondo colpo (i nemici dei primi minuti): vola via girando, e chi para salta dritto al colpo
+        // finale, che chiude la scena a vuoto. Così la sequenza resta intera anche con chi muore subito.
+        b.alzo = Math.max(b.alzo || 0, 2 * S); b.vAlzo = 6.5 * S; b.vx = f.dir * 7 * S; b.ruota = f.dir * 1.2;
+        if (!ultimo) { cinema.chiusa = true; cinema.z = null; f.t = Math.max(f.t, CINEMA.colpi[2] - 4); }
+      }
+    }
+    // ogni colpo: un attimo fermo; l'ultimo è il più pesante
+    fermoColpo = Math.max(fermoColpo, ultimo ? 9 : 4);
+    scossa = Math.max(scossa, ultimo ? 12 : 5);
+    if (ultimo) { lampoSchermo = Math.max(lampoSchermo, 0.3); scrivi("CONTRO!", (f.p.bacino.x + xBersaglio(b)) / 2, Math.max(testataBasso + 40 * S, f.p.testa.y - 46 * S), true); }
+    cinema.colpi++;
+  }
+  function fendenteCinema(f, x, y, i) {
+    if (particelle.length < MAX_PARTICELLE - 4) {
+      // montante quasi verticale, fendente girato di traverso, finale orizzontale e largo
+      const ang = i === 0 ? -f.dir * 1.25 : i === 1 ? f.dir * 0.55 : -f.dir * 0.12, lung = (i === 2 ? 70 : 52) * S;
+      particelle.push({ tipo: "taglio", x, y, vx: 0, vy: 0, vita: 18, max: 18, ang, lung, colore: "#ffd84a" });
+      particelle.push({ tipo: "taglio", x: x + f.dir * 4 * S, y: y + 3 * S, vx: 0, vy: 0, vita: 13, max: 13, ang: ang + 0.1, lung: lung * 0.7, colore: "#ffffff" });
+      particelle.push({ tipo: "impatto", x, y, vx: 0, vy: 0, vita: 14, max: 14, r: (i === 2 ? 64 : 40) * S, giro: Math.random() * 6, colore: i === 2 ? "#ffffff" : "#ffd84a" });
+    }
+    scintille(x, y, i === 2 ? 20 : 10, "#ffd84a");
+    suona("taglio", x, i === 2 ? 1 : 0.75);
+    if (i === 2) suona("boom", x, 0.6);
+  }
+  // A ogni passo: la sequenza finisce con l'azione; la camera la segue e torna.
+  function aggiornaCinema() {
+    if (cinema) {
+      const f = cinema.f;
+      if (!f || !f.p || f.azione !== "contro" || !f.cinema || f.esploso || f.fuoriCampo) {
+        if (f) f.cinema = false;
+        cinema = null;
+      }
+    }
+  }
+  // Quanto va veloce il tempo dentro la sequenza: lentissimo attorno ai colpi, più svelto fra uno e l'altro.
+  function rampaCinema() {
+    const f = cinema && cinema.f;
+    if (!f) return 1;
+    let d = 99;
+    for (const c of CINEMA.colpi) d = Math.min(d, Math.abs(f.t - c));
+    if (f.t < CINEMA.scatto[0]) return 0.3;
+    if (f.t > CINEMA.fine) return 0.7;
+    return d <= 1 ? 0.16 : d <= 3 ? 0.3 : 0.55;
+  }
+  // La camera della sequenza: stringe sul punto fra i due, con le bande nere; dolce in entrata e in uscita.
+  function camminaCamera() {
+    const c = cinema, f = c && c.f;
+    let tx = camCinema.x, ty = camCinema.y, tk = 1, tb = 0;
+    if (f && f.p) {
+      const b = bersaglioCinema(f), bx = b ? xBersaglio(b) : f.p.bacino.x, by = b ? (b.p ? b.p.collo.y : corpoZ(b)[1]) : f.p.collo.y;
+      tx = (f.p.bacino.x + bx) / 2; ty = (f.p.collo.y + by) / 2;
+      const fuori = Math.max(0, f.t - CINEMA.fine) / (CINEMA.durata - CINEMA.fine);
+      tk = 1 + CINEMA.zoom * (1 - liscio(fuori)) * fattoreScossa(); tb = 1 - liscio(fuori);
+      if (camCinema.k <= 1.001) { camCinema.x = tx; camCinema.y = ty; }
+    }
+    camCinema.x += (tx - camCinema.x) * 0.18; camCinema.y += (ty - camCinema.y) * 0.18;
+    camCinema.k += (tk - camCinema.k) * 0.14; camCinema.barre += (tb - camCinema.barre) * 0.16;
+    if (camCinema.k < 1.001 && !c) camCinema.k = 1;
+    if (camCinema.barre < 0.005) camCinema.barre = 0;
+  }
+  function disegnaBarreCinema() {
+    const b = camCinema.barre;
+    if (b <= 0) return;
+    const h = Math.round(Math.min(H * 0.09, 60 * S) * b);
+    ctx.save(); ctx.fillStyle = "#050409"; ctx.fillRect(0, 0, W, h); ctx.fillRect(0, H - h, W, h);
+    // la vignetta: i bordi al buio, il centro sulla scena
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.7);
+    g.addColorStop(0, "rgba(5,4,9,0)"); g.addColorStop(1, "rgba(5,4,9," + (0.55 * b).toFixed(3) + ")");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.restore();
   }
   function colpisci(f, altro, forza, x, y, suono) {
     if (fatale && altro && altro.tipo) return;                   // durante il colpo finale conta solo la scena
@@ -6032,6 +6230,7 @@
     z.vx = lanciato ? 0 : dir * Math.min(8, 2.5 + forza) * 0.55 * S * (grosso ? 0.3 : 1);
     scintille(x, y, 7, "#ffe27a");
     fermoColpo = Math.max(fermoColpo, 2);
+    if (!lanciato) { z.reaz = 12; z.reazDir = dir || -z.dir; }
     if (z.hp > 0) { if (!lanciato) z.stato = "va"; scrivi(SUONI[Math.floor(Math.random() * SUONI.length)], x, y - 8 * S, false); return true; }
     if (lanciato) prossimaLetale = tempo + attesaLetale();
     z.stato = "giu"; z.cade = dir || 1; orda.uccisi++; orda.uccisiOndata++;
@@ -6673,14 +6872,28 @@
       if (z.volo) { muoviDrago(z, q, Z); continue; }
       z.x += z.vx; z.vx *= 0.86;
       z.x = Math.max(q.l + 6 * S, Math.min(q.r - 6 * S, z.x));
-      if (z.stato === "giu") continue;
+      if (z.stato === "giu") {
+        // (abbattuto in aria: ricade)
+        if (z.alzo > 0) { z.vAlzo = (z.vAlzo || 0) - 0.6 * S; z.alzo = Math.max(0, z.alzo + z.vAlzo); if (z.alzo <= 0) { z.vAlzo = 0; polvere(z.x, q.base - 1, 5); } }
+        continue;
+      }
       if (z.stato === "cala") {
         // Giù dalla fune dell'elicottero, sempre più svelto, fino alla piattaforma.
         z.vy = (z.vy || 0) + 0.45 * S; z.alzo = Math.max(0, z.alzo - z.vy);
         if (z.alzo <= 0) { z.stato = "va"; z.s = 0; z.vy = 0; polvere(z.x, q.base - 1, 5); suona("pop", z.x, 0.5); }
         continue;
       }
-      if (z.alzo > 0 && z.stato !== "salto") z.alzo = Math.max(0, z.alzo - 4 * S);      // colpito a mezz'aria: giù
+      if (z.reaz > 0) z.reaz--;
+      if (z.vAlzo) {
+        // In aria per il contrattacco in scena: sale e ricade; di schianto, il terreno si apre dove atterra.
+        z.alzo = Math.max(0, (z.alzo || 0) + z.vAlzo); z.vAlzo -= (z.schianto ? 0.9 : 0.45) * S;
+        if (z.ruota) z.ruota *= 0.97;
+        if (z.alzo <= 0) {
+          if (z.schianto) { squarciaSuolo(z.x, q.base, 1.4); scossa = Math.max(scossa, 8); suona("tonfo", z.x, 0.9); }
+          else polvere(z.x, q.base - 1, 4);
+          z.vAlzo = 0; z.schianto = false; z.ruota = 0;
+        }
+      } else if (z.alzo > 0 && z.stato !== "salto") z.alzo = Math.max(0, z.alzo - 4 * S);      // colpito a mezz'aria: giù
       if (z.stato === "esce") {
         if (z.s % 6 === 0 && z.s < 40) polvere(z.x, q.base - 1, 1);
         // (si arrampica fuori: qualche zolla salta via a ogni spinta)
@@ -7113,6 +7326,14 @@
     }
     ctx.translate(z.x, q.base - (z.alzo || 0) + emerge * 62 * S * sc);
     ctx.scale(sc, sc);
+    // In aria per il contrattacco: gira su sé stesso intorno alla vita.
+    if (z.ruota && z.alzo > 0) { ctx.translate(0, -34 * S); ctx.rotate(z.ruota); ctx.translate(0, 34 * S); }
+    // La botta presa (18/10/2026, Riccardo: «ancora non vedo migliorate le animazioni… dei nemici»): indietro col busto
+    // dalla parte del colpo, schiacciato e poi rimbalza, invece di restare dritto come un cartello.
+    if (z.reaz > 0) {
+      const u = z.reaz / 12, k = Math.sin(u * Math.PI) * (u > 0.5 ? 1 : 0.6), dc = z.reazDir || -d;
+      ctx.rotate(dc * 0.38 * k); ctx.translate(dc * 4 * S * k, 0); ctx.scale(1 - 0.08 * k, 1 + 0.05 * k);
+    }
     if (z.stato === "salto" && z.salto && z.salto.t <= 16) ctx.scale(1.1, 0.84);          // il saltatore si accovaccia
     // Le pose nuove (16/10/2026): la carica letale (indietro, tremando; poi tutto in avanti) e il barcollo.
     if (z.stato === "mira") { const k = Math.min(1, z.s / 14); ctx.rotate(-z.dir * 0.16 * k + Math.sin(z.s * 1.4) * 0.03 * k); ctx.scale(1 + 0.05 * k, 1 - 0.06 * k); }
@@ -7293,7 +7514,14 @@
       // (carica: le braccia salgono sopra la testa e tornano indietro; colpo: giù e avanti)
       const g = grosso ? 1.25 : 1;
       let mano;
-      if (tc && tc.dopo < 8) { const k = 1 - tc.dopo / 8; mano = { x: spalla.x + d * (22 + 6 * k) * g * S, y: spalla.y + (su + 7 * k) * S }; }
+      if (tc && tc.dopo < 12) {
+        // Il colpo (18/10/2026, Riccardo: «ancora non vedo migliorati gli attacchi dei nemici»): la mano non scivola più
+        // in avanti ma cala ad arco, da sopra la testa giù davanti al petto, va oltre e torna. Quella dietro segue in ritardo.
+        const ritardo = su > 0 ? 1.5 : 0, a = Math.max(0, tc.dopo - ritardo);
+        const giu = a < 4 ? liscio(a / 4) : 1, torna = a > 5 ? liscio((a - 5) / 7) : 0;
+        const th = -1.75 + 2.35 * giu - 0.6 * torna, R = (24 + 4 * giu - 6 * torna) * g * S;
+        mano = { x: spalla.x + d * Math.cos(th) * R, y: spalla.y + su * S + Math.sin(th) * R };
+      }
       else if (tc) mano = { x: spalla.x + d * (19 - 21 * tc.u) * g * S, y: spalla.y + (su - 27 * tc.u * g + Math.sin(z.t * 0.09 + su) * 1.2 * (1 - tc.u)) * S };
       else { const alza = (grosso ? 22 : 9) * colpo * (1 - colpo) * 4; mano = { x: spalla.x + d * (19 + 6 * colpo) * S, y: spalla.y + (su - alza + Math.sin(z.t * 0.09 + su) * 1.2 + (svelto ? 5 : 0)) * S }; }
       const gomito = { x: (spalla.x + mano.x) / 2, y: (spalla.y + mano.y) / 2 + 2.2 * S };
@@ -7301,6 +7529,18 @@
       ctx.strokeStyle = T[0]; ctx.lineWidth = (grosso ? 5.4 : 3.4) * S; ctx.beginPath(); ctx.moveTo(spalla.x, spalla.y + su * S); ctx.lineTo(gomito.x, gomito.y); ctx.stroke();
       ctx.strokeStyle = tono; ctx.beginPath(); ctx.moveTo(gomito.x, gomito.y); ctx.lineTo(mano.x, mano.y); ctx.stroke();
       ctx.fillStyle = tono; ctx.strokeStyle = nero; ctx.lineWidth = 0.9 * S; ctx.beginPath(); ctx.arc(mano.x, mano.y, (grosso ? 3.8 : 2.7) * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      // Il lampo sulla mano quando si apre la finestra del parry (spunto da Prince of Persia: The Lost Crown): una
+      // stella d'oro che si accende e si spegne in un attimo. È il «adesso» letto sul nemico, non solo sull'anello.
+      if (su < 0 && tc && tc.manca !== null && tc.manca >= 0 && tc.manca <= PARRY.finestra) {
+        const u = 1 - tc.manca / PARRY.finestra, r = (5 + 9 * Math.sin(Math.min(1, u * 1.6) * Math.PI)) * S;
+        ctx.save(); ctx.translate(mano.x, mano.y); ctx.rotate(passi * 0.08);
+        ctx.globalAlpha = 0.95; ctx.fillStyle = "#ffd84a"; ctx.shadowColor = "#ffd84a"; ctx.shadowBlur = 10 * S;
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) { const rr = i % 2 ? r * 0.22 : r, aa = i * Math.PI / 4; ctx.lineTo(Math.cos(aa) * rr, Math.sin(aa) * rr); }
+        ctx.closePath(); ctx.fill();
+        ctx.shadowBlur = 0; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(0, 0, r * 0.18, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
     }
     ctx.restore();
     segnoNuovo(z);
@@ -11770,7 +12010,8 @@
   }
   function danneggiaStriscia(x, forza, forzato) {
     urtoArena(x, pavimento, 60 * S, forza, "pavimento");
-    if (!(pavimento < H - 4) || fermo) return;
+    // (col suolo vivo i segni li tiene l'arena: niente crepe coi fili, pensate per la striscia delle notizie)
+    if (!(pavimento < H - 4) || fermo || suoloVivo()) return;
     // Un danno nuovo al massimo ogni 5 secondi circa: la striscia deve
     // restare quasi sempre leggibile. Le mosse finali passano avanti.
     if (!forzato) for (const d of danni) if (d.eta < 420 || (Math.abs(d.x - x) < 26 * S && d.eta < 400)) return;
@@ -12211,7 +12452,7 @@
     colpoDaMano(a, b); colpoDaMano(b, a);
     aggiornaLame(); aggiornaFulmini(); aggiornaMagie();
     aggiornaTelefoni(); aggiornaCreature(); aggiornaNubi(); aggiornaFinale(); aggiornaProiettili(); aggiornaParticelle(); aggiornaEventi(); aggiornaDanni();
-    aggiornaArti(); aggiornaMeteo(); aggiornaSisma(); aggiornaMeteore(); aggiornaBuco(); aggiornaFatale(); tieniDentroFatale(); aggiornaEquilibri(); aggiornaMira(); aggiornaCorsa(); aggiornaAudio(); aggiornaOrda(); aggiornaOnde(); aggiornaVite();
+    aggiornaArti(); aggiornaMeteo(); aggiornaSisma(); aggiornaMeteore(); aggiornaBuco(); aggiornaFatale(); tieniDentroFatale(); aggiornaEquilibri(); aggiornaCinema(); aggiornaMira(); aggiornaCorsa(); aggiornaAudio(); aggiornaOrda(); aggiornaOnde(); aggiornaVite();
     if (anime) controllaScontro();
     for (const sc of scie) sc.vita--;
     if (scie.length && scie[0].vita <= 0) scie = scie.filter((sc) => sc.vita > 0);
@@ -13461,6 +13702,9 @@
     disegnaScenario();
     ctx.save();
     if (scossa > 0 && fattoreScossa() > 0) ctx.translate(caso(-1, 1) * Math.min(4, scossa) * S * fattoreScossa(), caso(-1, 1) * Math.min(4, scossa) * S * fattoreScossa());
+    // La camera del contrattacco in scena (vedi «IL CONTRATTACCO IN SCENA»).
+    camminaCamera();
+    if (camCinema.k > 1.001) { ctx.translate(W / 2, H / 2); ctx.scale(camCinema.k, camCinema.k); ctx.translate(-camCinema.x - (W / 2 - camCinema.x) / camCinema.k, -camCinema.y - (H / 2 - camCinema.y) / camCinema.k); }
     // Lo zoom del parry: si stringe sul punto e torna (spento con la scossa spenta).
     if (zoomParry) {
       if (fattoreScossa() > 0) {
@@ -13549,6 +13793,7 @@
     disegnaFinale(true);
     if (barreVita && !corsa) disegnaBarre();
     ctx.restore();
+    disegnaBarreCinema();
     // Il lampo bianco del parry, su tutto.
     if (lampoSchermo > 0.01) { ctx.save(); ctx.globalAlpha = lampoSchermo * (fattoreScossa() > 0 ? 1 : 0.4); ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H); ctx.restore(); }
     disegnaTastiSfida();
@@ -13576,7 +13821,7 @@
     if (!ultimo) ultimo = adesso;
     // Nella corsa si tiene il conto di quanto dura un fotogramma: se il telefono fatica, meno zombie insieme.
     if (corsa && corsa.chi && ultimo && adesso > ultimo) corsa.dtMedio = (corsa.dtMedio || 16.7) * 0.97 + Math.min(200, adesso - ultimo) * 0.03;
-    riserva += Math.min(100, adesso - ultimo) * ritmo * (ralenti > 0 ? 0.32 : 1);
+    riserva += Math.min(100, adesso - ultimo) * ritmo * (cinema ? rampaCinema() : ralenti > 0 ? 0.32 : 1);
     if (ralenti > 0) ralenti--;
     ultimo = adesso;
     let giri = 0;
@@ -16158,6 +16403,60 @@
       righeUI(dici(v.testo || ""), descr.w - 36 * S, 13 * S).forEach((r, k) => scriviUI(r, descr.x + 18 * S, descr.y + 62 * S + k * 19 * S, 13 * S, "#ffffff", "left", 600));
     }
   }
+  // ·· IL ROSTER (18/10/2026, Riccardo: «accanto al menu iniziale il roster dei personaggi con le proprie caratteristiche
+  // e la possibilità di aumentarle con i crediti accumulati») ··
+  // Le quattro famiglie in alto (cambiano lo stile, come nella scelta della corsa), sotto i due lottatori della famiglia
+  // col ritratto dal vivo e le cinque doti dell'allenamento (ALLENAMENTO): livello a pallini e il tasto coi crediti.
+  // Le doti sono per personaggio e per famiglia, le stesse di «Allena» nella scelta della corsa.
+  function disegnaRoster(x, y, w, h) {
+    const compatto = h < 300 * S, rr = compatto ? 19 * S : 27 * S, sotto = compatto ? 42 * S : 56 * S;
+    pannelloUI(x, y, w, h, 12 * S, "rgba(255,216,74,.35)", "rgba(20,18,32,.84)");
+    scriviUI(dici("PERSONAGGI"), x + 16 * S, y + 20 * S, 15 * S, ORO, "left", 900);
+    scriviUI("\u{1FA99} " + cifre(banca), x + w - 16 * S, y + 20 * S, 14 * S, "#ffffff", "right", 900);
+    // le famiglie
+    const n = PERSONAGGI_CORSA.length, wt = (w - 32 * S - (n - 1) * 6 * S) / n;
+    PERSONAGGI_CORSA.forEach(([st, nome], i) => {
+      const scelto = st === stile, chiuso = st && !libero("guerrieri");
+      tastoUI(x + 16 * S + i * (wt + 6 * S), y + 36 * S, wt, 24 * S, (chiuso ? "\u{1F512} " : "") + dici(nome), () => { if (!scelto) comandi.stile(st); },
+              { colore: scelto ? ORO : "#2a2735", scritta: scelto ? "#17171c" : "#ffffff", px: (wt < 100 * S ? 10 : 11) * S, bordo: scelto ? null : "rgba(255,255,255,.22)" });
+    });
+    // i due lottatori, uno per colonna
+    const col = (w - 40 * S) / 2, yy = y + 72 * S;
+    ["robot", "mela"].forEach((tipo, k) => {
+      const cx = x + 16 * S + k * (col + 8 * S), f = lottatori.find((l) => l.tipo === tipo);
+      pannelloUI(cx, yy, col, h - (yy - y) - 12 * S, 9 * S, "rgba(255,255,255,.1)", "rgba(255,255,255,.04)");
+      // il ritratto
+      const pr = compatto ? 14 * S : 18 * S, px = cx + 8 * S + pr, py = yy + 6 * S + pr;
+      ctx.save(); ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fillStyle = "#242a3c"; ctx.fill(); ctx.clip();
+      if (f && f.p && f.p.testa && !f.esploso && !f.fuori) {
+        const kk = 1.25 / Math.max(0.5, f.scala || 1);
+        ctx.translate(px - f.p.testa.x * kk, py + 4 * S - f.p.testa.y * kk); ctx.scale(kk, kk);
+        try { (stile ? disegnaUmano : f.tipo === "robot" ? disegnaRobot : disegnaMela)(f); } catch (errore) { /* un ritratto in meno */ }
+      }
+      ctx.restore();
+      ctx.save(); ctx.strokeStyle = COLORI_ANIME[tipo] || ORO; ctx.lineWidth = 2 * S; ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+      scriviUI(nomeDi(tipo), px + pr + 10 * S, py - 7 * S, 15 * S, "#ffffff", "left", 900);
+      const vita = 100 + 12 * allenato(tipo, "tempra"), danni = 8 * allenato(tipo, "colpo");
+      scriviUI("❤️ " + vita + "   \u{1F44A} +" + danni + "%", px + pr + 10 * S, py + 11 * S, 11 * S, "rgba(255,255,255,.75)", "left", 700);
+      // le doti
+      Object.keys(ALLENAMENTO).forEach((id, j) => {
+        const A = ALLENAMENTO[id], liv = allenato(tipo, id), ry = yy + sotto + j * rr, pieno = liv >= A.max, prezzo = pieno ? 0 : costoAllenamento(tipo, id);
+        if (ry + rr > y + h - 12 * S) return;
+        scriviUI(A.icona, cx + 16 * S, ry + rr / 2, 13 * S, "#ffffff", "center");
+        scriviUI(dici(A.nome), cx + 30 * S, ry + rr / 2 - (compatto ? 0 : 5 * S), (compatto && col < 230 * S ? 10 : 11.5) * S, "#ffffff", "left", 800);
+        // i pallini del livello (stretti: accanto al nome, a destra prima del tasto)
+        for (let q = 0; q < A.max; q++) {
+          const qx = compatto ? cx + col - 58 * S - 16 * S - (A.max - 1 - q) * 8 * S : cx + 34 * S + q * 9 * S, qy = compatto ? ry + rr / 2 : ry + rr / 2 + 8 * S;
+          ctx.beginPath(); ctx.arc(qx, qy, (compatto ? 2.4 : 2.8) * S, 0, Math.PI * 2);
+          ctx.fillStyle = q < liv ? ORO : "rgba(255,255,255,.18)"; ctx.fill();
+        }
+        const bh = compatto ? 17 * S : 20 * S, bw = 58 * S, bx = cx + col - bw - 8 * S, by = ry + (rr - bh) / 2;
+        if (pieno) scriviUI("MAX", bx + bw / 2, ry + rr / 2, 11 * S, ORO, "center", 900);
+        else tastoUI(bx, by, bw, bh, "+ " + cifre(prezzo) + " \u{1FA99}", () => { if (!allena(tipo, id)) { suona("mancato"); scrivi(dici("Crediti insufficienti"), bx + bw / 2, by - 6 * S, false); } },
+                     { colore: banca >= prezzo ? ORO : "#2a2735", scritta: banca >= prezzo ? "#17171c" : "rgba(255,255,255,.55)", px: 10.5 * S, bordo: banca >= prezzo ? null : "rgba(255,255,255,.2)" });
+      });
+    });
+  }
   function disegnaMenu() {
     if (!menu) return;
     menu.t++;
@@ -16170,21 +16469,27 @@
       const voci = p === "principale" ? vociPrincipale() : vociPausa();
       if (menu.sel >= voci.length) menu.sel = 0;
       const px = Math.min(64 * S, (stretto ? W - 40 : W * 0.5) / 5.2);
+      let sottoLogo = top;
       if (p === "principale") {
         const giu = logoMenu(stretto ? W / 2 : 40 * S, top + px * 0.6, px, stretto ? "center" : "left");
         // (il motto lo può dare l'ospite: nelle arene del sito non c'è una pagina sotto)
         scriviUI(dici(typeof window.__ringMotto === "string" ? window.__ringMotto : "Il ring è la pagina che stai guardando."), stretto ? W / 2 : 44 * S, top + px * 1.35 + giu, 13 * S, "rgba(255,255,255,.75)", stretto ? "center" : "left", 700);
+        sottoLogo = top + px * 1.35 + giu - 12 * S;
       } else {
         titoloGrande(dici("PAUSA"), stretto ? W / 2 : 40 * S, top + 30 * S, stretto ? "center" : "left");
         if (corsa && corsa.chi) scriviUI("⚠️ " + dici("Minaccia") + " " + corsa.round + "  ·  " + dici("Liv.") + " " + corsa.liv + "  ·  " + cifre(corsa.punti) + " " + dici("punti"), stretto ? W / 2 : 44 * S, top + 62 * S, 13 * S, "rgba(255,255,255,.8)", stretto ? "center" : "left", 700);
       }
       const y0 = top + (p === "principale" ? px * 1.35 + 34 * S + (NOME_GIOCO.trim().split(/\s+/).length >= 3 ? px * 0.95 : 0) : 92 * S), rh = 44 * S;
+      // (`__ringRoster`: al posto della scheda della voce, accanto al menu, i personaggi da allenare coi crediti)
+      const conRoster = p === "principale" && window.__ringRoster && !corsa;
       if (stretto) {
-        const w = Math.min(360 * S, W - 32);
-        colonnaVoci(voci, W / 2 - w / 2, y0, w, rh, { x: W / 2 - w / 2, y: y0 + voci.length * (rh + 8 * S) + 8 * S, w, h: 120 * S });
+        const w = Math.min(360 * S, W - 32), yd = y0 + voci.length * (rh + 8 * S) + 8 * S;
+        colonnaVoci(voci, W / 2 - w / 2, y0, w, rh, conRoster ? null : { x: W / 2 - w / 2, y: yd, w, h: 120 * S });
+        if (conRoster && H - yd > 230 * S) disegnaRoster(W / 2 - w / 2, yd, w, H - yd - 16 * S);
       } else {
-        const w = Math.min(340 * S, W * 0.36);
-        colonnaVoci(voci, 40 * S, y0, w, rh, { x: 40 * S + w + 40 * S, y: y0, w: Math.min(420 * S, W - w - 120 * S), h: 170 * S });
+        const w = Math.min(340 * S, W * 0.36), xr = 40 * S + w + 40 * S, wr = Math.min(conRoster ? 470 * S : 420 * S, W - w - 120 * S);
+        colonnaVoci(voci, 40 * S, y0, w, rh, conRoster ? null : { x: xr, y: y0, w: wr, h: 170 * S });
+        if (conRoster) { const yr = Math.min(y0, sottoLogo); disegnaRoster(xr, yr, wr, H - yr - 24 * S); }
       }
       suggerimenti([[["↑", "↓"], "Scegli"], [["Invio"], "Conferma"]].concat(p === "pausa" ? [[["Esc"], "Riprendi"]] : []));
       scriviUI("v" + (window.__ringVersione || "1.2"), W - 16 * S, H - 18 * S, 10 * S, "rgba(255,255,255,.45)", "right", 700);
@@ -16986,7 +17291,7 @@
                           return { a: mira.a, v: mira.v, dir: mira.dir, t: mira.t, da: mira.da.tipo, resta: Math.max(0, MIRA.attesa - mira.t), ox: o.x, oy: o.y, fx: e.x, fy: e.y }; })() : null,
     lampoMira: lampoMira ? { ox: lampoMira.ox, oy: lampoMira.oy, fx: lampoMira.fx, fy: lampoMira.fy, t: lampoMira.t, preso: lampoMira.preso } : null,
     buco: buco ? { x: buco.x, y: buco.y, r: buco.r, fase: buco.fase, dentro: buco.dentro.map((d) => d.tipo), passati: buco.passati, uscita: doveEsce(buco.x, buco.y) } : null,
-    arti: arti.length, macchie: macchie.length, acquazzone, natale, uragano: !!uragano, cruento, ritmo, ralenti,
+    arti: arti.length, macchie: macchie.length, acquazzone, natale, uragano: !!uragano, cruento, ritmo, ralenti: cinema ? Math.max(ralenti, 1) : ralenti, cinema: cinema ? { t: cinema.f.t, colpi: cinema.colpi } : null,
     pioggia: gocce.length, pioggiaInFondo: gocce.reduce((n, g) => n + (g.y > pavimento * 0.7 ? 1 : 0), 0), piovendo, bagnato, sisma: sisma ? { t: sisma.t, x: sisma.x, alto: sisma.alto, forza: sisma.k } : null,
     lapilli: lapilli.length, colate: colate.length, meteore: meteore.map((m) => ({ x: m.x, y: m.y, bx: m.bx, by: m.by, grossa: m.grossa })),
     sciame: sciame ? sciame.resta : 0, bruciature: bruciature.length, trema: radiceTrema(),
@@ -16997,7 +17302,7 @@
                    ricetta: orda.ricetta ? { tema: orda.ricetta.tema, arrivo: orda.ricetta.arrivo, totale: orda.ricetta.totale, insieme: orda.ricetta.insieme, restano: orda.ricetta.coda.length } : null,
                    zombie: orda.zombie.map((z) => ({ x: z.x, y: z.volo ? z.y : orda.base - (z.alzo || 0), volo: z.volo || null, stato: z.stato, hp: z.hp, lato: z.lato, tipo: z.tipo,
                                                    s: z.s, equil: z.equil || 0, sbilanciato: z.sbilanciato || 0, extra: z.extra || 0 })) } : null, primatoOrda,
-    parata: { catena: catenaParry.n, lampo: lampoSchermo, zoom: !!zoomParry, guardia: chiPara() ? (chiPara().guardiaPt === undefined ? GUARDIA.max : chiPara().guardiaPt) : null,
+    parata: { catena: catenaParry.n, lampo: lampoSchermo, zoom: !!zoomParry || !!cinema, guardia: chiPara() ? (chiPara().guardiaPt === undefined ? GUARDIA.max : chiPara().guardiaPt) : null,
               stordito: chiPara() ? chiPara().stordito || 0 : 0, perfetto: chiPara() ? !!chiPara().parryPerfetto : false },
     radiale: (() => { const g = lottatori.length ? geometriaRadiale() : { x: 0, y: 0, centro: 0, spicchi: [], largo: 0 };
                       return { aperto: radiale.aperto, apre: radiale.apre, chi: radiale.chi, lato: radiale.lato, x: g.x, y: g.y, centro: g.centro, largo: g.largo, voci: vociRadiale().map((v) => v[0]),

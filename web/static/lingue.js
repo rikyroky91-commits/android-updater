@@ -192,6 +192,8 @@
     "raccolte": ["collected", "recogidas", "ramassées", "gesammelt"],
     "Crediti": ["Credits", "Créditos", "Crédits", "Credits"],
     "Allena": ["Train", "Entrenar", "Entraîner", "Trainieren"],
+    "PERSONAGGI": ["FIGHTERS", "PERSONAJES", "PERSONNAGES", "KÄMPFER"],
+    "Crediti insufficienti": ["Not enough credits", "Créditos insuficientes", "Crédits insuffisants", "Nicht genug Credits"],
     "Allenamento": ["Training", "Entrenamiento", "Entraînement", "Training"],
     "Per sempre, solo per questo personaggio": ["Forever, for this fighter only", "Para siempre, solo para este personaje", "Pour toujours, pour ce personnage seulement", "Für immer, nur für diese Figur"],
     "Spendi i crediti in «Allena» prima della prossima corsa: arriverai più lontano.": ["Spend your credits in “Train” before the next run: you will get further.", "Gasta los créditos en «Entrenar» antes de la próxima partida: llegarás más lejos.", "Dépense tes crédits dans « Entraîner » avant la prochaine partie : tu iras plus loin.", "Gib deine Credits vor dem nächsten Lauf unter „Trainieren“ aus: Du kommst weiter."],

@@ -56,7 +56,7 @@ from core.util import (alleggerisci_se_serve, fmt_date, fmt_relative, libera_mem
                        registra_da_svuotare, stato_alleggerimento)
 
 from . import account, auth_web, presenters as P
-from . import donazioni, imei_status, tac_admin
+from . import donazioni, giocatori, imei_status, tac_admin
 from .cache import CacheATempo
 from .contesto import (RADICE, contesto as _contesto, rendi as _rendi,
                        rendi_blocco as _rendi_blocco)
@@ -106,6 +106,7 @@ app.mount("/static", StaticFiles(directory=RADICE / "static"), name="static")
 app.include_router(account.router)
 app.include_router(tac_admin.router)
 app.include_router(donazioni.router)
+app.include_router(giocatori.router)   # account dei giocatori di Parry Brawl Survivor (web/giocatori.py)
 
 
 # La cache delle ricerche è la prima cosa che l'alleggerimento può
