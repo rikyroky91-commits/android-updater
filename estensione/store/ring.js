@@ -2591,12 +2591,21 @@
     const conAnello = imp.anello === "sempre" || (imp.anello === "corsa" && corsa && corsa.chi);
     const c = { x: (f.p.collo.x + f.p.bacino.x) / 2, y: (f.p.collo.y + f.p.bacino.y) / 2 }, R0 = 30 * S;
     ctx.save(); ctx.lineCap = "round";
-    // Lo scudo, in guardia.
-    if (f.azione === "para") {
-      const aperta = f.paraT0 !== undefined && tempo - f.paraT0 <= PARRY.finestra + larghezzaParry(f);
-      const a0 = f.dir > 0 ? 0 : Math.PI, k = aperta ? 0.75 + 0.25 * Math.sin(passi * 0.6) : 0.55;
-      ctx.globalAlpha = k; ctx.strokeStyle = aperta ? "#ffd84a" : "#8fd3ff"; ctx.lineWidth = (aperta ? 5 : 3.5) * S;
-      ctx.beginPath(); ctx.arc(c.x, c.y, R0 + 6 * S, a0 - 0.9, a0 + 0.9); ctx.stroke();
+    // Lo scudo, in guardia. È anche la stamina (18/10/2026, Riccardo: «non usare un'altra barra per la stamina, utilizza
+    // la stessa della difesa»): lo scudo è lungo quanto la guardia che resta, e si accorcia mentre la si tiene. Rotta,
+    // lampeggia rosso per un attimo. Prima c'era un secondo arco sotto i piedi (`disegnaGuardia`), ora tolto.
+    const kg = f.guardiaPt === undefined ? 1 : Math.max(0, Math.min(1, f.guardiaPt / GUARDIA.max));
+    const rotta = f.guardiaRotta !== undefined && tempo - f.guardiaRotta < 40;
+    if (f.azione === "para" || rotta) {
+      const aperta = f.azione === "para" && f.paraT0 !== undefined && tempo - f.paraT0 <= PARRY.finestra + larghezzaParry(f);
+      const a0 = f.dir > 0 ? 0 : Math.PI, k = rotta ? (passi % 6 < 3 ? 1 : 0.3) : aperta ? 0.75 + 0.25 * Math.sin(passi * 0.6) : 0.6;
+      const largo = 0.9, Rs = R0 + 6 * S;
+      // il posto dello scudo pieno, appena accennato
+      ctx.globalAlpha = 0.22; ctx.strokeStyle = "#0e0c18"; ctx.lineWidth = 5 * S;
+      ctx.beginPath(); ctx.arc(c.x, c.y, Rs, a0 - largo, a0 + largo); ctx.stroke();
+      const resto = rotta ? 1 : Math.max(0.06, kg), tinta = rotta ? "#ff3b30" : aperta ? "#ffd84a" : kg > 0.5 ? "#8fd3ff" : kg > 0.25 ? "#ffb62e" : "#ff4a3a";
+      ctx.globalAlpha = k; ctx.strokeStyle = tinta; ctx.lineWidth = (aperta ? 5 : 3.5) * S;
+      ctx.beginPath(); ctx.arc(c.x, c.y, Rs, a0 - largo * resto, a0 + largo * resto); ctx.stroke();
       ctx.globalAlpha = k * 0.35; ctx.lineWidth = 12 * S; ctx.stroke();
     }
     // L'anello del tempo.
@@ -2627,7 +2636,6 @@
       }
     }
     ctx.restore();
-    disegnaGuardia(f, c);
   }
   // L'equilibrio di uno zombie (`z`) o di un lottatore: sale; pieno, sbilanciato.
   function sbilancia(chi, quanto, x, y) {
@@ -2730,18 +2738,6 @@
       }
     }
     for (const f of lottatori) if (f.p && !f.esploso && !f.fuoriCampo) barra(f.p.testa.x, f.p.testa.y - 30 * S, f);
-  }
-  // La guardia di chi gioca: un arco sotto i piedi, quando non è piena (o in guardia).
-  function disegnaGuardia(f, c) {
-    if (f.guardiaPt === undefined || (f.guardiaPt >= GUARDIA.max && f.azione !== "para")) return;
-    const k = f.guardiaPt / GUARDIA.max, rotta = f.guardiaRotta !== undefined && tempo - f.guardiaRotta < 40;
-    const R = 34 * S, a0 = Math.PI * 0.2, a1 = Math.PI * 0.8;
-    ctx.save(); ctx.lineCap = "round";
-    ctx.globalAlpha = 0.5; ctx.strokeStyle = "rgba(0,0,0,.6)"; ctx.lineWidth = 5 * S;
-    ctx.beginPath(); ctx.arc(c.x, c.y, R, a0, a1); ctx.stroke();
-    ctx.globalAlpha = rotta ? (passi % 6 < 3 ? 1 : 0.3) : 0.9; ctx.strokeStyle = rotta ? "#ff3b30" : k > 0.5 ? "#8fd3ff" : k > 0.25 ? "#ffb62e" : "#ff4a3a"; ctx.lineWidth = 3.4 * S;
-    ctx.beginPath(); ctx.arc(c.x, c.y, R, a1 - (a1 - a0) * k, a1); ctx.stroke();
-    ctx.restore();
   }
   // Parata normale dopo una pressione di S: era troppo presto per il parry. Lo si dice, così si impara il tempo.
   function troppoPresto(f, x, y) {
@@ -3045,7 +3041,9 @@
     if (audio.acceso) preparaAudio();                            // i browser lasciano suonare solo dopo un gesto
     if (fermo || (evento.button !== undefined && evento.button > 0)) return;
     const bersaglio = evento.target;
-    if (bersaglio && bersaglio.closest && bersaglio.closest(".ring-pannello, .ultimora-barra, .corsa-nome")) return;   // (il campo del nome della corsa è un vero modulo)
+    // (il campo del nome della corsa è un vero modulo; `[data-ring-fuori]`: i pannelli dell'ospite, come il menu del sito
+    // del gioco, che nei menu del motore altrimenti non ricevevano il clic)
+    if (bersaglio && bersaglio.closest && bersaglio.closest(".ring-pannello, .ultimora-barra, .corsa-nome, [data-ring-fuori]")) return;
     // Nell'estensione i tasti stanno nello shadow DOM: un clic lì non prende lottatori.
     if (ospite && (bersaglio === ospite || (evento.composedPath && evento.composedPath().indexOf(ospite) >= 0))) return;
     // La mira sta sopra a tutto: il secondo tocco fa partire il colpo.
@@ -3278,6 +3276,7 @@
   window.addEventListener("touchstart", (e) => {
     const t = e.touches && e.touches[0];
     raggioPresa = 30;
+    if (e.target && e.target.closest && e.target.closest("[data-ring-fuori]")) return;
     if (t && !fermo && (mira || ((corsa || classifica.aperta || sceltaModo) && (corsaModale() || tastoCorsa(t.clientX, t.clientY))) || qualcosaSotto(t.clientX, t.clientY) || sottoRadiale(t.clientX, t.clientY) > -2 || sottoTastoSfida(t.clientX, t.clientY) >= 0)) e.preventDefault();
   }, { passive: false });
   // Finché si tiene qualcosa col dito la pagina non deve scorrere.
@@ -3411,6 +3410,51 @@
       particelle.push({ tipo: "polvere", x: x + caso(-5, 5) * S, y, vx: caso(-1.2, 1.2) * S,
                         vy: caso(-0.9, -0.2) * S, vita: Math.round(caso(16, 28)), max: 28, colore: "#b9b4ab" });
     }
+  }
+  // ·· IL TERRENO CHE SI APRE (18/10/2026, Riccardo: «utilizza il pavimento così in alto per far uscire gli zombie dal
+  // terreno creando un effetto dinamico e carino del terreno; utilizza il terreno anche per renderlo centro e protagonista
+  // degli effetti dinamici degli imprevisti») ··
+  // Una buca nel suolo: si spalanca con schegge di pietra e polvere, resta aperta un attimo e si richiude. Sopra ci
+  // passa chi esce dal terreno (zombie, forziere, gemme). L'arena dell'ospite la sente come botta «emerge» (crepe che
+  // restano sul pavimento: vedi `urtoArena`). Senza `window.__ringSuolo` (pagine vere, estensione) solo la buca e la polvere.
+  const buche = [];
+  const suoloVivo = () => !!window.__ringSuolo && inArenaApp();
+  function squarciaSuolo(x, y, forza) {
+    if (verso < 0 || fermo) return;
+    const k = Math.max(0.3, Math.min(2, forza || 1));
+    if (buche.length > 18) buche.shift();
+    buche.push({ x, y, r: (16 + 10 * k) * S, nato: passi });
+    polvere(x, y - 1, Math.round(3 + 3 * k));
+    if (suoloVivo()) {
+      for (let i = 0; i < 3 + 3 * k && particelle.length < 160; i++) {
+        const v = caso(2.5, 5.5) * S * Math.min(1.4, k);
+        particelle.push({ tipo: "scheggia", x: x + caso(-8, 8) * S, y: y - 2 * S, vx: caso(-1.6, 1.6) * S, vy: -v, vita: Math.round(caso(24, 40)), max: 40,
+                          colore: i % 3 ? "#8f8377" : "#b3a597", rot: caso(0, 6) });
+      }
+      urtoArena(x, y, (22 + 14 * k) * S, 0.4 * k, "emerge");
+      if (k >= 1.2) scossa = Math.max(scossa, 4 * k);
+    }
+  }
+  function disegnaBuche() {
+    for (let i = buche.length - 1; i >= 0; i--) if (passi - buche[i].nato > 150) buche.splice(i, 1);
+    if (!buche.length) return;
+    ctx.save();
+    for (const b of buche) {
+      const a = passi - b.nato, apre = Math.min(1, a / 10), chiude = a > 90 ? Math.max(0, 1 - (a - 90) / 60) : 1, w = b.r * apre * (0.55 + 0.45 * chiude);
+      if (w < 0.5) continue;
+      // il bordo smosso, poi il buio dentro
+      ctx.globalAlpha = 0.9 * chiude; ctx.fillStyle = "#5a5047";
+      ctx.beginPath(); ctx.ellipse(b.x, b.y + 1 * S, w + 4 * S, (4 + 3 * apre) * S, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#0d0a0f";
+      ctx.beginPath(); ctx.ellipse(b.x, b.y + 1.5 * S, w, (2.6 + 2.4 * apre) * S, 0, 0, Math.PI * 2); ctx.fill();
+      // zolle sul bordo
+      ctx.fillStyle = "#8f8377";
+      for (let j = 0; j < 4; j++) {
+        const u = (j - 1.5) / 1.5, zx = b.x + u * (w + 3 * S), zy = b.y - (1.5 + (j % 2) * 1.5) * S * apre;
+        ctx.beginPath(); ctx.ellipse(zx, zy, 3.4 * S, 2 * S, u * 0.4, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.restore();
   }
   function schegge(x, y, n, colore) {
     for (let i = 0; i < n && particelle.length < 160; i++) {
@@ -5872,7 +5916,7 @@
       z.stato = "cala"; z.alzo = Math.max(0, q.base - elicottero.y - 34 * S); z.vy = 0;
       return;
     }
-    polvere(x, q.base - 1, 4);
+    squarciaSuolo(x, q.base, z.tipo === "capo" ? 2 : pesante(z) ? 1.3 : 0.8);
     if (z.tipo === "capo") {
       z.x = Math.max(q.l + 60 * S, Math.min(q.r - 60 * S, z.x));             // è largo: dentro la finestra per intero
       z.hp = z.hpMax = corsa && corsa.chi ? Math.round((14 + 2.5 * corsa.round) * (1 + 0.5 * pressione())) : 18 + 3 * (corsa ? corsa.round : 1);
@@ -6637,7 +6681,13 @@
         continue;
       }
       if (z.alzo > 0 && z.stato !== "salto") z.alzo = Math.max(0, z.alzo - 4 * S);      // colpito a mezz'aria: giù
-      if (z.stato === "esce") { if (z.s % 6 === 0 && z.s < 40) polvere(z.x, q.base - 1, 1); if (z.s >= 46) { z.stato = "va"; z.s = 0; } continue; }
+      if (z.stato === "esce") {
+        if (z.s % 6 === 0 && z.s < 40) polvere(z.x, q.base - 1, 1);
+        // (si arrampica fuori: qualche zolla salta via a ogni spinta)
+        if (suoloVivo() && z.s % 9 === 4 && z.s < 36 && particelle.length < 150) particelle.push({ tipo: "scheggia", x: z.x + caso(-10, 10) * S, y: q.base - 2 * S, vx: caso(-1.4, 1.4) * S, vy: -caso(1.5, 3.5) * S, vita: 28, max: 28, colore: "#8f8377", rot: caso(0, 6) });
+        if (z.s >= 46) { z.stato = "va"; z.s = 0; }
+        continue;
+      }
       if (z.botta > 0) { z.botta--; continue; }
       // Va verso il lottatore sveglio più vicino che sta su questo piano.
       let f = null, d0 = 1e9;
@@ -7593,7 +7643,9 @@
   const RAD = { centro: 64, dentro: 124, fuori: 188 };
   function geometriaRadiale() {
     const U = Math.max(S, 1), n = vociRadiale().length, sx = radiale.lato === "sx" ? 1 : -1;
-    const x = sx < 0 ? W : 0, y = pavimento;
+    // (`__ringRadialeInBasso`: nell'angolo dello schermo e non sul pavimento, che nelle arene sta più in alto; sito del
+    // gioco, 18/10/2026, Riccardo: «i comandi radiali mettili in basso a destra e non sopra il terreno»)
+    const x = sx < 0 ? W : 0, y = window.__ringRadialeInBasso ? H : pavimento;
     const nFuori = n > 5 ? Math.ceil(n * 0.58) : n, spicchi = [];
     for (let i = 0; i < n; i++) {
       const giro = i < nFuori ? 1 : 0, quanti = giro ? nFuori : n - nFuori, k = giro ? i : i - nFuori;
@@ -13439,6 +13491,7 @@
     for (const pz of pezzi) disegnaPezzo(pz);
     for (const f of lottatori) disegnaCratere(f.cratere);
     disegnaScie();
+    disegnaBuche();
     disegnaOrda();
     disegnaAggancio();
     disegnaEquilibri();
@@ -15231,13 +15284,22 @@
       suona("moneta", z.x, 0.8);
     } else if (nome === "gemme") {
       const valore = Math.max(2, Math.round(xpPerLivello(c.liv) / 14));
-      for (let i = 0; i < 16; i++) {
+      if (suoloVivo()) {
+        // Dal terreno: tre crepe si aprono e ne zampillano le gemme.
+        for (let j = 0; j < 3; j++) {
+          const gx = Math.max(40 * S, Math.min(W - 40 * S, hx + (j - 1) * caso(110, 190) * S));
+          squarciaSuolo(gx, base, 1);
+          for (let i = 0; i < 6; i++) c.gemme.push({ x: gx, y: base - 6 * S, vx: caso(-2.2, 2.2) * S, vy: -caso(5, 9) * S, base, valore, tipo: "gemma", t: 60, tirata: false });
+        }
+      } else for (let i = 0; i < 16; i++) {
         c.gemme.push({ x: caso(30 * S, W - 30 * S), y: testataBasso + caso(0, 90) * S, vx: 0, vy: caso(0.5, 2) * S, base, valore, tipo: "gemma", t: 60, tirata: false });
       }
       suona("preso", hx, 0.7);
     } else if (nome === "forziere") {
       const x = Math.max(40 * S, Math.min(W - 40 * S, hx + (c.rng() < 0.5 ? -1 : 1) * caso(90, 200) * S));
-      c.forzieri.push({ x, y: testataBasso + 30 * S, base, vy: 0, paracadute: true });
+      // (col terreno vivo il forziere salta fuori dal suolo invece di scendere col paracadute)
+      if (suoloVivo()) { squarciaSuolo(x, base, 1.4); c.forzieri.push({ x, y: base - 13 * S, base, vy: -8 * S }); }
+      else c.forzieri.push({ x, y: testataBasso + 30 * S, base, vy: 0, paracadute: true });
       suona("pop", x, 0.7);
     } else {
       c.frenesia = 480;
@@ -16055,6 +16117,7 @@
     return w;
   }
   function suggerimenti(lista) {
+    if (window.__ringSuggerimenti === false) return;              // l'ospite non li vuole (sito del gioco, 18/10/2026)
     let x = 16 * S;
     const y = Math.min(H, pavimento) - 16 * S;                       // (sopra la barra in fondo alla pagina)
     ctx.save(); ctx.globalAlpha = 0.9;
@@ -16243,11 +16306,21 @@
     if (!f || !f.p || f.fuoriCampo) return;
     const b = f.p.bacino;
     if (c.frenesia > 0 && c.fase === "lotta") {
-      // La frenesia: un anello d'oro che pulsa, e scintille che girano.
-      const k = c.frenesia < 90 && passi % 8 < 4 ? 0.3 : 1, R = (40 + 4 * Math.sin(passi * 0.3)) * S;
-      ctx.save(); ctx.globalAlpha = 0.75 * k; ctx.strokeStyle = ORO; ctx.lineWidth = 3 * S;
-      ctx.beginPath(); ctx.ellipse(b.x, b.y - 8 * S, R, R * 0.8, 0, 0, Math.PI * 2); ctx.stroke();
-      for (let i = 0; i < 4; i++) { const a = passi * 0.12 + i * Math.PI / 2; tondo(b.x + Math.cos(a) * R, b.y - 8 * S + Math.sin(a) * R * 0.8, 3 * S, "#fff3b0"); }
+      // La frenesia: una pozza di luce d'oro sul terreno sotto i piedi, e scintille che salgono da lì (18/10/2026, Riccardo:
+      // «il senso di questo cerchio giallo bruttissimo intorno al personaggio»: prima era un anello coi pallini addosso
+      // al corpo). Sul finire lampeggia. Il «×2» del cruscotto dice che cos'è.
+      const k = c.frenesia < 90 && passi % 8 < 4 ? 0.35 : 1, y0 = f.base !== undefined ? f.base : b.y + 30 * S;
+      const R = (34 + 3 * Math.sin(passi * 0.25)) * S;
+      ctx.save();
+      const g = ctx.createRadialGradient(b.x, y0, 0, b.x, y0, R);
+      g.addColorStop(0, "rgba(255,216,74,.55)"); g.addColorStop(0.6, "rgba(255,170,40,.22)"); g.addColorStop(1, "rgba(255,170,40,0)");
+      ctx.globalAlpha = k; ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(b.x, y0, R, R * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+      for (let i = 0; i < 5; i++) {
+        const u = ((passi * 0.9 + i * 23) % 60) / 60, dx = Math.sin(i * 2.4 + passi * 0.05) * R * 0.7;
+        ctx.globalAlpha = k * (1 - u) * 0.9;
+        tondo(b.x + dx, y0 - u * 46 * S, (1.2 + (1 - u) * 1.4) * S, i % 2 ? "#fff3b0" : ORO);
+      }
       ctx.restore();
     }
     if (c.gelato > 0) {

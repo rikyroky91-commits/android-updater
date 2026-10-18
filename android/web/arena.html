@@ -118,7 +118,27 @@
     @keyframes polvere { from { transform: scale(.4); opacity: .9; } to { transform: scale(1.6, 1.2) translateY(-14px); opacity: 0; } }
     .pietra.risorge { animation: risorge .6s cubic-bezier(.2, .9, .3, 1.2); }
     @keyframes risorge { from { transform: translateY(30px) scaleY(.2); opacity: 0; } to { transform: none; opacity: 1; } }
-    @media (prefers-reduced-motion: reduce) { .pezzo, .polverone { display: none; } .pietra.colpita, .pietra.risorge { animation: none; } }
+    /* ---------------- IL SUOLO CHE RISPONDE (18/10/2026: zombie che escono, imprevisti) ---------------- */
+    .segno { position: absolute; pointer-events: none; animation: svanisce var(--dura, 9s) ease-in forwards; }
+    .segno.crepa { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='%23110b08' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M50 0 L46 8 L38 12 L30 22 L22 26 L10 38'/%3E%3Cpath d='M50 0 L55 9 L63 13 L70 24 L82 29 L92 38'/%3E%3Cpath d='M46 8 L48 20 L44 30 L47 40'/%3E%3Cpath d='M63 13 L60 24'/%3E%3Cpath d='M30 22 L33 31'/%3E%3C/g%3E%3Cg fill='none' stroke='%23d8c9b6' stroke-opacity='.35' stroke-width='.8'%3E%3Cpath d='M51 1 L47 9 L39 13'/%3E%3Cpath d='M51 1 L56 10 L64 14'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat; }
+    .segno.bruciato { border-radius: 50%; background: radial-gradient(closest-side, rgba(20, 10, 6, .75), rgba(20, 10, 6, .35) 55%, transparent); }
+    .segno.brace { border-radius: 50%; mix-blend-mode: screen; --dura: 4.5s;
+                   background: radial-gradient(closest-side, rgba(255, 210, 120, .95), rgba(255, 110, 30, .7) 40%, rgba(180, 40, 10, .25) 70%, transparent); }
+    .segno.buca { border-radius: 50% 50% 46% 46%; --dura: 3.2s;
+                  background: radial-gradient(closest-side, #07050a 0, #1c1612 60%, rgba(60, 50, 44, .6) 85%, transparent); }
+    @keyframes svanisce { 0% { opacity: 0; transform: scale(.6); } 6% { opacity: 1; transform: none; } 70% { opacity: 1; } 100% { opacity: 0; } }
+    .zolla { position: absolute; pointer-events: none; border-radius: 3px; background: linear-gradient(#b3a597, #6d635a);
+             animation: zolla .8s cubic-bezier(.3, .6, .6, 1) forwards; }
+    @keyframes zolla { 0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+                       45% { transform: translate(calc(var(--dx) * .6), var(--su)) rotate(calc(var(--giro) * .6)); }
+                       100% { transform: translate(var(--dx), 6px) rotate(var(--giro)); opacity: 0; } }
+    .pietra.suolo.trema { animation: trema .5s linear; }
+    @keyframes trema { 10% { transform: translate(-3px, 2px); } 25% { transform: translate(3px, -2px); } 40% { transform: translate(-2px, 1px); }
+                       60% { transform: translate(2px, -1px); } 80% { transform: translate(-1px, 1px); } }
+    .onda-suolo { position: absolute; pointer-events: none; height: 14px; border-radius: 50%;
+                  background: radial-gradient(closest-side, rgba(230, 210, 180, .6), transparent); animation: onda-suolo .9s ease-out forwards; }
+    @keyframes onda-suolo { from { transform: scaleX(.1); opacity: 1; } to { transform: scaleX(1); opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .pezzo, .polverone, .zolla, .onda-suolo { display: none; } .pietra.colpita, .pietra.risorge, .pietra.suolo.trema { animation: none; } }
   </style>
 </head>
 <body>
@@ -147,10 +167,11 @@
       return v;
     }
     var fisso = [];   // gli addobbi che non dipendono dalle misure (si creano una volta)
+    var suolo = null;  // il pavimento di pietra del cortile, che risponde alle botte (vedi «Il suolo»)
 
     function costruisci() {
       var W = window.innerWidth, H = window.innerHeight, largo = W > H;
-      scena.textContent = ""; pedane = [];
+      scena.textContent = ""; pedane = []; suolo = null; segni = [];
       if (tipo === "lava") {
         el("div", "monti dietro"); el("div", "monti");
         var lava = Math.round(H * (largo ? 0.16 : 0.13));
@@ -191,7 +212,8 @@
         el("div", "citta vicina", "bottom:" + (H - ft) + "px;height:" + Math.round(H * 0.22) + "px");
         el("div", "torcia", "left:" + Math.round(W * 0.06) + "px;top:" + (ft - 46) + "px");
         el("div", "torcia", "left:" + Math.round(W * 0.94 - 10) + "px;top:" + (ft - 46) + "px");
-        el("div", "pietra suolo", "left:0;top:" + ft + "px;width:" + W + "px;height:" + (H - ft) + "px");
+        suolo = el("div", "pietra suolo", "left:0;top:" + ft + "px;width:" + W + "px;height:" + (H - ft) + "px");
+        suolo.dataset.cima = String(ft);
         var aw = Math.min(largo ? W * 0.26 : W * 0.36, 300), primo = ft - Math.max(120, H * (largo ? 0.22 : 0.16));
         pedana("grigia", W * (largo ? 0.12 : 0.04), primo, aw, 38, true);
         pedana("grigia", W * (largo ? 0.88 : 0.96) - aw, primo, aw, 38, true);
@@ -228,6 +250,7 @@
     }
     window.__ringUrto = function (u) {
       if (!u) return;
+      segnaSuolo(u);
       for (var i = 0; i < pedane.length; i++) {
         var p = pedane[i];
         if (p.giu) continue;
@@ -254,6 +277,66 @@
       p.v.classList.add("crollata"); p.s.remove();
       rileggi();
       setTimeout(function () { torna(p); }, 15000);
+    }
+    // ·· Il suolo (18/10/2026, Riccardo: «utilizza il pavimento per far uscire gli zombie dal terreno… e il terreno
+    // centro e protagonista degli effetti degli imprevisti») ··
+    // Il pavimento del cortile non si rompe (non c'è da dove cadere) ma tiene il segno: dove esce uno zombie restano una
+    // buca e le crepe; meteoriti e scoppi lasciano brace e bruciature; il terremoto lo fa tremare con un'onda di polvere;
+    // chi ci si schianta lo crepa. I segni svaniscono da soli (al massimo `MAX_SEGNI` insieme).
+    var segni = [], MAX_SEGNI = 22, ultimaTrema = 0;
+    function segno(cls, x, y, w, h, dura) {
+      var e = el("div", "segno " + cls, "left:" + Math.round(x - w / 2) + "px;top:" + Math.round(y) + "px;width:" + Math.round(w) + "px;height:" + Math.round(h) + "px" +
+                 (dura ? ";--dura:" + dura + "s" : ""));
+      segni.push(e);
+      while (segni.length > MAX_SEGNI) segni.shift().remove();
+      setTimeout(function () { e.remove(); var i = segni.indexOf(e); if (i >= 0) segni.splice(i, 1); }, ((dura || 9) + 0.2) * 1000);
+      return e;
+    }
+    function zolle(x, y, n, alto) {
+      for (var i = 0; i < n; i++) {
+        var z = el("div", "zolla", "left:" + Math.round(x + (Math.random() - 0.5) * 24) + "px;top:" + Math.round(y - 4) + "px;width:" + Math.round(4 + Math.random() * 7) + "px;height:" + Math.round(3 + Math.random() * 5) + "px");
+        z.style.setProperty("--dx", Math.round((Math.random() - 0.5) * 70) + "px");
+        z.style.setProperty("--su", -Math.round(alto * (0.5 + Math.random() * 0.6)) + "px");
+        z.style.setProperty("--giro", Math.round((Math.random() - 0.5) * 300) + "deg");
+        setTimeout(function (e) { return function () { e.remove(); }; }(z), 900);
+      }
+    }
+    function segnaSuolo(u) {
+      if (!suolo) return;
+      var cima = +suolo.dataset.cima, alto = window.innerHeight - cima, f = Math.max(0.2, Math.min(2, u.forza || 0.5));
+      if (u.tipo === "sisma") {
+        var ora = Date.now();
+        if (ora - ultimaTrema < 450) return;
+        ultimaTrema = ora;
+        suolo.classList.remove("trema"); void suolo.offsetWidth; suolo.classList.add("trema");
+        var o = el("div", "onda-suolo", "left:0;top:" + (cima - 7) + "px;width:" + window.innerWidth + "px");
+        setTimeout(function () { o.remove(); }, 950);
+        if (Math.random() < 0.6) segno("crepa", Math.random() * window.innerWidth, cima, 60 + Math.random() * 80, alto * 0.55, 12);
+        return;
+      }
+      if (u.tipo === "urto") return;
+      // (solo le botte che arrivano al suolo)
+      var r = u.r || 0;
+      if (u.y < cima - Math.max(24, r)) return;
+      var x = u.x;
+      if (u.tipo === "emerge") {
+        var w = Math.max(30, r * 1.6);
+        segno("buca", x, cima - 3, w * 0.8, 9, 3.2);
+        segno("crepa", x, cima, w * 1.6, Math.min(alto * 0.75, 30 + 26 * f), 7);
+        zolle(x, cima, 3 + Math.round(4 * f), 30 + 30 * f);
+      } else if (u.tipo === "meteora") {
+        segno("bruciato", x, cima - 10, Math.max(70, r * 1.2), 26, 11);
+        segno("brace", x, cima - 8, Math.max(46, r * 0.8), 18, 4.5);
+        segno("crepa", x, cima, Math.max(90, r * 1.6), alto * 0.8, 11);
+        zolle(x, cima, 8, 70);
+      } else if (u.tipo === "esplosione") {
+        segno("bruciato", x, cima - 9, Math.max(60, r), 22, 9);
+        segno("crepa", x, cima, Math.max(70, r * 1.2), alto * 0.6, 9);
+        zolle(x, cima, 6, 55);
+      } else if (u.tipo === "pavimento") {
+        segno("crepa", x, cima, 50 + 40 * f, Math.min(alto * 0.6, 24 + 30 * f), 7);
+        zolle(x, cima, 2 + Math.round(3 * f), 24);
+      }
     }
     // Torna quando nessun lottatore occupa il suo spazio (sennò ci riprova fra un secondo).
     function torna(p) {
