@@ -5050,6 +5050,82 @@ test("la prima corsa è giocata con la guida: il tempo si ferma sul colpo e aspe
   dentro(amb);
 });
 
+test("guida sul sito: dopo il parry da soli, la lezione delle speciali (parata tenuta e dito in su); fermo finché non ne parte una", () => {
+  // (Riccardo, 19/10/2026: «se si lascia premuto parata e si fa slide verso l'alto si ha accesso a tutte le mosse
+  // speciali… inseriscilo nel tutorial». Il gesto lo fa il sito, `__ringHudEsterno`: il motore aspetta il comando.)
+  const { amb, r } = corsaAvviata({ nuovo: true, globali: { __ringHudEsterno: true } }, "robot", 4242);
+  const premiQuandoFermo = (st) => { if (st.corsa.fermo && st.corsa.aiuto !== "speciali") { r.premi("para"); r.lascia("para"); } };
+  let premuto = false;
+  amb.avanza(60 * 120, (st) => {
+    premiQuandoFermo(st);
+    if (st.corsa.guida === "da-solo") {
+      const m = r.minacciaParry();
+      if (m !== null && m <= 8 && !premuto) { r.premi("para"); r.lascia("para"); premuto = true; }
+      if (m === null) premuto = false;
+    }
+    return !(st.corsa.guida === "speciali" && st.corsa.fermo);
+  });
+  let s = amb.stato();
+  assert.strictEqual(s.corsa.guida, "speciali", "dopo il parry da soli viene la lezione delle speciali");
+  assert.strictEqual(s.corsa.aiuto, "speciali");
+  assert.ok(r.tempoParry().fermo && r.tempoParry().aiuto === "speciali", "il sito lo sa: la parata dice «TIENI E SU»");
+  // la parata tenuta da sola non fa ripartire il tempo: si aspetta la mossa
+  r.premi("para");
+  const t0 = s.tempo; amb.avanza(90);
+  assert.strictEqual(amb.stato().tempo, t0, "fermo finché non parte una speciale");
+  const voce = r.mosse().voci.find((v) => v.pronta && v.id !== "para" && v.id !== "carica");
+  assert.ok(voce, "con l'energia piena, nella fila c'è qualcosa da lanciare");
+  r.lascia("para");
+  assert.ok(r.ordina(r.mosse().chi, voce.id), "la mossa scelta dalla fila parte");
+  amb.avanza(60 * 8, (st) => st.corsa.guida === "speciali");
+  assert.strictEqual(amb.stato().corsa.guida, "fine", "partita la speciale, la guida va avanti");
+  amb.avanza(60 * 4);
+  assert.strictEqual(amb.stato().corsa.guida, null);
+  dentro(amb);
+  // senza i tasti del sito (tracker, estensione: c'è il controller radiale) la lezione non c'è
+  const altro = corsaAvviata({ nuovo: true }, "robot", 4242);
+  let vista = false;
+  altro.amb.avanza(60 * 120, (st) => {
+    premiQuandoFermo(st);
+    if (st.corsa.guida === "speciali") vista = true;
+    if (st.corsa.guida === "da-solo") { const m = altro.r.minacciaParry(); if (m !== null && m <= 8) { altro.r.premi("para"); altro.r.lascia("para"); } }
+    return st.corsa.guida !== null;
+  });
+  assert.ok(!vista, "senza il gesto del sito la lezione delle speciali si salta");
+});
+
+test("corsa, in automatico: i super guerrieri e gli spadaccini usano da soli le loro speciali", () => {
+  // (Riccardo, 19/10/2026: «le varie mosse speciali che abbiamo creato nel tempo falle anche usare da solo in modalità
+  // automatica»). Prima l'eroe della corsa faceva solo pugni, calci, onda e raffica.
+  const prova = (stile, attese, minimo) => {
+    const viste = new Set();
+    for (let k = 0; k < 3 && viste.size < minimo; k++) {
+      const { amb, r } = corsaAvviata({ memoria: { "mut-ring-stile": stile, "mut-ring-sblocchi": JSON.stringify({ lame: 1, maghi: 1, classici: 1 }) } }, "robot", 300 + k);
+      avanzaCorsa(amb, r, 60 * 70, (st) => {
+        if (st.tempo % 240 === 0) r.energia("robot", 100);
+        const e = st.lottatori.find((l) => l.tipo === "robot");
+        if (e && attese.indexOf(e.azione) >= 0) viste.add(e.azione);
+      });
+      dentro(amb);
+    }
+    assert.ok(viste.size >= minimo, stile + ": da soli usano troppo poche speciali: " + [...viste]);
+  };
+  prova("guerrieri", ["sfera", "disco", "rush", "lampo", "barriera", "trasforma"], 3);
+  prova("lame", ["scattoLama", "lancioLama"], 1);
+});
+
+test("i fulmini in fila del mago nella corsa non disegnano niente prima del loro turno (prima: ellisse col raggio negativo)", () => {
+  const { amb, r } = corsaAvviata({ memoria: { "mut-ring-stile": "maghi", "mut-ring-sblocchi": JSON.stringify({ maghi: 1 }) } }, "robot", 51);
+  avanzaCorsa(amb, r, 60 * 6);
+  // (tre zombie a tiro: il terzo fulmine parte 10 fotogrammi dopo, ed è quello che disegnava il cerchio al rovescio)
+  for (let n = 0; n < 6; n++) {
+    const x = amb.lottatore("robot").bacino.x;
+    for (const dx of [-120, 90, 160]) r.zombie("lento", x + dx);
+    r.energia("robot", 100); r.ordina("robot", "fulmine"); avanzaCorsa(amb, r, 60);
+  }
+  dentro(amb);                                              // (il canvas finto si ferma su un raggio negativo)
+});
+
 test("nemici nuovi e fucile-sega: la prima volta una scheda dice cosa fanno e come fermarli, poi mai più", () => {
   const { amb, r } = corsaAvviata({ nuovo: true, memoria: { "mut-ring-guida": "fatta" } }, "robot", 960);
   const chiudiTutte = (st) => { if (st.corsa && st.corsa.scheda && st.corsa.scheda.chiave !== "bruto" && st.corsa.scheda.chiave !== "motosega") r.premi("para"); };
