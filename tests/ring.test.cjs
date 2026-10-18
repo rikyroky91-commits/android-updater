@@ -3626,8 +3626,8 @@ test("la corsa: a ogni round con l'orda un nemico nuovo, e i protagonisti cambia
     if (c.tipo === "duello") { assert.strictEqual(c.nuovo, null, "nel duello niente novità"); continue; }
     nuovi.push(c.nuovo); protagonisti.push(c.protagonisti);
   }
-  // (dal 16/10/2026 il bruto armato è il quarto)
-  assert.deepStrictEqual(nuovi.slice(0, 13), ["striscia", "botto", "dragoFuoco", "bruto", "gonfio", "saltatore", "dragoFulmine", "corazzato", "gelido", "grosso", "dragoVeleno", "sputatore", "rabbioso"]);
+  // (dal 18/10/2026 il bruto armato è il primo)
+  assert.deepStrictEqual(nuovi.slice(0, 13), ["bruto", "striscia", "botto", "dragoFuoco", "gonfio", "saltatore", "dragoFulmine", "corazzato", "gelido", "grosso", "dragoVeleno", "sputatore", "rabbioso"]);
   assert.strictEqual(nuovi[13], null, "finiti i nuovi, i round mescolano quelli già visti");
   for (let i = 1; i < protagonisti.length; i++) {
     assert.ok(protagonisti[i].length >= 2, "due o tre protagonisti a round");
@@ -3644,10 +3644,10 @@ test("la corsa: il nemico nuovo si vede subito, fra i primi ad arrivare", () => 
   const arrivati = [];
   avanzaCorsa(amb, r, 60 * 12, (s) => {
     if (s.orda && s.corsa.round === 2) for (const z of s.orda.zombie) if (!arrivati.includes(z)) arrivati.push(z.tipo);
-    return !arrivati.includes("striscia");
+    return !arrivati.includes("bruto");
   });
-  assert.strictEqual(amb.stato().corsa.nuovo, "striscia");
-  assert.ok(arrivati.includes("striscia"), "lo strisciante arriva nei primi secondi del suo round");
+  assert.strictEqual(amb.stato().corsa.nuovo, "bruto");
+  assert.ok(arrivati.includes("bruto"), "il bruto armato arriva nei primi secondi del suo round");
 });
 
 test("la corsa: i draghetti volano, tirano fuoco, e le armi li abbattono", () => {

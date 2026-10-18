@@ -2717,6 +2717,17 @@
       if (!vivoZ(z) || z.volo) continue;
       const c = corpoZ(z);
       barra(c[3], c[4] - c[5] - 16 * S, z);
+      // LA VITA DEL CAPO (18/10/2026, Riccardo: «la vita dei boss mettila piccola sopra la testa del boss stesso»): una
+      // barretta sopra l'equilibrio, al posto del pannello grande in cima allo schermo.
+      if (z.tipo === "capo" && z.hpMax > 0) {
+        const w = 48 * S, h = 5 * S, x = c[3] - w / 2, y = c[4] - c[5] - 26 * S, k = Math.max(0, Math.min(1, z.hp / z.hpMax));
+        ctx.save();
+        ctx.fillStyle = "rgba(12,10,20,.75)"; rettangoloTondo(x - 1.5 * S, y - 1.5 * S, w + 3 * S, h + 3 * S, 3 * S); ctx.fill();
+        ctx.fillStyle = k > 0.5 ? "#b48cff" : k > 0.25 ? "#ff8a3a" : "#ff3b30";
+        if (k > 0) { rettangoloTondo(x, y, w * k, h, 2 * S); ctx.fill(); }
+        ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.fillRect(x, y, w * k, 1.4 * S);
+        ctx.restore();
+      }
     }
     for (const f of lottatori) if (f.p && !f.esploso && !f.fuoriCampo) barra(f.p.testa.x, f.p.testa.y - 30 * S, f);
   }
@@ -6978,6 +6989,48 @@
     ctx.fillStyle = "#3a1f24"; ctx.beginPath(); ctx.ellipse(d * 2.6 * S, 3.4 * S, (2 + 1.2 * colpo) * S, (1.4 + 1.4 * colpo) * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.restore();
   }
+  // ·· GLI ATTACCHI CHE SI LEGGONO (18/10/2026, Riccardo: «animazioni d'attacco migliori dei nemici, non si capisce
+  // quando attaccano») ·· Tre segnali, dal più lontano al più vicino al colpo:
+  //  - la CARICA: chi sta per mordere si tira indietro e si accuccia, le braccia salgono sopra la testa (anticipazione);
+  //  - per terra, davanti a lui, la ZONA del colpo che si riempie dal suo corpo verso la punta: rossa, d'oro quando
+  //    manca quanto la finestra del parry (lo stesso oro dell'anello e del tasto);
+  //  - il COLPO: scatto in avanti, braccia giù, una scia bianca ad arco davanti per qualche fotogramma.
+  function tempoColpoZ(z) {
+    if (z.stato !== "colpo" || z.volo) return null;
+    const cs = colpiZ(z), pc = prossimoColpoZ(z);
+    let prima = 0, dopo = 1e9;
+    for (const c of cs) if (c <= z.s) { prima = c; dopo = z.s - c; }
+    if (pc === null) return { u: 0, dopo, manca: null };
+    const da = cs.indexOf(pc) > 0 ? cs[cs.indexOf(pc) - 1] : 0, u = Math.max(0, Math.min(1, (z.s - da) / Math.max(1, pc - da)));
+    return { u: u * u * (3 - 2 * u), dopo: pc === cs[0] ? 1e9 : dopo, manca: pc - z.s, primo: pc === cs[0] };
+  }
+  function disegnaAvvisoColpo(z) {
+    const tc = tempoColpoZ(z);
+    if (!tc) return;
+    const q = orda, Z = ZOMBI[z.tipo], d = z.dir, sc = Z.scala, base = q.base - (z.alzo || 0);
+    ctx.save();
+    if (tc.manca !== null && tc.manca >= 0) {
+      const dentro = tc.manca <= PARRY.finestra, col = dentro ? "#ffd84a" : "#ff3b30";
+      const x0 = z.x + d * 4 * S * sc, lung = ((Z.portata || 27) + 10) * S, x1 = x0 + d * lung, ry = 6 * S * Math.max(1, sc * 0.8);
+      ctx.globalAlpha = 0.22; ctx.fillStyle = col;
+      ctx.beginPath(); ctx.ellipse((x0 + x1) / 2, base, lung / 2, ry, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = dentro ? 0.75 : 0.5;
+      const xu = x0 + d * lung * tc.u;
+      ctx.beginPath(); ctx.ellipse((x0 + xu) / 2, base, Math.max(1, lung * tc.u / 2), ry * (0.6 + 0.4 * tc.u), 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 0.9; ctx.strokeStyle = col; ctx.lineWidth = (dentro ? 2.4 : 1.4) * S; ctx.setLineDash([5 * S, 4 * S]);
+      ctx.beginPath(); ctx.ellipse((x0 + x1) / 2, base, lung / 2, ry, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    }
+    if (tc.dopo < 8) {
+      // La scia del colpo: un arco bianco davanti, dall'alto in giù.
+      const k = 1 - tc.dopo / 8, cx = z.x + d * 8 * S * sc, cy = base - 40 * S * sc, R = 26 * S * sc;
+      const a0 = d > 0 ? -1.3 : Math.PI + 1.3, a1 = d > 0 ? 0.7 : Math.PI - 0.7;
+      ctx.globalAlpha = k; ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(23,23,28,.55)"; ctx.lineWidth = (7 * k + 2) * S;
+      ctx.beginPath(); ctx.arc(cx, cy, R, a0, a1, d < 0); ctx.stroke();
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = (5 * k + 1) * S; ctx.stroke();
+    }
+    ctx.restore();
+  }
   function disegnaZombie(z) {
     if (z.volo) { if (z.volo === "becco") disegnaCorvo(z); else disegnaDrago(z); segnoNuovo(z); return; }
     const q = orda, T = TONI_ZOMBIE[z.tono], d = z.dir, nero = "#17171c", Z = ZOMBI[z.tipo], sc = Z.scala;
@@ -7015,6 +7068,12 @@
     if (z.stato === "mira") { const k = Math.min(1, z.s / 14); ctx.rotate(-z.dir * 0.16 * k + Math.sin(z.s * 1.4) * 0.03 * k); ctx.scale(1 + 0.05 * k, 1 - 0.06 * k); }
     else if (z.stato === "letale") ctx.rotate(z.dir * 0.42);
     else if (z.stato === "barcolla") ctx.rotate(Math.sin(z.s * 0.22) * 0.2);
+    // La carica e il colpo (vedi «GLI ATTACCHI CHE SI LEGGONO»): indietro e giù, poi tutto in avanti.
+    const tc = tempoColpoZ(z);
+    if (tc) {
+      if (tc.dopo < 8) { const k = 1 - tc.dopo / 8; ctx.translate(d * 5 * S * k, 0); ctx.rotate(d * 0.3 * k); ctx.scale(1 + 0.06 * k, 1 - 0.05 * k); }
+      else { ctx.rotate(-d * 0.22 * tc.u + (tc.manca !== null && tc.manca <= 6 ? Math.sin(z.s * 2.3) * 0.02 : 0)); ctx.scale(1 + 0.05 * tc.u, 1 - 0.08 * tc.u); }
+    }
     if (z.tipo === "striscia") {
       if (k > 0) { ctx.translate(0, 3 * S * k); ctx.scale(1, 1 - 0.5 * k); }
       disegnaStrisciante(z, T, pelle, scura, nero);
@@ -7181,8 +7240,12 @@
     // Le braccia tese in avanti; quando morde si alzano e calano (il grosso le cala dall'alto).
     else for (const [su, tono] of [[2.5, scura], [-2.5, pelle]]) {
       if (su < 0 && z.senzaBraccio) continue;
-      const alza = (grosso ? 22 : 9) * colpo * (1 - colpo) * 4;
-      const mano = { x: spalla.x + d * (19 + 6 * colpo) * S, y: spalla.y + (su - alza + Math.sin(z.t * 0.09 + su) * 1.2 + (svelto ? 5 : 0)) * S };
+      // (carica: le braccia salgono sopra la testa e tornano indietro; colpo: giù e avanti)
+      const g = grosso ? 1.25 : 1;
+      let mano;
+      if (tc && tc.dopo < 8) { const k = 1 - tc.dopo / 8; mano = { x: spalla.x + d * (22 + 6 * k) * g * S, y: spalla.y + (su + 7 * k) * S }; }
+      else if (tc) mano = { x: spalla.x + d * (19 - 21 * tc.u) * g * S, y: spalla.y + (su - 27 * tc.u * g + Math.sin(z.t * 0.09 + su) * 1.2 * (1 - tc.u)) * S };
+      else { const alza = (grosso ? 22 : 9) * colpo * (1 - colpo) * 4; mano = { x: spalla.x + d * (19 + 6 * colpo) * S, y: spalla.y + (su - alza + Math.sin(z.t * 0.09 + su) * 1.2 + (svelto ? 5 : 0)) * S }; }
       const gomito = { x: (spalla.x + mano.x) / 2, y: (spalla.y + mano.y) / 2 + 2.2 * S };
       ctx.strokeStyle = nero; ctx.lineWidth = (grosso ? 7.4 : 5.4) * S; ctx.beginPath(); ctx.moveTo(spalla.x, spalla.y + su * S); ctx.lineTo(gomito.x, gomito.y); ctx.lineTo(mano.x, mano.y); ctx.stroke();
       ctx.strokeStyle = T[0]; ctx.lineWidth = (grosso ? 5.4 : 3.4) * S; ctx.beginPath(); ctx.moveTo(spalla.x, spalla.y + su * S); ctx.lineTo(gomito.x, gomito.y); ctx.stroke();
@@ -7372,6 +7435,7 @@
   function disegnaOrda() {
     const q = orda;
     if (!q) return;
+    for (const z of q.zombie) if (!z.inBuco && z.stato === "colpo") disegnaAvvisoColpo(z);     // (per terra, sotto i corpi)
     for (const z of q.zombie) if (!z.inBuco) { disegnaZombie(z); if (z.stato === "mira" || z.stato === "barcolla") disegnaSegnoZombie(z); }
     if (lava && elicottero) disegnaElicottero();
     if (q.fase === "festa" || !q.ricetta || corsa) return;      // nella corsa il conto lo tiene il suo cruscotto
@@ -14329,8 +14393,10 @@
                          botto: 2, gelido: 2, saltatore: 2, sputatore: 2, doro: 6, dragoFuoco: 3, dragoFulmine: 3, dragoVeleno: 3, corvo: 1, bruto: 4 };
   // Chi entra nella corsa, nell'ordine: uno nuovo a ogni round con l'orda (all'inizio ci sono solo il
   // lento e lo svelto). Finiti i nuovi, ogni round ha due o tre protagonisti a sorte, mai quelli di prima.
-  // (il bruto armato è il quarto: arriva presto, perché il fucile-sega che lascia cambia la corsa)
-  const NOVITA_CORSA = ["striscia", "botto", "dragoFuoco", "bruto", "gonfio", "saltatore", "dragoFulmine", "corazzato", "gelido", "grosso", "dragoVeleno", "sputatore", "rabbioso"];
+  // (il bruto armato è il primo dal 18/10/2026: da quarto arrivava alla minaccia 5, oltre i due minuti, insieme al
+  // capo, e molti non l'avevano mai visto; Riccardo: «mancano i nemici aggiunti di recente». Il fucile-sega che lascia
+  // cambia la corsa, quindi conviene prenderlo subito)
+  const NOVITA_CORSA = ["bruto", "striscia", "botto", "dragoFuoco", "gonfio", "saltatore", "dragoFulmine", "corazzato", "gelido", "grosso", "dragoVeleno", "sputatore", "rabbioso"];
   const NEMICI_CORSA = { striscia: ["\u{1F41B}", "Strisciante"], botto: ["\u{1F4A3}", "Botto"], dragoFuoco: ["\u{1F409}\u{1F525}", "Draghetto di fuoco"],
                          gonfio: ["\u{1F922}", "Gonfio"], saltatore: ["\u{1F997}", "Saltatore"], dragoFulmine: ["\u{1F409}⚡", "Draghetto elettrico"],
                          corazzato: ["\u{1F6E1}️", "Corazzato"], gelido: ["❄️", "Gelido"], grosso: ["\u{1FAA3}", "Bestione"],
@@ -16292,10 +16358,7 @@
       if (!n || n.fuoriCampo) return null;
       return { nome: nomeNemico(), k: n.koVero ? 0 : 1 - n.danni / Math.max(1, n.soglia), equil: n.equil || 0, sbil: n.sbilanciato > 0 };
     }
-    if (c.tipo === "boss" && orda) {
-      const z = orda.zombie.find((q) => q.tipo === "capo" && q.stato !== "giu");
-      if (z) return { nome: dici("Il capo"), k: z.hp / (z.hpMax || 1), equil: z.equil || 0, sbil: z.sbilanciato > 0 };
-    }
+    // (la vita del capo dal 18/10/2026 sta sopra la sua testa: vedi `disegnaEquilibri`)
     return null;
   }
   // Sotto il cruscotto, in alto a sinistra: il colpo finale e i tre posti degli oggetti.

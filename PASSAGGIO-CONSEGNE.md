@@ -342,6 +342,9 @@ Riccardo: «un tappeto musicale ritmico che va a ritmo con i nemici e il parry»
 - **Stamina**: Riccardo, «stare sempre in parata fa diminuire la stamina». La guardia tenuta da chi gioca, dopo la finestra del parry, consuma `GUARDIA.tenuta` (0,3) a passo: piena si svuota in circa 5,5 s e, vuota, si rompe come per i colpi (stordimento). Si ricarica solo fuori guardia, come prima.
 - **Arena «cortile»** (`?tipo=arena` in `android/web/arena.html`): pavimento di pietra largo da bordo a bordo, tre lastre sospese. Riccardo: «un ring distruttibile con le mosse e gli imprevisti». Le pedane fragili (le tre del cortile, le due piccole della lava, le tre isolette del cielo; mai il pavimento né la piattaforma grande della lava) hanno 100 punti, si crepano a vista, crollano in pezzi e tornano dopo 15 s se nessuno sta nel loro spazio. Nell'app è il primo riquadro delle arene.
 - **Sito**: la corsa si gioca nel cortile; «1 contro 1» sulla lava prende il posto del combattimento libero.
+- **Attacchi che si leggono** (18/10, Riccardo: «non si capisce quando attaccano»): in carica lo zombie si tira indietro e alza le braccia sopra la testa; per terra la zona del colpo si riempie, rossa e d'oro nella finestra del parry; al colpo scatta in avanti con una scia bianca ad arco (`tempoColpoZ`, `disegnaAvvisoColpo`).
+- **Vita del capo** sopra la sua testa, sopra l'equilibrio; tolto il pannello grande in alto (resta quello del rivale nel duello).
+- **Bruto armato primo fra i nemici nuovi** (prima era il quarto: arrivava alla minaccia 5, oltre i due minuti, e Riccardo non l'aveva visto).
 - Non provato su un telefono vero; i danni (esplosione 70 × forza, meteora 85, urto di un corpo 4-16, terremoto 60 × forza ogni mezzo secondo) sono a occhio.
 
 ### 4.7 Test
@@ -447,6 +450,7 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 18/10/2026 | Claude | Attacchi degli zombie leggibili (carica, zona per terra rossa/oro, scia del colpo), vita del capo sopra la testa, bruto armato primo fra i nuovi. Node 218/218 | `claude/parry-brawl-web` |
 | 18/10/2026 | Claude | Stamina della guardia tenuta, arena «cortile» con pedane che si rompono (anche nelle arene lava e cielo, e nell'app), «1 contro 1» al posto del combattimento libero sul sito; tre test nuovi. Node 218/218 | `claude/parry-brawl-web` |
 | 18/10/2026 | Claude | Musica a tempo nel motore e API per i comandi touch del sito nuovo **Parry Brawl Survivor** (repo `parry-brawl-survivor`, costruito da questo motore a un commit fissato); logo e motto del menu decisi dall'ospite; due test nuovi (morsi sulla griglia, azioni a tastiera spenta). Test Node: due cadute casuali isolate (n. 76 e n. 86), da sole passano 3 su 3. Non unito a `main` | `claude/parry-brawl-web` |
 | 17/10/2026 | Claude | CI rossa su `main` (anche sull'unione di prima, `f8d3910`) per due test instabili già noti, sistemati: l'arena di lava (3 su 20) ora spegne gli imprevisti, tiene fermo il robot lontano dal bordo mentre prova la lava e guarda dove la mela ricompare appena rientra; «gli oggetti entrano dai lati» (1 su 20: dall'alto ne arriva meno di uno su due, a caso) guarda altri 150 s se non li ha visti tutti e due. Dopo: 0 su 40 e 0 su 20, suite Node 214 su 214. Nessuna modifica al gioco | `main` |
