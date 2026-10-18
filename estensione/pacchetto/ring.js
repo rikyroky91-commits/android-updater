@@ -14961,6 +14961,10 @@
     if (id === "finale") return comandi.colpo("mira") !== false;
     if (id === "sinistra" || id === "destra") return muoviConTasti(f, id === "sinistra" ? -1 : 1);
     if (id === "para") {
+      // (la guida ha fermato il tempo: il tasto premuto lo fa ripartire comunque, anche se in quel momento non si può
+      // parare; prima restava fermo per sempre, Riccardo 18/10/2026: «al tutorial dello zombie svelto anche se premo
+      // parata non va avanti»)
+      if (corsa && corsa.aiuto) corsa.aiuto.premutoT = tempo;
       // (dal 16/10/2026: si para anche a metà di una mossa che si può lasciare, o alla fine di un colpo; e ci si gira
       // da soli verso chi sta arrivando, che è chi si vuole parare)
       if (!puoMuovere(f) || (f.azione && NON_INTERROMPIBILI[f.azione])) return false;
@@ -16294,6 +16298,12 @@
     if (!a || !c.chi || c.fase !== "lotta" || c.pausa || cinema || mira) { if (a) a.fermo = false; return 1; }
     const f = eroe();
     if (!f || !f.p || f.esploso || f.fuoriCampo) return 1;
+    // Si ferma solo se in quel momento si può davvero parare (non a terra, non stordito, non a metà del contrattacco o
+    // di una mossa che non si lascia): sennò il tasto non farebbe niente e il gioco resterebbe fermo per sempre. E premuto
+    // il tasto (`premutoT`, vedi `eseguiTasto`) si riparte comunque, per un attimo.
+    const puo = puoMuovere(f) && !(f.stordito > 0) && braccia(f) && f.azione !== "contro" && !(f.azione && NON_INTERROMPIBILI[f.azione]);
+    if (a.modo === "parata" && f.azione === "para") f.durata = Math.max(f.durata, f.t + 40);     // (nella lezione un tocco vale come tenuto)
+    if (!puo || (a.premutoT !== undefined && tempo - a.premutoT < 40)) { a.fermo = false; return 1; }
     if (a.modo === "sega") {
       if (!segaInMano(f)) { c.aiuto = null; return 1; }
       if (f.agguato !== undefined) { a.fermo = false; c.aiuto = null; return 1; }

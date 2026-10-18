@@ -5072,3 +5072,29 @@ test("nemici nuovi e fucile-sega: la prima volta una scheda dice cosa fanno e co
   assert.ok(sega, "il fucile-sega, preso la prima volta, si spiega");
   dentro(amb);
 });
+
+test("il primo colpo guidato di un nemico nuovo: fermo finché non si preme, e premuto riparte sempre (anche a terra)", () => {
+  // (Riccardo, 18/10/2026: «al tutorial dello zombie svelto anche se premo parata non va avanti»)
+  const visti = JSON.parse(GIA_VISTI); delete visti.svelto;
+  const { amb, r } = corsaAvviata({ nuovo: true, memoria: { "mut-ring-guida": "fatta", "mut-ring-presentati": JSON.stringify(visti) } }, "robot", 31);
+  avanzaCorsa(amb, r, 60 * 3, (s) => (s.orda && s.corsa.fase === "lotta" ? false : undefined));
+  const f = amb.lottatore("robot");
+  r.zombie("svelto", f.bacino.x + 160);
+  let st = null;
+  amb.avanza(60 * 10, (s) => { st = s; if (s.corsa.scheda && s.corsa.scheda.chiave !== "svelto") r.premi("para"); return !(s.corsa.scheda && s.corsa.scheda.chiave === "svelto"); });
+  assert.strictEqual(st.corsa.scheda && st.corsa.scheda.chiave, "svelto", "lo svelto si presenta");
+  amb.avanza(30); r.premi("para");
+  let fermo = false;
+  amb.avanza(60 * 20, (s) => { if (s.corsa.fermo) { fermo = true; return false; } });
+  assert.ok(fermo, "il suo primo morso ferma il tempo");
+  const t0 = amb.stato().tempo;
+  r.premi("para"); r.lascia("para");
+  amb.avanza(20);
+  assert.ok(amb.stato().tempo > t0, "premuto, il gioco riparte");
+  // e se ne arriva un altro mentre l'eroe non può parare, il gioco non si ferma (sennò resterebbe fermo per sempre)
+  let bloccato = 0;
+  amb.avanza(60 * 15, (s) => { const e = s.lottatori.find((l) => l.tipo === "robot"); if (s.corsa.fermo && (e.ko || e.azione === "contro")) bloccato++; });
+  assert.strictEqual(bloccato, 0, "mai fermo con l'eroe che non può parare");
+  dentro(amb);
+});
+
