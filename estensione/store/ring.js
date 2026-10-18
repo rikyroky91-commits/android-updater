@@ -16169,10 +16169,22 @@
     const l = window.__ringModoLibero;
     if (modo === "libero" && l && l.unoControUno) usatoS = true;
   }
+  const ACC = () => (window.__ringAccount && typeof window.__ringAccount.stato === "function" ? window.__ringAccount : null);
+  function contoAccount() { const A = ACC(); if (!A) return undefined; try { return A.stato() || null; } catch (errore) { return null; } }
+  function apriAccount() { const A = ACC(); if (A && A.apri) { try { A.apri(); } catch (errore) { /* niente */ } } return true; }
+  function vociAccount() {
+    const c = contoAccount();
+    if (c === undefined) return [];
+    return [c ? { icona: "\u{1F464}", nome: c.nick, testo: "Sei dentro: crediti, potenziamenti dei personaggi, missioni e record sono salvati nel tuo account e li ritrovi su ogni dispositivo.", fa: apriAccount }
+              : { icona: "\u{1F464}", nome: "Account", testo: "Stai giocando come ospite: crediti, potenziamenti e record restano solo su questo dispositivo e si perdono se cancelli i dati del browser. Con un account (nick, email e password) li conservi e li ritrovi ovunque.", fa: apriAccount, nuovo: true, etichetta: "OSPITE" }];
+  }
   function vociPrincipale() {
     const libero = window.__ringModoLibero && typeof window.__ringModoLibero === "object" && window.__ringModoLibero.nome ? window.__ringModoLibero : null;
     const v = [
       { icona: "\u{1F3C3}", nome: "Corsa infinita", testo: "Il cuore del gioco: un'orda che cresce senza fermarsi. Para al momento giusto, sali di livello, scegli armi e poteri, batti un capo ogni cinque livelli di minaccia.", fa: () => { menu = null; modoScelto("corsa"); if (sceltaModo) scegliModo("corsa"); else if (!corsa) comandi.corsa(); return true; } },
+      // L'account dell'ospite (`__ringAccount`, sito del gioco, 18/10/2026, Riccardo: «l'account deve essere nel menu
+      // principale, accedi o gioca come ospite, ma devi far capire che per conservare statistiche e upgrade serve l'account»)
+      ...vociAccount(),
       { icona: libero ? libero.icona || "\u{1F94A}" : "\u{1F94A}", nome: libero ? libero.nome : "Combattimento libero", testo: libero ? libero.testo : "Due lottatori sulla pagina che si picchiano da soli. Comandi chi vuoi, scegli i personaggi, lanci oggetti e scateni imprevisti dalla tendina.", fa: () => { menu = null; modoScelto("libero"); if (sceltaModo) scegliModo("libero"); else if (corsa) chiudiCorsa(); return true; } },
       { icona: "\u{1F4D6}", nome: "Come si gioca", testo: "Sei pagine per imparare tutto: muoversi, attaccare, la parata e il parry col contrattacco, la corsa infinita, l'aggancio, crescere fra una corsa e l'altra.", fa: () => vaiA("guida"), nuovo: primaVolta },
       { icona: "⚙️", nome: "Impostazioni", testo: "Audio e volume, dettaglio grafico, aiuti al parry, rallentatore, scossa dello schermo, difficoltà della corsa, tasti.", fa: () => vaiA("impostazioni") },
@@ -16390,7 +16402,7 @@
       if (v.nuovo) {
         ctx.globalAlpha = entra; ctx.save(); ctx.shadowColor = "#56e1ff"; ctx.shadowBlur = (6 + 6 * Math.sin(passi * 0.15)) * S;
         pannelloUI(x + dx + w - 92 * S, yy + rh / 2 - 9 * S, 82 * S, 18 * S, 9 * S, null, "#56e1ff"); ctx.restore();
-        scriviUI(dici("INIZIA QUI"), x + dx + w - 51 * S, yy + rh / 2 + 1, 10 * S, "#17171c", "center", 900);
+        scriviUI(dici(v.etichetta || "INIZIA QUI"), x + dx + w - 51 * S, yy + rh / 2 + 1, 10 * S, "#17171c", "center", 900);
       }
       ctx.restore();
       tastiUI.push({ x: x + dx, y: yy, w, h: rh, fa: () => { menu.sel = i; attivaVoce(menu.pagina, v); } });
@@ -16413,6 +16425,16 @@
     pannelloUI(x, y, w, h, 12 * S, "rgba(255,216,74,.35)", "rgba(20,18,32,.84)");
     scriviUI(dici("PERSONAGGI"), x + 16 * S, y + 20 * S, 15 * S, ORO, "left", 900);
     scriviUI("\u{1FA99} " + cifre(banca), x + w - 16 * S, y + 20 * S, 14 * S, "#ffffff", "right", 900);
+    // chi gioca da ospite lo deve sapere qui, dove spende i crediti: si perdono senza account
+    const conto = contoAccount();
+    let giu = 0;
+    if (conto === null) {
+      giu = 34 * S;
+      const ys = y + 66 * S;
+      pannelloUI(x + 16 * S, ys, w - 32 * S, 28 * S, 8 * S, "rgba(255,138,128,.55)", "rgba(255,90,78,.12)");
+      scriviUI("⚠️ " + dici("Ospite: i progressi restano solo su questo dispositivo"), x + 26 * S, ys + 14 * S, 10.5 * S, "#ffd2cc", "left", 700);
+      tastoUI(x + w - 16 * S - 78 * S, ys + 4 * S, 72 * S, 20 * S, dici("Salvali"), apriAccount, { px: 10.5 * S });
+    } else if (conto) scriviUI("\u{1F464} " + conto.nick + " · " + dici("salvato nell'account"), x + w / 2, y + 20 * S, 11 * S, "rgba(255,255,255,.6)", "center", 700);
     // le famiglie
     const n = PERSONAGGI_CORSA.length, wt = (w - 32 * S - (n - 1) * 6 * S) / n;
     PERSONAGGI_CORSA.forEach(([st, nome], i) => {
@@ -16421,7 +16443,7 @@
               { colore: scelto ? ORO : "#2a2735", scritta: scelto ? "#17171c" : "#ffffff", px: (wt < 100 * S ? 10 : 11) * S, bordo: scelto ? null : "rgba(255,255,255,.22)" });
     });
     // i due lottatori, uno per colonna
-    const col = (w - 40 * S) / 2, yy = y + 72 * S;
+    const col = (w - 40 * S) / 2, yy = y + 72 * S + giu;
     ["robot", "mela"].forEach((tipo, k) => {
       const cx = x + 16 * S + k * (col + 8 * S), f = lottatori.find((l) => l.tipo === tipo);
       pannelloUI(cx, yy, col, h - (yy - y) - 12 * S, 9 * S, "rgba(255,255,255,.1)", "rgba(255,255,255,.04)");
