@@ -2578,7 +2578,7 @@
       else if (z.stato === "letale" && z.preda === f) conta(Math.max(0, (dx - ((Z.portata || 27) + 8) * S) / (z.velL || LETALE.vel * S)), c[3], c[4], z, true);
     }
     if (corsa && corsa.tiri) for (const t of corsa.tiri) {
-      if (t.tipo !== "granata" || t.rimandata || t.parata || (fx - t.x) * t.vx <= 0) continue;
+      if ((t.tipo !== "granata" && t.tipo !== "proiettile") || t.rimandata || t.rimandato || t.parata || (fx - t.x) * t.vx <= 0) continue;
       const dd = Math.min(lontanoDalCorpo(f, t.x, t.y), Math.hypot(t.x - fx, t.y - (f.base - 8 * S))), v = Math.hypot(t.vx, t.vy) || 1;
       conta(Math.max(0, (dd - (t.r + 32 * S)) / v), t.x, t.y, null);
     }
@@ -2770,7 +2770,8 @@
     if (f === chiPara()) musicaParry(perfetto, catenaParry.n);
     // L'impatto: fermo, lampo bianco, zoom leggero sul punto, scintille verso chi ha attaccato.
     fermoColpo = Math.max(fermoColpo, perfetto ? 14 : 9);
-    lampoSchermo = Math.max(lampoSchermo, perfetto ? 0.42 : 0.26);
+    // (dimezzato il 18/10/2026: col contrattacco in scena il bianco su tutto copriva i primi colpi)
+    lampoSchermo = Math.max(lampoSchermo, perfetto ? 0.32 : 0.16);
     zoomParry = { x, y, t: 0, dur: perfetto ? 26 : 18, k: perfetto ? 0.08 : 0.05 };
     for (let i = 0; i < (perfetto ? 16 : 10) && particelle.length < MAX_PARTICELLE; i++) {
       const a = (f.dir > 0 ? 0 : Math.PI) + caso(-0.9, 0.9) - f.dir * 0.3, v = caso(6, 13) * S;
@@ -2855,50 +2856,41 @@
   //   4. il colpo finale: a due mani in avanti, lo scaraventa via e giù, e il terreno si apre dove atterra.
   // Se il nemico cade prima, la sequenza passa al più vicino (entro un balzo), sennò si chiude in anticipo.
   // Solo per chi gioca: le lotte fra due lottatori automatici restano col contrattacco breve di prima.
-  const CINEMA = { durata: 46, scatto: [6, 11], colpi: [12, 22, 33], fine: 38, zoom: 0.16, danni: [4.5, 4.5, 9] };
+  // (rifatta il 18/10/2026 sera, Riccardo: «il rallentamento dura troppo e senza animazioni sensate»: un terzo più corta,
+  // lenta solo un attimo sui colpi, e i tre colpi sono le mosse vere del lottatore: montante, calcio, doppio diretto)
+  const CINEMA = { durata: 32, scatto: [3, 7], colpi: [9, 16, 24], fine: 27, zoom: 0.1, danni: [4.5, 4.5, 9] };
   const liscio = (u) => { u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); };
   const mescola = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
   function posaCinema(q, t) {
     const [s0, s1] = CINEMA.scatto, [c1, c2, c3] = CINEMA.colpi;
+    // la curva di una mossa vera attorno al suo colpo: sale in 3 passi, torna in 4 (come `e` in `posa`)
+    const curva = (c) => { const u = (t - (c - 3)) / 7; return u <= 0 || u >= 1 ? 0 : Math.sin(Math.PI * u); };
+    // in guardia, fra un colpo e l'altro
+    q.manoA = [58, 9]; q.gomitoA = [46, 11]; q.manoD = [56, 5]; q.gomitoD = [44, 6];
     if (t < s0) {
       // la parata che spazza via il colpo
       const k = liscio(t / s0);
-      q.manoA = mescola([58, 9], [80, 20], k); q.gomitoA = mescola([46, 11], [62, 12], k); q.manoD = [50, -4]; q.gomitoD = [44, -2];
-      q.bacino[0] -= 3 * k; q.collo[1] -= 3 * k; q.testa[1] -= 3 * k;
-    } else if (t < c1) {
-      // lo scatto: basso, in avanti, braccia dietro
-      const k = liscio((t - s0) / (s1 - s0));
-      q.manoA = mescola([80, 20], [40, -16], k); q.gomitoA = mescola([62, 12], [46, -8], k);
-      q.manoD = mescola([50, -4], [38, -20], k); q.gomitoD = mescola([44, -2], [44, -10], k);
-      q.bacino[0] -= 8 * k; q.collo[0] -= 6 * k; q.collo[1] += 10 * k; q.testa[0] -= 6 * k; q.testa[1] += 12 * k;
-      q.piedeA = [0, 18]; q.piedeD = [0, -18]; q.ginocchioA = [16, 16]; q.ginocchioD = [12, -10];
-    } else if (t < c2) {
-      // il montante: dal basso in alto, sulle punte
-      const k = liscio((t - c1 + 2) / 5), r = liscio((t - c1 - 4) / 5);
-      q.manoA = mescola(mescola([30, 22], [104, 14], k), [86, 4], r); q.gomitoA = mescola(mescola([40, 12], [80, 12], k), [70, 6], r);
-      q.manoD = [56, 6]; q.gomitoD = [46, 4];
-      q.collo[1] += 4 - 2 * k; q.testa[0] += 3 * k; q.bacino[0] += 4 * k;
-      q.piedeA = [4 * k, 12]; q.piedeD = [0, -12]; q.ginocchioA = [18, 10]; q.ginocchioD = [13, -7];
-    } else if (t < c3) {
-      // il fendente girato: da dietro in alto a davanti in basso, il busto ruota
-      const k = liscio((t - c2 + 2) / 5), r = liscio((t - c2 - 4) / 6);
-      q.manoA = mescola(mescola([84, -14], [50, 36], k), [56, 18], r); q.gomitoA = mescola(mescola([70, -8], [58, 20], k), [52, 10], r);
-      q.manoD = mescola([72, -22], [46, 24], k); q.gomitoD = mescola([62, -12], [50, 12], k);
-      q.collo[1] += -4 + 10 * k; q.testa[1] += -4 + 11 * k; q.bacino[1] += 3 * k;
-      q.piedeA = [0, 16]; q.piedeD = [0, -14]; q.ginocchioA = [15, 13]; q.ginocchioD = [13, -8];
-    } else if (t < CINEMA.fine + 2) {
-      // il colpo finale: tutto il peso in avanti, a due mani
-      const k = liscio((t - c3 + 3) / 4);
-      q.manoA = mescola([62, -10], [52, 40], k); q.manoD = mescola([58, -14], [48, 38], k);
-      q.gomitoA = mescola([54, -4], [52, 24], k); q.gomitoD = mescola([50, -8], [48, 22], k);
-      q.collo[1] += 12 * k; q.testa[1] += 14 * k; q.bacino[1] += 6 * k; q.bacino[0] -= 4 * k;
-      q.piedeA = [0, 24]; q.piedeD = [0, -18]; q.ginocchioA = [16, 18]; q.ginocchioD = [12, -12];
-    } else {
-      // si ricompone in guardia
-      const k = liscio((t - CINEMA.fine - 2) / 6);
-      q.manoA = mescola([52, 40], [58, 9], k); q.manoD = mescola([48, 38], [56, 5], k);
-      q.gomitoA = mescola([52, 24], [46, 11], k); q.gomitoD = mescola([48, 22], [44, 6], k);
-      q.collo[1] += 12 * (1 - k); q.testa[1] += 14 * (1 - k);
+      q.manoA = mescola([58, 9], [76, 18], k); q.gomitoA = mescola([46, 11], [60, 12], k);
+      q.collo[1] -= 3 * k; q.testa[1] -= 3 * k;
+      return;
+    }
+    if (t <= s1) {
+      // lo scatto: basso e in avanti
+      const k = Math.sin(Math.PI * (t - s0) / (s1 - s0 + 1));
+      q.collo[1] += 7 * k; q.testa[1] += 9 * k; q.bacino[0] -= 4 * k;
+      q.piedeA = [0, 16]; q.piedeD = [0, -16]; q.ginocchioA = [15, 14]; q.ginocchioD = [12, -9];
+    }
+    // il montante (come la mossa «montante»)
+    let e = curva(c1);
+    if (e > 0) { q.manoA = [44 + 30 * e, 10 + 10 * e]; q.gomitoA = [42 + 14 * e, 8 + 6 * e]; q.bacino[0] -= 3 * e; q.piedeA = [3 * e, 12]; }
+    // il calcio (come «calcio»)
+    e = curva(c2);
+    if (e > 0) { q.piedeA = [8 + 22 * e, 8 + 22 * e]; q.ginocchioA = [14 + 13 * e, 7 + 12 * e]; q.collo[1] -= 4 * e; q.testa[1] -= 5 * e; }
+    // il doppio diretto, con tutto il peso avanti (come «diretto», a due mani)
+    e = t >= c3 - 3 && t < CINEMA.fine + 4 ? Math.sin(Math.PI * Math.min(1, (t - (c3 - 3)) / 9)) : 0;
+    if (e > 0) {
+      q.manoD = [51, 8 + 24 * e]; q.gomitoD = [47, 5 + 13 * e]; q.manoA = [53, 10 + 22 * e]; q.gomitoA = [48, 8 + 12 * e];
+      q.collo[1] += 5 * e; q.testa[1] += 6 * e; q.bacino[1] += 3 * e; q.piedeA = [0, 14 + 6 * e]; q.ginocchioA = [14, 12 + 4 * e];
     }
   }
   // Su chi va il prossimo colpo: quello di prima se è ancora in piedi, sennò il più vicino davanti (entro un balzo).
@@ -2935,7 +2927,7 @@
       if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "linea", x: f.p.bacino.x - f.dir * 14 * S, y: f.p.bacino.y - caso(-16, 16) * S, vx: -f.dir * 5 * S, vy: 0, vita: 10, max: 10, lung: caso(18, 34) * S, colore: "#ffe27a" });
       if (t === s0) suona("soffio", f.cx, 0.7);
     }
-    if (t > s1 && t < CINEMA.fine && t % 3 === 0) residua(f);
+    if (t > s1 && t < CINEMA.fine && CINEMA.colpi.indexOf(t) >= 0) residua(f);
     const i = CINEMA.colpi.indexOf(t);
     if (i === CINEMA.colpi.length - 1 && !b && cinema.chiusa) { scrivi("CONTRO!", f.p.bacino.x, Math.max(testataBasso + 40 * S, f.p.testa.y - 46 * S), true); fendenteCinema(f, f.p.bacino.x + f.dir * 34 * S, f.p.collo.y + 6 * S, i); fermoColpo = Math.max(fermoColpo, 6); scossa = Math.max(scossa, 8); return; }
     if (i < 0 || !b) return;
@@ -2968,7 +2960,7 @@
     // ogni colpo: un attimo fermo; l'ultimo è il più pesante
     fermoColpo = Math.max(fermoColpo, ultimo ? 9 : 4);
     scossa = Math.max(scossa, ultimo ? 12 : 5);
-    if (ultimo) { lampoSchermo = Math.max(lampoSchermo, 0.3); scrivi("CONTRO!", (f.p.bacino.x + xBersaglio(b)) / 2, Math.max(testataBasso + 40 * S, f.p.testa.y - 46 * S), true); }
+    if (ultimo) { lampoSchermo = Math.max(lampoSchermo, 0.16); scrivi("CONTRO!", (f.p.bacino.x + xBersaglio(b)) / 2, Math.max(testataBasso + 40 * S, f.p.testa.y - 46 * S), true); }
     cinema.colpi++;
   }
   function fendenteCinema(f, x, y, i) {
@@ -2999,9 +2991,9 @@
     if (!f) return 1;
     let d = 99;
     for (const c of CINEMA.colpi) d = Math.min(d, Math.abs(f.t - c));
-    if (f.t < CINEMA.scatto[0]) return 0.3;
-    if (f.t > CINEMA.fine) return 0.7;
-    return d <= 1 ? 0.16 : d <= 3 ? 0.3 : 0.55;
+    if (f.t < CINEMA.scatto[0]) return 0.45;
+    if (f.t > CINEMA.fine) return 1;
+    return d === 0 ? 0.25 : d === 1 ? 0.45 : 0.85;
   }
   // La camera della sequenza: stringe sul punto fra i due, con le bande nere; dolce in entrata e in uscita.
   function camminaCamera() {
@@ -3617,11 +3609,11 @@
   // restano sul pavimento: vedi `urtoArena`). Senza `window.__ringSuolo` (pagine vere, estensione) solo la buca e la polvere.
   const buche = [];
   const suoloVivo = () => !!window.__ringSuolo && inArenaApp();
-  function squarciaSuolo(x, y, forza) {
+  function squarciaSuolo(x, y, forza, lava) {
     if (verso < 0 || fermo) return;
     const k = Math.max(0.3, Math.min(2, forza || 1));
     if (buche.length > 18) buche.shift();
-    buche.push({ x, y, r: (16 + 10 * k) * S, nato: passi });
+    buche.push({ x, y, r: (16 + 10 * k) * S * (lava ? 1.25 : 1), nato: passi, lava: !!lava });
     polvere(x, y - 1, Math.round(3 + 3 * k));
     if (suoloVivo()) {
       for (let i = 0; i < 3 + 3 * k && particelle.length < 160; i++) {
@@ -3634,17 +3626,28 @@
     }
   }
   function disegnaBuche() {
-    for (let i = buche.length - 1; i >= 0; i--) if (passi - buche[i].nato > 150) buche.splice(i, 1);
+    for (let i = buche.length - 1; i >= 0; i--) if (passi - buche[i].nato > (buche[i].lava ? 260 : 150)) buche.splice(i, 1);
     if (!buche.length) return;
     ctx.save();
     for (const b of buche) {
-      const a = passi - b.nato, apre = Math.min(1, a / 10), chiude = a > 90 ? Math.max(0, 1 - (a - 90) / 60) : 1, w = b.r * apre * (0.55 + 0.45 * chiude);
+      const resta = b.lava ? 200 : 90, a = passi - b.nato, apre = Math.min(1, a / 10), chiude = a > resta ? Math.max(0, 1 - (a - resta) / 60) : 1, w = b.r * apre * (0.55 + 0.45 * chiude);
       if (w < 0.5) continue;
       // il bordo smosso, poi il buio dentro
       ctx.globalAlpha = 0.9 * chiude; ctx.fillStyle = "#5a5047";
       ctx.beginPath(); ctx.ellipse(b.x, b.y + 1 * S, w + 4 * S, (4 + 3 * apre) * S, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#0d0a0f";
       ctx.beginPath(); ctx.ellipse(b.x, b.y + 1.5 * S, w, (2.6 + 2.4 * apre) * S, 0, 0, Math.PI * 2); ctx.fill();
+      if (b.lava) {
+        // il pozzo di lava: dentro brucia e pulsa, il bagliore sale
+        const p = 0.75 + 0.25 * Math.sin(passi * 0.2 + b.x);
+        const g = ctx.createRadialGradient(b.x, b.y + 1.5 * S, 0, b.x, b.y + 1.5 * S, w);
+        g.addColorStop(0, "rgba(255,230,140," + (0.95 * p).toFixed(2) + ")"); g.addColorStop(0.45, "rgba(255,120,30,.85)"); g.addColorStop(1, "rgba(120,20,0,0)");
+        ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(b.x, b.y + 1.5 * S, w * 0.92, (2.2 + 2 * apre) * S, 0, 0, Math.PI * 2); ctx.fill();
+        const alone = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y - 20 * S, w * 2);
+        alone.addColorStop(0, "rgba(255,140,40," + (0.28 * p * chiude).toFixed(3) + ")"); alone.addColorStop(1, "rgba(255,140,40,0)");
+        ctx.fillStyle = alone; ctx.fillRect(b.x - w * 2, b.y - w * 2, w * 4, w * 2);
+        if (passi % 5 === 0 && chiude > 0.3 && particelle.length < 140) particelle.push({ tipo: "scheggia", x: b.x + caso(-0.6, 0.6) * w, y: b.y, vx: caso(-0.4, 0.4) * S, vy: -caso(0.8, 2) * S, vita: 26, max: 26, colore: "#ffb347", rot: 0 });
+      }
       // zolle sul bordo
       ctx.fillStyle = "#8f8377";
       for (let j = 0; j < 4; j++) {
@@ -5911,7 +5914,11 @@
   // Morendo lascia sempre il fucile-sega (`motosega`): passandoci sopra l'eroe lo prende in mano. Spara da lontano
   // e da vicino sega: gli zombie segati perdono la testa e le braccia (vedi `sega`).
   // Mai più di `max` bruti in piedi insieme: gli altri escono corazzati.
-  const BRUTO = { lontano: [130, 270], mira: 34, cd: [170, 240], danno: 10, raggio: 62, miccia: 80, max: 2 };
+  // (18/10/2026, Riccardo: «spara proiettili e lancia granate che col parry tornano al mittente; cerca di stare a
+  // distanza per sparare meglio»): `raffica` tre colpi del fucile-sega dopo `rMira` passi col puntino rosso, ogni `rPasso`;
+  // `vicino`: più vicino di così indietreggia; `proiettile` la velocità, il danno.
+  const BRUTO = { lontano: [150, 300], mira: 34, cd: [170, 240], danno: 10, raggio: 62, miccia: 80, max: 2,
+                  rMira: 18, rPasso: 7, rColpi: 3, rCd: [100, 160], vicino: 120, proiettile: 7.5, dannoP: 4 };
   const pesante = (z) => z.tipo === "grosso" || z.tipo === "capo";
   const TEMI_ONDATA = {
     mista: { lento: 5, svelto: 2, striscia: 2, gonfio: 1.5, grosso: 1 },
@@ -6029,10 +6036,20 @@
     q.altrove = -120;
     if (Math.abs(base - q.base) < 8 * S) return;                 // è già lì: saranno loro a scendere
     for (const z of q.zombie) if (z.stato !== "giu") polvere(z.x, q.base - 2, 3);
+    q.vecchiaBase = q.base;
     q.base = base; q.su = !!largo; q.l = largo ? largo.l : 0; q.r = largo ? largo.r : W;
     q.cx = Math.max(q.l + 40 * S, Math.min(q.r - 40 * S, chi.reduce((t, l) => t + l.p.bacino.x, 0) / chi.length));
     q.zombie = q.zombie.filter((z) => z.stato !== "giu");
+    const vecchia = q.vecchiaBase;
     for (const z of q.zombie) {
+      if (suoloVivo()) {
+        // Col suolo vivo nessuno spunta dalla lastra: chi è giù resta giù e salta su; chi era su ricade giù.
+        // (`alzo` è l'altezza sopra la base dell'orda: sotto la lastra è negativo)
+        const yZ = (vecchia === undefined ? pavimento : vecchia) - (z.alzo || 0);
+        z.alzo = q.base - yZ; z.vx = 0; z.balzo = null;
+        if (z.stato === "esce" && z.alzo > 0) z.stato = "va";
+        continue;
+      }
       z.x = Math.max(q.l + 8 * S, Math.min(q.r - 8 * S, q.cx + z.lato * caso(130, 300) * S));
       z.stato = "esce"; z.s = 0; z.vx = 0; z.botta = 0; z.dir = -z.lato;
       polvere(z.x, q.base - 1, 4);
@@ -6114,7 +6131,10 @@
       z.stato = "cala"; z.alzo = Math.max(0, q.base - elicottero.y - 34 * S); z.vy = 0;
       return;
     }
-    squarciaSuolo(x, q.base, z.tipo === "capo" ? 2 : pesante(z) ? 1.3 : 0.8);
+    // Col suolo vivo si esce solo dal pavimento in basso (18/10/2026, Riccardo: «non possono uscire dalle parti del ring
+    // in alto, solo dalla parte inferiore»): se l'orda sta su una lastra, si scava sotto e poi si salta su (vedi `balzaSu`).
+    if (suoloVivo()) { if (q.base < pavimento - 4 * S) z.alzo = -(pavimento - q.base); z.scava = z.tipo === "capo" ? 2 : pesante(z) || z.tipo === "bruto" ? 1.3 : 0.8; z.lava = z.tipo === "bruto"; }
+    else squarciaSuolo(x, q.base, z.tipo === "capo" ? 2 : pesante(z) ? 1.3 : 0.8);
     if (z.tipo === "capo") {
       z.x = Math.max(q.l + 60 * S, Math.min(q.r - 60 * S, z.x));             // è largo: dentro la finestra per intero
       z.hp = z.hpMax = corsa && corsa.chi ? Math.round((14 + 2.5 * corsa.round) * (1 + 0.5 * pressione())) : 18 + 3 * (corsa ? corsa.round : 1);
@@ -6122,8 +6142,39 @@
       scrivi(dici("Il capo") + "!", x, q.base - 140 * S, true);
     }
   }
+  function brutoDaSotto(z, q) {
+    const f = eroe();
+    if (!f || !f.p || f.fuoriCampo) { z.fase += 0.03; return; }
+    const dx = f.p.bacino.x - z.x;
+    z.dir = dx >= 0 ? 1 : -1;
+    if (z.botta > 0) { z.botta--; return; }
+    if (specialeZombie(z, q, ZOMBI.bruto, f, dx, true)) return;
+    // fuori tiro: si avvicina quanto basta
+    if (Math.abs(dx) > BRUTO.lontano[1] * S) { z.x += z.dir * z.vel * S; z.fase += 0.05; }
+  }
+  // Il balzo da sotto la lastra fin sopra: si accovaccia, salta ad arco, atterra in piedi (col suolo vivo).
+  function balzaSu(z, q) {
+    if (!z.balzo) { z.balzo = { t: 0, da: z.alzo, x0: z.x, x1: Math.max(q.l + 14 * S, Math.min(q.r - 14 * S, z.x + (q.cx - z.x) * 0.25)) }; z.vx = 0; }
+    const b = z.balzo, T = 34;
+    b.t++;
+    if (b.t <= 8) return;                                   // accovacciato (vedi il disegno)
+    const u = Math.min(1, (b.t - 8) / T);
+    z.x = b.x0 + (b.x1 - b.x0) * u;
+    z.alzo = b.da * (1 - u) + Math.sin(Math.PI * u) * 46 * S;
+    if (b.t === 9) { polvere(z.x, q.base - b.da - 1, 4); suona("salto", z.x, 0.4); }
+    if (u >= 1) { z.alzo = 0; z.balzo = null; z.stato = "va"; z.s = 0; polvere(z.x, q.base - 1, 5); suona("tonfo", z.x, 0.5); }
+  }
+  // Quanto è ancora sotto terra chi esce (0 fuori, 1 tutto sotto): con lo scavo, prima niente, poi solo la mano, poi a strattoni.
+  function sottoTerra(z) {
+    if (z.stato !== "esce") return 0;
+    if (!z.scava) return Math.max(0, 1 - z.s / 46);
+    if (z.s < 14) return 1.2;
+    if (z.s < 22) return 0.97 - 0.07 * liscio((z.s - 14) / 8);
+    const u = (z.s - 22) / 24, n = Math.min(2, Math.floor(u * 3)), f = u * 3 - n;
+    return 0.9 * (1 - (n + liscio(Math.min(1, f * 1.6))) / 3);
+  }
   // In piedi (o in volo): si può colpire e colpisce. Il salto, lo sputo e la picchiata sono della corsa.
-  const vivoZ = (z) => !z.inBuco && (z.stato === "va" || z.stato === "colpo" || z.stato === "salto" || z.stato === "sputa" || z.stato === "granata" || z.stato === "tuffo" || z.stato === "mira" ||
+  const vivoZ = (z) => !z.inBuco && (z.stato === "va" || z.stato === "colpo" || z.stato === "salto" || z.stato === "sputa" || z.stato === "granata" || z.stato === "raffica" || z.stato === "tuffo" || z.stato === "mira" ||
                        z.stato === "letale" || z.stato === "barcolla" || (z.stato === "esce" && z.s > 22));
   // ·· L'AGGANCIO (17/10/2026, Riccardo: «con il mouse posso cliccare su un nemico e attivare un soft lock-on, in modo
   // che se ci si vuole concentrare su un nemico specifico si può fare») ··
@@ -6391,7 +6442,52 @@
   // La bocca del lanciagranate: davanti, all'altezza dell'anca, un po' in su quando punta.
   function boccaBruto(z, q) {
     const sc = ZOMBI.bruto.scala;
-    return { x: z.x + z.dir * 30 * S * sc, y: q.base - 36 * S * sc };
+    return { x: z.x + z.dir * 30 * S * sc, y: q.base - (z.alzo || 0) - 36 * S * sc };
+  }
+  // Un colpo del fucile-sega: dritto al petto, un filo di dispersione. Col parry torna a chi l'ha sparato.
+  function sparaProiettile(z, f, q) {
+    if (!corsa || !corsa.tiri || !f || !f.p) return;
+    const b = boccaBruto(z, q), hx = f.p.bacino.x, hy = f.p.bacino.y - 10 * S + caso(-6, 6) * S;
+    const dx = hx - b.x, dy = hy - b.y, l = Math.hypot(dx, dy) || 1, v = BRUTO.proiettile * S;
+    corsa.tiri.push({ tipo: "proiettile", x: b.x, y: b.y, vx: dx / l * v, vy: dy / l * v, r: 2.6 * S, danno: BRUTO.dannoP, t: 0, da: z, rimandato: false });
+    suona("sparo", b.x, 0.55); z.vx = -z.dir * 0.6 * S;
+    if (particelle.length < MAX_PARTICELLE - 2) {
+      particelle.push({ tipo: "lampo", x: b.x, y: b.y, vx: 0, vy: 0, vita: 4, max: 4, r: 9 * S });
+      particelle.push({ tipo: "fumo", x: b.x, y: b.y, vx: z.dir * 0.6 * S, vy: -0.4 * S, vita: 18, max: 18, r: 3 * S, colore: "#8d8a85" });
+    }
+  }
+  function aggiornaProiettile(t, f, vivo) {
+    t.x += t.vx; t.y += t.vy;
+    if (t.rimandato) {
+      // di ritorno: chi trova (prima chi l'ha sparato) lo prende
+      if (orda) for (const w of orda.zombie) {
+        if (!vivoZ(w)) continue;
+        const c = corpoZ(w);
+        if (Math.hypot(c[0] - t.x, c[1] - t.y) < c[2] + 6 * S || Math.hypot(c[3] - t.x, c[4] - t.y) < c[5] + 6 * S) {
+          colpisciZombie(w, 6, Math.sign(t.vx) || 1, t.x, t.y, eroe()); scintille(t.x, t.y, 10, "#ffd84a"); scrivi("RIMANDATO!", t.x, t.y - 18 * S, false);
+          return false;
+        }
+      }
+      return t.t < 240 && t.x > -30 && t.x < W + 30 && t.y > -60 && t.y < H + 30;
+    }
+    if (vivo) {
+      const dd = lontanoDalCorpo(f, t.x, t.y), arriva = (f.p.bacino.x - t.x) * t.vx > 0, davanti = f.dir === (t.x >= f.p.bacino.x ? 1 : -1);
+      if (arriva && davanti && dd < t.r + 30 * S && inFinestraParry(f)) {
+        // il parry: torna dritto su chi l'ha sparato, più veloce
+        const z = t.da && vivoZ(t.da) ? t.da : null, c = z ? corpoZ(z) : null;
+        const tx = c ? c[0] : t.x - t.vx * 40, ty = c ? c[1] : t.y, dx = tx - t.x, dy = ty - t.y, l = Math.hypot(dx, dy) || 1, v = Math.hypot(t.vx, t.vy) * 1.5;
+        t.vx = dx / l * v; t.vy = dy / l * v; t.rimandato = true;
+        faiParry(f, null, t.x, t.y, null, true);
+        if (corsa && corsa.chi) corsa.proiettiliRimandati = (corsa.proiettiliRimandati || 0) + 1;
+        return true;
+      }
+      if (arriva && davanti && dd < t.r + 14 * S && f.azione === "para") {
+        scintille(t.x, t.y, 6, "#bfe9ff"); suona("metallo", t.x, 0.4); consumaGuardia(f, GUARDIA.colpo * 0.5, t.x, t.y);
+        return false;
+      }
+      if (dd < t.r + 8 * S) { colpitoEroe(f, t.danno, t.x, t.y, Math.sign(t.vx) || 1, 1.2); scintille(t.x, t.y, 6, "#ffb62e"); return false; }
+    }
+    return t.t < 200 && t.x > -30 && t.x < W + 30 && t.y > -60 && t.y < H + 30;
   }
   function lancioGranata(z, f, q) {
     if (!corsa || !corsa.tiri || !f || !f.p) return;
@@ -6677,10 +6773,27 @@
           if (z.s >= BRUTO.mira + 22) { z.stato = "va"; z.s = 0; z.cdGranata = Math.round(caso(BRUTO.cd[0], BRUTO.cd[1])); }
           return true;
         }
+        if (z.stato === "raffica") {
+          // il fucile-sega: punta col puntino rosso, poi tre colpi
+          const k = z.s - BRUTO.rMira;
+          if (k >= 0 && k % BRUTO.rPasso === 0 && k < BRUTO.rPasso * BRUTO.rColpi) sparaProiettile(z, f, q);
+          if (k >= BRUTO.rPasso * BRUTO.rColpi + 10) { z.stato = "va"; z.s = 0; z.cdRaffica = Math.round(caso(BRUTO.rCd[0], BRUTO.rCd[1])); }
+          return true;
+        }
         if (z.cdGranata === undefined) z.cdGranata = Math.round(caso(50, 110));
+        if (z.cdRaffica === undefined) z.cdRaffica = Math.round(caso(30, 70));
         if (z.cdGranata > 0) z.cdGranata--;
-        if (z.stato === "va" && sopra && d > 100 * S && d < 320 * S) {
-          if (!(z.cdGranata > 0) && !(corsa.tiri || []).some((t) => t.tipo === "granata" && t.da === z)) { z.stato = "granata"; z.s = 0; suona("metallo", z.x, 0.4); return true; }
+        if (z.cdRaffica > 0) z.cdRaffica--;
+        if (z.stato === "va" && sopra) {
+          const hx = f.p.bacino.x;
+          z.dir = hx >= z.x ? 1 : -1;
+          // troppo vicino: indietreggia guardandolo, per tornare a tiro (se ha spazio dietro)
+          const dietro = z.x - z.dir * 20 * S, L = z.alzo < 0 ? 0 : q.l, Rr = z.alzo < 0 ? W : q.r;
+          if (d < BRUTO.vicino * S && dietro > L + 20 * S && dietro < Rr - 20 * S) { z.x -= z.dir * z.vel * 0.9 * S; z.fase += 0.06; return true; }
+          if (d > 90 * S && d < 380 * S) {
+            if (!(z.cdGranata > 0) && !(corsa.tiri || []).some((t) => t.tipo === "granata" && t.da === z)) { z.stato = "granata"; z.s = 0; suona("metallo", z.x, 0.4); return true; }
+            if (!(z.cdRaffica > 0)) { z.stato = "raffica"; z.s = 0; suona("clic", z.x, 0.6); return true; }
+          }
           if (d > BRUTO.lontano[0] * S && d < BRUTO.lontano[1] * S) { z.fase += 0.03; return true; }       // resta lì, a distanza
         }
         return false;
@@ -6871,7 +6984,8 @@
       if (z.nuovo > 0) z.nuovo--;
       if (z.volo) { muoviDrago(z, q, Z); continue; }
       z.x += z.vx; z.vx *= 0.86;
-      z.x = Math.max(q.l + 6 * S, Math.min(q.r - 6 * S, z.x));
+      // (chi sta sul pavimento sotto la lastra dell'orda ha tutto il pavimento, non solo la lastra)
+      if (z.alzo < 0) z.x = Math.max(6 * S, Math.min(W - 6 * S, z.x)); else z.x = Math.max(q.l + 6 * S, Math.min(q.r - 6 * S, z.x));
       if (z.stato === "giu") {
         // (abbattuto in aria: ricade)
         if (z.alzo > 0) { z.vAlzo = (z.vAlzo || 0) - 0.6 * S; z.alzo = Math.max(0, z.alzo + z.vAlzo); if (z.alzo <= 0) { z.vAlzo = 0; polvere(z.x, q.base - 1, 5); } }
@@ -6894,6 +7008,26 @@
           z.vAlzo = 0; z.schianto = false; z.ruota = 0;
         }
       } else if (z.alzo > 0 && z.stato !== "salto") z.alzo = Math.max(0, z.alzo - 4 * S);      // colpito a mezz'aria: giù
+      // Sotto la lastra dove sta l'orda (col suolo vivo): fuori dalla buca, un balzo fin lassù.
+      if (z.alzo < 0 && z.stato !== "esce" && z.stato !== "giu") {
+        // il bruto no: è un tiratore, resta sul pavimento e spara da lì a chi sta sulla lastra, a distanza
+        if (z.tipo === "bruto" && corsa) { brutoDaSotto(z, q); continue; }
+        balzaSu(z, q); continue;
+      }
+      if (z.stato === "esce" && z.scava) {
+        // LO SCAVO (18/10/2026, Riccardo: «si devono vedere i nemici che scavano da giù per poi risalire»): 0-14 sotto
+        // terra (il suolo si gonfia, sputa terra a fiotti), al 14 la mano sfonda (la buca si apre), 14-46 risale a strattoni.
+        const yS = q.base - (z.alzo || 0);
+        if (z.s < 14 && z.s % 3 === 0 && particelle.length < 150) {
+          for (let i = 0; i < 2; i++) particelle.push({ tipo: "scheggia", x: z.x + caso(-7, 7) * S, y: yS - 1 * S, vx: caso(-1.2, 1.2) * S, vy: -caso(1.5, 3.2 + z.s * 0.12) * S, vita: 22, max: 22, colore: i ? "#6d5a48" : "#8f8377", rot: caso(0, 6) });
+          if (z.s % 6 === 0) suona("tonfo", z.x, 0.15);
+        }
+        if (z.s === 14) { squarciaSuolo(z.x, yS, z.scava, z.lava); suona(z.lava ? "fiamma" : "tonfo", z.x, 0.5); }
+        if (z.lava && z.s < 46 && z.s % 2 === 0 && particelle.length < 150) particelle.push({ tipo: "scheggia", x: z.x + caso(-9, 9) * S, y: yS - 2 * S, vx: caso(-0.8, 0.8) * S, vy: -caso(1.5, 4) * S, vita: 24, max: 24, colore: z.s % 4 ? "#ff8a2a" : "#ffd27a", rot: 0 });
+        if (z.s > 14 && z.s < 44 && (z.s - 14) % 8 === 0) { polvere(z.x, yS - 1, 3); if (particelle.length < 150) particelle.push({ tipo: "scheggia", x: z.x + caso(-10, 10) * S, y: yS - 2 * S, vx: caso(-1.6, 1.6) * S, vy: -caso(2, 4) * S, vita: 28, max: 28, colore: "#8f8377", rot: caso(0, 6) }); }
+        if (z.s >= 46) { z.stato = "va"; z.s = 0; z.scava = 0; }
+        continue;
+      }
       if (z.stato === "esce") {
         if (z.s % 6 === 0 && z.s < 40) polvere(z.x, q.base - 1, 1);
         // (si arrampica fuori: qualche zolla salta via a ogni spinta)
@@ -7267,6 +7401,17 @@
     const da = cs.indexOf(pc) > 0 ? cs[cs.indexOf(pc) - 1] : 0, u = Math.max(0, Math.min(1, (z.s - da) / Math.max(1, pc - da)));
     return { u: u * u * (3 - 2 * u), dopo: pc === cs[0] ? 1e9 : dopo, manca: pc - z.s, primo: pc === cs[0] };
   }
+  // IL MORSO (18/10/2026, Riccardo: «gli zombie cercano di addentare il giocatore con un'animazione fatta bene»): nella
+  // carica la bocca si spalanca e la testa va indietro; al colpo la testa scatta in avanti e le fauci si chiudono di
+  // colpo, le mani afferrano davanti; poi torna. `apre` 0..1 la bocca, `spinta` la testa avanti (-indietro), `giro` la nuca.
+  function morsoZ(z, tc) {
+    if (!tc) return { apre: z.stato === "giu" ? 0.3 : 0.15 + 0.1 * Math.sin(z.t * 0.13 + z.fase) * 0.5, spinta: 0, giro: 0 };
+    if (tc.dopo < 12) {
+      const a = tc.dopo, scatto = a < 4 ? 1 : Math.max(0, 1 - (a - 4) / 8);
+      return { apre: a < 1 ? 0.5 : a < 5 ? 0 : Math.min(0.4, (a - 5) / 10), spinta: scatto, giro: 0.12 * scatto, chiusa: a < 5 };
+    }
+    return { apre: 0.2 + 0.8 * tc.u, spinta: -0.45 * tc.u, giro: -0.4 * tc.u };
+  }
   function disegnaAvvisoColpo(z) {
     const tc = tempoColpoZ(z);
     if (!tc) return;
@@ -7304,14 +7449,27 @@
     const pelle = z.lampo > 0 ? "#ffffff" : z.gelo > 0 ? "#cfeeff" : bruto ? "#a3a199" : botto ? (z.stato === "colpo" && passi % 6 < 3 ? "#ff7a5a" : "#c9b27a") : gelido ? "#c4e6f5"
       : saltatore ? "#cbd96c" : sputatore ? "#bba3d2" : doro ? "#ffd84a" : rabbioso ? "#d9a08c" : capo ? "#8aa47c" : corazzato ? "#93b48a" : gonfio ? "#b9dc6e" : grosso ? "#86a878" : svelto ? "#b7d1a6" : "#9dbf8c";
     const scura = bruto ? "#66645e" : botto ? "#8f7a48" : gelido ? "#7fb0c8" : saltatore ? "#8a9a3a" : sputatore ? "#7d5f99" : doro ? "#b8901c" : rabbioso ? "#a8604c" : gonfio ? "#8fb650" : grosso ? "#628556" : "#6f9164";
-    const emerge = z.stato === "esce" ? Math.max(0, 1 - z.s / 46) : 0;
+    const emerge = sottoTerra(z);
     const k = z.stato === "giu" ? Math.min(1, z.s / 16) : 0;                   // 0 in piedi, 1 steso
     ctx.save();
     if (z.stato === "giu") ctx.globalAlpha = Math.max(0, 1 - Math.max(0, z.s - 26) / 24);
     // Chi sta uscendo dal terreno si vede solo sopra la linea del suolo.
     const fin = Math.max(1, sc);
     // Il ritaglio serve solo a chi sta uscendo dal terreno; per gli altri costa e basta (con trenta zombie si sente).
-    if (z.stato === "esce") { ctx.beginPath(); ctx.rect(z.x - 80 * S * fin, q.base - 120 * S * fin, 160 * S * fin, 120 * S * fin); ctx.clip(); }
+    if (z.stato === "esce") {
+      const yS = q.base - (z.alzo || 0);
+      if (z.scava && z.s < 20) {
+        // il suolo che si gonfia sopra chi scava, con le crepe che si allargano
+        const g = Math.min(1, z.s / 14), r = (10 + 8 * g) * S * fin;
+        ctx.save(); ctx.fillStyle = "#7d6f62"; ctx.strokeStyle = "#3a2f28"; ctx.lineWidth = 1 * S;
+        ctx.beginPath(); ctx.ellipse(z.x, yS, r, (1 + 4 * g + Math.sin(z.s * 1.7) * 0.8) * S, 0, Math.PI, 0); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = "#1a1310"; ctx.lineWidth = 1.2 * S; ctx.beginPath();
+        for (const a of [-0.8, -0.2, 0.5, 1.1]) { ctx.moveTo(z.x, yS - 2 * S * g); ctx.lineTo(z.x + Math.cos(a) * r * 0.9 * g, yS - Math.abs(Math.sin(a)) * 4 * S * g); }
+        ctx.stroke(); ctx.restore();
+      }
+      ctx.beginPath(); ctx.rect(z.x - 80 * S * fin, yS - 140 * S * fin, 160 * S * fin, 140 * S * fin); ctx.clip();
+    }
+
     // Il capo: un alone viola dietro, che pulsa.
     if (capo && z.stato !== "giu") {
       const g = ctx.createRadialGradient(z.x, q.base - 60 * S, 10 * S, z.x, q.base - 60 * S, 90 * S);
@@ -7326,6 +7484,9 @@
     }
     ctx.translate(z.x, q.base - (z.alzo || 0) + emerge * 62 * S * sc);
     ctx.scale(sc, sc);
+    // chi risale si dimena (a destra e a sinistra a ogni strattone); chi sta per balzare si accovaccia
+    if (z.stato === "esce" && z.scava && z.s >= 14) ctx.rotate(Math.sin(z.s * 0.55) * 0.12);
+    if (z.balzo && z.balzo.t <= 8) { const k = Math.sin(Math.min(1, z.balzo.t / 8) * Math.PI / 2); ctx.scale(1 + 0.12 * k, 1 - 0.22 * k); }
     // In aria per il contrattacco: gira su sé stesso intorno alla vita.
     if (z.ruota && z.alzo > 0) { ctx.translate(0, -34 * S); ctx.rotate(z.ruota); ctx.translate(0, 34 * S); }
     // La botta presa (18/10/2026, Riccardo: «ancora non vedo migliorate le animazioni… dei nemici»): indietro col busto
@@ -7342,7 +7503,7 @@
     // La carica e il colpo (vedi «GLI ATTACCHI CHE SI LEGGONO»): indietro e giù, poi tutto in avanti.
     const tc = tempoColpoZ(z);
     if (tc) {
-      if (tc.dopo < 8) { const k = 1 - tc.dopo / 8; ctx.translate(d * 5 * S * k, 0); ctx.rotate(d * 0.3 * k); ctx.scale(1 + 0.06 * k, 1 - 0.05 * k); }
+      if (tc.dopo < 10) { const k = tc.dopo < 2 ? 1 : 1 - liscio((tc.dopo - 2) / 8); ctx.translate(d * 9 * S * k, 0); ctx.rotate(d * 0.36 * k); ctx.scale(1 + 0.07 * k, 1 - 0.06 * k); }
       else { ctx.rotate(-d * 0.22 * tc.u + (tc.manca !== null && tc.manca <= 6 ? Math.sin(z.s * 2.3) * 0.02 : 0)); ctx.scale(1 + 0.05 * tc.u, 1 - 0.08 * tc.u); }
     }
     if (z.tipo === "striscia") {
@@ -7416,13 +7577,14 @@
     }
     ctx.restore();
     // La testa: storta, un occhio grande e uno piccolo, la bocca aperta.
-    const testa = { x: spalla.x + d * 3 * S, y: spalla.y - 10 * S + Math.sin(z.t * 0.11) * 0.8 * S };
+    const mz = morsoZ(z, tc);
+    const testa = { x: spalla.x + d * (3 + 8 * mz.spinta) * S, y: spalla.y - 10 * S + Math.sin(z.t * 0.11) * 0.8 * S + (mz.spinta > 0 ? 2.5 * mz.spinta : -2 * mz.spinta) * S };
     if (z.senzaTesta) {
       // Segato: al posto della testa, il collo mozzo.
       ctx.fillStyle = "#7fae4a"; ctx.strokeStyle = nero; ctx.lineWidth = 1 * S;
       ctx.beginPath(); ctx.ellipse(spalla.x + d * 1 * S, spalla.y - 2 * S, 4 * S, 2.2 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     } else {
-      ctx.save(); ctx.translate(testa.x, testa.y); ctx.rotate(d * (0.22 + 0.08 * Math.sin(z.t * 0.05)) - (z.botta > 0 ? d * 0.4 : 0));
+      ctx.save(); ctx.translate(testa.x, testa.y); ctx.rotate(d * (0.22 + 0.08 * Math.sin(z.t * 0.05) + mz.giro) - (z.botta > 0 ? d * 0.4 : 0));
       if (grosso) ctx.scale(0.86, 0.86);
       ctx.fillStyle = pelle; ctx.strokeStyle = nero; ctx.lineWidth = 1.1 * S;
       ctx.beginPath(); ctx.arc(0, 0, 8 * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -7497,8 +7659,32 @@
           ctx.restore();
         }
       }
-      ctx.fillStyle = "#3a1f24"; ctx.strokeStyle = nero; ctx.lineWidth = 0.8 * S;
-      ctx.beginPath(); ctx.ellipse(d * 2.6 * S, 4 * S, (2.2 + 1.2 * colpo) * S, (1.5 + 1.6 * colpo) * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      // La bocca: le fauci con i denti, che si aprono nella carica e si chiudono di scatto sul morso.
+      {
+        const bx = d * 3 * S, by = 3.2 * S, larga = (2.6 + 1.6 * mz.apre) * S, giu = (0.8 + 6.2 * mz.apre) * S;
+        ctx.fillStyle = "#2a1418"; ctx.strokeStyle = nero; ctx.lineWidth = 0.8 * S;
+        ctx.beginPath(); ctx.moveTo(bx - larga, by); ctx.quadraticCurveTo(bx, by - 1.4 * S, bx + larga, by);
+        ctx.quadraticCurveTo(bx + d * 0.6 * S, by + giu * 1.25, bx - larga * 0.8, by + giu * 0.7); ctx.closePath(); ctx.fill(); ctx.stroke();
+        if (mz.apre > 0.25) {
+          // denti storti, sopra e sotto
+          ctx.fillStyle = "#efe9cf"; ctx.beginPath();
+          for (const u of [-0.7, -0.2, 0.35, 0.8]) {
+            const x = bx + u * larga; ctx.moveTo(x - 0.8 * S, by - 0.2 * S); ctx.lineTo(x + 0.8 * S, by - 0.2 * S); ctx.lineTo(x, by + 1.6 * S);
+            const y2 = by + giu * (0.8 + 0.2 * u * d); ctx.moveTo(x - 0.7 * S, y2); ctx.lineTo(x + 0.7 * S, y2); ctx.lineTo(x + 0.1 * S, y2 - 1.4 * S);
+          }
+          ctx.fill();
+          // la lingua grigioverde in fondo
+          ctx.fillStyle = "#7a4a52"; ctx.beginPath(); ctx.ellipse(bx - d * 0.6 * S, by + giu * 0.75, larga * 0.5, 1.2 * S, 0, 0, Math.PI * 2); ctx.fill();
+        }
+        if (mz.chiusa) {
+          // lo schiocco: due archi bianchi davanti alla bocca che si chiudono
+          const u = Math.min(1, tc.dopo / 4);
+          ctx.strokeStyle = "rgba(255,255,255," + (0.95 - 0.8 * u).toFixed(2) + ")"; ctx.lineWidth = 1.6 * S; ctx.beginPath();
+          ctx.arc(bx + d * 7 * S, by - 3 * S, (5 + 4 * u) * S, Math.PI * 0.15, Math.PI * 0.85);
+          ctx.moveTo(bx + d * 7 * S + (5 + 4 * u) * S, by + 7 * S); ctx.arc(bx + d * 7 * S, by + 7 * S, (5 + 4 * u) * S, -Math.PI * 0.15, -Math.PI * 0.85, true);
+          ctx.stroke();
+        }
+      }
       ctx.restore();
     }
     if (gelido && z.stato !== "giu") {
@@ -7515,14 +7701,24 @@
       const g = grosso ? 1.25 : 1;
       let mano;
       if (tc && tc.dopo < 12) {
-        // Il colpo (18/10/2026, Riccardo: «ancora non vedo migliorati gli attacchi dei nemici»): la mano non scivola più
-        // in avanti ma cala ad arco, da sopra la testa giù davanti al petto, va oltre e torna. Quella dietro segue in ritardo.
-        const ritardo = su > 0 ? 1.5 : 0, a = Math.max(0, tc.dopo - ritardo);
-        const giu = a < 4 ? liscio(a / 4) : 1, torna = a > 5 ? liscio((a - 5) / 7) : 0;
-        const th = -1.75 + 2.35 * giu - 0.6 * torna, R = (24 + 4 * giu - 6 * torna) * g * S;
-        mano = { x: spalla.x + d * Math.cos(th) * R, y: spalla.y + su * S + Math.sin(th) * R };
+        // Il morso (vedi `morsoZ`): le mani, aperte in alto e in basso nella carica, si chiudono davanti alla bocca come
+        // una tagliola (quella dietro con un attimo di ritardo), tengono e poi lasciano.
+        const ritardo = su > 0 ? 1 : 0, a = Math.max(0, tc.dopo - ritardo);
+        const chiude = a < 3 ? liscio(a / 3) : 1, lascia = a > 6 ? liscio((a - 6) / 6) : 0;
+        const apertaX = 18, apertaY = su > 0 ? 9 : -14, presaX = 27, presaY = su > 0 ? 1 : -5;
+        const mx = apertaX + (presaX - apertaX) * chiude - 8 * lascia, my = apertaY + (presaY - apertaY) * chiude + 4 * lascia;
+        mano = { x: spalla.x + d * mx * g * S, y: spalla.y + my * S };
       }
-      else if (tc) mano = { x: spalla.x + d * (19 - 21 * tc.u) * g * S, y: spalla.y + (su - 27 * tc.u * g + Math.sin(z.t * 0.09 + su) * 1.2 * (1 - tc.u)) * S };
+      else if (tc) {
+        // la carica: le braccia avanti, una sale e una scende, le dita aperte; tremano un poco all'ultimo
+        const u = tc.u, trema = tc.manca !== null && tc.manca <= 6 ? Math.sin(z.s * 2.1 + su) * 1.2 : 0;
+        mano = { x: spalla.x + d * (19 - 1 * u) * g * S, y: spalla.y + (su * (1 + 2.4 * u) - 6 * u + trema + Math.sin(z.t * 0.09 + su) * 1.2 * (1 - u)) * S };
+      }
+      else if (z.stato === "esce" && z.scava) {
+        // dalla buca: le braccia su, a graffiare il bordo, una per volta
+        const tira = Math.sin(z.s * 0.55 + (su > 0 ? Math.PI : 0));
+        mano = { x: spalla.x + d * (6 + 5 * tira) * S, y: spalla.y + (-26 - 8 * Math.max(0, tira) + su) * S };
+      }
       else { const alza = (grosso ? 22 : 9) * colpo * (1 - colpo) * 4; mano = { x: spalla.x + d * (19 + 6 * colpo) * S, y: spalla.y + (su - alza + Math.sin(z.t * 0.09 + su) * 1.2 + (svelto ? 5 : 0)) * S }; }
       const gomito = { x: (spalla.x + mano.x) / 2, y: (spalla.y + mano.y) / 2 + 2.2 * S };
       ctx.strokeStyle = nero; ctx.lineWidth = (grosso ? 7.4 : 5.4) * S; ctx.beginPath(); ctx.moveTo(spalla.x, spalla.y + su * S); ctx.lineTo(gomito.x, gomito.y); ctx.lineTo(mano.x, mano.y); ctx.stroke();
@@ -7546,8 +7742,11 @@
     segnoNuovo(z);
   }
   function braccioBruto(z, spalla, d, pelle, scura, nero, colpo, Z) {
-    const punta = z.stato === "granata" ? Math.min(1, z.s / 12) * (z.s > BRUTO.mira ? Math.max(0, 1 - (z.s - BRUTO.mira) / 14) : 1) : 0;
-    const rinculo = z.stato === "granata" && z.s >= BRUTO.mira && z.s < BRUTO.mira + 8 ? (BRUTO.mira + 8 - z.s) / 8 : 0;
+    const fineR = BRUTO.rMira + BRUTO.rPasso * BRUTO.rColpi, kr = z.s - BRUTO.rMira;
+    const punta = z.stato === "granata" ? Math.min(1, z.s / 12) * (z.s > BRUTO.mira ? Math.max(0, 1 - (z.s - BRUTO.mira) / 14) : 1)
+      : z.stato === "raffica" ? Math.min(1, z.s / 8) * 0.55 * (z.s > fineR ? Math.max(0, 1 - (z.s - fineR) / 10) : 1) : 0;
+    const rinculo = z.stato === "granata" && z.s >= BRUTO.mira && z.s < BRUTO.mira + 8 ? (BRUTO.mira + 8 - z.s) / 8
+      : z.stato === "raffica" && kr >= 0 && kr < BRUTO.rPasso * BRUTO.rColpi ? Math.max(0, 1 - (kr % BRUTO.rPasso) / 4) * 0.6 : 0;
     const gx = spalla.x + d * (9 - 4 * rinculo) * S, gy = spalla.y + (15 - 3 * punta) * S - colpo * 6 * S;
     const ang = -0.38 * punta - 0.25 * rinculo + colpo * 0.5;
     const locale = (u, v) => ({ x: gx + d * (Math.cos(ang) * u - Math.sin(ang) * v) * S, y: gy + (Math.sin(ang) * u + Math.cos(ang) * v) * S });
@@ -7567,12 +7766,18 @@
     ctx.strokeStyle = nero; ctx.fillStyle = "#4a5a3a"; rettangoloTondo(12 * S, -3.2 * S, 14 * S, 6.4 * S, 1.6 * S); ctx.fill(); ctx.stroke();
     ctx.fillStyle = "#2f382c"; rettangoloTondo(25 * S, -4.2 * S, 3.6 * S, 8.4 * S, 1 * S); ctx.fill(); ctx.stroke();
     ctx.fillStyle = "#4a3a30"; ctx.beginPath(); ctx.moveTo(-9 * S, -2 * S); ctx.lineTo(-15 * S, 1 * S); ctx.lineTo(-15 * S, 5 * S); ctx.lineTo(-8 * S, 4 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
-    if (z.stato === "granata" && z.s < BRUTO.mira && passi % 6 < 4) {
+    if (((z.stato === "granata" && z.s < BRUTO.mira) || (z.stato === "raffica" && z.s < BRUTO.rMira)) && passi % 6 < 4) {
       // Il puntino rosso: sta per tirare.
       ctx.save(); ctx.shadowColor = "#ff2a2a"; ctx.shadowBlur = 8 * S; tondo(29 * S, -0.5 * S, 2 * S, "#ff2a2a"); ctx.restore();
     }
     ctx.restore();
     if (!z.senzaBraccio) braccio({ x: spalla.x + d * 2 * S, y: spalla.y - 2 * S }, locale(14, 3), pelle);
+    if (z.stato === "raffica" && z.s < BRUTO.rMira) {
+      // il raggio rosso del mirino, che si accende sempre più deciso
+      const o = locale(29, -0.5), k = z.s / BRUTO.rMira;
+      ctx.save(); ctx.globalAlpha = 0.15 + 0.45 * k; ctx.strokeStyle = "#ff2a2a"; ctx.lineWidth = 1 * S;
+      ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(o.x + d * Math.cos(ang) * 220 * S, o.y + Math.sin(ang) * 220 * S); ctx.stroke(); ctx.restore();
+    }
   }
   // Sopra il primo nemico nuovo del round, per tre secondi: una freccia d'oro che saltella.
   function segnoNuovo(z) {
@@ -7882,7 +8087,10 @@
   // Trascinando il ritratto oltre metà finestra, passa nell'altro angolo.
   const RAD = { centro: 64, dentro: 124, fuori: 188 };
   function geometriaRadiale() {
-    const U = Math.max(S, 1), n = vociRadiale().length, sx = radiale.lato === "sx" ? 1 : -1;
+    // (nell'angolo dello schermo, `__ringRadialeInBasso`: non più alto della fascia del pavimento, così non copre il campo;
+    // 18/10/2026, Riccardo: «il menu deve essere più piccolo e non prendere il sopra il terreno di gioco»)
+    const U = window.__ringRadialeInBasso ? Math.min(Math.max(S, 1), Math.max(0.58, (H - pavimento) * 1.02 / RAD.fuori)) : Math.max(S, 1);
+    const n = vociRadiale().length, sx = radiale.lato === "sx" ? 1 : -1;
     // (`__ringRadialeInBasso`: nell'angolo dello schermo e non sul pavimento, che nelle arene sta più in alto; sito del
     // gioco, 18/10/2026, Riccardo: «i comandi radiali mettili in basso a destra e non sopra il terreno»)
     const x = sx < 0 ? W : 0, y = window.__ringRadialeInBasso ? H : pavimento;
@@ -14924,6 +15132,13 @@
     if (!c || !c.chi || c.fase !== "lotta" || !q || !q.ricetta) return false;
     preparaFase();
     const r = ricettaFase(), R = q.ricetta;
+    // Il nemico nuovo entra subito, non in fondo a quello che resta della fase prima (18/10/2026, Riccardo: «alla minaccia 4
+    // ancora non sono arrivati»): i primi due della sua specie passano in testa alla coda.
+    if (c.nuovo) {
+      const primi = [];
+      for (let i = 0; i < r.coda.length && primi.length < 2; i++) if (r.coda[i].tipo === c.nuovo) { primi.push(r.coda.splice(i, 1)[0]); i--; }
+      primi.forEach((e, k) => { e.attesa = Math.min(e.attesa || 0, 40 + 120 * k); R.coda.splice(Math.min(R.coda.length, 1 + 3 * k), 0, e); });
+    }
     R.coda.push(...r.coda);
     R.totale += r.totale; R.n = r.n; R.tema = r.tema; R.arrivo = r.arrivo; R.maxVolo = r.maxVolo;
     R.insieme = R.insiemeBase = r.insieme;
@@ -15561,6 +15776,7 @@
     c.tiri = c.tiri.filter((t) => {
       t.t++;
       if (t.tipo === "granata") return aggiornaGranata(t, f, vivo, base);
+      if (t.tipo === "proiettile") return aggiornaProiettile(t, f, vivo);
       if (t.tipo === "saetta") {
         if (t.t === t.scocca) {
           suona("tuono", t.x1, 0.45); scossa = Math.max(scossa, 5); scintille(t.x1, t.y1, 10, "#fff6a8");
@@ -16041,6 +16257,16 @@
           ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2 * S; ctx.stroke();
         }
         ctx.globalAlpha = 1;
+        continue;
+      }
+      if (t.tipo === "proiettile") {
+        // una scia gialla e un nucleo bianco; rimandato, d'oro e più grosso
+        const lung = t.rimandato ? 4 : 3;
+        ctx.save(); ctx.lineCap = "round";
+        ctx.strokeStyle = t.rimandato ? "rgba(255,216,74,.8)" : "rgba(255,190,80,.7)"; ctx.lineWidth = (t.rimandato ? 4 : 2.6) * S;
+        ctx.beginPath(); ctx.moveTo(t.x - t.vx * lung, t.y - t.vy * lung); ctx.lineTo(t.x, t.y); ctx.stroke();
+        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.2 * S; ctx.beginPath(); ctx.moveTo(t.x - t.vx * 1.2, t.y - t.vy * 1.2); ctx.lineTo(t.x, t.y); ctx.stroke();
+        ctx.restore();
         continue;
       }
       if (t.tipo === "granata") {
@@ -16607,7 +16833,8 @@
   function disegnaCorsa() {
     tastiUI = [];
     // (dal 17/10/2026 la scelta del modo è il menu principale: vedi «IL MENU»)
-    if (sceltaModo && !corsa && !menu) menu = { pagina: "principale", pila: [], sel: 0, t: 0, guida: 0, conferma: 0 };
+    // (non mentre è aperta la classifica: si riapriva il menu sopra e la classifica dal menu principale non si vedeva mai)
+    if (sceltaModo && !corsa && !menu && !classifica.aperta) menu = { pagina: "principale", pila: [], sel: 0, t: 0, guida: 0, conferma: 0 };
     if (menu && !(corsa && corsa.chi)) { ctx.save(); disegnaMenu(); ctx.restore(); return; }
     const c = corsa;
     if (c) {
