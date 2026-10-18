@@ -29,7 +29,12 @@ function riquadro(l, t, r, b) {
   return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
 }
 
-function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false, premio = null, pannello = false, audio = null, arena = null, globali = {} } = {}) {
+// (`nuovo`: un giocatore che non ha mai giocato, con la prima corsa guidata e le schede dei nemici nuovi. Di serie no:
+// i test della corsa vogliono l'orda subito, senza schede che fermano il gioco. Vedi «LA PRIMA CORSA GUIDATA».)
+const GIA_VISTI = JSON.stringify({ lento: 1, svelto: 1, corvo: 1, striscia: 1, botto: 1, dragoFuoco: 1, gonfio: 1, saltatore: 1, dragoFulmine: 1, corazzato: 1, gelido: 1,
+  grosso: 1, dragoVeleno: 1, sputatore: 1, rabbioso: 1, bruto: 1, capo: 1, doro: 1, letale: 1, motosega: 1 });
+function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false, premio = null, pannello = false, audio = null, arena = null, globali = {}, nuovo = false } = {}) {
+  if (!nuovo) { if (!("mut-ring-guida" in memoria)) memoria["mut-ring-guida"] = "fatta"; if (!("mut-ring-presentati" in memoria)) memoria["mut-ring-presentati"] = GIA_VISTI; }
   const richieste = [];
   const ascoltatori = {};
   const contesto2d = new Proxy({}, {
@@ -4582,7 +4587,9 @@ test("bruto armato: col parry al momento giusto la granata torna indietro e scop
 
 test("bruto armato: morendo lascia il fucile-sega, e l'eroe lo prende in mano", () => {
   let preso = false, lasciato = false;
-  for (let k = 0; k < 3 && !preso; k++) {
+  // (cinque tentativi: la bestia agile del 18/10/2026 sera schiva, e l'eroe automatico ci mette di più ad abbatterla;
+  // misurato su dieci semi, prima e dopo, non la prende in un minuto 3-4 volte su 10)
+  for (let k = 0; k < 5 && !preso; k++) {
     const { amb, r } = corsaColBruto(940 + k, 45);           // (addosso: da lontano il bruto tiene la distanza)
     avanzaCorsa(amb, r, 60 * 60, (s) => {
       if ((s.corsa.aTerra || []).indexOf("motosega") >= 0) lasciato = true;
@@ -4995,4 +5002,73 @@ test("arena che si rompe: esplosioni, meteore e urti arrivano all'ospite; senza 
   senza.avanza(30);
   senza.finestra.__ring.scoppia(300, 500, true);
   assert.strictEqual(fuori.length, 0, "fuori da un'arena l'hook non si chiama");
+});
+
+// --- La prima corsa guidata (18/10/2026 sera) ------------------------------------------------------------------------
+test("la prima corsa è giocata con la guida: il tempo si ferma sul colpo e aspetta il tasto; la seconda corsa no", () => {
+  // (Riccardo: «il tutorial deve essere un gameplay guidato… per il parry rallenta il gioco quando si avvicina
+  // l'avversario e nel momento in cui si deve fare il parry aspetta che il giocatore prema il tasto»)
+  const { amb, r } = corsaAvviata({ nuovo: true }, "robot", 4242);
+  const fermo = (passo) => {
+    let s = null;
+    amb.avanza(60 * 40, (st) => { s = st; return !(st.corsa.guida === passo && st.corsa.fermo); });
+    assert.ok(s.corsa.fermo, "al passo «" + passo + "» il tempo si ferma sul colpo");
+    // fermo davvero: i fotogrammi passano, il gioco no, finché non si preme
+    const t0 = amb.stato().tempo; amb.avanza(90);
+    assert.strictEqual(amb.stato().tempo, t0, "fermo finché non si preme");
+    assert.ok(r.tempoParry().fermo, "il tasto della parata lo sa (il sito lo fa pulsare)");
+  };
+  assert.ok(!amb.stato().corsa.scheda, "niente pagine da leggere: si gioca subito");
+  fermo("parata");
+  r.premi("para"); r.lascia("para");                       // (un tocco: vale come tenuto)
+  amb.avanza(60 * 4, (st) => st.corsa.guida === "parata");
+  assert.strictEqual(amb.stato().corsa.guida, "parata-ok", "il morso finisce sulla parata");
+  fermo("parry");
+  r.premi("para"); r.lascia("para");
+  let parry = false;
+  amb.avanza(60 * 3, (st) => { if (st.scritte.some((x) => x === "PARRY!" || x === "PARRY PERFETTO!")) parry = true; return !parry; });
+  assert.ok(parry, "premuto a tempo fermo: parry");
+  // da soli: il tempo rallenta dentro la finestra ma non si ferma; si preme quando l'anello è d'oro
+  amb.avanza(60 * 8, (st) => st.corsa.guida !== "da-solo");
+  assert.strictEqual(amb.stato().corsa.guida, "da-solo");
+  let premuto = false;
+  amb.avanza(60 * 60, (st) => {
+    assert.ok(!st.corsa.fermo || st.corsa.aiuto === "parry", "da soli il tempo non si ferma (se non dopo due errori)");
+    const m = r.minacciaParry();
+    if (m !== null && m <= 8 && !premuto) { r.premi("para"); r.lascia("para"); premuto = true; }
+    if (m === null) premuto = false;
+    if (st.corsa.fermo) { r.premi("para"); r.lascia("para"); }
+    return st.corsa.guida === "da-solo";
+  });
+  assert.strictEqual(amb.stato().corsa.guida, "fine");
+  amb.avanza(60 * 4);
+  assert.strictEqual(amb.stato().corsa.guida, null, "guida finita: l'orda parte");
+  assert.strictEqual(amb.memoria["mut-ring-guida"], "fatta");
+  const dopo = corsaAvviata({ nuovo: true, memoria: Object.assign({}, amb.memoria) }, "mela", 77);
+  avanzaCorsa(dopo.amb, dopo.r, 60 * 6);
+  assert.strictEqual(dopo.amb.stato().corsa.guida, null, "la seconda volta la guida non c'è");
+  dentro(amb);
+});
+
+test("nemici nuovi e fucile-sega: la prima volta una scheda dice cosa fanno e come fermarli, poi mai più", () => {
+  const { amb, r } = corsaAvviata({ nuovo: true, memoria: { "mut-ring-guida": "fatta" } }, "robot", 960);
+  const chiudiTutte = (st) => { if (st.corsa && st.corsa.scheda && st.corsa.scheda.chiave !== "bruto" && st.corsa.scheda.chiave !== "motosega") r.premi("para"); };
+  avanzaCorsa(amb, r, 60 * 3, (s) => { chiudiTutte(s); return s.orda && s.corsa.fase === "lotta" ? false : undefined; });
+  const f = amb.lottatore("robot");
+  r.zombie("bruto", f.bacino.x + 200);
+  let s = null;
+  amb.avanza(60 * 8, (st) => { s = st; chiudiTutte(st); return !(st.corsa && st.corsa.scheda && st.corsa.scheda.chiave === "bruto"); });
+  assert.strictEqual(s.corsa.scheda && s.corsa.scheda.chiave, "bruto", "la bestia armata si presenta");
+  amb.avanza(30); r.premi("para");
+  assert.ok(JSON.parse(amb.memoria["mut-ring-presentati"]).bruto, "e resta nel salvataggio");
+  // il suo primo colpo (la raffica o la granata) è guidato: il tempo si ferma e aspetta il parry
+  let fermo = false;
+  amb.avanza(60 * 20, (st) => { if (st.corsa.fermo) { fermo = true; return false; } });
+  assert.ok(fermo, "il primo colpo della bestia ferma il tempo");
+  r.premi("para"); r.lascia("para"); amb.avanza(120);
+  r.corsa.lascia("motosega");
+  let sega = false;
+  avanzaCorsa(amb, r, 60 * 8, (st) => { if (st.corsa.scheda && st.corsa.scheda.chiave === "motosega") { sega = true; return false; } chiudiTutte(st); });
+  assert.ok(sega, "il fucile-sega, preso la prima volta, si spiega");
+  dentro(amb);
 });
