@@ -3349,7 +3349,7 @@ test("la corsa: gemme e livelli a metà lotta, col tempo fermo mentre si sceglie
   avanzaCorsa(amb, r, 300);
   let s = amb.stato();
   assert.ok(s.corsa.armi.dardi === 1, "si parte con l'arma della propria famiglia");
-  r.corsa.esperienza(12);
+  r.corsa.esperienza(70);           // (il primo livello costa 58 dal 18/10/2026 sera: vedi `xpPerLivello`)
   amb.avanza(2);
   s = amb.stato();
   assert.ok(s.corsa.carte && s.corsa.carte.length === 3, "un livello: tre carte");
@@ -3871,7 +3871,7 @@ test("la tastiera nella corsa: A sceglie il robot, Q W E le carte, X C V gli ogg
   assert.ok(r.tastoGiu("KeyA"), "A: si gioca col robot (sta a sinistra)");
   assert.strictEqual(amb.stato().corsa.chi, "robot");
   avanzaCorsa(amb, r, 200);
-  r.corsa.esperienza(40); amb.avanza(2);
+  r.corsa.esperienza(70); amb.avanza(2);
   assert.ok(amb.stato().corsa.carte, "un livello: le carte");
   assert.ok(r.tastoGiu("KeyW"), "W prende la seconda carta");
   assert.ok(!amb.stato().corsa.carte || amb.stato().corsa.liv > 1);
@@ -3986,7 +3986,7 @@ test("l'audio: la lotta suona, la mira canta, la corsa ha i suoi suoni, e nessun
   r.spara();
   amb.avanza(400);
   r.corsa.apri(7); amb.avanza(20); r.corsa.scegli("mela"); avanzaCorsa(amb, r, 300);
-  r.corsa.esperienza(30); r.corsa.forziere(); avanzaCorsa(amb, r, 20); r.corsa.vinci(); avanzaCorsa(amb, r, 300);
+  r.corsa.esperienza(70); r.corsa.forziere(); avanzaCorsa(amb, r, 20); r.corsa.vinci(); avanzaCorsa(amb, r, 300);
   r.corsa.finisci();
   assert.strictEqual(Finto.conto.cattivi, 0, "nessuna frequenza o volume che un browser vero rifiuterebbe");
   dentro(amb);
@@ -4595,22 +4595,41 @@ test("bruto armato: morendo lascia il fucile-sega, e l'eroe lo prende in mano", 
   assert.ok(preso, "l'eroe non ha preso il fucile-sega");
 });
 
-test("fucile-sega: da vicino sega, e lo zombie segato va in pezzi", () => {
+test("fucile-sega: la parata è l'agguato, il primo che arriva va in due a rallentatore e la sega si rompe", () => {
+  // (18/10/2026 sera, Riccardo: «quando ho il fucile con motosega in mano e premo la difesa mi metto in modalità che appena
+  // un avversario arriva lo affetto in due… ogni volta che uso la motosega si rompe e la butto via»)
   const { amb, r } = corsaAvviata({}, "robot", 960);
   avanzaCorsa(amb, r, 60 * 10, (s) => (s.orda && s.corsa.fase === "lotta" ? false : undefined));
   r.corsa.lascia("motosega");
-  const f = amb.lottatore("robot");
-  for (const dx of [60, 95, -70]) r.zombie("lento", f.bacino.x + dx);
-  let sega = false, pezzi = false, inMano = false;
-  avanzaCorsa(amb, r, 60 * 15, (s) => {
+  let f = amb.lottatore("robot");
+  let inMano = false, segaDaSolo = false;
+  avanzaCorsa(amb, r, 60 * 6, (s) => {
     const e = s.lottatori.find((l) => l.tipo === "robot");
-    if (e.arma === "motosega") inMano = true;
-    if (e.azione === "sega") sega = true;
-    if (s.scritte.some((x) => x === "SQUARCH!")) { pezzi = true; return false; }
+    if (e.azione === "sega") segaDaSolo = true;
+    if (e.arma === "motosega") { inMano = true; return false; }
   });
   assert.ok(inMano, "passandoci sopra il fucile-sega va in mano");
-  assert.ok(sega, "da vicino l'eroe deve segare");
-  assert.ok(pezzi, "lo zombie segato deve andare in pezzi");
+  assert.ok(r.tempoParry().sega, "il tasto della parata lo sa: in mano c'è la sega");
+  // un tocco solo della parata: l'agguato resta anche lasciato il tasto
+  assert.ok(r.premi("para")); r.lascia("para");
+  f = amb.lottatore("robot");
+  assert.ok(r.tempoParry().agguato, "in agguato");
+  amb.avanza(20);
+  assert.strictEqual(amb.lottatore("robot").azione, "para", "lasciato il tasto, l'agguato non si chiude subito");
+  for (const dx of [90, -120]) r.zombie("lento", amb.lottatore("robot").bacino.x + dx);
+  let squarcio = false, scritta = false, rotta = false, prima = null;
+  avanzaCorsa(amb, r, 60 * 8, (s) => {
+    const e = s.lottatori.find((l) => l.tipo === "robot");
+    if (e.azione === "sega") segaDaSolo = true;
+    if (e.azione === "squarcio") { squarcio = true; if (prima === null) prima = s.orda.uccisi; }
+    if (s.scritte.some((x) => x === "SQUARCIATO!")) scritta = true;
+    if (s.scritte.some((x) => x === "SEGA ROTTA!") && e.arma !== "motosega") { rotta = true; return false; }
+  });
+  assert.ok(squarcio, "il primo che arriva a portata: lo squarcio");
+  assert.ok(scritta, "«SQUARCIATO!»");
+  assert.ok(rotta, "dopo il taglio la sega si rompe e non è più in mano");
+  assert.ok(amb.stato().orda.uccisi > prima, "lo zombie tagliato è giù");
+  assert.ok(!segaDaSolo, "chi gioca non sega più da solo: la sega è solo l'agguato");
   dentro(amb);
 });
 

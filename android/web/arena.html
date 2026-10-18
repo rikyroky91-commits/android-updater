@@ -166,6 +166,12 @@
       }
       return v;
     }
+    // L'altezza del terreno la può decidere chi ospita l'arena (18/10/2026, il sito del gioco, Riccardo: «abbassa il terreno
+    // perché prende troppo schermo, usa il livello del terreno come linea di confine tra l'ui e il gameplay»):
+    // `window.__ringAltezzaSuolo(tipo, W, H, largo)` → pixel dal fondo dello schermo, o niente per le misure di sempre.
+    function suoloOspite(t, W, H, largo) {
+      try { var v = typeof window.__ringAltezzaSuolo === "function" ? +window.__ringAltezzaSuolo(t, W, H, largo) : 0; return v > 0 ? Math.round(Math.min(H * 0.4, v)) : 0; } catch (e) { return 0; }
+    }
     var fisso = [];   // gli addobbi che non dipendono dalle misure (si creano una volta)
     var suolo = null;  // il pavimento di pietra del cortile, che risponde alle botte (vedi «Il suolo»)
 
@@ -174,7 +180,7 @@
       scena.textContent = ""; pedane = []; suolo = null; segni = [];
       if (tipo === "lava") {
         el("div", "monti dietro"); el("div", "monti");
-        var lava = Math.round(H * (largo ? 0.16 : 0.13));
+        var lava = suoloOspite("lava", W, H, largo) || Math.round(H * (largo ? 0.16 : 0.13));
         window.__ringArena = { lava: lava };
         var mw = Math.min(largo ? W * 0.56 : W * 0.8, 620), ml = (W - mw) / 2, mt = H * (largo ? 0.6 : 0.6);
         pedana("lastra", ml, mt, mw, Math.round(Math.min(90, H * 0.1)));
@@ -205,7 +211,7 @@
       } else if (tipo === "arena") {
         // Il cortile: il pavimento è quello del motore e va da un bordo all'altro (niente da cui cadere);
         // sopra, tre lastre sospese a due altezze, tutte fragili.
-        var ft = Math.round(H * (largo ? 0.8 : 0.76));
+        var ft = H - (suoloOspite("arena", W, H, largo) || Math.round(H * (largo ? 0.2 : 0.24)));
         window.__ringArena = { lava: 0, pavimento: H - ft };
         el("div", "luna");
         el("div", "citta", "bottom:" + (H - ft) + "px;height:" + Math.round(H * 0.34) + "px");

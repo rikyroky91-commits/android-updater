@@ -1348,8 +1348,27 @@
         break;
       }
       case "para":
+        if (f.agguato !== undefined && f.arma && f.arma.tipo === "motosega") {
+          // L'agguato della sega: basso sulle gambe, la lama accesa avanti all'altezza della pancia, che vibra.
+          const vib = Math.sin(f.t * 2.3) * 0.6;
+          q.manoA = [40 + vib, 27]; q.gomitoA = [43, 16]; q.manoD = [38 + vib, 21]; q.gomitoD = [40, 10];
+          q.piedeA = [0, 15]; q.piedeD = [0, -13]; q.ginocchioA = [13, 13]; q.ginocchioD = [12, -8];
+          q.bacino[1] -= 3; q.collo[0] += 2; q.testa[0] += 3; q.testa[1] += 3; q.collo[1] += 2;
+          break;
+        }
         q.manoA = [58, 9]; q.gomitoA = [46, 11]; q.manoD = [56, 5]; q.gomitoD = [44, 6];
         q.collo[1] -= 2; q.testa[1] -= 2; q.bacino[0] -= 2; break;
+      case "squarcio": {
+        // Lo squarcio: la lama tirata indietro, poi il fendente orizzontale a tutto braccio (al sesto fotogramma il
+        // taglio), il corpo che gira dietro al colpo, e il colpo che resta lì mentre la sega si rompe.
+        const T = AGGUATO.taglio, k = f.t < T ? liscio(f.t / T) : 1, dopo = f.t > T ? Math.min(1, (f.t - T) / 8) : 0;
+        const ind = 1 - k;
+        q.manoA = [46 - 4 * k, -4 * ind + 34 * k - 6 * dopo]; q.gomitoA = [48 - 2 * k, 2 * ind + 22 * k - 4 * dopo];
+        q.manoD = [44 - 4 * k, -8 * ind + 28 * k - 6 * dopo]; q.gomitoD = [44 - 2 * k, -2 * ind + 16 * k - 3 * dopo];
+        q.piedeA = [0, 10 + 8 * k]; q.piedeD = [0, -12 - 4 * k]; q.ginocchioA = [14, 9 + 8 * k]; q.ginocchioD = [13, -8 - 3 * k];
+        q.bacino[0] += 4 * k - 4 * ind; q.collo[0] += 6 * k - 3 * ind; q.testa[0] += 7 * k - 3 * ind; q.collo[1] += 3 * k; q.testa[1] += 4 * k;
+        break;
+      }
       case "contro": {
         if (f.cinema) { posaCinema(q, f.t); break; }
         // Il parry e il contrattacco (vedi PARRY): il braccio davanti spazza via il colpo dall'alto verso l'esterno,
@@ -2005,7 +2024,7 @@
                    carica: 70, onda: 80, raffica: 40, rush: 44,
                    sfera: 150, disco: 56, lampo: 40, barriera: 110, avvinghia: 96, telecinesi: 124,
                    trasforma: 96, gelo: 44, rimpicciolisci: 40, fulmine: 50, levita: 100,
-                   falene: 46, catene: 40, stelle: 62, smeraldo: 104, respinta: 26, contro: 28,
+                   falene: 46, catene: 40, stelle: 62, smeraldo: 104, respinta: 26, contro: 28, squarcio: 30,
                    affondo: 24, rovescio: 26, scattoLama: 44, lancioLama: 40, pressa: 50, testata: 22,
                    cavallina: 46, sgabello: 46, trottola: 34, insieme: 38, bolide: 50, fionda: 34 };
 
@@ -2071,9 +2090,12 @@
       if (f.azione === "spara" && f.t === 10 && f.arma) spara(f, altro);
       if (f.azione === "fiammata" && f.arma) fiammata(f, altro);
       if (f.azione === "sega" && f.arma) sega(f, altro);
+      if (f.azione === "para" && f.agguato !== undefined) agguatoSega(f, altro);
+      if (f.azione === "squarcio") eseguiSquarcio(f);
       if (anime) eseguiAnime(f, altro);
       if (lame()) eseguiLama(f, altro);
       if (f.t >= f.durata) {
+        if (f.azione === "sega") rompiSega(f);              // (la sega si usa una volta: vedi «L'AGGUATO DELLA SEGA»)
         if ((f.azione === "spara" || f.azione === "fiammata" || f.azione === "fendente") && f.arma && f.colpiArma <= 0) {
           f.tel = f.arma; f.arma.stato = "portato"; f.arma = null; inizia(f, "lancia"); return;
         }
@@ -2196,6 +2218,8 @@
       if (f.azione === "spara" && f.t === 10 && f.arma) spara(f, altro);
       if (f.azione === "fiammata" && f.arma) fiammata(f, altro);
       if (f.azione === "sega" && f.arma) sega(f, altro);
+      if (f.azione === "para" && f.agguato !== undefined) agguatoSega(f, altro);
+      if (f.azione === "squarcio") eseguiSquarcio(f);
       if (f.azione === "estrai" && f.t === 14 && !f.tel) estraiDuo(f);
       if (anime) eseguiAnime(f, altro);
       else if (f.azione === "trasforma") eseguiTrasforma(f, altro);   // il ring libero: colosso e albero
@@ -2223,6 +2247,7 @@
         }
         if (f.azione === "solleva" && f.tel) { inizia(f, "lancia"); return; }
         if (f.azione === "estrai" && f.tel) { inizia(f, "lancia"); return; }
+        if (f.azione === "sega") rompiSega(f);              // (la sega si usa una volta: vedi «L'AGGUATO DELLA SEGA»)
         // Finiti i colpi l'arma vuota si tira addosso all'avversario.
         if ((f.azione === "spara" || f.azione === "fiammata" || f.azione === "fendente") && f.arma && f.colpiArma <= 0) {
           f.tel = f.arma; f.arma.stato = "portato"; f.arma = null; inizia(f, "lancia"); return;
@@ -2541,6 +2566,140 @@
     if (tenuta) { f.durata = PARRY.guardiaMax; f.guardia = true; }
     if (!(f.paraRiposo > tempo)) { f.paraT0 = tempo; f.paraRiposo = tempo + PARRY.riposo; }
     else f.paraT0 = undefined;
+    // Col fucile-sega in mano la guardia è l'agguato (vedi «L'AGGUATO DELLA SEGA»): dura di più anche a tocco singolo.
+    if (segaInMano(f)) { f.agguato = tempo; f.durata = Math.max(f.durata, AGGUATO.durata); } else f.agguato = undefined;
+  }
+  // ·· L'AGGUATO DELLA SEGA (18/10/2026, Riccardo: «quando ho il fucile con motosega in mano e premo la difesa mi metto in
+  // modalità che appena un avversario arriva lo affetto in due con un'animazione a rallentatore come il parry, dove arti e
+  // pezzi di nemici vanno in giro per il ring. Ogni volta che uso la motosega si rompe e la butto via») ··
+  // La parata, col fucile-sega in mano, mette in posa: la lama accesa avanti, la catena che gira. Il primo nemico che
+  // entra a portata (davanti o dietro: ci si gira) parte lo SQUARCIO: un attimo fermo, il tempo a un terzo, la camera
+  // che stringe, un fendente orizzontale e lo zombie tagliato in due all'altezza della pancia; la metà di sopra vola via
+  // girando, quella di sotto crolla, le braccia e la poltiglia schizzano per il ring. Il capo non si taglia: perde un
+  // terzo della vita. Contro l'avversario del duello volano due arti. Poi la sega si rompe: la catena salta, l'arma vola
+  // via dietro, rotta. La sega si usa solo così: chi gioca non sega più da solo (spara ancora da lontano), e gli altri
+  // lottatori che segano la rompono lo stesso, dopo la prima segata.
+  const AGGUATO = { durata: 150, portata: 66, rallentatore: 56, taglio: 6, rompe: 14 };
+  const segaInMano = (f) => !!(f && f.arma && f.arma.tipo === "motosega");
+  // Chi è a portata della lama in agguato: uno zombie a terra (non in volo, non sotto terra), o l'avversario del duello.
+  function predaSega(f, altro) {
+    const R = AGGUATO.portata * S;
+    let meglio = null, dm = R;
+    if (orda && Math.abs(orda.base - f.base) <= 30 * S) for (const z of orda.zombie) {
+      if (!vivoZ(z) || z.volo || z.inBuco || z.stato === "esce") continue;
+      const d = Math.abs(z.x - f.p.bacino.x);
+      if (d < dm) { dm = d; meglio = z; }
+    }
+    if (altro && altro.p && !altro.ko && !altro.esploso && !altro.preso && !altro.fuoriCampo && altro.tipo &&
+        Math.abs(altro.base - f.base) <= 30 * S && Math.abs(altro.p.bacino.x - f.p.bacino.x) < dm && (!corsa || corsa.fase === "lotta")) meglio = altro;
+    return meglio;
+  }
+  // A ogni passo dell'agguato: la catena che gira, e chi arriva a portata.
+  function agguatoSega(f, altro) {
+    if (!segaInMano(f)) { f.agguato = undefined; return; }
+    const t = f.arma;
+    if ((tempo - f.agguato) % 8 === 0) { suona("taglio", t.x, 0.22); if (particelle.length < MAX_PARTICELLE) scintille(t.x + Math.cos(t.a) * 22 * S, t.y + 6 * S, 1, "#ffe27a"); }
+    const b = predaSega(f, altro);
+    if (!b) return;
+    f.dir = (b.p ? b.p.bacino.x : b.x) >= f.p.bacino.x ? 1 : -1;
+    f.agguato = undefined; f.guardia = false; f.paraT0 = undefined; f.premutoS = undefined;
+    inizia(f, "squarcio"); f.squarcioDi = b;
+    f.riparo = Math.max(f.riparo || 0, 36);
+    // fermi tutti e due: chi arriva resta lì, sotto la lama
+    if (b.p) { b.azione = null; b.stordito = Math.max(b.stordito || 0, 30); b.scatto = 0; }
+    else { b.botta = Math.max(b.botta || 0, 30); b.vx = 0; b.s = 0; }
+    const x = (f.p.bacino.x + (b.p ? b.p.bacino.x : b.x)) / 2, y = f.p.collo.y + 10 * S;
+    fermoColpo = Math.max(fermoColpo, 8);
+    zoomParry = { x, y, t: 0, dur: 34, k: 0.11 };
+    if (imp.rallentatore) ralenti = Math.max(ralenti, AGGUATO.rallentatore);
+    suona("soffio", f.cx, 0.8);
+  }
+  // Lo squarcio, passo per passo: ci si porta sotto, al sesto fotogramma il taglio, al quattordicesimo la sega si rompe.
+  function eseguiSquarcio(f) {
+    const b = f.squarcioDi;
+    if (f.t < AGGUATO.taglio && b) {
+      const tx = b.p ? b.p.bacino.x : b.x, dx = tx - f.dir * 34 * S - f.cx;
+      if (Math.abs(dx) > 2 * S) { const st = dx * 0.4; for (const n in f.p) { f.p[n].x += st; f.p[n].ox += st; } f.cx += st; f.meta = f.cx; }
+      residua(f);
+    }
+    if (f.t === AGGUATO.taglio) { f.squarcioDi = null; squarcia(f, b); }
+    if (f.t === AGGUATO.rompe) rompiSega(f);
+  }
+  function squarcia(f, b) {
+    const t = f.arma, xa = t ? t.x + Math.cos(t.a) * 18 * S : f.p.bacino.x + f.dir * 30 * S;
+    if (b && !b.p && orda && vivoZ(b)) {
+      const c = corpoZ(b);
+      squarcioVFX(f, c[0], c[1]);
+      if (b.tipo === "capo") {
+        // il capo non si taglia: un terzo della vita, e barcolla
+        b.hp = Math.max(0.01, b.hp - (b.hpMax || b.hp) * 0.34);
+        colpisciZombie(b, 9, f.dir, c[0], c[1], f);
+        scrivi(dici("SQUARCIATO!"), c[0], c[4] - 30 * S, true);
+      } else {
+        const copia = Object.assign({}, b, { lampo: 0, nuovo: 0, stato: "va", s: 0, botta: 0, gelo: 0, sbilanciato: 0, reaz: 0, tagliato: false });
+        b.hp = 0.01;
+        colpisciZombie(b, 9, f.dir, c[0], c[1], f);
+        if (!vivoZ(b)) { b.tagliato = true; tagliaInDue(copia, c, f.dir); }
+        if (corsa && corsa.chi && f.tipo === corsa.chi) { corsa.punti += 60; caricaCorsa(12); }
+      }
+    } else if (b && b.p && !b.ko && !b.esploso) {
+      squarcioVFX(f, b.p.bacino.x, b.p.bacino.y - 6 * S);
+      colpisci(f, b, PARRY.forza * 1.6, b.p.bacino.x, b.p.bacino.y, "SQUARCIATO!");
+      smembra(b, b.p.bacino.x, b.p.bacino.y); smembra(b, b.p.bacino.x, b.p.bacino.y);
+      for (const n in b.p) b.p[n].ox -= f.dir * 7 * S;
+    } else squarcioVFX(f, xa, f.p.collo.y + 8 * S);            // (andato via: il taglio a vuoto si vede lo stesso)
+  }
+  // Il fendente dello squarcio: una riga di luce orizzontale larga, la raggiera bianca, il lampo.
+  function squarcioVFX(f, x, y) {
+    if (particelle.length < MAX_PARTICELLE - 4) {
+      particelle.push({ tipo: "taglio", x, y, vx: 0, vy: 0, vita: 22, max: 22, ang: f.dir * 0.06, lung: 84 * S, colore: "#ff5a3a" });
+      particelle.push({ tipo: "taglio", x, y: y + 2 * S, vx: 0, vy: 0, vita: 16, max: 16, ang: f.dir * 0.06, lung: 64 * S, colore: "#ffffff" });
+      particelle.push({ tipo: "impatto", x, y, vx: 0, vy: 0, vita: 16, max: 16, r: 70 * S, giro: Math.random() * 6, colore: "#ffd84a" });
+    }
+    scintille(x, y, 18, "#ffe27a");
+    suona("taglio", x, 1); suona("boom", x, 0.45);
+    fermoColpo = Math.max(fermoColpo, 10); scossa = Math.max(scossa, 14);
+    lampoSchermo = Math.max(lampoSchermo, 0.18);
+    scrivi(dici("SQUARCIATO!"), x, y - 70 * S, true);
+  }
+  // Lo zombie in due metà (la sua figura vera, ritagliata sopra e sotto la pancia), più le braccia e la poltiglia.
+  function tagliaInDue(z, c, dir) {
+    if (!orda) return;
+    const sc = ZOMBI[z.tipo] ? ZOMBI[z.tipo].scala : 1, T = TONI_ZOMBIE[z.tono] || ["#6f9164"], yT = c[1], piedi = orda.base - (z.alzo || 0);
+    const mezza = (meta, px, py, vx, vy, va, r) => {
+      if (particelle.length >= MAX_PARTICELLE) return;
+      particelle.push({ tipo: "pezzoZ", forma: "meta", meta, zz: z, x0: px, y0: py, yT, x: px, y: py, vx, vy, a: 0, va, r, verso: dir, vita: 170, max: 170, base: orda.base });
+    };
+    // sopra: vola su e indietro girando; sotto: resta in piedi un attimo e crolla
+    mezza("su", z.x, yT, dir * caso(2.2, 3.2) * S, -caso(5.5, 7) * S, dir * caso(0.1, 0.16), 16 * S * sc);
+    mezza("giu", z.x, piedi, dir * 0.6 * S, -1.2 * S, dir * 0.07, 0);
+    if (!cruento) return;
+    const pelle = z.tipo === "bruto" ? "#a3a199" : "#9dbf8c";
+    for (let i = 0; i < 2 && particelle.length < MAX_PARTICELLE; i++) {
+      particelle.push({ tipo: "pezzoZ", forma: "braccio", x: z.x + caso(-6, 6) * S, y: yT - 10 * S, r: 10 * S * sc, colore: T[0],
+                        vx: caso(-3, 3) * S + dir * 2 * S, vy: -caso(5, 8) * S, vita: 120, max: 120, a: 0, va: caso(-0.4, 0.4), base: orda.base });
+    }
+    if (Math.random() < 0.5 && particelle.length < MAX_PARTICELLE) {
+      particelle.push({ tipo: "pezzoZ", forma: "testa", x: c[3], y: c[4], r: 8 * S * sc, colore: pelle, vx: dir * caso(1, 3) * S, vy: -caso(7, 9) * S, vita: 120, max: 120, a: 0, va: caso(0.2, 0.4) * dir, base: orda.base });
+    }
+    for (let i = 0; i < 16 && particelle.length < MAX_PARTICELLE; i++) {
+      const a = caso(-Math.PI, 0), v = caso(2, 7) * S;
+      particelle.push({ tipo: "goccia", x: z.x + caso(-8, 8) * S, y: yT, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vita: 100, max: 100, r: caso(1.2, 2.6) * S, colore: i % 3 ? "#7fae4a" : "#5c8a35" });
+    }
+  }
+  // La sega si rompe: la catena salta con le scintille e l'arma vola via dietro, girando, e sparisce.
+  function rompiSega(f) {
+    const t = f.arma;
+    if (!t || t.tipo !== "motosega") return;
+    f.arma = null; f.colpiArma = 0; f.agguato = undefined;
+    t.morto = true; t.armato = false;
+    scintille(t.x, t.y, 12, "#ffe27a"); schegge(t.x, t.y, 6, "#c9ced8");
+    if (particelle.length < MAX_PARTICELLE) {
+      particelle.push({ tipo: "pezzoZ", forma: "sega", x: t.x, y: t.y, vx: -f.dir * caso(3, 4.5) * S, vy: -caso(5, 7) * S, a: t.a, va: -f.dir * caso(0.25, 0.4),
+                        r: 4 * S, vita: 110, max: 110, base: pavimento });
+    }
+    suona("metallo", t.x, 0.9);
+    scrivi(dici("SEGA ROTTA!"), t.x, t.y - 30 * S, false);
   }
   // Il lampo del parry: un anello bianco che si apre, una raggiera d'oro, il tempo fermo.
   // `dir`: da che parte guarda chi para (verso chi ha attaccato): da lì si aprono le mezzelune.
@@ -3708,6 +3867,13 @@
       if (q.tipo === "pezzoZ") {
         // Un pezzo di zombie segato: vola, gira, rimbalza sul terreno dell'orda e lì resta finché sbiadisce.
         q.vy += 0.3 * S; q.a += q.va;
+        // (la metà di sotto dello squarcio: i piedi restano a terra e crolla girando sui piedi, vedi `tagliaInDue`)
+        if (q.forma === "meta" && q.meta === "giu") {
+          if (q.max - q.vita > 8) { q.a += (q.verso * 1.45 - q.a) * 0.07; q.va *= 0.8; }
+          if (q.y >= q.base) { q.y = q.base; q.vy = 0; }
+          q.vx *= 0.9;
+          continue;
+        }
         const su = Math.min(q.base, pavimento) - q.r * 0.5;
         if (q.y > su) { q.y = su; q.vy = Math.abs(q.vy) > 1.4 * S ? -Math.abs(q.vy) * 0.38 : 0; q.vx *= 0.6; q.va *= 0.6; }
         if (q.x < 0 || q.x > W) { q.vx = -q.vx * 0.5; q.x = Math.max(0, Math.min(W, q.x)); }
@@ -3741,7 +3907,8 @@
   const CARICHE = { pistola: 6, spada: 5, bazooka: 2, lanciafiamme: 3, motosega: 14 };
   const SPARANO = { pistola: 1, bazooka: 1, lanciafiamme: 1, motosega: 1 };
   // Il fucile-sega sega quando il bersaglio è a portata della lama.
-  const segaPronta = (f, d) => !!(f.arma && f.arma.tipo === "motosega" && f.colpiArma > 0 && d <= 44);
+  // (dal 18/10/2026 chi gioca non sega più da solo: la sega è l'agguato della parata, vedi «L'AGGUATO DELLA SEGA»)
+  const segaPronta = (f, d) => !!(f.arma && f.arma.tipo === "motosega" && f.colpiArma > 0 && d <= 44 && f !== chiPara());
   const azioneArma = (t) => (t && t.tipo === "lanciafiamme" ? "fiammata" : "spara");
   // Da che distanza conviene usare l'arma che si ha in mano.
   function puoSparare(f, d) {
@@ -7931,7 +8098,7 @@
     const q = orda;
     if (!q) return;
     for (const z of q.zombie) if (!z.inBuco && z.stato === "colpo") disegnaAvvisoColpo(z);     // (per terra, sotto i corpi)
-    for (const z of q.zombie) if (!z.inBuco) { disegnaZombie(z); if (z.stato === "mira" || z.stato === "barcolla") disegnaSegnoZombie(z); }
+    for (const z of q.zombie) if (!z.inBuco && !z.tagliato) { disegnaZombie(z); if (z.stato === "mira" || z.stato === "barcolla") disegnaSegnoZombie(z); }
     if (lava && elicottero) disegnaElicottero();
     if (q.fase === "festa" || !q.ricetta || corsa) return;      // nella corsa il conto lo tiene il suo cruscotto
     const n = q.ricetta.totale, abbattuti = q.fase === "pausa" ? n : q.uccisiOndata, passo = Math.min(10.5 * S, (W - 150 * S) / n), r = Math.min(3.6 * S, passo * 0.36);
@@ -13321,9 +13488,9 @@
       ctx.fillStyle = "#2b2f3a"; ctx.beginPath(); ctx.moveTo(-3 * S, 1 * S); ctx.lineTo(1 * S, 1 * S); ctx.lineTo(0, 6.5 * S); ctx.lineTo(-4 * S, 6.5 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
       // la lama: un ovale lungo d'acciaio sotto la canna
       ctx.fillStyle = "#c9ced8"; ctx.beginPath(); ctx.moveTo(4 * S, 1 * S); ctx.lineTo(23 * S, 1 * S); ctx.quadraticCurveTo(27.5 * S, 3 * S, 23 * S, 5.2 * S); ctx.lineTo(4 * S, 5.2 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
-      const gira = t.da && t.da.azione === "sega" ? (passi % 4) * 0.8 : 0;
+      const gira = t.da && (t.da.azione === "sega" || (t.da.azione === "para" && t.da.agguato !== undefined)) ? (passi % 4) * 0.8 : 0;
       ctx.fillStyle = "#17171c"; ctx.beginPath();
-      for (let u = 5 + gira; u < 23; u += 3.2) { ctx.moveTo(u * S, 5.2 * S); ctx.lineTo((u + 1.2) * S, 6.8 * S); ctx.lineTo((u + 2.4) * S, 5.2 * S); }
+      if (!t.rotta) for (let u = 5 + gira; u < 23; u += 3.2) { ctx.moveTo(u * S, 5.2 * S); ctx.lineTo((u + 1.2) * S, 6.8 * S); ctx.lineTo((u + 2.4) * S, 5.2 * S); }
       ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 0.7 * S; ctx.beginPath(); ctx.moveTo(6 * S, 2.4 * S); ctx.lineTo(21 * S, 2.4 * S); ctx.stroke();
     } else {
@@ -13529,6 +13696,30 @@
       // Il nucleo: un disco bianco pieno che si stringe.
       ctx.globalAlpha = Math.min(1, svan * 1.4); ctx.fillStyle = "#ffffff";
       ctx.beginPath(); ctx.arc(q.x, q.y, (4 + 16 * forte) * S, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    } else if (q.tipo === "pezzoZ" && q.forma === "meta") {
+      // Mezzo zombie dello squarcio (vedi `tagliaInDue`): la sua figura vera, ritagliata sopra o sotto il taglio,
+      // spostata e girata attorno al punto da cui è partita; sul taglio, la carne verde.
+      if (orda && q.zz) {
+        ctx.save(); ctx.globalAlpha = Math.min(1, q.vita / 24);
+        ctx.translate(q.x, q.y); ctx.rotate(q.a); ctx.translate(-q.x0, -q.y0);
+        const L = 140 * S;
+        ctx.save(); ctx.beginPath();
+        if (q.meta === "su") ctx.rect(q.x0 - L, q.yT - 3 * L, 2 * L, 3 * L); else ctx.rect(q.x0 - L, q.yT, 2 * L, 2 * L);
+        ctx.clip();
+        q.zz.t = (q.zz.t || 0) + 0.3;
+        disegnaZombie(q.zz);
+        ctx.restore();
+        const sc = ZOMBI[q.zz.tipo] ? ZOMBI[q.zz.tipo].scala : 1;
+        ctx.fillStyle = "#5c8a35"; ctx.strokeStyle = "#17171c"; ctx.lineWidth = 1 * S;
+        ctx.beginPath(); ctx.ellipse(q.x0, q.yT, 9 * S * sc, 2.6 * S, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#9fd36a"; ctx.beginPath(); ctx.ellipse(q.x0, q.yT, 5 * S * sc, 1.3 * S, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+    } else if (q.tipo === "pezzoZ" && q.forma === "sega") {
+      // Il fucile-sega rotto che vola via: senza catena (è saltata), girando.
+      ctx.save(); ctx.globalAlpha = Math.min(1, q.vita / 24); ctx.translate(q.x, q.y); ctx.rotate(q.a);
+      disegnaArma({ tipo: "motosega", a: q.a, da: null, rotta: true });
       ctx.restore();
     } else if (q.tipo === "pezzoZ") {
       ctx.save(); ctx.globalAlpha = Math.min(1, q.vita / 20); ctx.translate(q.x, q.y); ctx.rotate(q.a);
@@ -14650,7 +14841,7 @@
   // Lasciato il tasto della parata, la guardia finisce (resta qualche fotogramma, per non sembrare uno scatto).
   function lasciaTasto(e) {
     if (!e || !e.code || azioneDi(e.code) !== "para") return;
-    for (const f of lottatori) if (f.guardia) { f.guardia = false; if (f.azione === "para") f.durata = Math.min(f.durata, f.t + 6); }
+    for (const f of lottatori) if (f.guardia) { f.guardia = false; if (f.azione === "para") f.durata = Math.min(f.durata, f.agguato !== undefined ? Math.max(f.t + 6, AGGUATO.durata) : f.t + 6); }
   }
   if (window.addEventListener) window.addEventListener("keyup", lasciaTasto, true);
   // La sezione «Tastiera» della tendina: una riga per azione, col suo tasto. Si clicca il tasto e si
@@ -14781,7 +14972,7 @@
     bazooka: { icona: "\u{1F680}", nome: "Bazooka", peso: 0.8, testo: "Due razzi" },
     lanciafiamme: { icona: "\u{1F525}", nome: "Lanciafiamme", peso: 0.8, testo: "Tre fiammate" },
     // Solo dal bruto (peso 0: non esce mai a caso), e non va nei tre posti: passandoci sopra si prende in mano.
-    motosega: { icona: "\u{1FA9A}", nome: "Fucile-sega", peso: 0, testo: "Spara da lontano, sega da vicino" },
+    motosega: { icona: "\u{1FA9A}", nome: "Fucile-sega", peso: 0, testo: "Spara da lontano; con la parata, il primo che arriva lo tagli in due (poi si rompe)" },
   };
   // La bottega: potenziamenti permanenti, pagati con le monete di tutte le corse.
   const BOTTEGA = {
@@ -14930,7 +15121,11 @@
   const raggioCalamita = () => CORSA.calamita * S * (1 + 0.4 * livello("calamita") + 0.25 * (bottega.calamita || 0));
   const nomeDi = (tipo) => (stile ? nomeProprio(tipo) : dici(tipo === "robot" ? "Robot" : "Mela"));
   // (dal 16/10/2026, con la corsa a flusso, un quarto più lenta: le carte sono l'unica pausa che resta)
-  const xpPerLivello = (l) => Math.round(1.25 * (3 + 2.2 * l + Math.pow(l, 1.4)));
+  // (18/10/2026 sera, Riccardo: «i primi livelli arrivano troppo velocemente, i primi minuti sono troppo pieni di aumenti
+  // di livello». Misurato con l'eroe che gioca da solo: prima si era al livello 4 dopo un minuto di lotta e all'8 dopo
+  // due, una carta ogni dieci secondi. Ora i primi livelli costano molto di più e il sovrappiù cala fino a sparire al
+  // tredicesimo: un livello ogni 30-40 secondi nei primi minuti, poi la curva di prima.)
+  const xpPerLivello = (l) => Math.round(1.25 * (3 + 2.2 * l + Math.pow(l, 1.4)) + 50 * Math.max(0, 1 - (l - 1) / 12));
   function salvaBottega() {
     try { deposito.setItem("mut-ring-banca", String(banca)); deposito.setItem("mut-ring-bottega", JSON.stringify(bottega)); } catch (errore) { /* pazienza */ }
   }
@@ -17345,12 +17540,15 @@
         rotta: !!(f && f.guardiaRotta !== undefined && tempo - f.guardiaRotta < GUARDIA.rotta), catena: catenaParry.n, parry: f && f.parryT !== undefined ? tempo - f.parryT : 1e9, perfettoUltimo: !!(f && f.parryPerfetto),
         colpito: f && f.colpitoT !== undefined ? tempo - f.colpitoT : 1e9, battito: kb === null ? null : kb - Math.floor(kb), bpm: attiva ? Math.round(60 / musica.griglia.dur) : 0,
         lotta: !!(f && f.p && !f.esploso && (!corsa || corsa.fase === "lotta") && !corsaModale()),
+        // il fucile-sega in mano (la parata diventa l'agguato) e l'agguato in corso (vedi «L'AGGUATO DELLA SEGA»)
+        sega: segaInMano(f), agguato: !!(f && f.azione === "para" && f.agguato !== undefined && segaInMano(f)),
+        squarcio: f && f.azione === "squarcio" ? f.t : null,
       };
     },
     // Un'azione dei tasti (gli id di `AZIONI_TASTI`: sinistra, destra, para, vola, finale, aura, pugni, onda, mossa1…),
     // senza passare dalla tastiera: vale anche con la tastiera spenta. `lascia("para")` chiude la guardia.
     premi: (id) => { const ok = !!eseguiTasto(id); if (ok) riparti(); return ok; },
-    lascia: (id) => { if (id === "para") for (const f of lottatori) if (f.guardia) { f.guardia = false; if (f.azione === "para") f.durata = Math.min(f.durata, f.t + 6); } },
+    lascia: (id) => { if (id === "para") for (const f of lottatori) if (f.guardia) { f.guardia = false; if (f.azione === "para") f.durata = Math.min(f.durata, f.agguato !== undefined ? Math.max(f.t + 6, AGGUATO.durata) : f.t + 6); } },
     // La musica: stato e impostazioni ({ musica: "sempre"|"corsa"|"mai", ritardo: ms }).
     musica: (o) => {
       if (o && typeof o === "object") {
