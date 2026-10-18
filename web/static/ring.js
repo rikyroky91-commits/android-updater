@@ -240,7 +240,12 @@
   //   rallentatore  il rallentatore dopo il parry
   //   scossa        lo schermo che trema: "piena", "ridotta", "spenta"
   //   difficolta    nella corsa, quanto fanno male i colpi: "facile" (×0,7), "normale", "difficile" (×1,35)
-  const IMPOSTAZIONI_BASE = { volume: 7, anello: "sempre", aiutoParry: false, rallentatore: true, scossa: "piena", difficolta: "normale" };
+  //   musica        la musica a tempo (vedi LA MUSICA A TEMPO): "sempre", "corsa" (solo nella corsa), "mai"
+  //   ritardoAudio  millisecondi fra l'orario di una nota e quando la si sente, oltre a quelli dichiarati dal telefono
+  //                 (casse Bluetooth): si misura toccando a tempo
+  // (un ospite può cambiare la musica di serie con `window.__ringMusicaBase`: il sito del gioco la vuole sempre)
+  const IMPOSTAZIONI_BASE = { volume: 7, anello: "sempre", aiutoParry: false, rallentatore: true, scossa: "piena", difficolta: "normale",
+                              musica: ["sempre", "corsa", "mai"].indexOf(window.__ringMusicaBase) >= 0 ? window.__ringMusicaBase : "corsa", ritardoAudio: 0 };
   const imp = Object.assign({}, IMPOSTAZIONI_BASE);
   try {
     const t = JSON.parse(deposito.getItem("mut-ring-impostazioni") || "null");
@@ -275,7 +280,7 @@
     audio.acceso = !!si;
     try { deposito.setItem("mut-ring-audio", audio.acceso ? "on" : "off"); } catch (errore) { /* pazienza */ }
     if (audio.acceso) { preparaAudio(); suona("clic"); }
-    else for (const k in audio.anelli) fermaAnello(k);
+    else { for (const k in audio.anelli) fermaAnello(k); fermaMusica(); }
     for (const b of dentroPannello("[data-audio]")) b.setAttribute("aria-pressed", audio.acceso ? "true" : "false");
     return audio.acceso;
   }
@@ -448,6 +453,7 @@
   // Ogni sei passi: pioggia, vento, buco nero, la nota della mira; e i tuoni dei fulmini nuovi.
   function aggiornaAudio() {
     if (!audio.acceso || !audio.ctx || passi % 6) return;
+    aggiornaMusica();
     for (const z of fulmini) if (!fulminiSentiti.has(z)) { fulminiSentiti.add(z); suona("tuono", z.x, z.cielo ? 1.2 : 0.8); }
     livelloAnello("pioggia", anelloRumore("bandpass", 1800, 0.6), piovendo ? 0.09 : 0);
     livelloAnello("vento", anelloRumore("lowpass", 500, 1.5), uragano ? 0.16 : 0,
@@ -459,6 +465,273 @@
       const k = (mira.a + MIRA.su) / (MIRA.su + MIRA.giu);       // 0 in alto, 1 in basso
       a.o.frequency.setTargetAtTime(880 - 420 * k, t, 0.04);
     });
+  }
+
+  // ·· LA MUSICA A TEMPO (18/10/2026) ··
+  // Riccardo: «un tappeto musicale ritmico che va a ritmo con i nemici e il parry»; gli attacchi annunciati «non devono
+  // essere rari ma con un'ottima tempistica». Tre idee:
+  //  - L'OROLOGIO è quello dell'audio, non i passi della fisica: la musica resta liscia anche se il telefono perde
+  //    fotogrammi. I passi si agganciano all'orologio (`orologio`, corretto un poco a ogni passo) e da lì si sa quando
+  //    si VEDRÀ un passo futuro.
+  //  - Un attacco parabile PRENOTA un ottavo della griglia (`prenotaColpo`) e parte quando serve perché il colpo
+  //    arrivi lì: il morso cade sul battito, come la cassa. Uno solo per battito (un ottavo libero ai due lati),
+  //    così due colpi non arrivano mai insieme e il parry resta leggibile. Un battito prima del colpo suona un
+  //    «tic» dalla parte di chi attacca: si para a orecchio, non solo a occhio.
+  //  - La musica risponde: il parry mette un accordo sul sedicesimo dopo (più pieno se perfetto), la catena
+  //    accende uno strato in più, un colpo preso la ovatta per un attimo, il rallentatore la chiude in un filtro.
+  // Il ritardo dell'audio (casse Bluetooth: 150-250 ms) si misura toccando a tempo (`__ring.calibra`): il colpo si
+  // vede quando il suo battito si SENTE. Senza audio acceso la musica non esiste e niente aspetta il battito.
+  // Il tempo: battito ogni 32 passi (112,5 BPM), poi 28 (128,6) dal primo minuto di lotta, 24 (150) dal terzo.
+  const MUSICA = { passi: [32, 28, 24], minuti: [1, 3], volume: 0.5, avanti: 0.16, giro: 25, schermo: 0.02 };
+  // La Am – F – C – G, una battuta per accordo (note MIDI).
+  const ACCORDI_MUSICA = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]];
+  const hzMidi = (n) => 440 * Math.pow(2, (n - 69) / 12);
+  const musica = {
+    accesa: false, timer: null, bus: null, filtro: null, sordina: 0,
+    griglia: null,                     // { t0: secondi del battito k0, dur: secondi di un battito, k0 }
+    cambio: null,                      // { k: il battito da cui vale, dur }
+    sedicesimo: 0,                     // il prossimo sedicesimo da programmare
+    prenotati: new Map(),              // ottavo → { lato, rossa, z, tic }
+    orologio: { a: 0, t: 0, valido: false },
+    catenaFino: 0, finto: false, metronomo: false, clic: [], tocchi: [],
+  };
+  // Secondi dell'orologio della musica: quello dell'audio, o (nei test) i passi.
+  const oraMusica = () => (musica.finto ? tempo / 60 : audio.ctx ? audio.ctx.currentTime : 0);
+  // Quando si vede il passo `T`, nell'orologio della musica.
+  const secondiPasso = (T) => (musica.finto ? T / 60 : musica.orologio.a + (T - musica.orologio.t) / 60);
+  // Quanto dopo il suo orario si sente una nota: l'uscita del telefono, più quello che si è misurato toccando a tempo,
+  // meno il fotogramma che lo schermo ci mette a mostrare un passo.
+  function latenzaMusica() {
+    if (musica.finto) return 0;
+    const c = audio.ctx, uscita = c ? (c.outputLatency || c.baseLatency || 0) : 0;
+    return uscita + (imp.ritardoAudio || 0) / 1000 - MUSICA.schermo;
+  }
+  // Ogni passo della fisica, col suo orario nell'orologio dell'audio (dal ciclo): l'aggancio.
+  function agganciaPasso(t) {
+    const o = musica.orologio;
+    if (musica.finto) return;
+    if (!(t > 0) || ritmo !== 1 || ralenti > 0) { o.valido = false; return; }
+    const stima = o.a + (tempo - o.t) / 60, scarto = t - stima;
+    if (!o.valido || Math.abs(scarto) > 0.08) { o.a = t; o.t = tempo; o.valido = true; return; }
+    o.a += scarto * 0.05;
+  }
+  const passiBattito = () => {
+    const k = pressione();
+    return k >= MUSICA.minuti[1] ? MUSICA.passi[2] : k >= MUSICA.minuti[0] ? MUSICA.passi[1] : MUSICA.passi[0];
+  };
+  // Il battito `k` (anche frazionario) in secondi, col cambio di tempo se ce n'è uno in arrivo.
+  function secondiBattito(k) {
+    const g = musica.griglia, c = musica.cambio;
+    if (c && k >= c.k) return g.t0 + (c.k - g.k0) * g.dur + (k - c.k) * c.dur;
+    return g.t0 + (k - g.k0) * g.dur;
+  }
+  function battitoDi(t) {
+    const g = musica.griglia, c = musica.cambio;
+    if (c) { const tc = g.t0 + (c.k - g.k0) * g.dur; if (t >= tc) return c.k + (t - tc) / c.dur; }
+    return g.k0 + (t - g.t0) / g.dur;
+  }
+  const durBattito = (k) => (musica.cambio && k >= musica.cambio.k ? musica.cambio.dur : musica.griglia.dur);
+  // La griglia vale per gli attacchi solo mentre il tempo del gioco va come quello vero.
+  function musicaAttiva() {
+    if (!musica.accesa || !musica.griglia || inPausa || ritmo !== 1 || ralenti > 0) return false;
+    if (musica.finto) return true;
+    return !!(audio.ctx && audio.ctx.state === "running" && musica.orologio.valido);
+  }
+  // Quanti passi mancano a quando si vedrà l'ottavo `i` (quando la sua nota si sente). Si ricalcola a ogni passo e non
+  // si salva un passo d'arrivo: il fermo dei colpi secchi e il rallentatore spostano i passi rispetto all'audio.
+  const passiAlOttavo = (i) => (secondiBattito(i / 2) + latenzaMusica() - secondiPasso(tempo)) * 60;
+  // La griglia c'è (musica accesa, tempo del gioco normale), anche se in questo momento non si può contare.
+  const grigliaMusica = () => !!(musica.accesa && musica.griglia && ritmo === 1 && !inPausa && (musica.finto || (audio.ctx && audio.ctx.state === "running")));
+  const liberoOttavo = (i, io) => {
+    for (const j of [i - 1, i, i + 1]) { const p = musica.prenotati.get(j); if (p && p.z !== io && (!p.z || vivoZ(p.z))) return false; }
+    return true;
+  };
+  // Prenota il primo ottavo libero che arriva fra almeno `fot` passi (`mezzi`: anche a metà battito, sennò solo sui
+  // battiti). `colpi`: gli scarti in ottavi dei colpi dopo il primo (le tre manate del capo). Dice l'ottavo, o null.
+  function prenotaColpo(z, fot, lato, rossa, mezzi, colpi) {
+    if (!musicaAttiva()) return null;
+    const ora = secondiPasso(tempo + fot) - latenzaMusica();
+    let i = Math.ceil(battitoDi(ora) * 2);
+    for (let n = 0; n < 16; n++, i++) {
+      if (i % 2 && !mezzi) continue;
+      if (!liberoOttavo(i, z) || (colpi || []).some((d) => !liberoOttavo(i + d, z))) continue;
+      for (const d of [0].concat(colpi || [])) musica.prenotati.set(i + d, { lato, rossa: !!rossa, z, tic: false });
+      return { ottavo: i };
+    }
+    return null;
+  }
+  function liberaColpo(z) { for (const [i, p] of musica.prenotati) if (p.z === z) musica.prenotati.delete(i); }
+  // Uno zombie comincia la carica del morso: con la musica prenota il primo ottavo libero dopo la carica normale e la
+  // allunga quanto basta (al massimo un ottavo) perché il morso cada lì. Aspettare fermi a portata non va: l'eroe
+  // lo picchia via prima (misurato: zero morsi in quattro corse). Il capo prenota le sue tre manate, un ottavo l'una
+  // dall'altra (un battito, quando l'ottavo è sotto i 15 passi: a 150 BPM tre parry in 0,4 s non si fanno).
+  function aTempo(z, f, Z) {
+    z.extra = 0; z.passoCapo = undefined; z.ottavo = undefined;
+    if (!musicaAttiva()) return;
+    const ottavo = musica.griglia.dur * 30, passo = ottavo >= 15 ? 1 : 2, colpi = z.tipo === "capo" ? [passo, 2 * passo] : null;
+    liberaColpo(z);
+    const p = prenotaColpo(z, Z.carica, f && f.p ? Math.sign(z.x - f.p.bacino.x) : 0, false, true, colpi);
+    if (!p) return;
+    z.ottavo = p.ottavo; z.passoCapo = colpi ? Math.round(passo * ottavo) : undefined;
+    z.extra = Math.max(0, Math.round(passiAlOttavo(p.ottavo) - Z.carica));
+  }
+  // Durante la carica la si ritocca a ogni passo: il fermo dei colpi secchi e il rallentatore spostano i passi
+  // rispetto all'audio, e il morso deve restare sul suo ottavo.
+  function ritoccaCarica(z, Z) {
+    if (z.ottavo === undefined || !musicaAttiva()) return;
+    const c0 = Z.carica + (z.extra || 0);
+    if (z.s >= c0) return;
+    const voluto = Math.round(passiAlOttavo(z.ottavo));
+    if (voluto >= 3 && voluto !== c0 - z.s) z.extra = Math.max(-Math.round(Z.carica * 0.4), Math.min(60, (z.extra || 0) + voluto - (c0 - z.s)));
+  }
+  // Un tiro (draghi) parte quando il suo «colpo» cade su un ottavo, senza prenotare: non si para.
+  function suOttavo(fot) {
+    if (!musicaAttiva()) return true;
+    const b = battitoDi(secondiPasso(tempo + fot) - latenzaMusica()) * 2;
+    return Math.abs(b - Math.round(b)) * durBattito(b / 2) / 2 * 60 <= 0.5;
+  }
+  // ·· Il suono ··
+  function tamburoMusica(c, o, t, tipo, k) {
+    if (tipo === "cassa") { notaAudio(c, o, t, 150, 42, 0.32, "sine", 0.95 * k, 0.002); soffioAudio(c, o, t, 0.02, 0.25 * k, "lowpass", 1800, 600); }
+    else if (tipo === "rullante") { soffioAudio(c, o, t, 0.16, 0.55 * k, "bandpass", 1900, 1500, 0.9); notaAudio(c, o, t, 220, 160, 0.09, "triangle", 0.28 * k); }
+    else if (tipo === "piatto") soffioAudio(c, o, t, 0.035, 0.22 * k, "highpass", 7000, 8000, 0.7);
+    else if (tipo === "aperto") soffioAudio(c, o, t, 0.18, 0.2 * k, "highpass", 6500, 7500, 0.7);
+    else if (tipo === "tic") { notaAudio(c, o, t, 1760, 1680, 0.05, "square", 0.16 * k, 0.001); notaAudio(c, o, t, 2640, 2600, 0.04, "sine", 0.12 * k, 0.001); }
+    else if (tipo === "sale") soffioAudio(c, o, t, 0.4, 0.3 * k, "bandpass", 500, 4200, 3);
+    else if (tipo === "crash") soffioAudio(c, o, t, 1.1, 0.4 * k, "highpass", 5000, 3000, 0.5);
+  }
+  function padMusica(c, o, t, accordo, dur) {
+    for (const n of accordo) for (const det of [-7, 7]) {
+      const osc = notaAudio(c, o, t, hzMidi(n), hzMidi(n), dur, "sawtooth", 0.035, 0.25);
+      osc.detune.value = det;
+    }
+  }
+  // Quanto strato: 0 calma (scelte, menu), 1 base, 2 lotta, 3 capo o catena.
+  function intensitaMusica() {
+    if (musica.metronomo) return -1;
+    if (corsa && (corsa.fase !== "lotta" || corsa.pausa || corsa.scelta || corsa.forziere)) return 0;
+    let l = (corsa && corsa.chi) ? (pressione() >= 1 ? 2 : 1) : orda && orda.fase === "lotta" ? 2 : 1;
+    if (orda && orda.zombie.some((z) => z.tipo === "capo" && vivoZ(z))) l = 3;
+    if (oraMusica() < musica.catenaFino) l = Math.min(3, l + 1);
+    return l;
+  }
+  function suonaSedicesimo(s, t) {
+    const c = audio.ctx, o = musica.bus, l = intensitaMusica(), pos = s % 16, battuta = Math.floor(s / 16);
+    const accordo = ACCORDI_MUSICA[battuta % 4], radice = accordo[0] - 24 + (accordo[0] > 55 ? -12 : 0) + 12;
+    if (l < 0) {                                                        // il metronomo della taratura
+      if (pos % 4 === 0) { tamburoMusica(c, o, t, "tic", pos === 0 ? 1.4 : 1); musica.clic.push(t); if (musica.clic.length > 32) musica.clic.shift(); }
+      return;
+    }
+    // L'avviso: un battito prima di un colpo prenotato (o mezzo, se la carica è più corta), un «tic» dalla sua parte;
+    // se è rosso, anche un soffio che sale due battiti prima.
+    if (s % 2 === 0) {
+      const e = s / 2;
+      for (const [d, tipo] of [[4, "sale"], [2, "tic"], [1, "tic"]]) {
+        const p = musica.prenotati.get(e + d);
+        if (!p || (tipo === "sale" ? !p.rossa || p.sale : p.tic) || (p.z && !vivoZ(p.z))) continue;
+        if (tipo === "sale") p.sale = true; else p.tic = true;
+        let out = o;
+        if (c.createStereoPanner) { out = c.createStereoPanner(); out.pan.value = (p.lato || 0) * 0.6; out.connect(o); }
+        tamburoMusica(c, out, t, tipo, p.rossa ? 1.3 : 1);
+      }
+    }
+    if (pos === 0) padMusica(c, o, t, accordo, durBattito(s / 4) * 4 * 0.95);
+    if (l === 0) { if (pos === 0 || pos === 8) tamburoMusica(c, o, t, "cassa", 0.5); return; }
+    if (pos % 4 === 0 || (l >= 3 && pos === 14)) tamburoMusica(c, o, t, "cassa", pos % 4 === 0 ? 1 : 0.7);
+    if (pos % 2 === 0) notaAudio(c, o, t, hzMidi(radice + (pos % 4 === 2 ? 12 : 0)), hzMidi(radice + (pos % 4 === 2 ? 12 : 0)), durBattito(s / 4) * 0.45, "sawtooth", 0.16, 0.004);
+    if (l >= 2 && (pos === 4 || pos === 12)) tamburoMusica(c, o, t, "rullante", 1);
+    if (l >= 2) tamburoMusica(c, o, t, pos % 4 === 2 ? "aperto" : "piatto", pos % 2 ? 0.5 : 0.9);
+    else if (pos % 4 === 2) tamburoMusica(c, o, t, "piatto", 1);
+    if (l >= 2) {                                                      // l'arpeggio sui sedicesimi
+      const n = accordo[[0, 1, 2, 1][pos % 4]] + 12 + (l >= 3 && pos >= 8 ? 12 : 0);
+      notaAudio(c, o, t, hzMidi(n), hzMidi(n), durBattito(s / 4) * 0.22, "triangle", l >= 3 ? 0.07 : 0.05, 0.003);
+    }
+  }
+  function tickMusica() {
+    const c = audio.ctx;
+    if (!c || !musica.accesa) return;
+    if (!vuoleMusica()) { fermaMusica(); return; }
+    const ora = c.currentTime, zitta = (inPausa && !musica.metronomo) || document.hidden || c.state !== "running";
+    musica.bus.gain.setTargetAtTime(zitta ? 0.0001 : MUSICA.volume, ora, 0.08);
+    const chiusa = ralenti > 0 || ora < musica.sordina;
+    musica.filtro.frequency.setTargetAtTime(chiusa ? (ralenti > 0 ? 700 : 900) : 16000, ora, chiusa ? 0.03 : 0.2);
+    // Il tempo cambia solo all'inizio di una battuta, una battuta dopo averlo deciso.
+    const voluto = passiBattito() / 60, kOra = battitoDi(ora);
+    if (!musica.cambio && Math.abs(voluto - musica.griglia.dur) > 1e-6 && !musica.metronomo) musica.cambio = { k: Math.ceil(kOra / 4) * 4 + 4, dur: voluto };
+    if (musica.cambio && kOra >= musica.cambio.k) {
+      musica.griglia = { t0: secondiBattito(musica.cambio.k), dur: musica.cambio.dur, k0: musica.cambio.k };
+      musica.cambio = null;
+    }
+    const tS = (s) => secondiBattito(s / 4);
+    while (tS(musica.sedicesimo) < ora - 0.03) musica.sedicesimo++;
+    for (let n = 0; n < 32; n++) {
+      const t = tS(musica.sedicesimo);
+      if (t >= ora + MUSICA.avanti) break;
+      if (!zitta) { try { suonaSedicesimo(musica.sedicesimo, Math.max(ora, t)); } catch (errore) { /* una nota persa */ } }
+      musica.sedicesimo++;
+    }
+    // Le prenotazioni passate se ne vanno.
+    const vecchio = Math.floor(battitoDi(ora) * 2) - 4;
+    for (const i of musica.prenotati.keys()) if (i < vecchio) musica.prenotati.delete(i);
+  }
+  const vuoleMusica = () => !!(audio.acceso && audio.ctx && !fermo && (musica.metronomo || (lottatori.length &&
+    (imp.musica === "sempre" || (imp.musica === "corsa" && corsa && corsa.chi)))));
+  function avviaMusica() {
+    const c = preparaAudio();
+    if (!c || musica.accesa) return;
+    try {
+      musica.bus = c.createGain(); musica.bus.gain.value = 0.0001;
+      musica.filtro = c.createBiquadFilter(); musica.filtro.type = "lowpass"; musica.filtro.frequency.value = 16000; musica.filtro.Q.value = 0.7;
+      musica.bus.connect(musica.filtro); musica.filtro.connect(audio.uscita);
+    } catch (errore) { return; }
+    musica.griglia = { t0: c.currentTime + 0.12, dur: (musica.metronomo ? 30 : passiBattito()) / 60, k0: 0 };
+    musica.cambio = null; musica.sedicesimo = 0; musica.prenotati.clear(); musica.accesa = true;
+    musica.timer = setInterval(tickMusica, MUSICA.giro);
+  }
+  function fermaMusica() {
+    if (musica.timer) clearInterval(musica.timer);
+    musica.timer = null; musica.accesa = false; musica.prenotati.clear(); musica.griglia = null; musica.cambio = null;
+    const bus = musica.bus, c = audio.ctx;
+    if (bus && c) { try { bus.gain.setTargetAtTime(0.0001, c.currentTime, 0.05); setTimeout(() => { try { bus.disconnect(); } catch (e) { /* già staccato */ } }, 400); } catch (errore) { /* pazienza */ } }
+    musica.bus = null; musica.filtro = null;
+  }
+  // Ogni sei passi (da `aggiornaAudio`): accende o spegne.
+  function aggiornaMusica() {
+    if (musica.finto) return;
+    const vuole = vuoleMusica();
+    if (vuole && !musica.accesa) avviaMusica();
+    else if (!vuole && musica.accesa) fermaMusica();
+  }
+  // La risposta al parry: un accordo sul prossimo sedicesimo; perfetto, più pieno e col piatto; la catena alza lo strato.
+  function musicaParry(perfetto, catena) {
+    if (!musica.accesa || musica.finto || !audio.ctx) return;
+    const c = audio.ctx, o = musica.bus, ora = c.currentTime, k = battitoDi(ora), s = Math.ceil(k * 4 + 0.15);
+    const t = Math.max(ora, secondiBattito(s / 4)), accordo = ACCORDI_MUSICA[Math.floor(s / 16) % 4];
+    try {
+      for (const n of accordo) notaAudio(c, o, t, hzMidi(n + 24), hzMidi(n + 24), perfetto ? 0.5 : 0.28, "square", perfetto ? 0.06 : 0.04, 0.004);
+      if (perfetto) { tamburoMusica(c, o, t, "crash", 1); notaAudio(c, o, t, hzMidi(accordo[0] + 36), hzMidi(accordo[0] + 36), 0.6, "sine", 0.08, 0.004); }
+    } catch (errore) { /* niente accordo */ }
+    if (catena >= 3) musica.catenaFino = Math.max(musica.catenaFino, ora + durBattito(k) * 8);
+  }
+  // Un colpo preso: la musica si ovatta per un attimo.
+  function musicaColpo() { if (musica.accesa && audio.ctx) musica.sordina = audio.ctx.currentTime + 0.35; }
+  // ·· La taratura del ritardo ·· (il sito la mostra; qui il metronomo e il conto)
+  function calibraMusica(cosa, quando) {
+    if (cosa === true) { musica.metronomo = true; musica.clic = []; musica.tocchi = []; if (musica.accesa) fermaMusica(); accendiAudio(true); avviaMusica(); return { n: 0 }; }
+    if (cosa === false) { musica.metronomo = false; if (musica.accesa) fermaMusica(); salvaImp(); aggiornaMusica(); return { ritardo: imp.ritardoAudio }; }
+    if (cosa === "tocco" && audio.ctx && musica.clic.length) {
+      const t = audio.ctx.currentTime - Math.max(0, Math.min(0.2, (quando || 0) / 1000));
+      let vicino = musica.clic[0];
+      for (const q of musica.clic) if (Math.abs(q - t) < Math.abs(vicino - t)) vicino = q;
+      const d = t - vicino;
+      if (Math.abs(d) < 0.25) musica.tocchi.push(d);
+      if (musica.tocchi.length > 10) musica.tocchi.shift();
+      const ord = musica.tocchi.slice().sort((a, b) => a - b), med = ord.length ? ord[Math.floor(ord.length / 2)] : 0;
+      const c = audio.ctx, uscita = c.outputLatency || c.baseLatency || 0;
+      if (ord.length >= 4) imp.ritardoAudio = Math.round(Math.max(-150, Math.min(450, (med - uscita) * 1000)) / 5) * 5;
+      return { n: musica.tocchi.length, ritardo: imp.ritardoAudio, scarto: Math.round(d * 1000) };
+    }
+    return { n: musica.tocchi.length, ritardo: imp.ritardoAudio };
   }
 
   let costume = "nessuno", tavolozza = null;
@@ -2282,7 +2555,7 @@
       const Z = ZOMBI[z.tipo], dx = Math.abs(z.x - fx), c = corpoZ(z);
       const pc = z.stato === "colpo" ? prossimoColpoZ(z) : null;
       if (pc !== null && dx < (Z.portata + 12) * S && (fx - z.x) * z.dir > 0) conta(pc - z.s, c[3], c[4], z);
-      else if (z.stato === "letale" && z.preda === f) conta(Math.max(0, (dx - ((Z.portata || 27) + 8) * S) / (LETALE.vel * S)), c[3], c[4], z, true);
+      else if (z.stato === "letale" && z.preda === f) conta(Math.max(0, (dx - ((Z.portata || 27) + 8) * S) / (z.velL || LETALE.vel * S)), c[3], c[4], z, true);
     }
     if (corsa && corsa.tiri) for (const t of corsa.tiri) {
       if (t.tipo !== "granata" || t.rimandata || t.parata || (fx - t.x) * t.vx <= 0) continue;
@@ -2379,7 +2652,8 @@
     if (lampoSchermo > 0) lampoSchermo = Math.max(0, lampoSchermo - 0.05);
   }
   // I colpi di uno zombie in una carica: il capo ne tira tre di fila (vedi «LE TRE MANATE DEL CAPO»), gli altri uno.
-  const colpiZ = (z) => { const c = ZOMBI[z.tipo].carica; return z.tipo === "capo" ? [c, c + 18, c + 36] : [c]; };
+  // (con la musica, le tre manate del capo stanno sulla griglia: vedi `aTempo`)
+  const colpiZ = (z) => { const c = ZOMBI[z.tipo].carica + (z.extra || 0), d = z.passoCapo || 18; return z.tipo === "capo" ? [c, c + d, c + 2 * d] : [c]; };
   const prossimoColpoZ = (z) => { for (const c of colpiZ(z)) if (c >= z.s) return c; return null; };
   // Quanto è tirato il braccio (0..1): sale fino al colpo; fra un colpo e l'altro del capo torna a metà e riparte.
   function posaColpoZ(z) {
@@ -2460,6 +2734,7 @@
     scrivi(perfetto ? dici("PARRY PERFETTO!") : "PARRY!", x, y - 22 * S, true);
     if (mio && catenaParry.n >= 2) scrivi("×" + catenaParry.n, x + f.dir * 46 * S, y - 4 * S, true);
     suona("parry", x, 1); if (perfetto) suona("potenza", x, 0.5);
+    if (f === chiPara()) musicaParry(perfetto, catenaParry.n);
     // L'impatto: fermo, lampo bianco, zoom leggero sul punto, scintille verso chi ha attaccato.
     fermoColpo = Math.max(fermoColpo, perfetto ? 14 : 9);
     lampoSchermo = Math.max(lampoSchermo, perfetto ? 0.42 : 0.26);
@@ -5802,7 +6077,7 @@
       if (z.s >= Z.carica + 16) { z.stato = "va"; z.s = 0; z.cd = Math.round(caso(110, 170) / (1 + 0.25 * pressione())); }
       return;
     }
-    if (corsa && corsa.fase === "lotta" && --z.cd <= 0 && Math.abs(dx) < 90 * S) {
+    if (corsa && corsa.fase === "lotta" && --z.cd <= 0 && Math.abs(dx) < 90 * S && suOttavo(Z.carica)) {
       z.tiri++;
       if (z.tiri % 3 === 0 || Z.picchia) {
         const x1 = Math.max(q.l + 20 * S, Math.min(q.r - 20 * S, 2 * hx - z.x));
@@ -5968,7 +6243,13 @@
     return !q.zombie.some((w) => w.stato === "mira" || w.stato === "letale");
   }
   function iniziaLetale(z, f) {
-    z.stato = "mira"; z.s = 0; z.preda = f; z.dirL = z.dir;
+    z.stato = "mira"; z.s = 0; z.preda = f; z.dirL = z.dir; z.velL = 0;
+    // (con la musica, l'arrivo prenota un ottavo: rosso, col soffio che sale due battiti prima)
+    if (f && f.p) {
+      const v0 = LETALE.vel * S * (pesante(z) ? 0.8 : 1), d = Math.max(0, Math.abs(f.p.bacino.x - z.x) - ((ZOMBI[z.tipo].portata || 27) + 8) * S);
+      liberaColpo(z); const p = prenotaColpo(z, LETALE.mira + Math.round(d / v0), Math.sign(z.x - f.p.bacino.x), true, true, null);
+      z.ottavo = p ? p.ottavo : undefined;
+    }
     suona("carica", z.x, 0.5);
     // La prima della corsa insegna il tasto.
     if (corsa && corsa.chi && !corsa.avvisoParry) {
@@ -5986,11 +6267,25 @@
       if (z.s % 3 === 0 && particelle.length < MAX_PARTICELLE) {
         particelle.push({ tipo: "scintilla", x: c[3] + caso(-3, 3) * S, y: c[4] - 18 * S, vx: caso(-1.6, 1.6) * S, vy: -caso(0.6, 2.2) * S, vita: 12, max: 12, colore: "#ff2a2a" });
       }
-      if (z.s >= LETALE.mira) { z.stato = "letale"; z.s = 0; polvere(z.x, q.base - 1, 6); scrivi("!!", c[3], c[4] - 34 * S, false); }
+      // (con la musica la rincorsa parte quando serve perché l'arrivo cada sul battito prenotato; la velocità
+      // si ritocca, entro un terzo, per arrivarci anche se la preda si è spostata)
+      const v0 = LETALE.vel * S * (pesante(z) ? 0.8 : 1), dist = p && p.p ? Math.max(0, Math.abs(p.p.bacino.x - z.x) - ((Z.portata || 27) + 8) * S) : 0;
+      const manca = z.ottavo !== undefined && musicaAttiva() ? passiAlOttavo(z.ottavo) : 0;
+      const pronto = z.ottavo === undefined || !grigliaMusica() || (musicaAttiva() && manca <= dist / v0 + 0.5) || z.s > LETALE.mira + 100;
+      if (z.s >= LETALE.mira && pronto) {
+        z.stato = "letale"; z.s = 0; polvere(z.x, q.base - 1, 6); scrivi("!!", c[3], c[4] - 34 * S, false);
+        const resta = z.ottavo !== undefined && musicaAttiva() ? manca : 0;
+        z.velL = resta > 2 ? Math.max(0.75 * v0, Math.min(1.35 * v0, dist / resta)) : v0;
+      }
       return;
     }
     // La rincorsa: piegato in avanti, una scia rossa dietro.
-    const v = LETALE.vel * S * (pesante(z) ? 0.8 : 1);
+    // (con la musica la velocità si ritocca a ogni passo, per arrivare sull'ottavo prenotato)
+    if (z.ottavo !== undefined && musicaAttiva() && p && p.p) {
+      const v0 = LETALE.vel * S * (pesante(z) ? 0.8 : 1), manca = passiAlOttavo(z.ottavo), dist = Math.max(0, Math.abs(p.p.bacino.x - z.x) - ((Z.portata || 27) + 8) * S);
+      if (manca > 2) z.velL = Math.max(0.75 * v0, Math.min(1.35 * v0, dist / manca));
+    }
+    const v = z.velL || LETALE.vel * S * (pesante(z) ? 0.8 : 1);
     z.x = Math.max(q.l + 6 * S, Math.min(q.r - 6 * S, z.x + z.dirL * v)); z.fase += 0.5;
     if (z.s % 2 === 0 && particelle.length < MAX_PARTICELLE) {
       particelle.push({ tipo: "linea", x: z.x - z.dirL * 14 * S, y: q.base - caso(14, 50) * S, vx: -z.dirL * 3 * S, vy: 0, vita: 9, max: 9, lung: caso(16, 30) * S, colore: "#ff4a4a" });
@@ -6326,6 +6621,7 @@
         // Il morso caricato insegue di qualche passo chi arretra (anche in guardia): un attacco annunciato dall'anello
         // del parry deve arrivare, non andare a vuoto per due pixel (17/10/2026).
         // (il capo ne tira tre di fila: vedi «LE TRE MANATE DEL CAPO»)
+        ritoccaCarica(z, Z);
         const colpi = colpiZ(z), pc = prossimoColpoZ(z);
         if (pc !== null && sopra && Math.abs(dx) > (Z.portata - 4) * S && Math.abs(dx) < (Z.portata + 30) * S) z.x += z.dir * Math.min(1.8 * S, Math.abs(dx) - (Z.portata - 4) * S);
         // Un lampo bianco sugli occhi, poco prima del morso: è il momento di parare (vedi PARRY).
@@ -6334,7 +6630,7 @@
         if (z.stato === "colpo" && z.s >= colpi[colpi.length - 1] + 26) { z.stato = "va"; z.s = 0; z.parati = 0; }
         continue;
       }
-      if (sopra && Math.abs(dx) < Z.portata * S) { z.stato = "colpo"; z.s = 0; continue; }
+      if (sopra && Math.abs(dx) < Z.portata * S) { z.stato = "colpo"; z.s = 0; aTempo(z, f, Z); continue; }
       // Avanti, senza montarsi addosso: chi ha un altro zombie subito davanti aspetta (lo svelto scarta e passa).
       const davanti = z.tipo !== "svelto" && q.zombie.some((w) => w !== z && w.stato !== "giu" && w.stato !== "esce" && (w.x - z.x) * z.dir > 0 && Math.abs(w.x - z.x) < 15 * S);
       if (!davanti && Math.abs(dx) > (Z.portata - 5) * S) { z.x += z.dir * z.vel * S; z.fase += 0.12 + z.vel * 0.08; }
@@ -13146,7 +13442,9 @@
     if (inPausa || (corsa && corsa.pausa)) riserva = 0;
     else if (fermoColpo > 0) { fermoColpo--; riserva = 0; }
     else {
-      while (riserva >= PASSO_MS && giri < 4) { passo(); riserva -= PASSO_MS; giri++; }
+      // (l'orario di ogni passo nell'orologio dell'audio: la musica a tempo ci si aggancia)
+      const oraAudio = musica.accesa && audio.ctx ? audio.ctx.currentTime : 0;
+      while (riserva >= PASSO_MS && giri < 4) { passo(); riserva -= PASSO_MS; giri++; if (oraAudio) agganciaPasso(oraAudio - riserva / 1000); }
       if (giri === 4) riserva = 0;
     }
     // Un disegno ogni due (30 fps); mentre se ne tiene uno in mano, tutti.
@@ -14691,7 +14989,7 @@
     if (!c || c.fase !== "lotta" || !f || c.pausa) return false;
     if (c.invuln > 0 || c.scudo > 0) { scintille(x, y, 6, "#bfe9ff"); return false; }
     danno = Math.max(1, Math.round(danno * crescita() * pelleCorsa() * (imp.difficolta === "facile" ? 0.7 : imp.difficolta === "difficile" ? 1.35 : 1)));
-    c.hp -= danno; c.danniRound += danno;
+    c.hp -= danno; c.danniRound += danno; musicaColpo();
     caricaCorsa(Math.min(danno, 30) * 0.25);                       // un colpo enorme non riempie il colpo finale
     c.lampo = 8;
     if (c.hp > 0) return false;
@@ -15404,7 +15702,9 @@
     ctx.fillStyle = "rgba(10,8,22,.66)"; ctx.fillRect(0, 0, W, H);
     const stretto = W < 600 * S, top = Math.max(testataBasso + 24 * S, H * (stretto ? 0.12 : 0.2));
     caratteri(36 * S, 900); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineWidth = 6 * S; ctx.lineJoin = "round"; ctx.strokeStyle = "#17171c"; ctx.fillStyle = ORO;
-    ctx.strokeText("Page Brawl", W / 2, top); ctx.fillText("Page Brawl", W / 2, top);
+    // (il nome lo può dare l'ospite: il sito del gioco si chiama Parry Brawl Survivor, 18/10/2026)
+    const nome = NOME_GIOCO; if (ctx.measureText(nome).width > W - 32 * S) caratteri(Math.round(36 * S * (W - 32 * S) / ctx.measureText(nome).width), 900);
+    ctx.strokeText(nome, W / 2, top); ctx.fillText(nome, W / 2, top);
     scriviUI(dici("Scegli come giocare"), W / 2, top + 34 * S, 14 * S, "#ffffff", "center", 700);
     const voci = [["corsa", "\u{1F3C3}", dici("Corsa infinita"), dici("Sopravvivi a ondate sempre più grandi: armi, livelli, draghetti, capi."), "sinistra"],
                   ["libero", "\u{1F94A}", dici("Combattimento libero"), dici("Due lottatori, i personaggi che vuoi, oggetti e imprevisti dalla tendina."), "destra"]];
@@ -15482,6 +15782,10 @@
     return [
       { nome: "Audio", valore: () => (audio.acceso ? "Acceso" : "Spento"), cambia: () => accendiAudio(!audio.acceso) },
       { nome: "Volume", barra: () => imp.volume / 10, valore: () => String(imp.volume), cambia: (v) => { imp.volume = Math.max(0, Math.min(10, imp.volume + v)); if (audio.uscita) audio.uscita.gain.value = volumeAudio(); suona("clic", W / 2, 0.6); } },
+      { nome: "Musica", valore: () => ({ sempre: "Sempre", corsa: "Solo nella corsa", mai: "Mai" })[imp.musica], cambia: (v) => { imp.musica = SCELTE(["sempre", "corsa", "mai"], imp.musica, v); aggiornaMusica(); },
+        nota: "Una base ritmica: i colpi dei nemici cadono sul battito e un «tic» li annuncia un battito prima." },
+      { nome: "Ritardo audio", valore: () => (imp.ritardoAudio > 0 ? "+" : "") + imp.ritardoAudio + " ms", cambia: (v) => { imp.ritardoAudio = Math.max(-150, Math.min(450, imp.ritardoAudio + 10 * v)); },
+        nota: "Con cuffie o casse Bluetooth il suono arriva tardi: alzalo finché il «tic» e il colpo coincidono." },
       { nome: "Dettaglio grafico", valore: () => ({ basso: "Basso", medio: "Medio", alto: "Alto" })[grafica.dettaglio], cambia: (v) => impostaGrafica({ dettaglio: SCELTE(["basso", "medio", "alto"], grafica.dettaglio, v) }),
         nota: "Basso: meno particelle e niente ombre sfumate, per i computer lenti." },
       { nome: "Anello del parry", valore: () => ({ sempre: "Sempre", corsa: "Solo nella corsa", mai: "Mai" })[imp.anello], cambia: (v) => { imp.anello = SCELTE(["sempre", "corsa", "mai"], imp.anello, v); },
@@ -15509,6 +15813,7 @@
     return out;
   }
   // Le pagine della guida: un titolo, le righe (icona, testo) e, a volte, una scenetta dal vivo.
+  const NOME_GIOCO = typeof window.__ringNome === "string" && window.__ringNome ? window.__ringNome.slice(0, 40) : "Page Brawl";
   const PAGINE_GUIDA = [
     { icona: "\u{1F44B}", titolo: "Benvenuto in Page Brawl", righe: [
       ["\u{1F4C4}", "La pagina che stai guardando è il ring: titoli, tasti e immagini sono piattaforme su cui salire."],
@@ -15602,20 +15907,37 @@
     }
     ctx.restore();
   }
+  // Il logo del menu. «Page Brawl»: PAGE bianco, BRAWL d'oro. Un nome di tre parole (il sito del gioco, 18/10/2026:
+  // «Parry Brawl Survivor») va su due righe: le prime due parole (la prima d'oro), sotto l'ultima, più piccola.
+  // Torna quanto scende sotto la riga di `y` (per mettere il motto dopo).
   function logoMenu(x, y, px, allinea) {
+    const parole = NOME_GIOCO.toUpperCase().split(/\s+/).filter(Boolean);
+    const tre = parole.length >= 3, riga = tre ? parole.slice(0, 2) : [parole[0] || "", parole.slice(1).join(" ")];
     ctx.save(); ctx.translate(x, y); ctx.rotate(-0.04);
+    // (non più largo dello schermo)
+    caratteri(px, 900);
+    const largo = largoTesto(riga[0] + " ", px) + largoTesto(riga[1], px);
+    if (largo > W - 36 * S) px = px * (W - 36 * S) / largo;
     caratteri(px, 900); ctx.textBaseline = "middle"; ctx.textAlign = allinea || "left"; ctx.lineJoin = "round";
-    const a = largoTesto("PAGE ", px), b = largoTesto("BRAWL", px), tot = a + b, x0 = allinea === "center" ? -tot / 2 : 0;
+    const a = largoTesto(riga[0] + " ", px), b = largoTesto(riga[1], px), tot = a + b, x0 = allinea === "center" ? -tot / 2 : 0;
     // La sciabolata rossa dietro.
     ctx.fillStyle = "#e0443a"; ctx.globalAlpha = 0.9;
     ctx.beginPath(); ctx.moveTo(x0 - 8 * S, px * 0.42); ctx.lineTo(x0 + tot + 14 * S, px * 0.22); ctx.lineTo(x0 + tot + 8 * S, px * 0.36); ctx.lineTo(x0 - 4 * S, px * 0.56); ctx.closePath(); ctx.fill();
     ctx.globalAlpha = 1; ctx.textAlign = "left";
     ctx.lineWidth = px * 0.16; ctx.strokeStyle = "#17171c";
-    ctx.strokeText("PAGE", x0, 0); ctx.fillStyle = "#ffffff"; ctx.fillText("PAGE", x0, 0);
-    ctx.save(); ctx.shadowColor = ORO; ctx.shadowBlur = (10 + 6 * Math.sin(passi * 0.06)) * S;
-    ctx.strokeText("BRAWL", x0 + a, 0); ctx.fillStyle = ORO; ctx.fillText("BRAWL", x0 + a, 0);
+    const oro = (t, xx, yy) => { ctx.save(); ctx.shadowColor = ORO; ctx.shadowBlur = (10 + 6 * Math.sin(passi * 0.06)) * S; ctx.strokeText(t, xx, yy); ctx.fillStyle = ORO; ctx.fillText(t, xx, yy); ctx.restore(); };
+    const bianco = (t, xx, yy) => { ctx.strokeText(t, xx, yy); ctx.fillStyle = "#ffffff"; ctx.fillText(t, xx, yy); };
+    if (tre) { oro(riga[0], x0, 0); bianco(riga[1], x0 + a, 0); } else { bianco(riga[0], x0, 0); oro(riga[1], x0 + a, 0); }
+    let sotto = 0;
+    if (tre) {
+      const p2 = px * 0.6, t3 = parole.slice(2).join(" ");
+      caratteri(p2, 900); ctx.lineWidth = p2 * 0.16;
+      const w3 = largoTesto(t3, p2), x3 = allinea === "center" ? -w3 / 2 : x0 + tot - w3;
+      oro(t3, x3, px * 0.95);
+      sotto = px * 0.95;
+    }
     ctx.restore();
-    ctx.restore();
+    return sotto;
   }
   // Un tasto della tastiera disegnato (per i suggerimenti in fondo): torna la larghezza.
   function tastoDisegnato(x, y, t) {
@@ -15679,13 +16001,14 @@
       if (menu.sel >= voci.length) menu.sel = 0;
       const px = Math.min(64 * S, (stretto ? W - 40 : W * 0.5) / 5.2);
       if (p === "principale") {
-        logoMenu(stretto ? W / 2 : 40 * S, top + px * 0.6, px, stretto ? "center" : "left");
-        scriviUI(dici("Il ring è la pagina che stai guardando."), stretto ? W / 2 : 44 * S, top + px * 1.35, 13 * S, "rgba(255,255,255,.75)", stretto ? "center" : "left", 700);
+        const giu = logoMenu(stretto ? W / 2 : 40 * S, top + px * 0.6, px, stretto ? "center" : "left");
+        // (il motto lo può dare l'ospite: nelle arene del sito non c'è una pagina sotto)
+        scriviUI(dici(typeof window.__ringMotto === "string" ? window.__ringMotto : "Il ring è la pagina che stai guardando."), stretto ? W / 2 : 44 * S, top + px * 1.35 + giu, 13 * S, "rgba(255,255,255,.75)", stretto ? "center" : "left", 700);
       } else {
         titoloGrande(dici("PAUSA"), stretto ? W / 2 : 40 * S, top + 30 * S, stretto ? "center" : "left");
         if (corsa && corsa.chi) scriviUI("⚠️ " + dici("Minaccia") + " " + corsa.round + "  ·  " + dici("Liv.") + " " + corsa.liv + "  ·  " + cifre(corsa.punti) + " " + dici("punti"), stretto ? W / 2 : 44 * S, top + 62 * S, 13 * S, "rgba(255,255,255,.8)", stretto ? "center" : "left", 700);
       }
-      const y0 = top + (p === "principale" ? px * 1.35 + 34 * S : 92 * S), rh = 44 * S;
+      const y0 = top + (p === "principale" ? px * 1.35 + 34 * S + (NOME_GIOCO.trim().split(/\s+/).length >= 3 ? px * 0.95 : 0) : 92 * S), rh = 44 * S;
       if (stretto) {
         const w = Math.min(360 * S, W - 32);
         colonnaVoci(voci, W / 2 - w / 2, y0, w, rh, { x: W / 2 - w / 2, y: y0 + voci.length * (rh + 8 * S) + 8 * S, w, h: 120 * S });
@@ -15738,7 +16061,7 @@
     const demo = g.demo && !stretto, wt = demo ? w * 0.6 : w, h = Math.min(H - y - 90 * S, 330 * S);
     pannelloUI(x, y, w, h, 14 * S, "rgba(255,216,74,.4)", "rgba(20,18,32,.86)");
     scriviUI(g.icona, x + 30 * S, y + 32 * S, 24 * S, "#ffffff", "center");
-    scriviUI(dici(g.titolo), x + 54 * S, y + 32 * S, 19 * S, ORO, "left", 900);
+    scriviUI(g.titolo === "Benvenuto in Page Brawl" ? dici("Benvenuto in") + " " + NOME_GIOCO : dici(g.titolo), x + 54 * S, y + 32 * S, 19 * S, ORO, "left", 900);
     let yy = y + 70 * S;
     for (const [ic, testo] of g.righe) {
       const lab = ic.length > 2 && /[A-Za-zÉ←→]/.test(ic);
@@ -16275,6 +16598,47 @@
     // Solo per i test: un tasto premuto (il codice fisico, come `e.code`), e la mappa dei tasti.
     // Quanti fotogrammi mancano al colpo parabile che arriva per primo su chi gioca (null: nessuno). Per i test.
     minacciaParry: () => { const m = minacciaParry(chiPara()); return m ? Math.round(m.fot) : null; },
+    // ·· Per i comandi touch del sito del gioco (18/10/2026) ··
+    // Il tasto Parata: quanti passi al colpo che arriva per primo, la finestra, il rosso, la guardia, la catena; e dove
+    // si è nel battito della musica (0..1, quando si SENTE), per farlo pulsare a tempo. Leggero: si legge a ogni disegno.
+    tempoParry: () => {
+      const f = chiPara() || comandato(), m = f ? minacciaParry(f) : null, attiva = musicaAttiva();
+      const kb = attiva ? battitoDi((audio.ctx ? audio.ctx.currentTime : oraMusica()) - latenzaMusica() - MUSICA.schermo) : null;
+      return {
+        fot: m ? m.fot : null, rossa: !!(m && m.rossa), finestra: f ? PARRY.finestra + larghezzaParry(f) : PARRY.finestra, perfetto: PARRY.perfetto,
+        inGuardia: !!(f && f.azione === "para"), aperta: inFinestraParry(f), guardia: f && f.guardiaPt !== undefined ? f.guardiaPt / GUARDIA.max : 1,
+        rotta: !!(f && f.guardiaRotta !== undefined && tempo - f.guardiaRotta < GUARDIA.rotta), catena: catenaParry.n, parry: f && f.parryT !== undefined ? tempo - f.parryT : 1e9, perfettoUltimo: !!(f && f.parryPerfetto),
+        colpito: f && f.colpitoT !== undefined ? tempo - f.colpitoT : 1e9, battito: kb === null ? null : kb - Math.floor(kb), bpm: attiva ? Math.round(60 / musica.griglia.dur) : 0,
+        lotta: !!(f && f.p && !f.esploso && (!corsa || corsa.fase === "lotta") && !corsaModale()),
+      };
+    },
+    // Un'azione dei tasti (gli id di `AZIONI_TASTI`: sinistra, destra, para, vola, finale, aura, pugni, onda, mossa1…),
+    // senza passare dalla tastiera: vale anche con la tastiera spenta. `lascia("para")` chiude la guardia.
+    premi: (id) => { const ok = !!eseguiTasto(id); if (ok) riparti(); return ok; },
+    lascia: (id) => { if (id === "para") for (const f of lottatori) if (f.guardia) { f.guardia = false; if (f.azione === "para") f.durata = Math.min(f.durata, f.t + 6); } },
+    // La musica: stato e impostazioni ({ musica: "sempre"|"corsa"|"mai", ritardo: ms }).
+    musica: (o) => {
+      if (o && typeof o === "object") {
+        // (`sveglia`: dentro un gesto dell'utente, il contesto audio può nascere o ripartire)
+        if (o.sveglia && audio.acceso) preparaAudio();
+        if (["sempre", "corsa", "mai"].indexOf(o.musica) >= 0) imp.musica = o.musica;
+        if (typeof o.ritardo === "number" && isFinite(o.ritardo)) imp.ritardoAudio = Math.max(-150, Math.min(450, Math.round(o.ritardo)));
+        salvaImp(); aggiornaMusica();
+      }
+      const c = audio.ctx;
+      return { accesa: musica.accesa, attiva: musicaAttiva(), musica: imp.musica, ritardo: imp.ritardoAudio, uscita: c ? Math.round((c.outputLatency || c.baseLatency || 0) * 1000) : 0,
+               bpm: musica.griglia ? Math.round(60 / musica.griglia.dur) : 0, prenotati: musica.prenotati.size, audio: audio.acceso };
+    },
+    // La taratura del ritardo: calibra(true) fa partire il metronomo, calibra("tocco", msDaQuandoÈSuccesso) a ogni
+    // tocco, calibra(false) chiude e salva. Dopo quattro tocchi il ritardo è già impostato.
+    calibra: (cosa, quando) => calibraMusica(cosa, quando),
+    // Solo per i test: la musica senza audio, con l'orologio dei passi (prenotazioni e battiti veri, niente suono).
+    musicaFinta: (si, passiBattito) => {
+      if (si) { musica.finto = true; musica.accesa = true; musica.griglia = { t0: tempo / 60, dur: (passiBattito || 30) / 60, k0: 0 }; musica.cambio = null; musica.prenotati.clear(); }
+      else { musica.finto = false; musica.accesa = false; musica.griglia = null; musica.prenotati.clear(); }
+      return { prenotati: Array.from(musica.prenotati.keys()) };
+    },
+    prenotati: () => Array.from(musica.prenotati.entries()).map(([i, p]) => ({ ottavo: i, passo: Math.round(tempo + passiAlOttavo(i)), rossa: p.rossa })),
     tastoGiu: (code, opz) => { let fermato = false; premiTasto(Object.assign({ code, repeat: false, target: null, preventDefault() {}, stopPropagation() { fermato = true; } }, opz || {})); return fermato; },
     tastoSu: (code) => { lasciaTasto({ code }); },
     mappaTasti: () => Object.assign({}, mappaTasti),
@@ -16451,7 +16815,7 @@
                    aggancio: agganciato() ? orda.zombie.indexOf(aggancio) : -1,
                    ricetta: orda.ricetta ? { tema: orda.ricetta.tema, arrivo: orda.ricetta.arrivo, totale: orda.ricetta.totale, insieme: orda.ricetta.insieme, restano: orda.ricetta.coda.length } : null,
                    zombie: orda.zombie.map((z) => ({ x: z.x, y: z.volo ? z.y : orda.base - (z.alzo || 0), volo: z.volo || null, stato: z.stato, hp: z.hp, lato: z.lato, tipo: z.tipo,
-                                                   s: z.s, equil: z.equil || 0, sbilanciato: z.sbilanciato || 0 })) } : null, primatoOrda,
+                                                   s: z.s, equil: z.equil || 0, sbilanciato: z.sbilanciato || 0, extra: z.extra || 0 })) } : null, primatoOrda,
     parata: { catena: catenaParry.n, lampo: lampoSchermo, zoom: !!zoomParry, guardia: chiPara() ? (chiPara().guardiaPt === undefined ? GUARDIA.max : chiPara().guardiaPt) : null,
               stordito: chiPara() ? chiPara().stordito || 0 : 0, perfetto: chiPara() ? !!chiPara().parryPerfetto : false },
     radiale: (() => { const g = lottatori.length ? geometriaRadiale() : { x: 0, y: 0, centro: 0, spicchi: [], largo: 0 };

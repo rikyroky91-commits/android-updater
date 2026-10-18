@@ -1,6 +1,6 @@
 # Passaggio di consegne: Mobile Update Tracker e Page Brawl
 
-Documento vivo. Ultimo aggiornamento: **17/10/2026**, su `main` dopo l'unione del parry, seconda volta (ramo `claude/exciting-cori-6cwl9m`, avanti veloce fino a `d970a2d`) e i due test instabili sistemati.
+Documento vivo. Ultimo aggiornamento: **18/10/2026**, sul ramo `claude/parry-brawl-web` (musica a tempo nel motore e sito a parte del gioco, **Parry Brawl Survivor**). `main` è com'era il 17/10.
 
 Questo file è il punto di ingresso per chiunque lavori sul repository: persone, Claude, Codex o altri agenti. Si tiene **sempre aggiornato** (regola in fondo, sezione 9). I passaggi di consegne dei singoli giri restano in `docs/consegne/` come archivio storico: questo li riassume e li sostituisce come riferimento.
 
@@ -37,6 +37,7 @@ Il flusso del repository è **push diretto su `main`** (nessuna PR è mai stata 
 
 | Ramo | Cosa contiene | Da fare |
 | --- | --- | --- |
+| `claude/parry-brawl-web` (18/10) | Musica a tempo (attacchi sul battito, «tic» d'avviso, risposta al parry, taratura del ritardo), API per i comandi touch (`tempoParry`, `premi`, `lascia`, `musica`, `calibra`), nome, motto e logo del menu decisi dall'ospite (`__ringNome`, `__ringMotto`). Serve al sito nuovo `rikyroky91-commits/parry-brawl-survivor` | Da unire a `main` con l'accordo di Riccardo: estensione e app prendono la musica (di serie solo nella corsa) |
 | `claude/exciting-cori-6cwl9m` (16-17/10) | Page Brawl 1.2.0 / Android 1.6.0, unito a `main` il 17/10 (`f8d3910`); dopo, **il parry, seconda volta** (parry perfetto, equilibrio e colpo di grazia, catena, attacchi rossi, tre manate del capo, guardia che si consuma) | **Unito a `main` il 17/10**, anche il parry nuovo (avanti veloce, su richiesta di Riccardo: «unisci»). Cancellabile |
 | `claude/ultimora-tema-scuro-codice-modello` (02/10) | Commit `61f8ca9` «lotte più fitte, meno tempi morti», mai arrivato su `main` | **Rifatto a mano il 16/10** sul ramo qui sopra (con lo strumento `tests/misura-lotta.cjs` che stava lì). Cancellabile (quello nuovo è su `main` dal 17/10) |
 
@@ -252,6 +253,9 @@ Il motore legge dall'ambiente degli hook opzionali. Sul sito nessuno è impostat
 | `window.__ringGrafica` | app | fps 30/60/120, risoluzione 50-100 %, dettaglio basso/medio/alto |
 | `window.__ringBordoOggetti` | app | oggetti tenuti lontani dai bordi (lottatori incastrati negli angoli) |
 | `window.__ringSceltaModo`, `__ringEstensione`, `__ringDati` | estensione, app | scelta del modo e dati dell'ospite |
+| `window.__ringNome`, `__ringMotto` | sito del gioco | nome nel logo del menu e nella guida (di serie «Page Brawl»; tre parole vanno su due righe) e motto sotto il logo |
+| `window.__ringMusicaBase` | sito del gioco | musica di serie: `"sempre"`, `"corsa"` (di serie), `"mai"` |
+| `__ring.tempoParry()`, `premi(id)`, `lascia(id)`, `musica(o)`, `calibra(...)` | sito del gioco (`hud.js`) | tasto Parata a tempo, azioni dei tasti anche a tastiera spenta, musica e taratura del ritardo audio |
 | `__ring.mosse()`, `cambia()`, `pannello()`, `pausa()`, `grafica()`, `corpi()` | letti dall'app | comandi nativi e stato del motore |
 
 Chi aggiunge un hook lo scrive in questa tabella e in `android/LEGGIMI.md`.
@@ -319,6 +323,17 @@ Dipendenza da ricordare: **estensione e app dipendono dal dominio del tracker**.
 - Super guerrieri ridisegnati l'11/10 e il 13/10 sul pupazzo di Riccardo, con costumi scelti perché non ricalchino Dragon Ball. Le **animazioni** invece devono essere «affini al mondo Dragon Ball» (16/10): stile del genere (scatti con immagini residue, onde caricate al fianco, carica dell'aura, linee d'impatto), mai gesti firma di un personaggio preciso.
 - La trasformazione dei super guerrieri si chiama **Limit Break** in tutte le lingue (16/10, prima «sovraccarico»).
 - I **maghi combattono a distanza** (16/10): fascia di tiro in `MAGO`, respinta, sparizione lontana (`sparizioneMago`). Duellanti e classici (robot e mela) restano com'erano per scelta di Riccardo («spadaccini e androidi li lascerei così per ora»): li toccano solo le correzioni generali dei tempi morti.
+
+### 4.6 bis La musica a tempo (18/10/2026)
+
+Riccardo: «un tappeto musicale ritmico che va a ritmo con i nemici e il parry», attacchi annunciati «non rari ma con un'ottima tempistica». In `ring.js`, sezione «LA MUSICA A TEMPO»:
+
+- Musica sintetizzata a strati (cassa, rullante, piatti, basso, pad, arpeggio) su La minore – Fa – Do – Sol; lo strato sale con la lotta, col capo e con la catena di parry. 112,5 BPM (un battito ogni 32 passi), 128,6 dal primo minuto di lotta, 150 dal terzo; il tempo cambia solo a inizio battuta.
+- L'orologio è quello dell'audio; i passi della fisica ci si agganciano (`agganciaPasso`). Ogni morso (e la carica letale) **prenota un ottavo** della griglia (`prenotaColpo`), al massimo uno per battito, e la carica si allunga o si accorcia a ogni passo (`ritoccaCarica`) perché il colpo arrivi lì anche dopo i fermi dei colpi secchi. Un battito prima (o mezzo) suona un «tic» dalla parte di chi attacca; per l'attacco rosso anche un soffio che sale. I draghi tirano sugli ottavi; le tre manate del capo stanno a un ottavo l'una dall'altra (a un battito sopra i 150 BPM).
+- Il parry mette un accordo sul sedicesimo dopo (col piatto se perfetto), un colpo preso ovatta la musica, il rallentatore la chiude in un filtro.
+- Impostazioni nuove: «Musica» (sempre / solo nella corsa / mai) e «Ritardo audio» (ms, per le cuffie Bluetooth; il sito lo misura toccando a tempo con `__ring.calibra`).
+- Senza audio acceso la musica non c'è e **niente cambia** rispetto a prima: i test Node girano senza audio. `__ring.musicaFinta(true, passi)` accende la griglia senza suono per i test.
+- **Non provato a orecchio su un telefono vero**: il suono è stato solo fatto girare in Chromium senza ascoltarlo. Da sentire: volume relativo della musica (`MUSICA.volume` 0,5) e degli effetti, e se il «tic» si sente nella mischia.
 
 ### 4.7 Test
 
@@ -423,6 +438,7 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 18/10/2026 | Claude | Musica a tempo nel motore e API per i comandi touch del sito nuovo **Parry Brawl Survivor** (repo `parry-brawl-survivor`, costruito da questo motore a un commit fissato); logo e motto del menu decisi dall'ospite; due test nuovi (morsi sulla griglia, azioni a tastiera spenta). Test Node: due cadute casuali isolate (n. 76 e n. 86), da sole passano 3 su 3. Non unito a `main` | `claude/parry-brawl-web` |
 | 17/10/2026 | Claude | CI rossa su `main` (anche sull'unione di prima, `f8d3910`) per due test instabili già noti, sistemati: l'arena di lava (3 su 20) ora spegne gli imprevisti, tiene fermo il robot lontano dal bordo mentre prova la lava e guarda dove la mela ricompare appena rientra; «gli oggetti entrano dai lati» (1 su 20: dall'alto ne arriva meno di uno su due, a caso) guarda altri 150 s se non li ha visti tutti e due. Dopo: 0 su 40 e 0 su 20, suite Node 214 su 214. Nessuna modifica al gioco | `main` |
 | 17/10/2026 | Claude | **Unito a `main`** il parry, seconda volta (avanti veloce del ramo `claude/exciting-cori-6cwl9m`, CI verde sul ramo): il push pubblica il sito su Oracle. Da fare a mano, come prima: caricare la 1.2.0 sul Chrome Web Store, l'AAB su Play, l'account Ko-fi | `main` |
 | 17/10/2026 | Claude | CI rossa sul parry nuovo: «la mira… gli zombie si falciano» è caduto una volta in CI (0 su 30 in locale). Il test sceglieva anche uno zombie addosso al robot, dietro l'origine della linea: ora ne sceglie uno ad almeno 80 px. Reso robusto anche il test del Limit Break (la trasformazione si richiede di nuovo se un colpo la interrompe). Nessuna modifica al gioco | `claude/exciting-cori-6cwl9m` |

@@ -4888,3 +4888,49 @@ test("pausa: Esc nella corsa ferma il tempo; Riprendi riparte; Abbandona chiede 
   assert.strictEqual(amb.stato().corsa.fase, "fine", "la seconda la corsa finisce");
   void t0;
 });
+
+// ·· La musica a tempo (18/10/2026) ··
+// Con la musica (qui finta: l'orologio sono i passi, un battito ogni 30), i morsi cadono sulla griglia degli ottavi,
+// al massimo uno per battito, e il tasto Parata del sito sa a che punto è il colpo.
+test("musica a tempo: i morsi cadono sugli ottavi della griglia, mai due nello stesso battito", () => {
+  const morsi = [];
+  let T0 = null, prenotazioni = 0, letto = null, ultimo = -1;
+  for (let k = 0; k < 4 && morsi.length < 4; k++) {
+    const { amb, r } = corsaAvviata({}, "robot", 3100 + k);
+    avanzaCorsa(amb, r, 60 * 10, (s) => (s.orda && s.corsa.fase === "lotta" ? false : undefined));
+    T0 = amb.stato().tempo;
+    r.musicaFinta(true, 30);
+    const f0 = amb.lottatore("robot");
+    r.zombie("corazzato", f0.bacino.x + 40);
+    r.zombie("corazzato", f0.bacino.x - 40);
+    avanzaCorsa(amb, r, 60 * 12, (s) => {
+      prenotazioni = Math.max(prenotazioni, r.prenotati().length);
+      const tp = r.tempoParry();
+      if (tp.fot !== null && letto === null) letto = tp;
+      // (una volta per passo: nel fermo dei colpi secchi lo stesso passo si rilegge più volte)
+      if (s.tempo !== ultimo) for (const z of s.orda ? s.orda.zombie : []) if (z.tipo === "corazzato" && z.stato === "colpo" && z.s === 24 + z.extra) morsi.push(s.tempo - T0);
+      ultimo = s.tempo;
+    });
+    r.musicaFinta(false);
+    dentro(amb);
+  }
+  if (process.env.MUSICA_DBG) console.log("morsi:", morsi.join(", "));
+  assert.ok(morsi.length >= 2, "pochi morsi da misurare: " + morsi.length);
+  assert.ok(prenotazioni > 0, "i morsi prenotano un ottavo");
+  for (const t of morsi) assert.ok(Math.abs(((t % 15) + 15) % 15) <= 1 || ((t % 15) + 15) % 15 >= 14, "morso fuori griglia al passo " + t + " (" + morsi.join(", ") + ")");
+  const uguali = morsi.filter((t, i) => i && t >= morsi[i - 1] && t - morsi[i - 1] < 30);
+  assert.strictEqual(uguali.length, 0, "due morsi a meno di un ottavo: " + morsi.join(", "));
+  assert.ok(letto && letto.finestra >= 14 && typeof letto.rossa === "boolean", "il tasto Parata legge il colpo in arrivo");
+});
+
+test("senza musica niente aspetta il battito, e le azioni del sito passano anche a tastiera spenta", () => {
+  const { amb, r } = corsaAvviata({}, "robot", 3200);
+  avanzaCorsa(amb, r, 60 * 6);
+  assert.strictEqual(r.prenotati().length, 0, "nessuna prenotazione senza musica");
+  assert.strictEqual(r.musica().accesa, false);
+  r.comandi.tastiera && r.comandi.tastiera(false);
+  avanzaCorsa(amb, r, 60 * 2, (s) => (s.corsa.fase === "lotta" ? false : undefined));
+  assert.strictEqual(r.premi("para"), true, "la parata parte dal tasto del sito");
+  r.lascia("para");
+  dentro(amb);
+});
