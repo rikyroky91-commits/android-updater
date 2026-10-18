@@ -258,7 +258,7 @@ Il motore legge dall'ambiente degli hook opzionali. Sul sito nessuno è impostat
 | `__ring.tempoParry()`, `premi(id)`, `lascia(id)`, `musica(o)`, `calibra(...)` | sito del gioco (`hud.js`) | tasto Parata a tempo, azioni dei tasti anche a tastiera spenta, musica e taratura del ritardo audio |
 | `window.__ringUrto(u)`, `__ring.rileva()` | arene (`android/web/arena.html`) | il motore dice dove arriva una botta (`{x, y, r, forza, tipo, el}`: esplosione, meteora, urto, pavimento, sisma); l'arena crepa e fa crollare le pedane fragili, poi chiede di rileggere i solidi |
 | `window.__ringModoLibero`, `__ringModoScelto(modo)` | sito del gioco | rinomina la seconda voce del menu («1 contro 1», con `unoControUno` si comanda il proprio lottatore da subito) e avvisa l'ospite del modo scelto (il sito cambia arena con `__pbArena`) |
-| `__ring.mosse()`, `cambia()`, `pannello()`, `pausa()`, `grafica()`, `corpi()` | letti dall'app | comandi nativi e stato del motore |
+| `__ring.mosse()`, `cambia()`, `pannello()`, `pausa()`, `grafica()`, `corpi()` | letti dall'app | comandi nativi e stato del motore; dal 18/10 `mosse().lottatori[i].vola` (in volo col jetpack), per ↑ e ↓ del sito del gioco |
 
 Chi aggiunge un hook lo scrive in questa tabella e in `android/LEGGIMI.md`.
 
@@ -450,6 +450,7 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 18/10/2026 | Claude | `mosse()` dice chi è in volo (`vola`), per le frecce facoltative del sito Parry Brawl Survivor sul PC (↑ decolla, ↓ atterra). Node 218/218 | `claude/parry-brawl-web` |
 | 18/10/2026 | Claude | Attacchi degli zombie leggibili (carica, zona per terra rossa/oro, scia del colpo), vita del capo sopra la testa, bruto armato primo fra i nuovi. Node 218/218 | `claude/parry-brawl-web` |
 | 18/10/2026 | Claude | Stamina della guardia tenuta, arena «cortile» con pedane che si rompono (anche nelle arene lava e cielo, e nell'app), «1 contro 1» al posto del combattimento libero sul sito; tre test nuovi. Node 218/218 | `claude/parry-brawl-web` |
 | 18/10/2026 | Claude | Musica a tempo nel motore e API per i comandi touch del sito nuovo **Parry Brawl Survivor** (repo `parry-brawl-survivor`, costruito da questo motore a un commit fissato); logo e motto del menu decisi dall'ospite; due test nuovi (morsi sulla griglia, azioni a tastiera spenta). Test Node: due cadute casuali isolate (n. 76 e n. 86), da sole passano 3 su 3. Non unito a `main` | `claude/parry-brawl-web` |

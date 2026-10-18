@@ -16672,7 +16672,9 @@
         voci: vociRadiale().map((v) => ({ id: v[0], icona: v[1], nome: dici(v[2]), costo: v[3] || 0, pronta: !!(f && puoFare(f, v)) })),
         lottatori: lottatori.map((l) => ({
           tipo: l.tipo, nome: stile && ASPETTI[stile] ? ASPETTI[stile][l.tipo].nome : dici(l.tipo === "robot" ? "Robot" : "Mela"),
-          colore: COLORI_ANIME[l.tipo], vita: l.p ? vitaVera(l) : 0, ki: l.ki || 0, ko: !!(l.ko > 0 || l.esploso || l.fuori) })),
+          colore: COLORI_ANIME[l.tipo], vita: l.p ? vitaVera(l) : 0, ki: l.ki || 0, ko: !!(l.ko > 0 || l.esploso || l.fuori),
+          // (18/10/2026: in volo col jetpack; il sito del gioco manda ↑ a decollare e ↓ ad atterrare)
+          vola: !!(l.jet > 0) })),
         punteggio: Object.assign({}, punteggio),
       };
     },
