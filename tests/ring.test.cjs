@@ -4930,7 +4930,49 @@ test("senza musica niente aspetta il battito, e le azioni del sito passano anche
   assert.strictEqual(r.musica().accesa, false);
   r.comandi.tastiera && r.comandi.tastiera(false);
   avanzaCorsa(amb, r, 60 * 2, (s) => (s.corsa.fase === "lotta" ? false : undefined));
-  assert.strictEqual(r.premi("para"), true, "la parata parte dal tasto del sito");
+  // (l'eroe può essere a metà di una mossa che non si interrompe: si riprova come chi tiene il dito sul tasto)
+  let parata = false;
+  avanzaCorsa(amb, r, 60 * 3, () => { parata = r.premi("para"); return parata ? false : undefined; });
+  assert.strictEqual(parata, true, "la parata parte dal tasto del sito");
   r.lascia("para");
   dentro(amb);
+});
+
+// ·· Stamina e arena che si rompe (18/10/2026) ··
+test("la guardia tenuta consuma la stamina e, vuota, si rompe", () => {
+  const { amb, r } = corsaAvviata({}, "robot", 3300);
+  avanzaCorsa(amb, r, 60 * 6, (s) => (s.corsa.fase === "lotta" ? false : undefined));
+  let su = false;
+  avanzaCorsa(amb, r, 60 * 3, () => { su = r.premi("para"); return su ? false : undefined; });
+  assert.ok(su, "la guardia parte");
+  let minimo = 1, rotta = false;
+  avanzaCorsa(amb, r, 60 * 8, (s) => {
+    const t = r.tempoParry();
+    minimo = Math.min(minimo, t.guardia);
+    if (t.rotta) { rotta = true; return false; }
+    if (!t.inGuardia && !rotta) r.premi("para");                 // (chi tiene premuto: se un colpo la interrompe, si rimette)
+  });
+  r.lascia("para");
+  assert.ok(minimo < 0.5, "la guardia tenuta deve calare: " + minimo);
+  assert.ok(rotta, "tenuta a lungo, la guardia si rompe");
+  dentro(amb);
+});
+
+test("arena che si rompe: esplosioni, meteore e urti arrivano all'ospite; senza arena niente", () => {
+  const urti = [];
+  const pedana = [150, 500, 450, 516];
+  const amb = ambiente({ estensione: true, larghezza: 600, altezza: 800, solidi: [pedana], arena: { lava: 0, pavimento: 160 },
+                         globali: { __ringUrto: (u) => urti.push(u) }, memoria: { "mut-ring": "on", "mut-ring-cruento": "off" } });
+  const r = amb.finestra.__ring;
+  amb.avanza(30);
+  r.scoppia(300, 500, true);
+  assert.ok(urti.some((u) => u.tipo === "esplosione" && u.r > 0 && u.forza > 0), "l'esplosione arriva all'arena");
+  r.danneggiaStriscia(300, 0.8);
+  assert.ok(urti.some((u) => u.tipo === "pavimento"), "e anche il colpo sul pavimento");
+  assert.doesNotThrow(() => r.rileva(), "rileggere i solidi a comando");
+  const fuori = [];
+  const senza = ambiente({ globali: { __ringUrto: (u) => fuori.push(u) } });
+  senza.avanza(30);
+  senza.finestra.__ring.scoppia(300, 500, true);
+  assert.strictEqual(fuori.length, 0, "fuori da un'arena l'hook non si chiama");
 });

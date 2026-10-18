@@ -152,7 +152,7 @@ public class Principale extends Activity {
                     {"blocco", "\uD83D\uDD12", "Lock screen", "The ring appears when you wake the screen"},
                     {"sistema", "\uD83D\uDCF1", "Whole phone", "Tap the bubble on any app"},
                     {"chrome", "\uD83C\uDF10", "Chrome only", "The bubble shows while you browse"},
-                    {"app", "\uD83C\uDFDF\uFE0F", "In the app", "Arenas: lava, sky, ring"}};
+                    {"app", "\uD83C\uDFDF\uFE0F", "In the app", "Arenas: stone, lava, sky, ring"}};
             for (final String[] v : voci) modi.addView(rigaModo(v[0], v[1], v[2], v[3], v[0].equals(modo)));
             col.addView(modi);
             col.addView(spazio(14));
@@ -161,6 +161,9 @@ public class Principale extends Activity {
         // Cosa fare adesso, secondo la modalità.
         if ("app".equals(modo)) {
             LinearLayout arene = new LinearLayout(this);
+            // (18/10/2026) il cortile di pietra, con le lastre che si rompono: il primo, il più largo per lottare
+            arene.addView(arena("arena", "Arena", new int[]{0xFF2C2342, 0xFFC9714C}, 0xFF918578), pesoUno());
+            arene.addView(spazio(10, true));
             arene.addView(arena("lava", "Lava", new int[]{0xFF5C1608, 0xFF0D0403}, 0xFFFF8A1F), pesoUno());
             arene.addView(spazio(10, true));
             arene.addView(arena("cielo", "Sky", new int[]{0xFF5AA9E6, 0xFFDFF1FF}, 0xFF5BB04C), pesoUno());

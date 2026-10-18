@@ -9,7 +9,14 @@
        quello che si vede è disegnato a parte, nei .pietra.
        ?tipo=lava   vulcano: piattaforma sospesa, due pedane, lava che uccide
        ?tipo=cielo  tre pedane nel cielo sopra un prato
-       ?tipo=ring   il ring classico sotto i riflettori -->
+       ?tipo=ring   il ring classico sotto i riflettori
+       ?tipo=arena  (18/10/2026) un cortile di pietra al tramonto: pavimento largo da bordo a bordo e tre lastre
+                    sospese che si crepano e crollano sotto colpi, esplosioni e imprevisti, poi tornano
+       LE PEDANE CHE SI ROMPONO (18/10/2026, Riccardo: «un ring distruttibile con le mosse e gli imprevisti»): il motore
+       chiama `window.__ringUrto({ x, y, r, forza, tipo, el })` a ogni botta; qui ogni pedana segnata come fragile ha
+       100 punti, si crepa a vista e a zero crolla in pezzi (il solido sparisce e `__ring.rileva()` lo fa sapere al
+       motore). Torna dopo una quindicina di secondi, quando nessuno sta nel suo spazio. Pavimento e piattaforma
+       principale della lava non si rompono mai. `window.__pbArena(tipo)` cambia arena a pagina aperta. -->
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none;
                  -webkit-tap-highlight-color: transparent; background: #050304; }
@@ -72,6 +79,46 @@
     .corda { position: absolute; height: 3px; border-radius: 2px; background: linear-gradient(#ff6b6b, #c0392b); box-shadow: 0 1px 2px rgba(0, 0, 0, .4); }
     .palo { position: absolute; width: 8px; border-radius: 3px; background: linear-gradient(90deg, #9aa3b5, #e6e9f0, #8a93a5); }
     .pavimento-ring { position: absolute; left: 0; right: 0; bottom: 0; height: 10px; background: #0d0f14; }
+
+    /* ---------------- ARENA (cortile di pietra) ---------------- */
+    .arena .scena { background: linear-gradient(#141127 0%, #2c2342 38%, #6b3d4f 66%, #c9714c 86%, #f2a35f 100%); }
+    .luna { position: absolute; right: 13%; top: 8%; width: 62px; height: 62px; border-radius: 50%;
+            background: radial-gradient(circle at 38% 36%, #fff8e6 0%, #f4dca8 55%, #d6b16f 100%); box-shadow: 0 0 60px rgba(255, 226, 160, .35); }
+    .citta { position: absolute; left: -2%; right: -2%; background: #231b30; opacity: .92;
+             clip-path: polygon(0 100%, 0 46%, 5% 46%, 5% 30%, 9% 30%, 9% 52%, 14% 52%, 14% 22%, 17% 18%, 20% 22%, 20% 50%, 26% 50%, 26% 36%, 31% 36%, 31% 58%,
+                                37% 58%, 37% 26%, 41% 26%, 41% 12%, 43% 12%, 43% 26%, 47% 26%, 47% 54%, 54% 54%, 54% 40%, 60% 40%, 60% 20%, 64% 20%, 64% 48%, 70% 48%,
+                                70% 32%, 75% 32%, 75% 56%, 81% 56%, 81% 24%, 84% 16%, 87% 24%, 87% 44%, 93% 44%, 93% 34%, 100% 34%, 100% 100%); }
+    .citta.vicina { background: #1a1424; opacity: 1; clip-path: polygon(0 100%, 0 62%, 8% 62%, 8% 48%, 15% 48%, 15% 70%, 24% 70%, 24% 55%, 33% 55%, 33% 74%,
+                                45% 74%, 45% 60%, 56% 60%, 56% 76%, 66% 76%, 66% 52%, 74% 52%, 74% 68%, 86% 68%, 86% 50%, 94% 50%, 94% 66%, 100% 66%, 100% 100%); }
+    .pietra.suolo { background:
+                      repeating-linear-gradient(90deg, rgba(0, 0, 0, .22) 0 2px, transparent 2px 72px),
+                      repeating-linear-gradient(180deg, transparent 0 22px, rgba(0, 0, 0, .18) 22px 24px),
+                      linear-gradient(#b3a597 0, #8f8377 6px, #6d635a 30%, #4b443e 70%, #302b27 100%);
+                    box-shadow: inset 0 3px 0 rgba(255, 220, 180, .35), 0 -10px 30px rgba(0, 0, 0, .25); }
+    .pietra.grigia { background: linear-gradient(#bfb3a6 0, #918578 5px, #6c625a 14px, #48413b 100%);
+                     clip-path: polygon(0 0, 100% 0, 100% 45%, 92% 62%, 83% 55%, 72% 82%, 60% 66%, 50% 100%, 40% 72%, 28% 86%, 17% 62%, 8% 74%, 0 48%);
+                     filter: drop-shadow(0 16px 18px rgba(20, 10, 30, .45)); }
+    .torcia { position: absolute; width: 10px; height: 46px; border-radius: 3px; background: linear-gradient(90deg, #3a2b22, #6b513f, #3a2b22); }
+    .torcia::before { content: ""; position: absolute; left: 50%; top: -20px; width: 18px; height: 26px; margin-left: -9px; border-radius: 50% 50% 45% 45%;
+                      background: radial-gradient(circle at 50% 70%, #fff3b0, #ffb347 45%, rgba(255, 90, 20, 0) 75%); animation: fiamma .18s ease-in-out infinite alternate; }
+    .torcia::after { content: ""; position: absolute; left: 50%; top: -60px; width: 160px; height: 160px; margin-left: -80px; border-radius: 50%;
+                     background: radial-gradient(rgba(255, 170, 80, .22), transparent 65%); pointer-events: none; }
+    @keyframes fiamma { from { transform: scale(1, 1) translateY(0); } to { transform: scale(.88, 1.1) translateY(-2px); } }
+
+    /* ---------------- LE PEDANE CHE SI ROMPONO (tutte le arene) ---------------- */
+    .crepe { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .15s;
+             background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 40' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='%23140c08' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 0 L14 9 L11 16 L19 27 L16 40'/%3E%3Cpath d='M14 9 L24 12'/%3E%3Cpath d='M47 0 L44 7 L52 15 L48 24 L55 33'/%3E%3Cpath d='M52 15 L62 13 L70 20'/%3E%3Cpath d='M86 0 L90 10 L84 17 L93 28 L89 40'/%3E%3Cpath d='M90 10 L101 8 L108 16'/%3E%3Cpath d='M30 40 L34 30 L28 22'/%3E%3Cpath d='M70 40 L73 31 L79 27'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 100% 100%; }
+    .pietra.colpita { animation: botta .22s ease-out; }
+    @keyframes botta { 30% { transform: translate(2px, 3px); } 60% { transform: translate(-2px, 1px); } }
+    .pietra.crollata { visibility: hidden; }
+    .pezzo { position: absolute; pointer-events: none; animation: cade 1.1s cubic-bezier(.5, 0, .9, .6) forwards; }
+    @keyframes cade { 0% { transform: translate(0, 0) rotate(0); opacity: 1; } 100% { transform: translate(var(--dx), 70vh) rotate(var(--giro)); opacity: 0; } }
+    .polverone { position: absolute; pointer-events: none; height: 40px; border-radius: 50%; background: radial-gradient(rgba(210, 195, 175, .55), transparent 70%);
+                 animation: polvere .9s ease-out forwards; }
+    @keyframes polvere { from { transform: scale(.4); opacity: .9; } to { transform: scale(1.6, 1.2) translateY(-14px); opacity: 0; } }
+    .pietra.risorge { animation: risorge .6s cubic-bezier(.2, .9, .3, 1.2); }
+    @keyframes risorge { from { transform: translateY(30px) scaleY(.2); opacity: 0; } to { transform: none; opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .pezzo, .polverone { display: none; } .pietra.colpita, .pietra.risorge { animation: none; } }
   </style>
 </head>
 <body>
@@ -79,25 +126,31 @@
   <script>
   (function () {
     "use strict";
+    var TIPI = ["lava", "cielo", "ring", "arena"];
     var tipo = (/[?&]tipo=(\w+)/.exec(location.search) || [])[1] || "lava";
-    if (["lava", "cielo", "ring"].indexOf(tipo) < 0) tipo = "lava";
+    if (TIPI.indexOf(tipo) < 0) tipo = "lava";
     document.documentElement.className = tipo;
     var scena = document.getElementById("scena");
     var VUOTA = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
     function el(tag, cls, stile) { var e = document.createElement(tag); if (cls) e.className = cls; if (stile) e.style.cssText = stile; scena.appendChild(e); return e; }
-    // Una pedana: la parte che si vede (alta `vista`) e il solido (alto 16 px) sul suo piano.
-    function pedana(cls, l, t, w, vista) {
+    // Una pedana: la parte che si vede (alta `vista`) e il solido (alto 16 px) sul suo piano. `fragile`: si rompe.
+    var pedane = [];
+    function pedana(cls, l, t, w, vista, fragile) {
       var v = el("div", "pietra " + cls, "left:" + l + "px;top:" + t + "px;width:" + w + "px;height:" + vista + "px");
       var s = new Image(); s.src = VUOTA; s.alt = ""; s.className = "solido";
       s.style.cssText = "left:" + l + "px;top:" + t + "px;width:" + w + "px;height:16px";
       scena.appendChild(s);
+      if (fragile) {
+        var c = document.createElement("div"); c.className = "crepe"; v.appendChild(c);
+        pedane.push({ v: v, s: s, crepe: c, l: l, t: t, w: w, h: vista, punti: 100, giu: 0 });
+      }
       return v;
     }
     var fisso = [];   // gli addobbi che non dipendono dalle misure (si creano una volta)
 
     function costruisci() {
       var W = window.innerWidth, H = window.innerHeight, largo = W > H;
-      scena.textContent = "";
+      scena.textContent = ""; pedane = [];
       if (tipo === "lava") {
         el("div", "monti dietro"); el("div", "monti");
         var lava = Math.round(H * (largo ? 0.16 : 0.13));
@@ -105,8 +158,8 @@
         var mw = Math.min(largo ? W * 0.56 : W * 0.8, 620), ml = (W - mw) / 2, mt = H * (largo ? 0.6 : 0.6);
         pedana("lastra", ml, mt, mw, Math.round(Math.min(90, H * 0.1)));
         var sw = mw * (largo ? 0.3 : 0.32), st = mt - Math.max(110, H * (largo ? 0.24 : 0.17));
-        pedana("lastra", ml + mw * 0.04, st, sw, 34);
-        pedana("lastra", ml + mw * 0.96 - sw, st, sw, 34);
+        pedana("lastra", ml + mw * 0.04, st, sw, 34, true);
+        pedana("lastra", ml + mw * 0.96 - sw, st, sw, 34, true);
         var l = el("div", "", ""); l.id = "lava"; l.style.height = lava + "px";
         for (var i = 0; i < 7; i++) {
           var b = document.createElement("span"); b.className = "bolla";
@@ -125,9 +178,25 @@
         var cw = Math.min(largo ? W * 0.5 : W * 0.74, 560), cl = (W - cw) / 2, ct = H * 0.66;
         pedana("isola", cl, ct, cw, 60);
         var pw = cw * 0.36, pt = ct - Math.max(120, H * 0.18);
-        pedana("isola", cl - cw * 0.08, pt, pw, 40);
-        pedana("isola", cl + cw * 1.08 - pw, pt, pw, 40);
-        pedana("isola", (W - pw * 0.9) / 2, pt - Math.max(110, H * 0.15), pw * 0.9, 36);
+        pedana("isola", cl - cw * 0.08, pt, pw, 40, true);
+        pedana("isola", cl + cw * 1.08 - pw, pt, pw, 40, true);
+        pedana("isola", (W - pw * 0.9) / 2, pt - Math.max(110, H * 0.15), pw * 0.9, 36, true);
+      } else if (tipo === "arena") {
+        // Il cortile: il pavimento è quello del motore e va da un bordo all'altro (niente da cui cadere);
+        // sopra, tre lastre sospese a due altezze, tutte fragili.
+        var ft = Math.round(H * (largo ? 0.8 : 0.76));
+        window.__ringArena = { lava: 0, pavimento: H - ft };
+        el("div", "luna");
+        el("div", "citta", "bottom:" + (H - ft) + "px;height:" + Math.round(H * 0.34) + "px");
+        el("div", "citta vicina", "bottom:" + (H - ft) + "px;height:" + Math.round(H * 0.22) + "px");
+        el("div", "torcia", "left:" + Math.round(W * 0.06) + "px;top:" + (ft - 46) + "px");
+        el("div", "torcia", "left:" + Math.round(W * 0.94 - 10) + "px;top:" + (ft - 46) + "px");
+        el("div", "pietra suolo", "left:0;top:" + ft + "px;width:" + W + "px;height:" + (H - ft) + "px");
+        var aw = Math.min(largo ? W * 0.26 : W * 0.36, 300), primo = ft - Math.max(120, H * (largo ? 0.22 : 0.16));
+        pedana("grigia", W * (largo ? 0.12 : 0.04), primo, aw, 38, true);
+        pedana("grigia", W * (largo ? 0.88 : 0.96) - aw, primo, aw, 38, true);
+        var cw2 = Math.min(largo ? W * 0.3 : W * 0.44, 340);
+        pedana("grigia", (W - cw2) / 2, primo - Math.max(115, H * (largo ? 0.2 : 0.15)), cw2, 40, true);
       } else {
         el("div", "faro");
         el("div", "pavimento-ring");
@@ -145,6 +214,68 @@
     costruisci();
     var attesa = 0;
     window.addEventListener("resize", function () { clearTimeout(attesa); attesa = setTimeout(costruisci, 120); });
+
+    // ·· Le botte sulle pedane fragili ··
+    function rileggi() { try { if (window.__ring && window.__ring.rileva) window.__ring.rileva(); } catch (e) { /* niente */ } }
+    function danno(u, p) {
+      var x0 = p.l, x1 = p.l + p.w, y0 = p.t, y1 = p.t + p.h;
+      if (u.tipo === "sisma") return 60 * u.forza;
+      if (u.tipo === "urto") return u.el === p.s ? 4 + 12 * u.forza : 0;
+      var dx = Math.max(x0 - u.x, 0, u.x - x1), dy = Math.max(y0 - u.y, 0, u.y - y1), d = Math.sqrt(dx * dx + dy * dy);
+      if (!(u.r > 0) || d > u.r) return 0;
+      var k = 1 - d / u.r;
+      return (u.tipo === "pavimento" ? 30 : u.tipo === "meteora" ? 85 : 70) * u.forza * k;
+    }
+    window.__ringUrto = function (u) {
+      if (!u) return;
+      for (var i = 0; i < pedane.length; i++) {
+        var p = pedane[i];
+        if (p.giu) continue;
+        var n = danno(u, p);
+        if (!(n > 0.5)) continue;
+        p.punti -= n;
+        p.crepe.style.opacity = String(Math.min(1, Math.max(0, (100 - p.punti) / 80)));
+        p.v.classList.remove("colpita"); void p.v.offsetWidth; p.v.classList.add("colpita");
+        if (p.punti <= 0) crolla(p);
+      }
+    };
+    function crolla(p) {
+      p.giu = Date.now();
+      var stile = getComputedStyle(p.v), n = Math.max(3, Math.min(7, Math.round(p.w / 50)));
+      for (var i = 0; i < n; i++) {
+        var w = p.w / n, q = el("div", "pezzo", "left:" + (p.l + i * w) + "px;top:" + p.t + "px;width:" + (w + 1) + "px;height:" + Math.round(p.h * (0.6 + Math.random() * 0.5)) + "px;" +
+                                "background:" + stile.backgroundImage + ";background-color:" + stile.backgroundColor + ";animation-delay:" + (Math.random() * 0.12).toFixed(2) + "s");
+        q.style.setProperty("--dx", ((Math.random() - 0.5) * 80).toFixed(0) + "px");
+        q.style.setProperty("--giro", ((Math.random() - 0.5) * 160).toFixed(0) + "deg");
+        setTimeout(function (e) { return function () { e.remove(); }; }(q), 1400);
+      }
+      var pol = el("div", "polverone", "left:" + (p.l - 20) + "px;top:" + (p.t - 14) + "px;width:" + (p.w + 40) + "px");
+      setTimeout(function () { pol.remove(); }, 1000);
+      p.v.classList.add("crollata"); p.s.remove();
+      rileggi();
+      setTimeout(function () { torna(p); }, 15000);
+    }
+    // Torna quando nessun lottatore occupa il suo spazio (sennò ci riprova fra un secondo).
+    function torna(p) {
+      if (pedane.indexOf(p) < 0) return;                  // l'arena è stata rifatta nel frattempo
+      var corpi = [];
+      try { corpi = (window.__ring && window.__ring.corpi && window.__ring.corpi()) || []; } catch (e) { corpi = []; }
+      for (var i = 0; i < corpi.length; i++) {
+        var c = corpi[i];
+        if (c && c[2] > p.l - 10 && c[0] < p.l + p.w + 10 && c[3] > p.t - 10 && c[1] < p.t + p.h + 10) { setTimeout(function () { torna(p); }, 1000); return; }
+      }
+      p.punti = 100; p.giu = 0; p.crepe.style.opacity = "0";
+      scena.appendChild(p.s);
+      p.v.classList.remove("crollata", "colpita"); void p.v.offsetWidth; p.v.classList.add("risorge");
+      rileggi();
+    }
+    // Un'altra arena a pagina aperta (il sito: la corsa nel cortile, l'1 contro 1 sulla lava).
+    window.__pbArena = function (nuovo) {
+      if (TIPI.indexOf(nuovo) < 0 || nuovo === tipo) return tipo;
+      tipo = nuovo; document.documentElement.className = tipo;
+      costruisci(); rileggi();
+      return tipo;
+    };
   })();
   </script>
   <script>window.__pbModo = "arena";</script>

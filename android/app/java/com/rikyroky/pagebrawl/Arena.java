@@ -94,7 +94,7 @@ public class Arena extends Activity {
         }
 
         String tipo = getIntent().getStringExtra(EXTRA_TIPO);
-        if (tipo == null || !tipo.matches("lava|cielo|ring")) tipo = "lava";
+        if (tipo == null || !tipo.matches("lava|cielo|ring|arena")) tipo = "lava";
         web.loadUrl("file:///android_asset/web/arena.html?tipo=" + tipo);
     }
 

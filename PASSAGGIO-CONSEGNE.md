@@ -37,7 +37,7 @@ Il flusso del repository è **push diretto su `main`** (nessuna PR è mai stata 
 
 | Ramo | Cosa contiene | Da fare |
 | --- | --- | --- |
-| `claude/parry-brawl-web` (18/10) | Musica a tempo (attacchi sul battito, «tic» d'avviso, risposta al parry, taratura del ritardo), API per i comandi touch (`tempoParry`, `premi`, `lascia`, `musica`, `calibra`), nome, motto e logo del menu decisi dall'ospite (`__ringNome`, `__ringMotto`). Serve al sito nuovo `rikyroky91-commits/parry-brawl-survivor` | Da unire a `main` con l'accordo di Riccardo: estensione e app prendono la musica (di serie solo nella corsa) |
+| `claude/parry-brawl-web` (18/10) | Musica a tempo (attacchi sul battito, «tic» d'avviso, risposta al parry, taratura del ritardo), API per i comandi touch (`tempoParry`, `premi`, `lascia`, `musica`, `calibra`), nome, motto e logo del menu decisi dall'ospite (`__ringNome`, `__ringMotto`); poi stamina della guardia tenuta, arena «cortile» con pedane che si rompono (`__ringUrto`, `__ring.rileva`), secondo modo rinominabile dall'ospite (`__ringModoLibero`, `__ringModoScelto`). Serve al sito nuovo `rikyroky91-commits/parry-brawl-survivor` | Da unire a `main` con l'accordo di Riccardo: estensione e app prendono la musica (di serie solo nella corsa) |
 | `claude/exciting-cori-6cwl9m` (16-17/10) | Page Brawl 1.2.0 / Android 1.6.0, unito a `main` il 17/10 (`f8d3910`); dopo, **il parry, seconda volta** (parry perfetto, equilibrio e colpo di grazia, catena, attacchi rossi, tre manate del capo, guardia che si consuma) | **Unito a `main` il 17/10**, anche il parry nuovo (avanti veloce, su richiesta di Riccardo: «unisci»). Cancellabile |
 | `claude/ultimora-tema-scuro-codice-modello` (02/10) | Commit `61f8ca9` «lotte più fitte, meno tempi morti», mai arrivato su `main` | **Rifatto a mano il 16/10** sul ramo qui sopra (con lo strumento `tests/misura-lotta.cjs` che stava lì). Cancellabile (quello nuovo è su `main` dal 17/10) |
 
@@ -256,6 +256,8 @@ Il motore legge dall'ambiente degli hook opzionali. Sul sito nessuno è impostat
 | `window.__ringNome`, `__ringMotto` | sito del gioco | nome nel logo del menu e nella guida (di serie «Page Brawl»; tre parole vanno su due righe) e motto sotto il logo |
 | `window.__ringMusicaBase` | sito del gioco | musica di serie: `"sempre"`, `"corsa"` (di serie), `"mai"` |
 | `__ring.tempoParry()`, `premi(id)`, `lascia(id)`, `musica(o)`, `calibra(...)` | sito del gioco (`hud.js`) | tasto Parata a tempo, azioni dei tasti anche a tastiera spenta, musica e taratura del ritardo audio |
+| `window.__ringUrto(u)`, `__ring.rileva()` | arene (`android/web/arena.html`) | il motore dice dove arriva una botta (`{x, y, r, forza, tipo, el}`: esplosione, meteora, urto, pavimento, sisma); l'arena crepa e fa crollare le pedane fragili, poi chiede di rileggere i solidi |
+| `window.__ringModoLibero`, `__ringModoScelto(modo)` | sito del gioco | rinomina la seconda voce del menu («1 contro 1», con `unoControUno` si comanda il proprio lottatore da subito) e avvisa l'ospite del modo scelto (il sito cambia arena con `__pbArena`) |
 | `__ring.mosse()`, `cambia()`, `pannello()`, `pausa()`, `grafica()`, `corpi()` | letti dall'app | comandi nativi e stato del motore |
 
 Chi aggiunge un hook lo scrive in questa tabella e in `android/LEGGIMI.md`.
@@ -334,6 +336,13 @@ Riccardo: «un tappeto musicale ritmico che va a ritmo con i nemici e il parry»
 - Impostazioni nuove: «Musica» (sempre / solo nella corsa / mai) e «Ritardo audio» (ms, per le cuffie Bluetooth; il sito lo misura toccando a tempo con `__ring.calibra`).
 - Senza audio acceso la musica non c'è e **niente cambia** rispetto a prima: i test Node girano senza audio. `__ring.musicaFinta(true, passi)` accende la griglia senza suono per i test.
 - **Non provato a orecchio su un telefono vero**: il suono è stato solo fatto girare in Chromium senza ascoltarlo. Da sentire: volume relativo della musica (`MUSICA.volume` 0,5) e degli effetti, e se il «tic» si sente nella mischia.
+
+### 4.6 ter Stamina, arena che si rompe, 1 contro 1 (18/10/2026)
+
+- **Stamina**: Riccardo, «stare sempre in parata fa diminuire la stamina». La guardia tenuta da chi gioca, dopo la finestra del parry, consuma `GUARDIA.tenuta` (0,3) a passo: piena si svuota in circa 5,5 s e, vuota, si rompe come per i colpi (stordimento). Si ricarica solo fuori guardia, come prima.
+- **Arena «cortile»** (`?tipo=arena` in `android/web/arena.html`): pavimento di pietra largo da bordo a bordo, tre lastre sospese. Riccardo: «un ring distruttibile con le mosse e gli imprevisti». Le pedane fragili (le tre del cortile, le due piccole della lava, le tre isolette del cielo; mai il pavimento né la piattaforma grande della lava) hanno 100 punti, si crepano a vista, crollano in pezzi e tornano dopo 15 s se nessuno sta nel loro spazio. Nell'app è il primo riquadro delle arene.
+- **Sito**: la corsa si gioca nel cortile; «1 contro 1» sulla lava prende il posto del combattimento libero.
+- Non provato su un telefono vero; i danni (esplosione 70 × forza, meteora 85, urto di un corpo 4-16, terremoto 60 × forza ogni mezzo secondo) sono a occhio.
 
 ### 4.7 Test
 
@@ -438,6 +447,7 @@ Una riga per giro, la più recente in alto. Data, chi, cosa, commit o ramo.
 
 | Data | Chi | Cosa | Commit / ramo |
 | --- | --- | --- | --- |
+| 18/10/2026 | Claude | Stamina della guardia tenuta, arena «cortile» con pedane che si rompono (anche nelle arene lava e cielo, e nell'app), «1 contro 1» al posto del combattimento libero sul sito; tre test nuovi. Node 218/218 | `claude/parry-brawl-web` |
 | 18/10/2026 | Claude | Musica a tempo nel motore e API per i comandi touch del sito nuovo **Parry Brawl Survivor** (repo `parry-brawl-survivor`, costruito da questo motore a un commit fissato); logo e motto del menu decisi dall'ospite; due test nuovi (morsi sulla griglia, azioni a tastiera spenta). Test Node: due cadute casuali isolate (n. 76 e n. 86), da sole passano 3 su 3. Non unito a `main` | `claude/parry-brawl-web` |
 | 17/10/2026 | Claude | CI rossa su `main` (anche sull'unione di prima, `f8d3910`) per due test instabili già noti, sistemati: l'arena di lava (3 su 20) ora spegne gli imprevisti, tiene fermo il robot lontano dal bordo mentre prova la lava e guarda dove la mela ricompare appena rientra; «gli oggetti entrano dai lati» (1 su 20: dall'alto ne arriva meno di uno su due, a caso) guarda altri 150 s se non li ha visti tutti e due. Dopo: 0 su 40 e 0 su 20, suite Node 214 su 214. Nessuna modifica al gioco | `main` |
 | 17/10/2026 | Claude | **Unito a `main`** il parry, seconda volta (avanti veloce del ramo `claude/exciting-cori-6cwl9m`, CI verde sul ramo): il push pubblica il sito su Oracle. Da fare a mano, come prima: caricare la 1.2.0 sul Chrome Web Store, l'AAB su Play, l'account Ko-fi | `main` |

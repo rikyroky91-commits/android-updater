@@ -951,8 +951,22 @@
   // IL SOBBALZO (13/10/2026): l'elemento vero della pagina che prende una botta si sposta di
   // qualche pixel verso dove è stato colpito, ruota appena e torna a posto da solo. È solo
   // un'animazione (Web Animations, `composite: add`): la pagina non viene modificata.
-  const sobbalzi = new WeakMap();
+  const sobbalzi = new WeakMap(), urtiPedane = new WeakMap();
+  // L'ARENA CHE SI ROMPE (18/10/2026, Riccardo: «un ring distruttibile con le mosse e gli imprevisti»). Il motore non
+  // rompe niente da sé: dice all'ospite dove è arrivata una botta, con `window.__ringUrto({ x, y, r, forza, tipo, el })`
+  // (tipo: "esplosione", "meteora", "urto" di un corpo su un solido, "pavimento", "sisma"); le pedane le crepa e le
+  // fa crollare l'arena (android/web/arena.html), poi `__ring.rileva()` rilegge i solidi. Senza l'hook, niente.
+  function urtoArena(x, y, r, forza, tipo, el) {
+    const h = window.__ringUrto;
+    if (typeof h !== "function" || !inArenaApp()) return;
+    try { h({ x, y, r, forza: Math.max(0, Math.min(2, forza)), tipo, el: el || null }); } catch (errore) { /* un'arena rotta non ferma il ring */ }
+  }
   function scuoti(el, dx, dy, forza) {
+    if (el && inArenaApp()) {
+      // (in passi di fisica, non in millisecondi: una botta per pedana ogni quarto di secondo)
+      if (el.getBoundingClientRect && passi - (urtiPedane.get(el) || -1e9) >= 16) { urtiPedane.set(el, passi); const r = el.getBoundingClientRect(); urtoArena(r.left + r.width / 2, r.top, 0, forza, "urto", el); }
+      return;
+    }
     if (!el || !el.animate || !el.isConnected || inArenaApp() || el.tagName === "IMG" && !el.src) return;
     const ora = performance.now();
     if (ora - (sobbalzi.get(el) || 0) < 260) return;
@@ -2509,7 +2523,9 @@
   //  - LE TRE MANATE DEL CAPO (Expedition 33): il capo colpisce tre volte di fila; ognuna si para, e se si parano tutte e
   //    tre parte il «CONTRO TOTALE»: il capo va subito a terra sbilanciato.
   const EQUILIBRIO = { parry: 0.45, perfetto: 0.7, parata: 0.1, colpo: 0.05, cala: 0.0025, attesa: 90, sbilancio: 150 };
-  const GUARDIA = { max: 100, morso: 22, grosso: 34, letale: 50, colpo: 18, parry: 15, ricarica: 0.45, rotta: 60 };
+  // (`tenuta`, 18/10/2026, Riccardo: «stare sempre in parata fa diminuire la stamina»: ogni passo in guardia tenuta, dopo
+  // la finestra del parry, consuma la guardia; piena si svuota in poco più di cinque secondi, e vuota si rompe)
+  const GUARDIA = { max: 100, morso: 22, grosso: 34, letale: 50, colpo: 18, parry: 15, ricarica: 0.45, rotta: 60, tenuta: 0.3 };
   // (i Riflessi dell'allenamento allargano la finestra all'eroe della corsa: vedi ALLENAMENTO)
   // (i Riflessi dell'allenamento, e l'aiuto delle impostazioni per chi gioca)
   const larghezzaParry = (f) => (corsa && corsa.chi && f.tipo === corsa.chi ? 3 * (corsa.riflessi || 0) : 0) + (imp.aiutoParry && f === chiPara() ? 4 : 0);
@@ -2648,6 +2664,12 @@
     for (const f of lottatori) {
       cala(f);
       if (f.guardiaPt !== undefined && f.guardiaPt < GUARDIA.max && f.azione !== "para") f.guardiaPt = Math.min(GUARDIA.max, f.guardiaPt + GUARDIA.ricarica);
+      // La guardia tenuta stanca (vedi GUARDIA.tenuta): solo di chi gioca, e solo dopo la finestra del parry.
+      if (f.azione === "para" && f.guardia && f.p && usatoS && f === chiPara() && tempo - (f.premutoS === undefined ? tempo : f.premutoS) > PARRY.finestra) {
+        if (f.guardiaPt === undefined) f.guardiaPt = GUARDIA.max;
+        f.guardiaPt -= GUARDIA.tenuta;
+        if (f.guardiaPt <= 0) { f.guardiaPt = 0.5; consumaGuardia(f, 1, f.p.collo.x, f.p.collo.y); }
+      }
     }
     if (lampoSchermo > 0) lampoSchermo = Math.max(0, lampoSchermo - 0.05);
   }
@@ -4543,6 +4565,7 @@
   function esplosione(x, y, potenza, att, inPieno) {
     suona("boom", x, potenza);
     const R = 80 * S * potenza;
+    urtoArena(x, y, R * 1.6, potenza, "esplosione");
     scossa = Math.max(scossa, Math.round(10 + 8 * potenza)); fermoColpo = Math.max(fermoColpo, 6);
     // Le schede della pagina vicine allo scoppio sobbalzano via dal centro.
     for (const sc of scatole) {
@@ -5209,6 +5232,7 @@
     if (s.k > 0) {
       scossa = Math.max(scossa, Math.round(2 + 4 * s.k));
       if (T % 5 === 0) scossone(s);
+      if (T % 30 === 0) urtoArena(W / 2, H / 2, W, 0.14 * s.k, "sisma");
       if (T === 34 || T === 240) danneggiaStriscia(caso(0.15, 0.85) * W, 0.6);
     } else if (!s.fermo) { s.fermo = true; radiceHtml("remove", "ring-trema"); }
     const metti = (q) => { if (particelle.length < MAX_PARTICELLE - 40) particelle.push(q); };
@@ -5397,6 +5421,7 @@
     const pot = m.grossa ? 1.5 : 0.55 + m.r / (16 * S), R = 62 * S * pot, aTerra = Math.abs(m.y - m.by) < 22 * S;
     const x = m.x, y = aTerra ? m.by : m.y;
     m.morta = true;
+    urtoArena(x, y, R * 1.4, pot, "meteora");
     scossa = Math.max(scossa, Math.round(6 + 7 * pot)); fermoColpo = Math.max(fermoColpo, m.grossa ? 5 : 2);
     const metti = (q) => { if (particelle.length < MAX_PARTICELLE - 20) particelle.push(q); };
     metti({ tipo: "lampo", x, y, vx: 0, vy: 0, vita: 6, max: 6, r: R * 1.3 });
@@ -11628,6 +11653,7 @@
     return pt;
   }
   function danneggiaStriscia(x, forza, forzato) {
+    urtoArena(x, pavimento, 60 * S, forza, "pavimento");
     if (!(pavimento < H - 4) || fermo) return;
     // Un danno nuovo al massimo ogni 5 secondi circa: la striscia deve
     // restare quasi sempre leggibile. Le mosse finali passano avanti.
@@ -15692,6 +15718,7 @@
   // La scelta del modo, all'accensione nell'estensione: due riquadri grandi, a sinistra la corsa e a
   // destra il combattimento libero (A e D dalla tastiera, come nella scelta del personaggio).
   function scegliModo(modo) {
+    modoScelto(modo);
     sceltaModo = false;
     if (modo === "corsa") apriCorsa();
     aggiornaInterruttori();
@@ -15756,10 +15783,24 @@
     return true;
   }
   // Le voci della pagina principale.
+  // IL MODO SCELTO DALL'OSPITE (18/10/2026, sito del gioco: «il ring con la lava per la modalità 1 vs 1, che prenderà il
+  // posto del combattimento libero»). `window.__ringModoLibero = { nome, testo, icona, unoControUno }` rinomina la seconda
+  // voce del menu; con `unoControUno` chi gioca comanda il suo lottatore dal primo istante (anello del parry compreso).
+  // `window.__ringModoScelto(modo)` ("corsa" o "libero") avvisa l'ospite prima che il modo parta: il sito cambia arena.
+  let modoDetto = null;
+  function modoScelto(modo) {
+    if (modoDetto && modoDetto.modo === modo && modoDetto.passi === passi) return;      // (la voce del menu e scegliModo)
+    modoDetto = { modo, passi };
+    try { if (typeof window.__ringModoScelto === "function") window.__ringModoScelto(modo); } catch (errore) { /* l'ospite non risponde: pazienza */ }
+    if (W) rileva();
+    const l = window.__ringModoLibero;
+    if (modo === "libero" && l && l.unoControUno) usatoS = true;
+  }
   function vociPrincipale() {
+    const libero = window.__ringModoLibero && typeof window.__ringModoLibero === "object" && window.__ringModoLibero.nome ? window.__ringModoLibero : null;
     const v = [
-      { icona: "\u{1F3C3}", nome: "Corsa infinita", testo: "Il cuore del gioco: un'orda che cresce senza fermarsi. Para al momento giusto, sali di livello, scegli armi e poteri, batti un capo ogni cinque livelli di minaccia.", fa: () => { menu = null; if (sceltaModo) scegliModo("corsa"); else if (!corsa) comandi.corsa(); return true; } },
-      { icona: "\u{1F94A}", nome: "Combattimento libero", testo: "Due lottatori sulla pagina che si picchiano da soli. Comandi chi vuoi, scegli i personaggi, lanci oggetti e scateni imprevisti dalla tendina.", fa: () => { menu = null; if (sceltaModo) scegliModo("libero"); else if (corsa) chiudiCorsa(); return true; } },
+      { icona: "\u{1F3C3}", nome: "Corsa infinita", testo: "Il cuore del gioco: un'orda che cresce senza fermarsi. Para al momento giusto, sali di livello, scegli armi e poteri, batti un capo ogni cinque livelli di minaccia.", fa: () => { menu = null; modoScelto("corsa"); if (sceltaModo) scegliModo("corsa"); else if (!corsa) comandi.corsa(); return true; } },
+      { icona: libero ? libero.icona || "\u{1F94A}" : "\u{1F94A}", nome: libero ? libero.nome : "Combattimento libero", testo: libero ? libero.testo : "Due lottatori sulla pagina che si picchiano da soli. Comandi chi vuoi, scegli i personaggi, lanci oggetti e scateni imprevisti dalla tendina.", fa: () => { menu = null; modoScelto("libero"); if (sceltaModo) scegliModo("libero"); else if (corsa) chiudiCorsa(); return true; } },
       { icona: "\u{1F4D6}", nome: "Come si gioca", testo: "Sei pagine per imparare tutto: muoversi, attaccare, la parata e il parry col contrattacco, la corsa infinita, l'aggancio, crescere fra una corsa e l'altra.", fa: () => vaiA("guida"), nuovo: primaVolta },
       { icona: "⚙️", nome: "Impostazioni", testo: "Audio e volume, dettaglio grafico, aiuti al parry, rallentatore, scossa dello schermo, difficoltà della corsa, tasti.", fa: () => vaiA("impostazioni") },
     ];
@@ -16579,6 +16620,8 @@
     corsaFinale: () => !!tastoFinale(),
     corsaOggetto: (i) => !!usaOggetto(i),
     // Dove stanno i corpi dei lottatori (per le zone toccabili che li seguono sopra lo schermo del telefono).
+    // Rilegge subito i solidi (l'arena ha tolto o rimesso una pedana).
+    rileva: () => { if (W) rileva(); },
     corpi: () => lottatori.map((f) => {
       if (!f.p || f.esploso || f.fuoriCampo) return null;
       let l = 1e9, t = 1e9, r = -1e9, b = -1e9;
