@@ -6345,6 +6345,13 @@
     polvere(z.x, q.base - 1, 4); suona("soffio", z.x, 0.6);
     return true;
   }
+  // Dopo aver sparato ringhia (la maschera si apre, le crepe bruciano): un attimo fermo, scoperto.
+  function ringhiaBruto(z, q) {
+    z.ringhio = 40;
+    const c = corpoZ(z);
+    scrivi("GRRR!", c[3], c[4] - 24 * S, false); suona("tonfo", z.x, 0.3);
+    for (let i = 0; i < 4 && particelle.length < MAX_PARTICELLE; i++) particelle.push({ tipo: "brace", x: c[0] + caso(-8, 8) * S, y: c[1] - caso(0, 14) * S, vx: caso(-0.6, 0.6) * S, vy: -caso(0.6, 1.4) * S, vita: 40, max: 40, r: caso(1, 2) * S, colore: "#ff8a2a" });
+  }
   function scattoBruto(z, q) {
     const b = z.scatto, T = BRUTO.scatto;
     if (!b) { z.stato = "va"; z.s = 0; return; }
@@ -6354,7 +6361,7 @@
     z.dir = b.d0;
     if (z.s % 3 === 0 && e > 0 && e < 1 && particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "linea", x: z.x, y: q.base - z.alzo - 30 * S, vx: -(b.x1 - b.x0) / T * 0.4, vy: 0, vita: 8, max: 8, lung: 14 * S, colore: "rgba(255,255,255,.6)" });
     // all'atterraggio resta piegato un attimo, scoperto: è lì che lo si prende
-    if (z.s >= T) { z.alzo = b.a0; z.stato = "va"; z.s = 0; z.scatto = null; z.attesa = 10; z.meta = undefined; z.botta = BRUTO.atterra; polvere(z.x, q.base - 1, 5); suona("tonfo", z.x, 0.5); }
+    if (z.s >= T) { z.alzo = b.a0; z.stato = "va"; z.s = 0; z.scatto = null; z.attesa = 10; z.meta = undefined; z.botta = BRUTO.atterra; polvere(z.x, q.base - 1, 8); suona("tonfo", z.x, 0.8); scossa = Math.max(scossa, 5); }
   }
   // Il balzo da sotto la lastra fin sopra: si accovaccia, salta ad arco, atterra in piedi (col suolo vivo).
   function balzaSu(z, q) {
@@ -6977,18 +6984,19 @@
         // (18/10/2026 sera) Agile: se gli si arriva addosso schiva con un balzo indietro o gli salta sopra la testa
         // (`scatto`), e fra un tiro e l'altro si sposta di lato a scatti invece di stare piantato.
         if (z.stato === "scatto") { scattoBruto(z, q); return true; }
+        if (z.ringhio > 0) { z.ringhio--; return true; }                  // (ringhia sul posto, poi riparte)
         if (z.cdScatto > 0) z.cdScatto--;
         if (z.stato === "va" && sopra && !(z.alzo < 0) && !(z.cdScatto > 0) && Math.abs(dx) < 92 * S && !f.ko && iniziaScattoBruto(z, q, f)) return true;
         if (z.stato === "granata") {
           if (z.s === BRUTO.mira) lancioGranata(z, f, q);
-          if (z.s >= BRUTO.mira + 22) { z.stato = "va"; z.s = 0; z.cdGranata = Math.round(caso(BRUTO.cd[0], BRUTO.cd[1])); }
+          if (z.s >= BRUTO.mira + 22) { z.stato = "va"; z.s = 0; z.cdGranata = Math.round(caso(BRUTO.cd[0], BRUTO.cd[1])); ringhiaBruto(z, q); }
           return true;
         }
         if (z.stato === "raffica") {
           // il fucile-sega: punta col puntino rosso, poi tre colpi
           const k = z.s - BRUTO.rMira;
           if (k >= 0 && k % BRUTO.rPasso === 0 && k < BRUTO.rPasso * BRUTO.rColpi) sparaProiettile(z, f, q);
-          if (k >= BRUTO.rPasso * BRUTO.rColpi + 10) { z.stato = "va"; z.s = 0; z.cdRaffica = Math.round(caso(BRUTO.rCd[0], BRUTO.rCd[1])); }
+          if (k >= BRUTO.rPasso * BRUTO.rColpi + 10) { z.stato = "va"; z.s = 0; z.cdRaffica = Math.round(caso(BRUTO.rCd[0], BRUTO.rCd[1])); ringhiaBruto(z, q); }
           return true;
         }
         if (z.cdGranata === undefined) z.cdGranata = Math.round(caso(50, 110));
@@ -8009,146 +8017,171 @@
     }
   }
   // Sopra il primo nemico nuovo del round, per tre secondi: una freccia d'oro che saltella.
-  // ·· LA BESTIA ARMATA, A VISTA (18/10/2026 sera) ··
-  // Riccardo: «non è altro che uno zombie più grande. Deve essere più agile e avere animazioni totalmente diverse
-  // rispetto agli zombie: bestie più muscolose che colpiscono dalla distanza». Un disegno suo, non lo zombie ingrandito:
-  // pelle blu ardesia, spalle enormi e vita stretta, creste d'osso gialle lungo la schiena, testa bassa e larga con le
-  // zanne e un occhio ambra acceso, gambe da bestia (ginocchio avanti, tallone alto), coda corta, una tracolla. Le pose:
-  //  - corsa bassa: busto quasi orizzontale, passi lunghi, l'arma all'anca (si sposta a scatti fra un tiro e l'altro);
-  //  - fermo: accovacciato, il peso che oscilla, la testa che si guarda intorno;
-  //  - mira (granata e raffica): in ginocchio, l'arma alla spalla puntata su chi gioca, il rinculo a ogni colpo;
-  //  - colpo da vicino: il calcio dell'arma su, sopra la testa, e giù;
-  //  - schivata (`scatto`): raccolto in aria, una capriola all'indietro o sopra la testa di chi gioca;
-  //  - colpito: il busto che scatta indietro; abbattuto: cade di schiena e sbiadisce.
-  // Disegnato in unità sue (avanti = x, su = -y), specchiato secondo dove guarda.
+  // ·· IL BRUTO DI BRACE, A VISTA (18/10/2026 notte) ··
+  // Riccardo: prima «non è altro che uno zombie più grande: più agile, animazioni totalmente diverse, bestie più
+  // muscolose che colpiscono dalla distanza»; poi voleva l'aspetto delle locuste di Gears of War, che non si copiano: il
+  // disegno è nostro, scelto con lui. Un umanoide enorme: pelle di bronzo bruciato con crepe di brace che si accendono
+  // quando spara, petto e braccia enormi su gambe corte e piegate, una maschera di ferro inchiodata sul viso con due
+  // fessure accese, un'armatura fatta coi pezzi del ring saldati (una lastra di pietra sulla spalla, la corda rossa a
+  // tracolla, piastre ribattute sugli avambracci). Le pose:
+  //  - cammina da peso massimo: spallate a ogni passo, il busto che dondola, l'arma all'anca;
+  //  - fermo: piantato a gambe larghe, il petto che si gonfia col respiro;
+  //  - mira (granata e raffica): si pianta a terra, l'arma alla spalla, le crepe che bruciano, il rinculo a ogni colpo;
+  //  - dopo la raffica ringhia (`z.ringhio`): testa indietro, la maschera che si apre sulla bocca, «GRRR!»;
+  //  - colpo da vicino: l'arma su a due mani e giù come una mazza;
+  //  - schivata (`scatto`): un balzo pesante, raccolto, che fa tremare il terreno all'arrivo;
+  //  - colpito: indietro col busto; abbattuto: in ginocchio, poi giù di faccia, e le crepe si spengono.
+  // Disegnato in unità sue (avanti = x, su = y, a scala `ZOMBI.bruto.scala`), specchiato secondo dove guarda.
   function disegnaBestia(z) {
     const q = orda;
     if (!q) return;
     const d = z.dir || 1, sc = ZOMBI.bruto.scala, k = sc * S, yB = q.base - (z.alzo || 0), st = z.stato, nero = "#17171c";
     const bianco = z.lampo > 0, gelo = z.gelo > 0;
-    const pelle = bianco ? "#ffffff" : gelo ? "#bfe3f2" : "#4a5a78", scura = bianco ? "#e8e8e8" : gelo ? "#8fb8cc" : "#2c3850", chiara = bianco ? "#ffffff" : "#7189ad";
-    const osso = "#d9b35c", occhio = "#ffb21a";
-    // quanto si muove (per la corsa): dallo spostamento fra un disegno e l'altro
+    const pelle = bianco ? "#ffffff" : gelo ? "#c9e3ee" : "#8a5a3c", scura = bianco ? "#eeeeee" : gelo ? "#94b6c6" : "#5a3826", luce = bianco ? "#ffffff" : "#b98058";
+    const ferro = "#4a4d55", ferroL = "#7a7f8a", corda = "#c0392b", pietra = "#8f8578";
     const spd = Math.abs(z.x - (z.xVisto === undefined ? z.x : z.xVisto)); z.xVisto = z.x;
-    z.corsaVista = Math.max(0, (z.corsaVista || 0) * 0.8 + (spd > 0.5 * S ? 0.2 : 0));
-    const corre = st === "va" && z.corsaVista > 0.35, mira = st === "granata" || st === "raffica";
-    const ph = z.fase * 2.2, t = z.t || 0;
-    // il rinculo e la punta dell'arma (come per lo zombie di prima: granata e raffica)
+    z.corsaVista = Math.max(0, (z.corsaVista || 0) * 0.8 + (spd > 0.4 * S ? 0.2 : 0));
+    const cammina = st === "va" && z.corsaVista > 0.3, mira = st === "granata" || st === "raffica";
+    const ph = z.fase * 2.4, t = z.t || 0;
     const fineR = BRUTO.rMira + BRUTO.rPasso * BRUTO.rColpi, kr = z.s - BRUTO.rMira;
     const rinculo = st === "granata" && z.s >= BRUTO.mira && z.s < BRUTO.mira + 8 ? (BRUTO.mira + 8 - z.s) / 8
-      : st === "raffica" && kr >= 0 && kr < BRUTO.rPasso * BRUTO.rColpi ? Math.max(0, 1 - (kr % BRUTO.rPasso) / 4) * 0.6 : 0;
-    const scende = mira ? Math.min(1, z.s / 8) * (st === "raffica" && z.s > fineR ? Math.max(0, 1 - (z.s - fineR) / 8) : st === "granata" && z.s > BRUTO.mira + 10 ? Math.max(0, 1 - (z.s - BRUTO.mira - 10) / 10) : 1) : 0;
-    // la posa: [avanti, su] in unità
-    let hip = [0, 36], lean = 0.25, giro = 0, testaSu = 0;
-    let piedi = [[6, 0], [-6, 0]], ginocchi = null;
-    let gun = [6, 38], ang = -0.05;
-    if (corre) {
-      lean = 0.95; hip = [0, 31 + Math.abs(Math.sin(ph)) * 3];
-      piedi = [[Math.sin(ph) * 18, Math.max(0, Math.cos(ph)) * 9], [Math.sin(ph + Math.PI) * 18, Math.max(0, Math.cos(ph + Math.PI)) * 9]];
-      gun = [10, 30]; ang = 0.15;
+      : st === "raffica" && kr >= 0 && kr < BRUTO.rPasso * BRUTO.rColpi ? Math.max(0, 1 - (kr % BRUTO.rPasso) / 4) * 0.7 : 0;
+    const punta = mira ? Math.min(1, z.s / 8) * (st === "raffica" && z.s > fineR ? Math.max(0, 1 - (z.s - fineR) / 8) : st === "granata" && z.s > BRUTO.mira + 10 ? Math.max(0, 1 - (z.s - BRUTO.mira - 10) / 10) : 1) : 0;
+    const ringhio = z.ringhio > 0 ? Math.sin(Math.PI * Math.min(1, (40 - z.ringhio) / 40)) : 0;
+    // le crepe di brace: accese di poco a riposo, forte quando punta e spara, spente da abbattuto
+    const brace = st === "giu" ? Math.max(0, 0.4 - z.s / 30) : 0.35 + 0.65 * Math.max(punta, rinculo, ringhio) + 0.08 * Math.sin(t * 0.15);
+    // la posa: [avanti, su]
+    let hip = [0, 30], lean = 0.08, testaSu = 0, giro = 0, spallata = 0;
+    let piedi = [[9, 0], [-9, 0]];
+    let gun = [10, 30], ang = 0.1;
+    if (cammina) {
+      // peso massimo: passi corti e pesanti, il busto che dondola e la spalla che va avanti col passo
+      const p = Math.sin(ph);
+      hip = [0, 29 + Math.abs(Math.cos(ph)) * 2.5]; lean = 0.16; spallata = p * 0.12;
+      piedi = [[p * 11, Math.max(0, Math.cos(ph)) * 5], [-p * 11, Math.max(0, -Math.cos(ph)) * 5]];
+      gun = [11 + p * 2, 29]; ang = 0.18;
     } else if (st === "scatto" && z.scatto) {
       const u = Math.min(1, z.s / BRUTO.scatto), e = u < 0.18 ? 0 : (u - 0.18) / 0.82;
-      if (e === 0) { hip = [0, 24]; lean = 0.7; piedi = [[10, 0], [-8, 0]]; }
-      else { hip = [0, 30]; lean = 0.5; piedi = [[10, 16], [-2, 14]]; giro = z.scatto.giro * Math.PI * 2 * liscio(e); }
-      gun = [4, 34]; ang = 0.6;
+      if (e === 0) { hip = [0, 21]; lean = 0.35; piedi = [[11, 0], [-10, 0]]; }
+      else { hip = [0, 28]; lean = 0.25; piedi = [[9, 10], [-6, 8]]; giro = z.scatto.giro > 0 ? 0 : -0.35 * Math.sin(Math.PI * e); }
+      gun = [8, 32]; ang = 0.4;
     } else if (mira) {
-      // in ginocchio: la gamba dietro a terra, quella davanti piegata avanti
-      const g = scende;
-      hip = [0, 36 - 14 * g]; lean = 0.25 - 0.15 * g;
-      piedi = [[8 + 6 * g, 0], [-6 - 14 * g, 0]];
-      ginocchi = g > 0.5 ? [[16, 12], [-6, 2]] : null;
-      gun = [6 + 12 * g - rinculo * 5, 38 + 8 * g]; ang = st === "granata" ? -0.25 * g : -0.04 * g;
+      // piantato a terra: gambe larghe, piegato, l'arma alla spalla puntata dritta
+      const g = punta;
+      hip = [-1 * g, 30 - 5 * g]; lean = 0.08 - 0.12 * rinculo;
+      piedi = [[12 + 3 * g, 0], [-12 - 4 * g, 0]];
+      gun = [12 + 6 * g - rinculo * 6, 34 + 10 * g]; ang = (st === "granata" ? -0.3 : -0.02) * g;
     } else if (st === "colpo") {
-      // il calcio dell'arma: su sopra la testa, poi giù
-      const Z = ZOMBI.bruto, c = Z.carica, u = Math.min(1, z.s / c), giu = z.s > c ? Math.min(1, (z.s - c) / 5) : 0;
-      lean = 0.3 - 0.35 * u + 0.8 * giu; hip = [0, 34 - 4 * giu];
-      gun = [4 + 18 * giu, 40 + 26 * u - 30 * giu]; ang = -1.5 * u * (1 - giu) + 0.9 * giu;
-      piedi = [[10, 0], [-10, 0]];
+      // l'arma su a due mani sopra la testa, e giù come una mazza
+      const c = ZOMBI.bruto.carica, u = Math.min(1, z.s / c), giu = z.s > c ? Math.min(1, (z.s - c) / 5) : 0;
+      lean = 0.1 - 0.25 * u + 0.6 * giu; hip = [0, 30 - 4 * giu];
+      gun = [6 + 16 * giu, 46 + 24 * u - 34 * giu]; ang = -1.4 * u * (1 - giu) + 1.0 * giu;
+      piedi = [[12, 0], [-10, 0]];
     } else if (st === "giu") {
-      lean = -0.2; hip = [0, 30];
+      hip = [0, 30 - 14 * Math.min(1, z.s / 10)]; lean = 0.3;
     } else {
-      // fermo: accovacciato, il peso che va e viene, la testa che si gira
-      const o = Math.sin(t * 0.06);
-      hip = [o * 1.5, 31 + Math.sin(t * 0.12) * 1.2]; lean = 0.4 + o * 0.05; testaSu = Math.sin(t * 0.03) * 2;
-      piedi = [[9, 0], [-9, 0]];
+      // fermo: gambe larghe, il petto che si gonfia
+      const r = Math.sin(t * 0.07);
+      hip = [0, 29 + r * 0.8]; lean = 0.06 + r * 0.03; testaSu = r * 0.8;
+      piedi = [[11, 0], [-11, 0]];
     }
-    if (z.reaz > 0 || z.botta > 0) lean -= 0.35 * Math.min(1, Math.max(z.reaz || 0, z.botta || 0) / 10);
-    const cade = st === "giu" ? Math.min(1, z.s / 16) : 0;
+    if (ringhio > 0) { lean -= 0.22 * ringhio; testaSu += 3 * ringhio; }
+    if (z.reaz > 0 || z.botta > 0) lean -= 0.3 * Math.min(1, Math.max(z.reaz || 0, z.botta || 0) / 10);
+    const cade = st === "giu" ? Math.max(0, Math.min(1, (z.s - 10) / 14)) : 0;
     ctx.save();
-    if (st === "giu") ctx.globalAlpha = Math.max(0, 1 - Math.max(0, z.s - 26) / 24);
-    // chi esce dal terreno si vede solo sopra la linea del suolo
+    if (st === "giu") ctx.globalAlpha = Math.max(0, 1 - Math.max(0, z.s - 30) / 22);
     if (st === "esce") { ctx.beginPath(); ctx.rect(z.x - 90 * k, q.base - (z.alzo || 0) - 160 * k, 180 * k, 160 * k); ctx.clip(); }
     ctx.translate(z.x, yB + (st === "esce" ? Math.max(0, 1 - z.s / 46) * 80 * k : 0));
     ctx.scale(d * k, k);
-    if (cade) { ctx.rotate(-1.35 * cade); }
-    if (giro) { ctx.translate(hip[0], -hip[1]); ctx.rotate(giro); ctx.translate(-hip[0], hip[1]); }
+    if (cade) ctx.rotate(1.25 * cade);                       // (giù di faccia, in avanti)
+    if (giro) ctx.rotate(giro);
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     const seg = (pts, w, col) => {
       ctx.beginPath(); ctx.moveTo(pts[0][0], -pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], -pts[i][1]);
       ctx.strokeStyle = nero; ctx.lineWidth = w + 2.4; ctx.stroke(); ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke();
     };
-    // il busto: dal bacino al petto, inclinato di `lean`
-    const L = 27, petto = [hip[0] + Math.sin(lean) * L, hip[1] + Math.cos(lean) * L];
-    const fronte = [Math.cos(lean), -Math.sin(lean)];                    // la direzione «avanti» del busto
-    const spalla = [petto[0] + fronte[0] * 2, petto[1] + fronte[1] * 2 - 2];
-    const testa = [petto[0] + Math.sin(lean) * 5 + fronte[0] * 9, petto[1] + Math.cos(lean) * 5 + fronte[1] * 9 + testaSu - 3];
-    // una gamba da bestia: anca → ginocchio (avanti) → caviglia (dietro, alta) → piede
-    const gamba = (pf, gin, col) => {
-      const a = hip, f = pf, kx = gin ? gin[0] : (a[0] + f[0]) / 2 + 8, ky = gin ? gin[1] : (a[1] + f[1]) / 2 + 2;
-      const cav = [f[0] - 6, f[1] + 7];
-      seg([a, [kx, ky]], 8.5, col); seg([[kx, ky], cav], 5.5, col); seg([cav, [f[0] + 6, f[1]]], 4.5, col);
+    const crepa = (pts) => {
+      if (brace <= 0.02) return;
+      ctx.save(); ctx.globalAlpha *= Math.min(1, brace); ctx.shadowColor = "#ff7a1a"; ctx.shadowBlur = 5 * brace * k;
+      ctx.strokeStyle = brace > 0.7 ? "#ffd27a" : "#ff8a2a"; ctx.lineWidth = 1.1;
+      ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.stroke(); ctx.restore();
     };
-    // la coda, corta e spessa, che ondeggia
-    const cod = Math.sin(t * 0.09 + (corre ? ph : 0)) * 4;
-    seg([[hip[0] - 4, hip[1] + 1], [hip[0] - 14, hip[1] - 4 + cod], [hip[0] - 21, hip[1] - 11 + cod * 1.5]], 5, scura);
-    gamba(piedi[1], ginocchi && ginocchi[1], scura);
-    // il braccio dietro (regge la canna)
-    const manoD = [gun[0] + Math.cos(ang) * 10, gun[1] - Math.sin(ang) * 10 + 1];
-    seg([[spalla[0] - 4, spalla[1]], [(spalla[0] + manoD[0]) / 2 - 3, (spalla[1] + manoD[1]) / 2 - 4], manoD], 6.5, scura);
-    // il busto: largo alle spalle, stretto in vita
+    // il busto (in coordinate del busto: y in giù negativo = su), largo e alto, inclinato di `lean`
+    const L = 30, petto = [hip[0] + Math.sin(lean) * L, hip[1] + Math.cos(lean) * L];
+    const spallaA = [petto[0] + 9 + spallata * 20, petto[1] - 4], spallaD = [petto[0] - 9 - spallata * 20, petto[1] - 3];
+    const testa = [petto[0] + 6, petto[1] + 9 + testaSu];             // (avanti e un po' su: non sparisce dietro la lastra della spalla)
+    // una gamba corta e grossa: anca, ginocchio avanti, piede largo
+    const gamba = (pf, col) => {
+      const a = [hip[0] + (pf[0] > hip[0] ? 4 : -4), hip[1] - 2], kx = (a[0] + pf[0]) / 2 + 4, ky = (a[1] + pf[1]) / 2 + 1;
+      seg([a, [kx, ky]], 10, col); seg([[kx, ky], [pf[0], pf[1] + 4]], 8, col);
+      ctx.fillStyle = ferro; ctx.strokeStyle = nero; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(pf[0] - 6, -pf[1]); ctx.lineTo(pf[0] + 9, -pf[1]); ctx.lineTo(pf[0] + 8, -pf[1] - 5); ctx.lineTo(pf[0] - 5, -pf[1] - 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    };
+    gamba(piedi[1], scura);
+    // il braccio dietro, sulla canna
+    const manoD = [gun[0] + Math.cos(ang) * 12, gun[1] - Math.sin(ang) * 12 + 1];
+    seg([spallaD, [(spallaD[0] + manoD[0]) / 2 - 2, Math.min(spallaD[1], manoD[1]) - 7], manoD], 9, scura);
+    // il busto
     ctx.save(); ctx.translate(hip[0], -hip[1]); ctx.rotate(lean);
     ctx.beginPath();
-    ctx.moveTo(-7, 0); ctx.lineTo(7, 0); ctx.quadraticCurveTo(15, -12, 13, -L + 2); ctx.quadraticCurveTo(6, -L - 5, -6, -L - 3);
-    ctx.quadraticCurveTo(-15, -L + 1, -13, -14); ctx.closePath();
-    ctx.fillStyle = pelle; ctx.fill(); ctx.strokeStyle = nero; ctx.lineWidth = 1.6; ctx.stroke();
-    // il petto e gli addominali, la pancia più chiara
-    ctx.fillStyle = chiara; ctx.beginPath(); ctx.moveTo(3, -2); ctx.quadraticCurveTo(11, -12, 9, -20); ctx.quadraticCurveTo(4, -16, 1, -8); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = scura; ctx.lineWidth = 1; ctx.beginPath();
-    ctx.moveTo(1, -19); ctx.quadraticCurveTo(8, -24, 12, -19); for (const yy of [-6, -10, -14]) { ctx.moveTo(3, yy); ctx.lineTo(8, yy - 0.5); } ctx.stroke();
-    // la tracolla
-    ctx.strokeStyle = "#3a2f28"; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(-10, -L + 2); ctx.lineTo(10, -3); ctx.stroke();
-    ctx.fillStyle = "#c9a35a"; for (let i = 0; i < 4; i++) { ctx.fillRect(-6 + i * 4.4, -L + 6 + i * 5.6, 2, 3); }
-    // le creste d'osso lungo la schiena
-    ctx.fillStyle = osso; ctx.strokeStyle = nero; ctx.lineWidth = 1.1;
-    for (const [yy, h] of [[-L + 1, 7], [-L + 9, 6], [-L + 17, 5]]) { ctx.beginPath(); ctx.moveTo(-12, yy); ctx.lineTo(-19, yy - h * 0.4); ctx.lineTo(-11, yy + 5); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    ctx.moveTo(-9, 2); ctx.lineTo(9, 2); ctx.quadraticCurveTo(14, -10, 20, -L + 1); ctx.quadraticCurveTo(12, -L - 9, -2, -L - 8);
+    ctx.quadraticCurveTo(-18, -L - 6, -19, -L + 2); ctx.quadraticCurveTo(-13, -12, -9, 2); ctx.closePath();
+    ctx.fillStyle = pelle; ctx.fill(); ctx.strokeStyle = nero; ctx.lineWidth = 1.8; ctx.stroke();
+    // i pettorali e la pancia, la luce sul petto
+    ctx.fillStyle = luce; ctx.beginPath(); ctx.ellipse(7, -L + 7, 8, 5, -0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = scura; ctx.lineWidth = 1.2; ctx.beginPath();
+    ctx.moveTo(-3, -L + 3); ctx.quadraticCurveTo(6, -L + 13, 16, -L + 6);
+    for (const yy of [-9, -14]) { ctx.moveTo(1, yy); ctx.quadraticCurveTo(6, yy - 1.5, 11, yy); }
+    ctx.moveTo(6, -6); ctx.lineTo(6, -17); ctx.stroke();
+    // le crepe di brace
+    crepa([[-12, -L + 4], [-8, -L + 10], [-11, -L + 15], [-6, -L + 20]]);
+    crepa([[12, -9], [9, -4], [13, 0]]);
+    crepa([[2, -L - 4], [-1, -L + 1], [3, -L + 4]]);
+    // la corda del ring a tracolla, con due borchie
+    ctx.strokeStyle = nero; ctx.lineWidth = 4.6; ctx.beginPath(); ctx.moveTo(-16, -L - 2); ctx.lineTo(13, -1); ctx.stroke();
+    ctx.strokeStyle = corda; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = ferroL; for (const u of [0.3, 0.7]) { ctx.beginPath(); ctx.arc(-16 + 29 * u, -L - 2 + (L + 1) * u, 1.6, 0, Math.PI * 2); ctx.fill(); }
+    // la cintura di ferro ribattuta
+    ctx.fillStyle = ferro; ctx.strokeStyle = nero; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(-10, 3); ctx.lineTo(10, 3); ctx.lineTo(10, -3); ctx.lineTo(-10, -3); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = ferroL; for (const x of [-6, 0, 6]) { ctx.beginPath(); ctx.arc(x, 0, 1.1, 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
-    // la testa: larga e bassa, l'arcata pesante, la mascella con le zanne, l'occhio ambra
-    ctx.save(); ctx.translate(testa[0], -testa[1]); ctx.rotate(lean * 0.4);
-    ctx.fillStyle = pelle; ctx.strokeStyle = nero; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.ellipse(0, 0, 9, 6.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(4, 4.5, 6.5, 3.6, 0.15, 0, Math.PI * 2); ctx.fillStyle = scura; ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#f2ead6"; for (const zx of [3, 8]) { ctx.beginPath(); ctx.moveTo(zx, 2.5); ctx.lineTo(zx + 1.2, -1.5); ctx.lineTo(zx + 2.4, 2.5); ctx.closePath(); ctx.fill(); ctx.stroke(); }
-    ctx.fillStyle = scura; ctx.beginPath(); ctx.moveTo(-1, -4.5); ctx.quadraticCurveTo(6, -8, 10, -3); ctx.lineTo(9, -1.5); ctx.quadraticCurveTo(5, -4, -1, -3); ctx.closePath(); ctx.fill();
-    ctx.save(); ctx.shadowColor = occhio; ctx.shadowBlur = 6 * k; ctx.fillStyle = bianco ? "#ffffff" : occhio;
-    ctx.beginPath(); ctx.ellipse(5.5, -1.6, 1.8, 1.2, -0.2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    ctx.fillStyle = osso; ctx.beginPath(); ctx.moveTo(-7, -4); ctx.lineTo(-13, -9); ctx.lineTo(-5, -6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // la testa: piccola, affondata fra le spalle, con la maschera di ferro inchiodata
+    ctx.save(); ctx.translate(testa[0], -testa[1]); ctx.rotate(lean * 0.3 - 0.25 * ringhio);
+    ctx.fillStyle = pelle; ctx.strokeStyle = nero; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.ellipse(-1, -1, 7.5, 7.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // la maschera: una piastra davanti, due fessure accese, i chiodi; col ringhio la parte bassa si apre sulla bocca
+    const apre = 2.5 * ringhio;
+    ctx.fillStyle = ferro; ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(8, -6); ctx.lineTo(9, 0); ctx.lineTo(1, 1); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(1, 1 + apre); ctx.lineTo(9, 0 + apre); ctx.lineTo(7.5, 6 + apre); ctx.lineTo(1, 6 + apre); ctx.closePath(); ctx.fill(); ctx.stroke();
+    if (apre > 0.4) { ctx.fillStyle = "#2a0f08"; ctx.fillRect(1.5, 1, 6.5, apre); ctx.fillStyle = "#ff8a2a"; ctx.globalAlpha *= 0.8; ctx.fillRect(2, 1.4, 5, apre * 0.6); ctx.globalAlpha /= 0.8; }
+    ctx.save(); ctx.shadowColor = "#ff8a2a"; ctx.shadowBlur = (4 + 6 * brace) * k; ctx.fillStyle = bianco ? "#ffffff" : brace > 0.7 ? "#ffe08a" : "#ff9a3a";
+    ctx.fillRect(3, -4.2, 4.6, 1.5); ctx.restore();
+    ctx.fillStyle = ferroL; for (const [x, y] of [[1.5, -5.5], [7.5, -5], [2, 4.5 + apre], [7, 4 + apre]]) { ctx.beginPath(); ctx.arc(x, y, 0.9, 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
-    gamba(piedi[0], ginocchi && ginocchi[0], pelle);
-    // l'arma (il fucile-sega, quello che lascia morendo): disegnata nelle unità di `disegnaArma`
+    gamba(piedi[0], pelle);
+    // l'arma (il fucile-sega che lascia morendo)
     if (st !== "giu" || cade < 0.6) {
-      ctx.save(); ctx.translate(gun[0], -gun[1]); ctx.rotate(ang); ctx.scale(1 / S, 1 / S);
+      ctx.save(); ctx.translate(gun[0], -gun[1]); ctx.rotate(ang); ctx.scale(1.15 / S, 1.15 / S);
       disegnaArma({ tipo: "motosega", a: 0, da: null });
       ctx.restore();
     }
-    // il braccio davanti: la spalla rotonda e muscolosa, l'avambraccio sull'impugnatura
-    const manoA = [gun[0] - Math.cos(ang) * 1, gun[1] + Math.sin(ang) * 1 - 2];
-    const gom = [(spalla[0] + manoA[0]) / 2 - 2, Math.min(spalla[1], manoA[1]) - 6];
-    seg([spalla, gom], 8, pelle); seg([gom, manoA], 6, pelle);
-    ctx.fillStyle = pelle; ctx.strokeStyle = nero; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(spalla[0], -spalla[1], 6.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = osso; ctx.beginPath(); ctx.moveTo(spalla[0] - 3, -spalla[1] - 5); ctx.lineTo(spalla[0] - 1, -spalla[1] - 11); ctx.lineTo(spalla[0] + 2, -spalla[1] - 5); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // il braccio davanti, enorme: spalla con la lastra di pietra del ring, l'avambraccio con la piastra ribattuta
+    const manoA = [gun[0] - Math.cos(ang) * 2, gun[1] + Math.sin(ang) * 2 - 2];
+    const gom = [(spallaA[0] + manoA[0]) / 2 - 3, Math.min(spallaA[1], manoA[1]) - 8];
+    seg([spallaA, gom], 11, pelle); seg([gom, manoA], 9, pelle);
+    ctx.save(); ctx.translate((gom[0] + manoA[0]) / 2, -(gom[1] + manoA[1]) / 2); ctx.rotate(Math.atan2(-(manoA[1] - gom[1]), manoA[0] - gom[0]));
+    ctx.fillStyle = ferro; ctx.strokeStyle = nero; ctx.lineWidth = 1.2; ctx.fillRect(-5, -4.6, 10, 9.2); ctx.strokeRect(-5, -4.6, 10, 9.2);
+    ctx.fillStyle = ferroL; for (const x of [-3, 3]) { ctx.beginPath(); ctx.arc(x, 0, 0.9, 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
-    // il puntino rosso della mira, dalla bocca dell'arma verso chi gioca (come prima)
+    ctx.save(); ctx.translate(spallaA[0], -spallaA[1]);
+    ctx.fillStyle = pelle; ctx.strokeStyle = nero; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(0, 0, 8.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    crepa([[-3, -4], [0, -1], [-2, 3]]);
+    ctx.rotate(-0.25); ctx.fillStyle = pietra; ctx.beginPath();
+    ctx.moveTo(-9, -6); ctx.lineTo(8, -9); ctx.lineTo(11, -3); ctx.lineTo(-7, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-2, -7); ctx.lineTo(1, -2); ctx.moveTo(4, -8); ctx.lineTo(5, -4); ctx.stroke();
+    ctx.restore();
+    ctx.restore();
     if (((st === "granata" && z.s < BRUTO.mira) || (st === "raffica" && z.s < BRUTO.rMira)) && passi % 6 < 4) {
       const b = boccaBruto(z, q);
       tondo(b.x, b.y, 2.2 * S, "#ff3b30");
@@ -15318,7 +15351,7 @@
                          gonfio: ["\u{1F922}", "Gonfio"], saltatore: ["\u{1F997}", "Saltatore"], dragoFulmine: ["\u{1F409}⚡", "Draghetto elettrico"],
                          corazzato: ["\u{1F6E1}️", "Corazzato"], gelido: ["❄️", "Gelido"], grosso: ["\u{1FAA3}", "Bestione"],
                          dragoVeleno: ["\u{1F409}\u{1F9EA}", "Draghetto velenoso"], sputatore: ["\u{1F4A6}", "Sputatore"], rabbioso: ["\u{1F621}", "Rabbioso"],
-                         bruto: ["\u{1F4A3}\u{1F52B}", "Bestia armata"] };
+                         bruto: ["\u{1F525}\u{1F52B}", "Bruto di brace"] };
   const PERSONAGGI_CORSA = [["", "Classici"], ["guerrieri", "Super guerrieri"], ["maghi", "Maghi"], ["lame", "Duellanti"]];
   // ·· LA PRIMA CORSA GUIDATA (18/10/2026 sera, Riccardo: «fai iniziare la corsa infinita come un tutorial la prima volta
   // che lo fai, quindi se sei loggato la seconda volta non lo fa più. Il tutorial ti fa vedere le basi e come fare la
@@ -15355,7 +15388,7 @@
     dragoVeleno: ["\u{1F409}\u{1F9EA}", "Draghetto velenoso", "Vola e tira dall'alto.", "Una palla di veleno ad arco che lascia una pozza.", "Spostati da dove cade e non restare nella pozza."],
     sputatore: ["\u{1F4A6}", "Sputatore", "Resta a distanza.", "Sputa veleno ad arco: la parata non lo ferma.", "Spostati quando sputa e vai a prenderlo da vicino."],
     rabbioso: ["\u{1F621}", "Rabbioso", "Rosso e velocissimo.", "Ti corre addosso e morde subito.", "Tieni il dito pronto: premi {P} appena l'anello diventa d'oro."],
-    bruto: ["\u{1F4A3}\u{1F52B}", "Bestia armata", "Muscolosa e agile: tiene la distanza e schiva saltando quando le vai addosso.", "Spara raffiche di colpi e tira granate a parabola.", "Col parry rimandi colpi e granate a chi li ha tirati. Morendo lascia il fucile-sega."],
+    bruto: ["\u{1F525}\u{1F52B}", "Bruto di brace", "Enorme e muscoloso, con la maschera di ferro: tiene la distanza e se gli vai addosso balza via.", "Spara raffiche e tira granate a parabola; quando ringhia è scoperto.", "Col parry rimandi colpi e granate a chi li ha tirati. Morendo lascia il fucile-sega."],
     capo: ["\u{1F480}", "Il capo", "Enorme e lento, con tanta vita.", "Tre manate di fila.", "Parale tutte e tre col parry: CONTRO TOTALE e il capo va giù sbilanciato."],
     doro: ["\u{1FA99}", "Zombie d'oro", "Non attacca: scappa carico di monete.", "Dopo otto secondi si rintana.", "Prendilo prima che scappi: lascia tante monete."],
     letale: ["\u{1F534}", "La carica rossa", "Una scintilla rossa, poi lo zombie parte di corsa verso di te.", "Una carica che la parata non regge: l'anello è rosso.", "Solo il parry la ferma: premi {P} quando arriva e stendi chi ti sta intorno."],
