@@ -32,7 +32,7 @@ function riquadro(l, t, r, b) {
 // (`nuovo`: un giocatore che non ha mai giocato, con la prima corsa guidata e le schede dei nemici nuovi. Di serie no:
 // i test della corsa vogliono l'orda subito, senza schede che fermano il gioco. Vedi «LA PRIMA CORSA GUIDATA».)
 const GIA_VISTI = JSON.stringify({ lento: 1, svelto: 1, corvo: 1, striscia: 1, botto: 1, dragoFuoco: 1, gonfio: 1, saltatore: 1, dragoFulmine: 1, corazzato: 1, gelido: 1,
-  grosso: 1, dragoVeleno: 1, sputatore: 1, rabbioso: 1, bruto: 1, capo: 1, doro: 1, letale: 1, motosega: 1 });
+  grosso: 1, dragoVeleno: 1, sputatore: 1, rabbioso: 1, bruto: 1, saiba: 1, capo: 1, doro: 1, letale: 1, motosega: 1 });
 function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false, premio = null, pannello = false, audio = null, arena = null, globali = {}, nuovo = false } = {}) {
   if (!nuovo) { if (!("mut-ring-guida" in memoria)) memoria["mut-ring-guida"] = "fatta"; if (!("mut-ring-presentati" in memoria)) memoria["mut-ring-presentati"] = GIA_VISTI; }
   const richieste = [];
@@ -3624,16 +3624,16 @@ test("la corsa: a ogni round con l'orda un nemico nuovo, e i protagonisti cambia
   const { amb, r } = corsaAvviata({}, "robot", 31);
   inLotta(amb, r);
   const nuovi = [], protagonisti = [amb.stato().corsa.protagonisti];
-  for (let i = 0; i < 15; i++) {
+  for (let i = 0; i < 16; i++) {
     r.corsa.prossimo(i === 5 ? "duello" : "ondata"); r.corsa.vinci();
     avanzaCorsa(amb, r, 400, (s) => s.corsa.fase !== "lotta" || !s.orda && s.corsa.tipo !== "duello");
     const c = amb.stato().corsa;
     if (c.tipo === "duello") { assert.strictEqual(c.nuovo, null, "nel duello niente novità"); continue; }
     nuovi.push(c.nuovo); protagonisti.push(c.protagonisti);
   }
-  // (dal 18/10/2026 il bruto armato è il primo)
-  assert.deepStrictEqual(nuovi.slice(0, 13), ["bruto", "striscia", "botto", "dragoFuoco", "gonfio", "saltatore", "dragoFulmine", "corazzato", "gelido", "grosso", "dragoVeleno", "sputatore", "rabbioso"]);
-  assert.strictEqual(nuovi[13], null, "finiti i nuovi, i round mescolano quelli già visti");
+  // (dal 18/10/2026 il bruto armato è il primo; dal 21/10 dopo di lui il germoglio esplosivo)
+  assert.deepStrictEqual(nuovi.slice(0, 14), ["bruto", "saiba", "striscia", "botto", "dragoFuoco", "gonfio", "saltatore", "dragoFulmine", "corazzato", "gelido", "grosso", "dragoVeleno", "sputatore", "rabbioso"]);
+  assert.strictEqual(nuovi[14], null, "finiti i nuovi, i round mescolano quelli già visti");
   for (let i = 1; i < protagonisti.length; i++) {
     assert.ok(protagonisti[i].length >= 2, "due o tre protagonisti a round");
     // (al secondo round i tipi visti sono solo tre: lì uno può tornare)
@@ -5174,3 +5174,97 @@ test("il primo colpo guidato di un nemico nuovo: fermo finché non si preme, e p
   dentro(amb);
 });
 
+
+// ·· Revisione del 24/10/2026 del giro del 21/10 (super guerrieri, brawl, frecce prioritarie) ··
+
+test("trasformato: i passi delle mosse restano interi, la raffica di pugni arriva e il teletrasporto non si rompe", () => {
+  // (il 21/10 il trasformato andava a passi di 1,6: `f.t % 4 === 2` non tornava mai e la raffica non toccava nessuno;
+  // e `zip()` chiamava `maghi(f)` senza nessuna `f`, quindi ogni teletrasporto lanciava un ReferenceError)
+  let colpita = false;
+  for (let prova = 0; prova < 9 && !colpita; prova++) {
+    const amb = ambiente();
+    amb.avanza(30);
+    const r = amb.finestra.__ring;
+    r.comandi.anime(true);
+    const m = amb.lottatore("mela");
+    amb.porta("robot", m.bacino.x - 26, m.bacino.y - 8, 20); amb.rilascia(m.bacino.x - 26, m.bacino.y - 8);
+    amb.avanza(70);
+    const f = r.lottatori().find((l) => l.tipo === "robot");
+    f.potenziato = 600; f.forma = 1;
+    assert.strictEqual(r.formaDi(f), "super");
+    r.rush("robot");
+    amb.avanza(60, () => {
+      assert.ok(Number.isInteger(f.t), "passo della mossa non intero: " + f.t);
+      if (amb.stato().lottatori.find((l) => l.tipo === "mela").danni > 0) { colpita = true; return false; }
+    });
+    assert.doesNotThrow(() => r.comandi.colpo("teletrasporto"), "il teletrasporto lancia un errore");
+    dentro(amb);
+  }
+  assert.ok(colpita, "la raffica di pugni del trasformato non ha mai colpito");
+});
+
+test("le frecce: a ring spento restano della pagina; acceso comandano il lottatore, e lasciate torna l'automa", () => {
+  const spento = ambiente({ memoria: { "mut-ring": "off" } });
+  for (const k of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]) assert.strictEqual(spento.finestra.__ring.tastoGiu(k), false, k + " preso a ring spento");
+  const amb = ambiente();
+  amb.avanza(30);
+  const r = amb.finestra.__ring;
+  const x0 = amb.lottatore("robot").bacino.x;
+  assert.ok(r.tastoGiu("ArrowLeft"), "a ring acceso la freccia comanda");
+  amb.avanza(20);
+  const f = r.lottatori().find((l) => l.tipo === "robot");
+  assert.ok(f.manuale, "con la freccia premuta comanda chi gioca");
+  assert.ok(amb.lottatore("robot").bacino.x < x0 - 20, "la freccia a sinistra non lo sposta");
+  r.tastoSu("ArrowLeft");
+  amb.avanza(2);
+  assert.ok(!f.manuale, "lasciata la freccia torna l'automa");
+  // nella scelta del modo le frecce restano dei menu (← corsa, → combattimento)
+  r.sceltaModo(true); amb.avanza(5);
+  assert.ok(r.tastoGiu("ArrowLeft"));
+  assert.strictEqual(r.sceltaModo(), false, "nella scelta del modo la freccia sceglie");
+  assert.ok(amb.stato().corsa, "freccia a sinistra: la corsa");
+});
+
+test("il brawl è del sito del gioco: altrove la seconda voce resta il combattimento libero", () => {
+  const amb = ambiente({ pannello: true });
+  const r = amb.finestra.__ring;
+  amb.avanza(30);
+  r.sceltaModo(true); amb.avanza(5);
+  assert.ok(r.tastoGiu("KeyD"));
+  assert.strictEqual(r.brawl(), null, "nell'estensione e sul tracker niente brawl");
+  assert.strictEqual(amb.stato().lottatori.length, 2, "combattimento libero: due lottatori");
+  amb.tastiPannello["[data-libero]"][0].ascolta.click();
+  assert.strictEqual(r.brawl(), null);
+  const sito = ambiente({ globali: { __ringModoLibero: { nome: "1 contro 1", testo: "", unoControUno: true } } });
+  const rs = sito.finestra.__ring;
+  sito.avanza(30);
+  rs.sceltaModo(true); sito.avanza(5);
+  assert.ok(rs.tastoGiu("KeyD"));
+  assert.strictEqual(rs.brawl() && rs.brawl().fase, "scelta", "sul sito l'1 contro 1 è il brawl");
+});
+
+test("brawl: quattro lottatori, nessun errore in lotta, e a tempo scaduto la classifica per meno morti", () => {
+  const amb = ambiente({ globali: { __ringBrawl: true } });
+  const r = amb.finestra.__ring;
+  amb.avanza(30);
+  r.apriBrawl(0);
+  assert.strictEqual(r.brawl().fase, "lotta");
+  assert.strictEqual(r.lottatori().length, 4);
+  const fatti = amb.avanza(60 * 185, () => { if (r.brawl().fase !== "lotta") return false; });
+  const b = r.brawl();
+  assert.strictEqual(b.fase, "fine", "dopo tre minuti la partita finisce (" + fatti + " fotogrammi, " + b.tempoRimanente + " rimasti)");
+  assert.strictEqual(b.classifica.length, 4);
+  for (let i = 1; i < 4; i++) assert.ok(b.classifica[i - 1].morto <= b.classifica[i].morto, "in testa chi è morto meno");
+  dentro(amb);
+});
+
+test("le scritte: via le onomatopee dei colpi, ma i numeri e i richiami restano", () => {
+  const amb = ambiente();
+  amb.avanza(30);
+  const r = amb.finestra.__ring;
+  const s = fs.readFileSync(path.join(__dirname, "..", "web", "static", "ring.js"), "utf8");
+  assert.ok(/if \(!pulito\) return false;/.test(s), "«×2», «+40», «-1 ❤️» non hanno lettere ma vanno scritte");
+  const lista = s.slice(s.indexOf("const LISTA_FUMETTI"), s.indexOf("]);", s.indexOf("const LISTA_FUMETTI")));
+  for (const w of ["ORA", "SU", "VAI", "GRRR"]) assert.ok(!lista.includes('"' + w + '"'), w + " è un richiamo, non un'onomatopea");
+  assert.ok(Array.isArray(r.scritte()));
+});

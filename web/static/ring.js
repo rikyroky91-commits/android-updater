@@ -1661,7 +1661,7 @@
       }
       case "trasforma":
         if (guerrieri(f) || stile === "guerrieri") {
-          // Posa trasformazione Limit Break autentica Goku (media_1792590619914_9380fbe6.png):
+          // Posa trasformazione Limit Break autentica Goku:
           // Kiba-dachi: gambe aperte, ginocchia piegate, baricentro abbassato.
           // Omeri inclinati in GIÙ dai deltoidi verso i fianchi a livello della VITA;
           // Gomiti flessi a ~85° ai fianchi; avambracci proiettati in SU e in avanti a 48°;
@@ -1776,7 +1776,7 @@
         break;
       case "carica": {
         if (guerrieri(f) || stile === "guerrieri") {
-          // POSA DI CARICA AURA DRAGON BALL Z ESATTAMENTE COME GOKU (media_1792590619914_9380fbe6.png):
+          // POSA DI CARICA AURA DRAGON BALL Z ESATTAMENTE COME GOKU:
           // Kiba-dachi: gambe aperte, ginocchia piegate in fuori, baricentro abbassato.
           // Torso proteso in avanti, testa tesa che ruggisce di rabbia marziale.
           // Omeri inclinati in GIÙ dai deltoidi verso i fianchi a livello della VITA;
@@ -2040,11 +2040,13 @@
         q.ginocchioA = [12, 9]; q.ginocchioD = [12, -7]; q.piedeA = [0, 10]; q.piedeD = [0, -10];
       }
     }
-    // LE POSE DI TUTTI I LOTTATORI SCORRONO FLUIDE
+    // LE POSE DEI SUPER GUERRIERI SCORRONO (16/10/2026, Riccardo: «i super guerrieri devono avere animazioni più fluide e affini al mondo dragon ball»).
     // Le pose cambiano di colpo (carica → sparo, un pugno → l'altro) e i muscoli ci arrivano in uno o due fotogrammi:
-    // da qui gli scatti. La posa voluta si insegue in modo organico: veloce e scattante nei colpi (0.75), morbida e fluida nel resto (0.42).
+    // da qui gli scatti. Per loro la posa voluta si insegue un po' alla volta: veloce nei colpi, più morbida nel resto.
     // Quando la direzione si inverte, anche la memoria delle pose si adatta senza strappi dello scheletro.
-    if (!(f.ko > 0) && !f.preso && !f.tenuto) {
+    // (il 21/10 valeva per tutti: la mano arrivava in ritardo nei colpi, i pugni andavano a vuoto e per rimediare erano
+    // state raddoppiate le hitbox, con l'eroe che spazzava l'orda; tornato ai soli super guerrieri)
+    if (guerrieri(f) && !(f.ko > 0) && !f.preso && !f.tenuto) {
       const a = (COLPI && COLPI[f.azione]) || f.azione === "rush" || f.azione === "contro" ? 0.74 : 0.42;
       const L = f.qLiscia || (f.qLiscia = {});
       if (f.dirPrecedente !== undefined && f.dirPrecedente !== f.dir) {
@@ -2324,9 +2326,9 @@
 
   function pensaVolo(f, altro) {
     if (f.azione) {
-      const isSuper = formaDi(f) === "super";
-      const isAttacco = COLPI[f.azione] || f.azione === "calcio" || f.azione === "diretto" || f.azione === "montante" || f.azione === "raffica" || f.azione === "rush" || f.azione === "pugno";
-      f.t += (isSuper && isAttacco ? 1.6 : 1);
+      // (`f.t` resta intero: i colpi partono a fotogrammi esatti, `f.t === 10`, `f.t % 4 === 2`... Il 21/10 il
+      // trasformato andava a passi di 1,6 e la raffica di pugni, le sfere e lo sparo non partivano più)
+      f.t++;
       if (f.azione === "para" && f.guardia) f.durata = Math.max(f.durata, f.t + 2);
       if (f.azione === "contro") eseguiContro(f, altro);
       if (f.azione === "spara" && f.t === 10 && f.arma) spara(f, altro);
@@ -2454,8 +2456,7 @@
     if (f.jet > 0) { pensaVolo(f, altro); return; }
     if (f.azione) {
       const isSuper = formaDi(f) === "super";
-      const isAttacco = COLPI[f.azione] || f.azione === "calcio" || f.azione === "diretto" || f.azione === "montante" || f.azione === "raffica" || f.azione === "rush" || f.azione === "pugno";
-      f.t += (isSuper && isAttacco ? 1.6 : 1);
+      f.t++;                                                       // intero: vedi pensaVolo
       if (f.azione === "para" && f.guardia) f.durata = Math.max(f.durata, f.t + 2);   // S ancora premuto: si resta in guardia
       if (f.azione === "contro") eseguiContro(f, altro);
       if (f.coppia) eseguiCoppia(f);
@@ -2723,10 +2724,11 @@
         return;
       }
       const m = f.p[arto], g = f.p.gomitoA, L = Math.hypot(m.x - g.x, m.y - g.y) || 1;
-      // Hitbox aumentata ed estesa per colpi fisici e lame per garantire fluidità d'impatto senza colpi a vuoto
-      for (const k of lama ? [8, 15, 22, 29] : [-4, 4, 12, 20]) {
-        const x = m.x + (lama ? (m.x - g.x) / L * k * S : f.dir * k * S), y = m.y + (lama ? (m.y - g.y) / L * k * S : 0);
-        const z = zombieToccato(x, y, (lama ? 8 : 14) * S);
+      // (il 21/10 le misure erano raddoppiate, 14 px su quattro punti: l'eroe spazzava l'orda da solo, la minaccia
+      // non saliva più e la carica rossa non arrivava mai; tornate com'erano)
+      for (const k of lama ? [8, 15, 22, 29] : [0]) {
+        const x = m.x + (lama ? (m.x - g.x) / L * k * S : 0), y = m.y + (lama ? (m.y - g.y) / L * k * S : 0);
+        const z = zombieToccato(x, y, (lama ? 4 : 6) * S);
         if (z) { f.colpito = true; colpisciZombie(z, forza * caso(0.9, 1.3) * (f.furia > 0 ? 1.5 : 1) * (lama ? 1.2 : 1), f.dir, x, y, f); return; }
       }
       return;
@@ -2742,7 +2744,7 @@
         for (const tg of bersagli) {
           for (const parte of ["testa", "collo", "bacino"]) {
             const b = tg.p[parte];
-            if (b && Math.hypot(x - b.x, y - b.y) < b.r + 8 * S) {
+            if (b && Math.hypot(x - b.x, y - b.y) < b.r + 4 * S) {
               f.colpito = true;
               colpisci(f, tg, forza * caso(0.9, 1.25), x, y, Math.random() < 0.5 ? "ZAC!" : "SWISH!");
               return;
@@ -2752,11 +2754,13 @@
       }
       return;
     }
-    const m = f.p[arto], extX = m.x + f.dir * 8 * S;
+    // (come la lama: la mano col margine di sempre. Il 21/10 era 12 px più un punto davanti, e il montante «di scena»
+    // del colpo finale mandava K.O. la vittima a metà scena)
+    const m = f.p[arto];
     for (const tg of bersagli) {
       for (const parte of ["testa", "collo", "bacino"]) {
         const b = tg.p[parte];
-        if (b && (Math.hypot(m.x - b.x, m.y - b.y) < b.r + 12 * S || Math.hypot(extX - b.x, m.y - b.y) < b.r + 12 * S)) {
+        if (b && Math.hypot(m.x - b.x, m.y - b.y) < b.r + 6 * S) {
           f.colpito = true;
           colpisci(f, tg, forza * caso(0.85, 1.3), m.x, m.y);
           return;
@@ -2776,22 +2780,24 @@
   // Le scritte del parry non si impilano: la nuova prende il posto della vecchia dello stesso gruppo, lì vicino.
   const SCRITTE_PARRY = { "PARRY!": 1, "PARRY PERFETTO!": 1, "CONTRO!": 2, "CONTRO LETALE!": 2, "PARATO!": 3, "TROPPO PRESTO!": 4, "TROPPO TARDI!": 4 };
   const gruppoParry = (t) => { for (const k in SCRITTE_PARRY) if (k === t || dici(k) === t) return SCRITTE_PARRY[k]; return 0; };
-  // Filtro radicale e completo: elimina tutte le onomatopee fumettose (TUMP, PAFF, BAM, SBAM, CRASH, PAM, TUM, ecc.)
+  // Niente onomatopee da fumetto sopra i colpi (21/10/2026, «pugni puliti»: TUMP, PAFF, BAM, SBAM, CRASH, PAM, TUM...).
+  // Restano le scritte che dicono qualcosa a chi gioca: numeri e punti («×2», «+40», «-1 ❤️») e i richiami
+  // («ORA!», «SU!», «VAI!», «GRRR!» del bruto che si scopre): fino al 24/10 il filtro toglieva anche quelle.
   const LISTA_FUMETTI = new Set([
-    "POW", "BAM", "SBAM", "SBAAM", "TUMP", "PAFF", "PAF", "ZOT", "BONK", "TIE", "TIÈ", "ORA", "DAI",
-    "STRIKE", "GRAH", "BOOM", "BOOOM", "BOOOOM", "KABOOM", "KA-BOOOM", "KRAK", "CRASH", "CREPA",
+    "POW", "BAM", "SBAM", "SBAAM", "TUMP", "PAFF", "PAF", "ZOT", "BONK", "TIE", "TIÈ",
+    "GRAH", "BOOM", "BOOOM", "BOOOOM", "KABOOM", "KRAK", "CRASH",
     "PAM", "TUM", "HOP", "FWOOSH", "CRACK", "ZAAAP", "SDENG", "CLONCK", "CLONK", "TONK", "SLAP",
-    "TONF", "DRIIN", "SPLASH", "THUD", "BSOD", "BIP", "POP", "CLANG", "SBONK", "STOCK", "TIC",
-    "FIUU", "HAAA", "YAAH", "GRRR", "UFF", "ARGH", "BANG", "CINQUE", "GNAM", "CHOMP", "TOC",
+    "TONF", "DRIIN", "SPLASH", "THUD", "BIP", "POP", "CLANG", "SBONK", "STOCK", "TIC",
+    "FIUU", "HAAA", "YAAH", "UFF", "ARGH", "BANG", "GNAM", "CHOMP", "TOC",
     "TUNK", "TZING", "TING", "SWISH", "SLASH", "SPLAT", "SQUARCH", "SLURP", "WHOOSH", "WHEEE",
-    "PTUI", "PUFF", "AHIA", "OPS", "OPLA", "SU", "VAI", "BRRR", "BRRRM", "COFF", "FRRR", "ZAC",
-    "PUM", "SLAM", "RUMMS", "BZZT", "NOTIFICA", "TRIIN", "CLICK", "TINK", "ZIP"
+    "PTUI", "PUFF", "AHIA", "OPS", "OPLA", "BRRR", "BRRRM", "COFF", "FRRR", "ZAC",
+    "PUM", "SLAM", "RUMMS", "BZZT", "TRIIN", "CLICK", "TINK", "ZIP"
   ]);
 
   function eFumetto(testo) {
     if (!testo) return true;
     const pulito = String(testo).toUpperCase().replace(/[^A-ZÀ-Ú]/g, "").trim();
-    if (!pulito) return true;
+    if (!pulito) return false;                                     // solo numeri e segni: si scrive
     if (LISTA_FUMETTI.has(pulito)) return true;
     const compresso = pulito.replace(/(.)\1+/g, "$1");
     if (LISTA_FUMETTI.has(compresso)) return true;
@@ -2801,11 +2807,11 @@
 
   function scrivi(testo, x, y, grande) {
     if (!testo) return;
-    if (eFumetto(testo)) return;
     if (audio.acceso) suonaParola(testo, x, grande);
     const gruppo = gruppoParry(testo);
     if (gruppo) for (let i = scritte.length - 1; i >= 0; i--) if (scritte[i].parry === gruppo && Math.abs(scritte[i].x - x) < 120 * S) scritte.splice(i, 1);
-    scritte.push({ testo: dici(testo), x: Math.max(50, Math.min(W - 50, x)), y: Math.max(26, y), vita: grande ? 70 : 26, grande, parry: gruppo });
+    // (l'onomatopea c'è ma non si disegna: si sente, e chi legge lo stato, come i test, sa che il colpo è arrivato)
+    scritte.push({ testo: dici(testo), x: Math.max(50, Math.min(W - 50, x)), y: Math.max(26, y), vita: grande ? 70 : 26, grande, parry: gruppo, muta: eFumetto(testo) });
   }
 
   const SUONI_TEL = ["DRIIN!", "CRACK!", "BIP!", "SPLASH!", "NOTIFICA!", "TRIIN!"];
@@ -3251,8 +3257,11 @@
       notificaAptico(perfetto ? "parry-perfetto" : "parry", { perfetto, n: catenaParry.n, x, y });
     }
     // L'impatto: fermo, lampo bianco, zoom leggero sul punto, scintille verso chi ha attaccato.
-    fermoColpo = Math.max(fermoColpo, perfetto ? 5 : 3);
-    lampoSchermo = Math.max(lampoSchermo, perfetto ? 0.12 : 0.05);
+    fermoColpo = Math.max(fermoColpo, perfetto ? 14 : 9);
+    // (dimezzato il 18/10/2026: col contrattacco in scena il bianco su tutto copriva i primi colpi. Il 21/10 qui era
+    // sceso a 0,12 con 5 fotogrammi di fermo: il parry non si sentiva più. Il bianco che si vede lo vela già il disegno,
+    // al massimo 0,12: vedi «Il lampo bianco del parry»)
+    lampoSchermo = Math.max(lampoSchermo, perfetto ? 0.32 : 0.16);
     zoomParry = { x, y, t: 0, dur: perfetto ? 26 : 18, k: perfetto ? 0.08 : 0.05 };
     for (let i = 0; i < (perfetto ? 16 : 10) && particelle.length < MAX_PARTICELLE; i++) {
       const a = (f.dir > 0 ? 0 : Math.PI) + caso(-0.9, 0.9) - f.dir * 0.3, v = caso(6, 13) * S;
@@ -3393,7 +3402,7 @@
       }
       return;
     }
-    if (f && (f.stile === "guerrieri" || stile === "guerrieri" || f.tipo === "goku" || f.tipo === "vegeta" || f.tipo === "gohan" || f.tipo === "trunks")) {
+    if (f && (f.stile === "guerrieri" || stile === "guerrieri")) {
       // Super guerriero in scena: parata Dragon Ball fluida e contrattacco devastante con un PUGNO potente
       q.manoA = [56, 16]; q.gomitoA = [46, 13]; q.manoD = [54, 8]; q.gomitoD = [44, 7];
       if (t < s0) {
@@ -3517,7 +3526,7 @@
     scossa = Math.max(scossa, ultimo ? 12 : 5);
     if (ultimo) {
       lampoSchermo = Math.max(lampoSchermo, 0.16);
-      const txtContro = maghi() ? "MAGIA VERDE!" : (stile === "guerrieri" || f.tipo === "goku" || f.tipo === "vegeta" || f.tipo === "gohan" || f.tipo === "trunks") ? "PUGNO CONTRO!" : "CONTRO!";
+      const txtContro = maghi() ? "MAGIA VERDE!" : (stile === "guerrieri") ? "PUGNO CONTRO!" : "CONTRO!";
       scrivi(txtContro, (f.p.bacino.x + xBersaglio(b)) / 2, Math.max(testataBasso + 40 * S, f.p.testa.y - 46 * S), true);
     }
     cinema.colpi++;
@@ -3537,7 +3546,7 @@
       if (i === 2) { scossa = Math.max(scossa, 14); fermoColpo = Math.max(fermoColpo, 8); }
       return;
     }
-    if (f.stile === "guerrieri" || stile === "guerrieri" || f.tipo === "goku" || f.tipo === "vegeta" || f.tipo === "gohan" || f.tipo === "trunks") {
+    if (f.stile === "guerrieri" || stile === "guerrieri") {
       // Super guerriero in scena: impatto del Pugno Contro devastante
       if (particelle.length < MAX_PARTICELLE - 4) {
         particelle.push({ tipo: "onda", x, y, vx: f.dir * 3 * S, vy: 0, vita: 20, max: 20, colore: "#ffd84a" });
@@ -3638,7 +3647,7 @@
     if (altro.azione === "para" && altro.dir === -f.dir) {
       impara(altro, "para", 1, 1); impara(f, f.azione, -1, 0);
       if (livelloDi(altro.tipo) >= 3 && Math.random() < 0.5) altro.combo = 1;
-      scrivi("PARATO!", x, y - 6 * S, false);
+      scrivi(taglio || suono === "BANG!" ? "CLANG!" : "PARATO!", x, y - 6 * S, false);
       scintille(x, y, 5, "#bfe9ff"); troppoPresto(altro, x, y);
       if (altro === chiPara()) sbilancia(f, EQUILIBRIO.parata, x, y);
       consumaGuardia(altro, GUARDIA.colpo, x, y);
@@ -3711,6 +3720,9 @@
     altro.dolore = 22;
     altro.azione = null;
     altro.scalata = null;
+    // (l'onomatopea del colpo non si disegna più, vedi `eFumetto`, ma è il suono del colpo: il 21/10 era stata tolta
+    // e la lotta era diventata quasi muta)
+    scrivi(suono || SUONI[Math.floor(Math.random() * SUONI.length)], x, y - 6 * S, false);
     if (ko && eroeColpito) { altro.ko = Math.max(altro.ko, 70); altro.inVolo = true; }
     else if (ko) segnaKO(f, altro);
     else altro.stordito = 12;
@@ -7389,8 +7401,8 @@
       if (corsa && corsa.chi && f.tipo === corsa.chi && !(corsa.invuln > 0 || corsa.scudo > 0)) feritaEroe(dannoLetale() * 0.35, x, y);
       return;
     }
-    // Preso in pieno.
-    scintille(x, y, 16, "#ff4a4a");
+    // Preso in pieno. (la scritta non si disegna, vedi `eFumetto`, ma si sente e dice ai test che è arrivata)
+    scrivi("SBAM!", x, y - 10 * S, true); scintille(x, y, 16, "#ff4a4a");
     scossa = Math.max(scossa, 10); fermoColpo = Math.max(fermoColpo, 6);
     if (corsa && corsa.chi && f.tipo === corsa.chi) {
       if (corsa.invuln > 0 || corsa.scudo > 0) { scintille(x, y, 6, "#bfe9ff"); return; }
@@ -7753,7 +7765,7 @@
     }
     f.morsiZ = (f.morsiZ || 0) + 1; f.colpitoT = tempo;
     scintille(x, y, 6, "#b6e36a");
-    // Scritte morso rimosse
+    scrivi(grosso ? "SBAM!" : ["GNAM!", "GRAH!", "CHOMP!"][f.morsiZ % 3], x, y - 10 * S, false);   // (non si disegna: vedi `eFumetto`)
     for (const n in f.p) f.p[n].ox -= z.dir * (grosso ? 7 : 2.6) * S;
     f.dolore = 22; f.azione = null; f.stordito = Math.max(f.stordito, 12); f.scalata = null; f.ordine = null;
     if (f.tel) lasciaCadere(f);
@@ -9826,12 +9838,13 @@
     const d = Math.hypot(bx - m.x, by - m.y) || 1, v = 8 * S;
     proiettili.push({ x: m.x, y: m.y, vx: (bx - m.x) / d * v, vy: (by - m.y) / d * v, da: f, vita: 160, energia: true, stella: maghi(), colore: COLORI_ANIME[f.tipo] });
   }
-  function zip(x, y, colore) {
+  function zip(x, y, colore, chi) {
     if (particelle.length >= MAX_PARTICELLE) return;
     particelle.push({ tipo: "zip", x, y, vx: 0, vy: 0, vita: 14, max: 14, colore });
     particelle.push({ tipo: "onda", x, y, vx: 0, vy: 0, vita: 12, max: 12, colore });
-    // I maghi spariscono in una nuvoletta.
-    for (let i = 0; maghi(f) && i < 6 && particelle.length < MAX_PARTICELLE; i++) {
+    // I maghi spariscono in una nuvoletta. (`chi`, facoltativo, è chi sparisce: nel brawl lo stile è di ognuno.
+    // Il 21/10 qui c'era `maghi(f)` senza nessuna `f`: ogni teletrasporto lanciava un ReferenceError.)
+    for (let i = 0; maghi(chi) && i < 6 && particelle.length < MAX_PARTICELLE; i++) {
       particelle.push({ tipo: "polvere", x: x + caso(-10, 10) * S, y: y + caso(-18, 18) * S, vx: caso(-1.2, 1.2) * S, vy: caso(-1, 0.2) * S,
                         vita: Math.round(caso(16, 26)), max: 28, colore: "#c9a6ff" });
     }
@@ -10339,7 +10352,7 @@
     const sotto = c.y + 26 * S;
     ctx.save();
     if (f.azione === "carica" && (guerrieri(f) || stile === "guerrieri")) {
-      // FIAMMA AURA D'ENERGIA DRAGON BALL Z (media_1792588008507_84969d57.png)
+      // FIAMMA AURA D'ENERGIA DRAGON BALL Z
       // Corona di fiamme appuntite e frastagliate che ruggiscono verso l'alto
       const tempoAura = passi * 0.55;
       const rBase = 26 * S, hAura = 80 * S;
@@ -10560,7 +10573,7 @@
     if (f.t < 30 && f.t % 4 === 2 && vicino) {
       const m = f.t % 8 === 2 ? f.p.manoA : f.p.manoD;
       colpettino(f, altro, (m.x + altro.p.collo.x) / 2, (m.y + altro.p.collo.y) / 2);
-      /* colpi rapidi */
+      if (f.t % 8 === 2 && passi % 2 === 0) scrivi(Math.random() < 0.5 ? "PAM!" : "TUM!", altro.p.collo.x, altro.p.collo.y - 14 * S, false);
     }
     if (f.t === 37 && vicino) {
       const inAria = altro.jet > 0 || altro.base - Math.max(altro.p.piedeA.y, altro.p.piedeD.y) > 20 * S;
@@ -10675,7 +10688,7 @@
           particelle.push({ tipo: "polvere", x: bp.x, y: bp.y, vx: Math.cos(a) * v * f.dir, vy: Math.sin(a) * v, vita: 26, max: 26, colore: i % 2 ? "#cfeeff" : "#ffffff" });
         }
         for (const z of t) { const c = colpo(z, 2.5); z.gelo = Math.max(z.gelo || 0, 220); z.botta = Math.max(z.botta || 0, 140); if (z.stato === "colpo") { z.stato = "va"; z.s = 0; } scintille(c[0], c[1], 6, "#cfeeff"); }
-        scrivi("PETRIFICUS!", bp.x + f.dir * 40 * S, bp.y - 20 * S, true);
+        scrivi(dici("GELO!"), bp.x + f.dir * 40 * S, bp.y - 20 * S, true);
         break;
       }
       case "stelle": {
@@ -10687,7 +10700,7 @@
           for (let k = 0; k < 4 && particelle.length < MAX_PARTICELLE; k++) particelle.push({ tipo: "linea", x: c[0] + caso(-8, 8) * S, y: c[1] - 120 * S - i * 10 * S, vx: caso(-0.5, 0.5) * S, vy: 9 * S, vita: 14, max: 14, lung: 24 * S, colore: k ? "#ffe27a" : "#ffffff" });
           scintille(c[0], c[1], 8, "#ffe27a");
         });
-        scrivi("BOMBARDA!", centro ? centro.x : b.x, f.p.testa.y - 50 * S, true); scossa = Math.max(scossa, 7);
+        scrivi(dici("STELLE CADENTI!"), centro ? centro.x : b.x, f.p.testa.y - 50 * S, true); scossa = Math.max(scossa, 7);
         break;
       }
       case "catene": {
@@ -10697,14 +10710,14 @@
           if (particelle.length < MAX_PARTICELLE - 1) particelle.push({ tipo: "onda", x: z.x, y: orda.base - 2 * S, vx: 0, vy: 0, vita: 30, max: 30, colore: col });
           for (let k = 0; k < 4 && particelle.length < MAX_PARTICELLE; k++) particelle.push({ tipo: "linea", x: z.x + caso(-10, 10) * S, y: orda.base - 4 * S, vx: 0, vy: -caso(1.5, 3) * S, vita: 22, max: 22, lung: 16 * S, colore: col });
         }
-        scrivi("INCARCERAMUS!", b.x + f.dir * 60 * S, f.p.testa.y - 40 * S, true); suona("metallo", b.x, 0.5);
+        scrivi(dici("LEGATI!"), b.x + f.dir * 60 * S, f.p.testa.y - 40 * S, true); suona("metallo", b.x, 0.5);
         break;
       }
       case "respinta": {
         const t = vicini(110);
         if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "onda", x: b.x, y: b.y, vx: 0, vy: 0, vita: 20, max: 20, colore: "#38bdf8" });
         for (const z of t) { colpo(z, 3.5); z.vx = (z.x >= b.x ? 1 : -1) * 11 * S * (pesante(z) ? 0.4 : 1); z.botta = Math.max(z.botta || 0, 32); }
-        scrivi("FLIPENDO!", b.x, f.p.testa.y - 30 * S, false); scossa = Math.max(scossa, 6); suona("soffio", b.x, 0.8);
+        scrivi("WHOOSH!", b.x, f.p.testa.y - 30 * S, false); scossa = Math.max(scossa, 6); suona("soffio", b.x, 0.8);
         break;
       }
       case "levita": {
@@ -10712,7 +10725,7 @@
         if (!z) break;
         colpo(z, 3.5); z.alzo = Math.max(z.alzo || 0, 5 * S); z.vAlzo = 12 * S; z.schianto = true; z.ruota = f.dir * 0.8; z.botta = Math.max(z.botta || 0, 70);
         for (let k = 0; k < 10 && particelle.length < MAX_PARTICELLE; k++) particelle.push({ tipo: "scintilla", x: z.x + caso(-12, 12) * S, y: orda.base - caso(0, 60) * S, vx: 0, vy: -caso(1, 3) * S, vita: 24, max: 24, colore: col });
-        scrivi("WINGARDIUM!", z.x, orda.base - 90 * S, true);
+        scrivi(dici("SU!"), z.x, orda.base - 90 * S, true);
         break;
       }
       case "falene": {
@@ -10724,7 +10737,7 @@
             particelle.push({ tipo: "scintilla", x: bp.x + (c[0] - bp.x) * u, y: bp.y + (c[1] - bp.y) * u - Math.sin(Math.PI * u) * 30 * S, vx: caso(-0.6, 0.6) * S, vy: caso(-0.6, 0.6) * S, vita: 20 + k * 2, max: 30, colore: k % 2 ? "#f2e6ff" : col });
           }
         });
-        scrivi("OPPUGNO!", bp.x, bp.y - 24 * S, false);
+        scrivi(dici("FALENE!"), bp.x, bp.y - 24 * S, false);
         break;
       }
     }
@@ -10916,7 +10929,7 @@
     }
     f.ki = 0; f.azione = null;
     schegge(c.x, c.y, 14, COLORI_ANIME[f.tipo]);
-    // CRASH rimosso
+    scrivi("CRASH!", c.x, c.y - 40 * S, false);                  // (si sente, non si disegna)
     return false;
   }
   // Avvinghiati all'avversario: ci si aggrappa, si lampeggia sempre più in
@@ -12061,7 +12074,7 @@
     ctx.closePath(); ctx.fill(); ctx.stroke();
   }
   function chiomaSuper(f, col, scura) {
-    // CRINIERA SUPER SAIYAN 3 AUTENTICA (media_1792587860517_9794dbf0.png):
+    // CRINIERA SUPER SAIYAN 3 AUTENTICA:
     // Una maestosa criniera dorata fluida e compatta (5 ciuffi massicci e armoniosi,
     // NON decine di aghi disordinati!). Scende arcuandosi all'indietro fino al bacino.
     const p = f.p, d = f.dir, t = p.testa, b = p.bacino;
@@ -12111,7 +12124,7 @@
       ctx.closePath(); ctx.fill(); ctx.stroke();
     }
   }
-  // Davanti, sopra la faccia del trasformato (media_1792587860517_9794dbf0.png):
+  // Davanti, sopra la faccia del trasformato:
   // Linea frontale pulita e l'UNICA iconica lunga ciocca frontale che scende sulla fronte/guancia
   function frangiaSuper(f, col, d) {
     const chiaro = mix(col, "#ffffff", 0.42);
@@ -12126,7 +12139,7 @@
     ctx.quadraticCurveTo(-d * 4.0 * S, -6.5 * S, -d * 8.0 * S, -1.0 * S);
     ctx.closePath(); ctx.fill(); ctx.stroke();
 
-    // L'UNICA LUNGA CIOCCA FRONTALE SSJ3 (media_1792587860517_9794dbf0.png)
+    // L'UNICA LUNGA CIOCCA FRONTALE SSJ3
     ctx.fillStyle = col;
     ctx.beginPath();
     ctx.moveTo(d * 1.8 * S, -7.0 * S);
@@ -12180,7 +12193,7 @@
     ctx.strokeStyle = nero; ctx.lineWidth = 1.3 * S; ctx.beginPath();
     ctx.moveTo(est.x + lato * 0.35 * S, est.y - 0.2 * S); ctx.lineTo(int.x, int.y); ctx.stroke();
     if (f && formaDi(f) === "super") {
-      // ARCATA SOPRACCIGLIARE SUPER SAIYAN 3 (media_1792587860517_9794dbf0.png):
+      // ARCATA SOPRACCIGLIARE SUPER SAIYAN 3:
       // Nel SSJ3 NON CI SONO LE SOPRACCIGLIA! L'arcata ossea muscolare sporge fiera con ombreggiatura marcata.
       ctx.strokeStyle = scuro(f.aspetto ? f.aspetto.pelle : "#c88e5d");
       ctx.lineWidth = 1.2 * S;
@@ -12231,7 +12244,7 @@
     } else {
       const batte = Math.floor(passi / 3) % 80 === 0 ? 0.3 : 1;
       if (urla) {
-        // Rughe di rabbia sulla fronte stile Toriyama (media_1792588018918_34bd7ea4.png)
+        // Rughe di rabbia sulla fronte stile Toriyama
         ctx.strokeStyle = nero; ctx.lineWidth = 0.9 * S;
         ctx.beginPath();
         ctx.moveTo(d * 0.2 * S - 1.4 * S, ey - 3.2 * S); ctx.lineTo(d * 0.2 * S - 1.0 * S, ey - 6.5 * S);
@@ -12279,7 +12292,7 @@
         ctx.lineTo(bx + 0.7 * S, by + 0.5 * S); ctx.lineTo(bx + 2.2 * S, by - 0.5 * S); ctx.stroke();
       }
     } else if (urla) {
-      // BOCCA DRAGON BALL Z / GOKU LIMIT BREAK (media_1792590619914_9380fbe6.png):
+      // BOCCA DRAGON BALL Z / GOKU LIMIT BREAK:
       // Denti serrati a grinta marziale con blocco smalto bianco puro, linea di contatto nera,
       // angoli scuri, pieghe di tensione e l'iconica ombra triangolare di Toriyama sotto il labbro!
       const wB = 3.8 * S, hB = 1.9 * S;
@@ -12812,7 +12825,7 @@
     ctx.save();
     ctx.translate((p.collo.x + p.bacino.x) / 2, (p.collo.y + p.bacino.y) / 2); ctx.rotate(ang);
     if (A.nudo || (sup && (guerrieri(f) || stile === "guerrieri"))) {
-      // Chi lotta a torso nudo: GOKU LIMIT BREAK (media_1792590619914_9380fbe6.png)
+      // Chi lotta a torso nudo: GOKU LIMIT BREAK
       // Torso muscoloso con pettorali scolpiti, addominali a tartaruga e fascia arancione strappata
       const w = 0.88, alto = -lung / 2 - 4 * S, basso = lung / 2 + 4 * S;
       ctx.lineJoin = "round";
@@ -13495,6 +13508,8 @@
     }
     if (F.fase === "fine") { if (++F.m > 34) fineFatale(false); return; }
     const m = F.m++;
+    // (`colpo` è anche il K.O. della scena, `contaFatale`: il 21/10, per togliere «SBAM!» e «BAM!», erano state tolte
+    // le chiamate e orbita, meteora e flipper finivano annullate. Le scritte non si disegnano già: `eFumetto`.)
     const colpo = (testo) => {
       const c = a.p.collo;
       contaFatale();
@@ -13548,7 +13563,7 @@
     if (F.tipo === "meteora") {
       // Lo manda per aria con un calcio e gli tira addosso una meteora.
       if (m === 0) inizia(da, "montante");
-      if (m === 11) { a.fatVola = true; a.fantasma = true; D.vy = -17 * S; D.base = a.base; }
+      if (m === 11) { colpo("SBAM!"); a.fatVola = true; a.fantasma = true; D.vy = -17 * S; D.base = a.base; }
       if (a.fatVola && !D.ferma) {
         muoviTutto(a, 0, D.vy); ruotaTutto(a, 0.16 * dir); D.vy += 0.55 * S;
         if (D.vy > 0 && a.p.bacino.y > testataBasso + 150 * S) { D.ferma = true; D.m0 = m; D.mx = a.p.bacino.x; D.my = Math.max(testataBasso + 40 * S, a.p.bacino.y - 90 * S); }
@@ -13625,7 +13640,7 @@
         D.finito = true;
         const x = Math.max(30 * S, Math.min(W - 30 * S, a.p.bacino.x));
         muoviTutto(a, x - a.p.bacino.x, D.base - 12 * S - a.p.bacino.y);
-        // colpo sbam rimosso
+        colpo("SBAM!");
         sfondaPagina(x, D.base - 10 * S, 1.1);
         lasciaAndare(a, 0, 6 * S);
         a.ko = Math.max(a.ko, 120);
@@ -13676,7 +13691,7 @@
     }
     if (F.tipo === "orbita") {
       if (m === 0) inizia(da, "montante");
-      if (m === 11) { a.fatVola = true; a.fantasma = true; D.vy = -24 * S; D.x = a.p.bacino.x; D.base = a.base; }
+      if (m === 11) { colpo("SBAM!"); a.fatVola = true; a.fantasma = true; D.vy = -24 * S; D.x = a.p.bacino.x; D.base = a.base; }
       if (a.fatVola && !D.su) {
         muoviTutto(a, 0, D.vy); ruotaTutto(a, 0.22 * dir); D.vy -= 0.6 * S;
         if (particelle.length < MAX_PARTICELLE && m % 2 === 0) particelle.push({ tipo: "fumo", x: a.p.bacino.x, y: a.p.bacino.y, vx: 0, vy: 2 * S, vita: 18, max: 18, r: 5 * S, colore: "#ffffff" });
@@ -13694,13 +13709,13 @@
           scossa = Math.max(scossa, 14); fermoColpo = Math.max(fermoColpo, 5);
           polvere(a.p.bacino.x - 12 * S, D.base - 1, 6); polvere(a.p.bacino.x + 12 * S, D.base - 1, 6);
           schegge(a.p.bacino.x, D.base - 4 * S, 8, "#b9b3a8");
-          // CRASH rimosso
+          scrivi("CRASH!", a.p.bacino.x, D.base - 46 * S, false);
           F.fase = "fine"; F.m = 0;
         }
       }
     } else if (F.tipo === "flipper") {
       if (m === 0) inizia(da, "calcio");
-      if (m === 13) { a.fatVola = true; a.fantasma = true; D.vx = dir * 17 * S; D.vy = -3.2 * S; D.rimbalzi = 0; D.dopo = 0; }
+      if (m === 13) { colpo("BAM!"); a.fatVola = true; a.fantasma = true; D.vx = dir * 17 * S; D.vy = -3.2 * S; D.rimbalzi = 0; D.dopo = 0; }
       if (a.fatVola) {
         muoviTutto(a, D.vx, D.vy); ruotaTutto(a, 0.42 * Math.sign(D.vx));
         D.vy += 0.16 * S;
@@ -14316,7 +14331,7 @@
       barra.classList.remove("ultimora-colpita"); void barra.offsetWidth;
       barra.classList.add("ultimora-colpita", "ultimora-guasta");
     }
-    // CRASH rimosso
+    scrivi(buco ? "CRASH!" : "CRACK!", x, pavimento - 16 * S, true);   // (si sente, non si disegna)
   }
   function aggiornaDanni() {
     for (const d of danniBordi) d.eta++;
@@ -14418,74 +14433,6 @@
 
   // ROUTE AUTOMATICA: quando il giocatore non impartisce comandi manuali, l'eroe
   // riprende istantaneamente la navigazione autonoma e avanza SEMPRE verso i nemici!
-  function riprendiRouteAutomaticaVersoNemici(f) {
-    if (!f || !f.p || f.manuale || f.ko > 0 || f.preso || f.tenuto || f.gelato > 0 || f.stordito > 0 || f.esploso || f.fuori || f.fuoriCampo) return;
-    // Se sta eseguendo una tecnica d'attacco (pugni, onde, cariche, aure, prese), lasciala completare
-    if (f.azione && f.azione !== "avanza" && f.azione !== "indietro" && f.azione !== "provoca" && f.azione !== "esulta") return;
-
-    let bersaglioX = null, bersaglioY = null;
-    if (brawl && brawl.fase === "lotta" && brawl.partecipanti) {
-      // 1. In Brawl: trova il rivale più vicino
-      let dMin = 1e9, bersaglio = null;
-      for (const p of brawl.partecipanti) {
-        const l = p.f;
-        if (!l || l === f || !l.p || l.ko > 0 || l.esploso || l.fuori || l.fuoriCampo) continue;
-        const dist = Math.abs(l.cx - f.cx);
-        if (dist < dMin) { dMin = dist; bersaglio = l; }
-      }
-      if (bersaglio) {
-        bersaglioX = bersaglio.cx;
-        bersaglioY = bersaglio.base;
-      }
-    } else if (orda && orda.fase === "lotta" && orda.zombie) {
-      // 2. Nella Corsa/Horde: trova il mostro/zombie più vicino
-      let dMin = 1e9, bersaglioZ = null;
-      for (const z of orda.zombie) {
-        if (!vivoZ(z) || z.inBuco) continue;
-        const dist = Math.abs(z.x - f.cx);
-        if (dist < dMin) { dMin = dist; bersaglioZ = z; }
-      }
-      if (bersaglioZ) {
-        bersaglioX = bersaglioZ.x;
-        bersaglioY = orda.base - (bersaglioZ.alzo || 0);
-      }
-    } else if (lottatori && lottatori.length > 1) {
-      // 3. Nel ring 1vs1 libero
-      const altro = lottatori.find((l) => l !== f && l.p && !l.ko && !l.esploso && !l.fuoriCampo);
-      if (altro) {
-        bersaglioX = altro.cx;
-        bersaglioY = altro.base;
-      }
-    }
-
-    if (bersaglioX === null) return;
-
-    const dx = bersaglioX - f.cx;
-    const dist = Math.abs(dx);
-    const lato = dx >= 0 ? 1 : -1;
-
-    // Guarda sempre il nemico
-    f.dir = lato;
-
-    const raggioAttacco = 28 * S;
-    if (dist > raggioAttacco) {
-      // Troppo lontano: avanza a passo spedito verso il nemico
-      f.meta = bersaglioX - lato * 22 * S;
-      f.azione = "avanza";
-      f.durata = 30;
-      f.corsa = dist > 70 * S ? 40 : 0;
-      f.veloce = dist > 70 * S && gambe(f) === 2;
-    } else {
-      // A portata d'attacco: ferma la camminata e cede subito l'iniziativa all'automa per attaccare
-      if (f.azione === "avanza") {
-        f.azione = null;
-        f.durata = 0;
-        f.t = 0;
-      }
-      f.pensa = 0;
-    }
-  }
-
   function aggiornaComandoManuale() {
     const f = eroe() || comandato();
     if (!f || !f.p || f.esploso || f.fuori || f.fuoriCampo || (f.ko > 0) || f.preso || f.tenuto || (f.gelato > 0)) {
@@ -14546,14 +14493,14 @@
         for (const n in f.p) f.p[n].oy = f.p[n].y - 3.2 * S;
       }
     } else {
-      // Quando NESSUN tasto freccia è premuto:
+      // Quando nessuna freccia è premuta torna a pensare l'automa. (Il 21/10 qui c'era anche una «route automatica»
+      // che a ogni fotogramma lo mandava verso il nemico più vicino: scavalcava l'aggancio, la distanza dei maghi, le
+      // armi, l'aiuto all'alleato, ed è stata tolta.)
       if (f.manuale) {
         f.manuale = false;
         f.corsa = 0;
         f.pensa = 0;
       }
-      // ROUTE AUTOMATICA ATTIVA: va SEMPRE verso i nemici!
-      riprendiRouteAutomaticaVersoNemici(f);
     }
   }
 
@@ -14779,7 +14726,9 @@
         for (const nome in q) {
           const pt = f.p[nome], [tx, ty] = q[nome];
           const k = TIRO[nome] * f.forza * intensita *
-            ((COLPI[f.azione] && (nome === COLPI[f.azione][0])) || (f.azione === "contro" && (nome === "manoD" || nome === "manoA" || nome === "gomitoD" || nome === "gomitoA")) ? 1.85 : 1);
+            (COLPI[f.azione] && nome === COLPI[f.azione][0] ? 1.6
+             : f.azione === "contro" && (nome === "manoD" || nome === "manoA" || nome === "gomitoD" || nome === "gomitoA") ? 1.85 : 1);
+          // (1,85 anche per i colpi dal 21/10: le lame dei duellanti non si incrociavano quasi più; tornato 1,6)
           const mx = (tx - pt.x) * k, my = (ty - pt.y) * k;
           pt.x += mx; pt.y += my;
           pt.ox += mx * (1 - scatto); pt.oy += my * (1 - scatto);
@@ -14883,6 +14832,7 @@
       // Uno schianto dopo un lancio si sente.
       if (urto > 6 * S && !f.polv) { polvere(f.p.piedeA.x, f.base - 1, urto > 11 * S ? 6 : 3); f.polv = 14; }
       if (f.inVolo && urto > 9 * S && !f.botta) {
+        scrivi(urto > 15 * S ? "SPLAT!" : "BONK!", f.p.bacino.x, f.p.bacino.y - 20 * S, false);
         f.botta = 30;
       }
     }
@@ -16248,10 +16198,12 @@
     ctx.restore();
     disegnaBarreCinema();
     // Il lampo visivo del parry (morbido e trasparente per non coprire mai la vista del duello)
-    if (lampoSchermo > 0.01) { ctx.save(); ctx.globalAlpha = Math.min(0.12, lampoSchermo * 0.35); ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+    // (21/10/2026: velato, al massimo 0,12 di bianco; con la scossa spenta ancora meno, come prima, per chi soffre i lampi)
+    if (lampoSchermo > 0.01) { ctx.save(); ctx.globalAlpha = Math.min(0.12, lampoSchermo * (fattoreScossa() > 0 ? 1 : 0.4) * 0.35); ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H); ctx.restore(); }
     disegnaTastiSfida();
     disegnaRadiale();
     for (const s of scritte) {
+      if (s.muta) continue;
       ctx.save();
       ctx.globalAlpha = Math.min(1, s.vita / 12);
       ctx.font = "800 " + Math.round((s.grande ? 17 : 12) * S) + "px Archivo, sans-serif";
@@ -16269,54 +16221,36 @@
   const PASSO_MS = 1000 / 60;
 
   function ciclo(adesso) {
-    window.__ringLoopTicks = (window.__ringLoopTicks || 0) + 1;
     richiesta = null;
-    if (document.hidden) { window.__ringHaltReason = "document.hidden"; return; }
-    if (fermo) { window.__ringHaltReason = "fermo"; return; }
+    if (document.hidden || fermo) return;
     if (!ultimo) ultimo = adesso;
+    // Nella corsa si tiene il conto di quanto dura un fotogramma: se il telefono fatica, meno zombie insieme.
     if (corsa && corsa.chi && ultimo && adesso > ultimo) corsa.dtMedio = (corsa.dtMedio || 16.7) * 0.97 + Math.min(200, adesso - ultimo) * 0.03;
-    const fattoreRitmo = (cinema ? rampaCinema() : corsa && corsa.aiuto ? ritmoAiuto() : ralenti > 0 ? 0.32 : 1);
-    riserva += Math.min(100, adesso - ultimo) * ritmo * (typeof fattoreRitmo === "number" ? fattoreRitmo : 1);
+    riserva += Math.min(100, adesso - ultimo) * ritmo * (cinema ? rampaCinema() : corsa && corsa.aiuto ? ritmoAiuto() : ralenti > 0 ? 0.32 : 1);
     if (ralenti > 0) ralenti--;
+    // Il cronometro del brawl va col tempo vero, non coi passi: fermo-colpo e rallentatore non lo allungano.
+    if (brawl && brawl.fase === "lotta" && !inPausa) brawl.tempoRimanente -= Math.min(100, adesso - ultimo) / PASSO_MS;
     ultimo = adesso;
     let giri = 0;
-    if (inPausa || (corsa && corsa.pausa)) {
-      window.__ringHaltReason = "inPausa=" + inPausa + " corsaPausa=" + !!(corsa && corsa.pausa);
-      riserva = 0;
-    }
-    else if (fermoColpo > 0) {
-      window.__ringFermoColpo = fermoColpo;
-      fermoColpo--;
-      riserva = 0;
-    }
+    // Un colpo secco ferma l'azione per qualche fotogramma: si sente di più.
+    // Nella corsa, mentre si sceglie una carta o si apre un forziere, il tempo è fermo.
+    if (inPausa || (corsa && corsa.pausa)) riserva = 0;
+    else if (fermoColpo > 0) { fermoColpo--; riserva = 0; }
     else {
-      window.__ringFermoColpo = 0;
+      // (l'orario di ogni passo nell'orologio dell'audio: la musica a tempo ci si aggancia)
       const oraAudio = musica.accesa && audio.ctx ? audio.ctx.currentTime : 0;
-      try {
-        while (riserva >= PASSO_MS && giri < 4) { passo(); riserva -= PASSO_MS; giri++; if (oraAudio) agganciaPasso(oraAudio - riserva / 1000); }
-        if (giri === 4) riserva = 0;
-      } catch (errPasso) {
-        window.__ringPassoError = (errPasso && (errPasso.stack || errPasso.message)) || String(errPasso);
-        console.error("Errore in passo():", errPasso);
-        riserva = 0;
-      }
+      while (riserva >= PASSO_MS && giri < 4) { passo(); riserva -= PASSO_MS; giri++; if (oraAudio) agganciaPasso(oraAudio - riserva / 1000); }
+      if (giri === 4) riserva = 0;
     }
+    // Un disegno ogni due (30 fps); mentre se ne tiene uno in mano, tutti.
     let disegnare;
     if (grafica.fps) disegnare = inPausa || presa.f || presa.tel || adesso - ultimoDisegno >= 1000 / grafica.fps - 2;
     else disegnare = presa.f || presa.tel || (fotogramma++ & 1) === 0 || inPausa;
     if (disegnare) {
       ultimoDisegno = adesso;
-      try {
-        if (grafica.fps > 60 && !inPausa) disegnaInterpolato(riserva / PASSO_MS); else disegna();
-      } catch (errDisegna) {
-        window.__ringDisegnaError = (errDisegna && (errDisegna.stack || errDisegna.message)) || String(errDisegna);
-        console.error("Errore in disegna():", errDisegna);
-      }
+      if (grafica.fps > 60 && !inPausa) disegnaInterpolato(riserva / PASSO_MS); else disegna();
     }
-    if (inPausa) {
-      window.__ringHaltReason = "inPausa-end";
-      return;
-    }
+    if (inPausa) return;                                         // in pausa: un ultimo disegno, poi niente
     richiesta = requestAnimationFrame(ciclo);
   }
   // Sopra i 60 fps: il fotogramma fra due passi della fisica. Corpi e oggetti si disegnano a metà strada fra la
@@ -16657,7 +16591,7 @@
     for (const b of dentroPannello("[data-menu]")) b.addEventListener("click", () => { apriPannello(false); assicuraAcceso(); apriMenu(corsa && corsa.chi ? "pausa" : "principale"); riparti(); });
     for (const b of dentroPannello("[data-corsa]")) b.addEventListener("click", () => { apriPannello(false); sceltaModo = false; if (!corsa) comandi.corsa(); aggiornaInterruttori(); });
     // Il combattimento libero (Brawl): si esce dalla corsa e si apre la scelta del Brawl.
-    for (const b of dentroPannello("[data-libero]")) b.addEventListener("click", () => { if (corsa) chiudiCorsa(); sceltaModo = false; apriBrawlScelta(); aggiornaInterruttori(); riparti(); });
+    for (const b of dentroPannello("[data-libero]")) b.addEventListener("click", () => { if (corsa) chiudiCorsa(); sceltaModo = false; if (conBrawl()) apriBrawlScelta(); aggiornaInterruttori(); riparti(); });
     for (const b of dentroPannello("[data-audio]")) { b.setAttribute("aria-pressed", audio.acceso ? "true" : "false"); b.addEventListener("click", () => comandi.audio()); }
     for (const b of dentroPannello("[data-classifica]")) {
       if (!conClassifica()) b.hidden = true;                     // senza rete (l'app sul telefono) la classifica non c'è
@@ -16942,24 +16876,25 @@
       return;
     }
     if (!tastiera || scrivendo(e.target) || !e.code) return;
-    if (tastiBrawl(e)) { e.preventDefault(); e.stopPropagation(); riparti(); return; }
+    if (!fermo && tastiBrawl(e)) { e.preventDefault(); e.stopPropagation(); riparti(); return; }
     if (!fermo && tastiMenu(e)) { e.preventDefault(); e.stopPropagation(); riparti(); return; }
     if (tastiCarte(e)) { e.preventDefault(); e.stopPropagation(); return; }
-
-    // Controllo prioritario da tastiera con i tasti direzionali:
-    const idPremuto = azioneDi(e.code);
-    if (e.code === "ArrowLeft" || idPremuto === "sinistra" || e.code === "ArrowRight" || idPremuto === "destra" || e.code === "ArrowUp" || e.code === "ArrowDown") {
-      if (e.code === "ArrowLeft" || idPremuto === "sinistra") tastiDirezionali.left = true;
-      if (e.code === "ArrowRight" || idPremuto === "destra") tastiDirezionali.right = true;
+    const id = azioneDi(e.code);
+    if (fermo && !corsa) return;                                  // ring spento: i tasti sono della pagina
+    // Le frecce (e i tasti di «Cammina») comandano il lottatore prima dell'automa (21/10/2026, «comandi freccia
+    // prioritari»). Solo a ring acceso e fuori dai menu e dalle scelte: il 21/10 le prendeva anche a ring spento, e
+    // nell'estensione le frecce non scorrevano più nessuna pagina.
+    const freccia = e.code === "ArrowLeft" || e.code === "ArrowRight" || e.code === "ArrowUp" || e.code === "ArrowDown" || id === "sinistra" || id === "destra";
+    if (freccia && !fermo && !sceltaModo && !corsaModale() && lottatori.length) {
+      if (e.code === "ArrowLeft" || id === "sinistra") tastiDirezionali.left = true;
+      if (e.code === "ArrowRight" || id === "destra") tastiDirezionali.right = true;
       if (e.code === "ArrowUp") tastiDirezionali.up = true;
       if (e.code === "ArrowDown") tastiDirezionali.down = true;
       e.preventDefault(); e.stopPropagation();
       riparti();
       return;
     }
-    const id = azioneDi(e.code);
     if (!id) return;
-    if (fermo && !corsa) return;                                  // ring spento: i tasti sono della pagina
     if (e.repeat && id !== "sinistra" && id !== "destra") { e.preventDefault(); return; }
     if (eseguiTasto(id)) { e.preventDefault(); e.stopPropagation(); riparti(); }
   }
@@ -16977,11 +16912,7 @@
 
     if (!tastiDirezionali.left && !tastiDirezionali.right && !tastiDirezionali.up && !tastiDirezionali.down) {
       const f = eroe() || comandato();
-      if (f) {
-        f.manuale = false;
-        f.corsa = 0;
-        riprendiRouteAutomaticaVersoNemici(f);
-      }
+      if (f && f.manuale) { f.manuale = false; f.corsa = 0; f.pensa = 0; }   // lasciate le frecce, pensa di nuovo l'automa
     }
     riparti();
 
@@ -17243,7 +17174,7 @@
                          gonfio: ["\u{1F922}", "Gonfio"], saltatore: ["\u{1F997}", "Saltatore"], dragoFulmine: ["\u{1F409}⚡", "Draghetto elettrico"],
                          corazzato: ["\u{1F6E1}️", "Corazzato"], gelido: ["❄️", "Gelido"], grosso: ["\u{1FAA3}", "Bestione"],
                          dragoVeleno: ["\u{1F409}\u{1F9EA}", "Draghetto velenoso"], sputatore: ["\u{1F4A6}", "Sputatore"], rabbioso: ["\u{1F621}", "Rabbioso"],
-                         bruto: ["\u{1F525}\u{1F52B}", "Bruto di brace"], saiba: ["🌱💥", "Saibaman"] };
+                         bruto: ["\u{1F525}\u{1F52B}", "Bruto di brace"], saiba: ["🌱💥", "Germoglio esplosivo"] };
   const PERSONAGGI_CORSA = [["", "Classici"], ["guerrieri", "Super guerrieri"], ["maghi", "Maghi"], ["lame", "Duellanti"]];
   // ·· LA PRIMA CORSA GUIDATA (18/10/2026 sera, Riccardo: «fai iniziare la corsa infinita come un tutorial la prima volta
   // che lo fai, quindi se sei loggato la seconda volta non lo fa più. Il tutorial ti fa vedere le basi e come fare la
@@ -17281,7 +17212,7 @@
     sputatore: ["\u{1F4A6}", "Sputatore", "Resta a distanza.", "Sputa veleno ad arco: la parata non lo ferma.", "Spostati quando sputa e vai a prenderlo da vicino."],
     rabbioso: ["\u{1F621}", "Rabbioso", "Rosso e velocissimo.", "Ti corre addosso e morde subito.", "Tieni il dito pronto: premi {P} appena l'anello diventa d'oro."],
     bruto: ["\u{1F525}\u{1F52B}", "Bruto di brace", "Enorme e muscoloso, con la maschera di ferro: tiene la distanza e se gli vai addosso balza via.", "Spara raffiche e tira granate a parabola; quando ringhia è scoperto.", "Col parry rimandi colpi e granate a chi li ha tirati. Morendo lascia il fucile-sega."],
-    saiba: ["🌱💥", "Saibaman", "Agile alien guerriero: lotta da terra con artigliate e salta per picchiate dall'alto.", "A bassa vita (<35%) carica a testa bassa per aggrapparsi al petto!", "Se ti si aggrappa addosso, esplode dopo un secondo (Yamcha): colpiscilo prima della detonazione!"],
+    saiba: ["🌱💥", "Germoglio esplosivo", "Piccolo e agile: lotta da terra con artigliate e salta per picchiare dall'alto.", "Quando è quasi finito carica a testa bassa per aggrapparsi al petto.", "Se ti si aggrappa addosso esplode dopo un secondo: colpiscilo prima."],
     capo: ["\u{1F480}", "Il capo", "Enorme e lento, con tanta vita.", "Tre manate di fila.", "Parale tutte e tre col parry: CONTRO TOTALE e il capo va giù sbilanciato."],
     doro: ["\u{1FA99}", "Zombie d'oro", "Non attacca: scappa carico di monete.", "Dopo otto secondi si rintana.", "Prendilo prima che scappi: lascia tante monete."],
     letale: ["\u{1F534}", "La carica rossa", "Una scintilla rossa, poi lo zombie parte di corsa verso di te.", "Una carica che la parata non regge: l'anello è rosso.", "Solo il parry la ferma: premi {P} quando arriva e stendi chi ti sta intorno."],
@@ -19039,9 +18970,9 @@
   // Modalità richiesta da Riccardo (21/10/2026):
   // "la modalità 1 vs 1 diventa brawl- dove tutti i personaggi si scontrano tra di loro in una partita a tempo 3 min dove chi muore meno volte vince (prendi ispirazione da super smash bros. dove dal roaster dei personaggi puoi scegliere il tuo"
   const ROSTER_BRAWL = [
-    { id: "zefir", nome: "Zefir", titolo: "Super Guerriero", stile: "guerrieri", tipo: "robot", icona: "\u26A1", colore: "#ffd84a", desc: "Aura potente, raffiche di pugni veloci, Kamehameha e parata con contrattacco pugno." },
+    { id: "zefir", nome: "Zefir", titolo: "Super Guerriero", stile: "guerrieri", tipo: "robot", icona: "\u26A1", colore: "#ffd84a", desc: "Aura potente, raffiche di pugni veloci, onda di energia e parata con contrattacco di pugno." },
     { id: "brasa", nome: "Brasa", titolo: "Guerriero Fiero", stile: "guerrieri", tipo: "mela", icona: "\u{1F525}", colore: "#ff9f43", desc: "Aggressivo e implacabile, sequenze di pugni e onde concentriche di ki distruttive." },
-    { id: "merlo", nome: "Merlo", titolo: "Gran Mago", stile: "maghi", tipo: "robot", icona: "\u{1FA84}", colore: "#a55eea", desc: "Magie a distanza da bacchetta Harry Potter, scudo Protego blu a cerchio e contrattacco Magia Verde." },
+    { id: "merlo", nome: "Merlo", titolo: "Gran Mago", stile: "maghi", tipo: "robot", icona: "\u{1FA84}", colore: "#a55eea", desc: "Magie a distanza con la bacchetta, scudo blu a cerchio e contrattacco di magia verde." },
     { id: "ortica", nome: "Ortica", titolo: "Strega Oscura", stile: "maghi", tipo: "mela", icona: "\u2728", colore: "#2bcbba", desc: "Incantesimi oscuri a lunga gittata, rune mistiche, fulmini magici e teletrasporto rapido." },
     { id: "rovo", nome: "Rovo", titolo: "Cyber Spadaccino", stile: "lame", tipo: "robot", icona: "\u{1F5E1}\uFE0F", colore: "#45aaf2", desc: "Fendenti precisi ad alta velocità, lama energetica laser e affondi taglienti." },
     { id: "scia", nome: "Scia", titolo: "Duellante Rapida", stile: "lame", tipo: "mela", icona: "\u2694\uFE0F", colore: "#fd79a8", desc: "Scatti fulminei, combinazioni acrobatiche di sciabola e contrattacchi letali a spirale." },
@@ -19050,6 +18981,10 @@
   ];
 
   let brawl = null;
+  // Il brawl è del sito del gioco, dove prende il posto dell'«1 contro 1» (`__ringModoLibero.unoControUno`), o di chi
+  // lo chiede con `window.__ringBrawl = true`. Nell'estensione, nell'app e sul tracker la seconda voce resta il
+  // combattimento libero di sempre (il 21/10 il brawl l'aveva sostituito ovunque).
+  const conBrawl = () => window.__ringBrawl === true || !!(window.__ringModoLibero && window.__ringModoLibero.unoControUno && window.__ringBrawl !== false);
 
   function apriBrawlScelta() {
     assicuraAcceso();
@@ -19154,7 +19089,7 @@
     scrivi("SUPER BRAWL!", W / 2, yBase - 70 * S, true);
     scrivi("3 MINUTI A TEMPO!", W / 2, yBase - 45 * S, true);
 
-    if (window.__ringAptico) window.__ringAptico("pesante");
+    notificaAptico("forte", { brawl: true });
     aggiornaInterruttori();
     riparti();
     return true;
@@ -19213,10 +19148,7 @@
     scossa = Math.max(scossa, 16);
     scintille(mx, my, 25, muertoSlot.colore);
 
-    if (navigator.vibrate) {
-      try { navigator.vibrate([40, 30, 80]); } catch (e) {}
-    }
-    if (window.__ringAptico) window.__ringAptico("pesante");
+    notificaAptico("ko", { brawl: true });
 
     morto.koVero = true;
     morto.fuoriCampo = true;
@@ -19231,8 +19163,7 @@
 
   function passoBrawl() {
     if (!brawl || brawl.fase !== "lotta") return;
-    brawl.t++;
-    brawl.tempoRimanente--;
+    brawl.t++;                                                     // (il cronometro lo fa scendere `ciclo`)
 
     for (const p of brawl.partecipanti) {
       if (p.respawnTimer > 0) {
@@ -19272,10 +19203,10 @@
           salvaBottega();
         } catch (err) {}
       }
-      if (window.__ringAptico) window.__ringAptico("vittoria");
+      notificaAptico("vittoria", { brawl: true });
     } else {
       suona("ko", W / 2, 1.1);
-      if (window.__ringAptico) window.__ringAptico("fallito");
+      notificaAptico("fallito", { brawl: true });
     }
   }
 
@@ -19844,7 +19775,7 @@
     modoScelto(modo);
     sceltaModo = false;
     if (modo === "corsa") apriCorsa();
-    else if (modo === "libero") apriBrawlScelta();
+    else if (modo === "libero" && conBrawl()) apriBrawlScelta();
     aggiornaInterruttori();
     riparti();
     return true;
@@ -19858,7 +19789,8 @@
     ctx.strokeText(nome, W / 2, top); ctx.fillText(nome, W / 2, top);
     scriviUI(dici("Scegli come giocare"), W / 2, top + 34 * S, 14 * S, "#ffffff", "center", 700);
     const voci = [["corsa", "\u{1F3C3}", dici("Corsa infinita"), dici("Sopravvivi a ondate sempre più grandi: armi, livelli, draghetti, capi."), "sinistra"],
-                  ["libero", "\u2694\uFE0F", dici("Brawl (Smash Bros)"), dici("4 lottatori nell'arena, sfida a tempo di 3 min: vince chi muore meno volte!"), "destra"]];
+                  conBrawl() ? ["libero", "\u2694\uFE0F", dici("Brawl"), dici("4 lottatori nell'arena, sfida a tempo di 3 min: vince chi muore meno volte!"), "destra"]
+                             : ["libero", "\u{1F94A}", dici("Combattimento libero"), dici("Due lottatori, i personaggi che vuoi, oggetti e imprevisti dalla tendina."), "destra"]];
     const w = stretto ? Math.min(320 * S, W - 32) : Math.min(280 * S, (W - 48) / 2), h = 170 * S, gap = 16 * S;
     voci.forEach(([modo, icona, nome, testo, tasto], i) => {
       const x = stretto ? W / 2 - w / 2 : W / 2 - w - gap / 2 + i * (w + gap), y = top + 64 * S + (stretto ? i * (h + gap) : 0);
@@ -19936,7 +19868,9 @@
       // L'account dell'ospite (`__ringAccount`, sito del gioco, 18/10/2026, Riccardo: «l'account deve essere nel menu
       // principale, accedi o gioca come ospite, ma devi far capire che per conservare statistiche e upgrade serve l'account»)
       ...vociAccount(),
-      { icona: libero ? libero.icona || "⚔️" : "⚔️", nome: libero ? libero.nome : "Brawl", testo: libero ? libero.testo : "Tutti contro tutti in una sfida a tempo di 3 minuti (Super Smash Bros style). Scegli dal roster: vince chi muore meno volte!", fa: () => { menu = null; modoScelto("libero"); apriBrawlScelta(); return true; } },
+      conBrawl()
+        ? { icona: "⚔️", nome: "Brawl", testo: "Tutti contro tutti, a tempo: 3 minuti. Scegli il tuo lottatore dal roster: vince chi muore meno volte.", fa: () => { menu = null; modoScelto("libero"); apriBrawlScelta(); return true; } }
+        : { icona: libero ? libero.icona || "\u{1F94A}" : "\u{1F94A}", nome: libero ? libero.nome : "Combattimento libero", testo: libero ? libero.testo : "Due lottatori sulla pagina che si picchiano da soli. Comandi chi vuoi, scegli i personaggi, lanci oggetti e scateni imprevisti dalla tendina.", fa: () => { menu = null; modoScelto("libero"); if (sceltaModo) scegliModo("libero"); else if (corsa) chiudiCorsa(); return true; } },
       { icona: "\u{1F4D6}", nome: "Come si gioca", testo: "Sei pagine per imparare tutto: muoversi, attaccare, la parata e il parry col contrattacco, la corsa infinita, l'aggancio, crescere fra una corsa e l'altra.", fa: () => vaiA("guida"), nuovo: primaVolta },
       { icona: "⚙️", nome: "Impostazioni", testo: "Audio e volume, dettaglio grafico, aiuti al parry, rallentatore, scossa dello schermo, difficoltà della corsa, tasti.", fa: () => vaiA("impostazioni") },
     ];
@@ -20988,10 +20922,6 @@
       return [Math.round(l), Math.round(t), Math.round(r), Math.round(b)];
     }),
     pausa: (si) => {
-      if (si !== undefined) {
-        window.__debugPausaCaller = { si: si, stack: (new Error()).stack };
-        console.error("DEBUG PAUSA CALLED:", si, (new Error()).stack);
-      }
       if (si !== undefined && !!si !== inPausa) { inPausa = !!si; ultimo = 0; riserva = 0; if (!inPausa) riparti(); }
       return inPausa;
     },
