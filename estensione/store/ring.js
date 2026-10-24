@@ -755,6 +755,7 @@
   let natale = !!(radiceNatale && radiceNatale.classList && radiceNatale.classList.contains && radiceNatale.classList.contains("natale"));
   window.addEventListener("mut:natale", (e) => { natale = !!(e && e.detail && e.detail.acceso); });
   let arti = [], macchie = [], cumulo = 0, danniBordi = [], testataBasso = 0;
+  let numeri = [], particelleFondo = [], brawl = null;  // i numeri del danno, l'aria dei biomi, il brawl
   // GLI IMPREVISTI RIFATTI (05/10/2026, su richiesta). La pioggia ha gocce sue
   // (non contano più fra le particelle), il terremoto arriva con un vulcano che
   // erutta, e piovono meteoriti. Vedi «Il meteo» e «Terremoto ed eruzione».
@@ -1088,6 +1089,8 @@
     // Un pavimento rialzato senza lava (il ring dell'app, 12/10/2026): il tappeto è il pavimento vero. Prima
     // era una pedana sopra un pavimento in fondo allo schermo, e i lottatori ci scendevano sotto e restavano lì.
     else if (arena && arena.pavimento > 0) pavimento = H - Math.min(H * 0.5, arena.pavimento);
+    // Il palco del brawl (vedi «IL PALCO DEL BRAWL»): al posto degli elementi della pagina, con l'abisso sotto.
+    if (brawl && brawl.palco && !inArenaApp()) palcoNeiSolidi();
   }
 
   // --- Il corpo --------------------------------------------------------
@@ -1202,7 +1205,7 @@
     if (lame()) for (const f of lottatori) accendiLama(f);
     fulmini = []; rune = []; cadute = []; duello = 0; sfida = null; sfidaPausa = 0; orda = null;
     danni = [];
-    scritte = []; telefoni = []; particelle = []; evento = null;
+    scritte = []; telefoni = []; particelle = []; numeri = []; evento = null;
     creature = []; nubi = []; finale = null; mira = null; lampoMira = null; miraBuio = 0; centroMira = null;
     gocce = []; spruzzi = []; bagnato = 0; pioveDa = 0; pioggiaFino = 0; prossimoLampo = 300;
     if (sisma) fineSisma();
@@ -1280,11 +1283,11 @@
     if (f.tel) lasciaCadere(f);
     if (f.arma) lasciaArma(f);
     if (f.tiene) molla(f);
+    if (brawl && brawl.fase === "lotta") { koBrawl(f, f.ultimoColpitoDa || altro, "abisso"); return; }
     scintille(x, pavimento - 4 * S, 24, "#ff5a1f"); scintille(x, pavimento - 12 * S, 14, "#ffd23f");
     scrivi(dici("LAVA!"), x, pavimento - 70 * S, true);
     suona("fiamma", x, 1.2);
     scossa = Math.max(scossa, 14);
-    if (brawl && brawl.fase === "lotta") { koBrawl(f, altro); return; }
     // Il punto è dell'altro, se non l'aveva già mandato K.O. con l'ultimo colpo.
     if (!f.koVero && altro && altro.p) segnaKO(altro, f);
     if (f.fuori || f.esploso) return;                          // il gran finale se l'è già preso
@@ -3676,13 +3679,10 @@
     if (eroeColpito) { altro.danni = 0; ko = feritaEroe(Math.min(forza, 7) * 2, x, y); }
     if (brawl && brawl.fase === "lotta" && altro.brawlIdx !== undefined) {
       if (altro.invuln > 0) return;
-      altro.vita = Math.max(0, (altro.vita || 100) - forza * 5.5);
-      altro.ultimoColpitoDa = f;
-      if (altro.vita <= 0) {
-        koBrawl(altro, f);
-        return;
-      }
-      ko = false;
+      // Come in Smash: la percentuale sale a ogni colpo e più è alta più si vola lontano (vedi «IL PALCO DEL BRAWL»).
+      altro.danni = 0; ko = false;
+      altro.ultimoColpitoDa = f; altro.colpitoBrawl = tempo;
+      spintaBrawl(f, altro, forza, x, y);
     }
     // Ha imparato qualcosa: chi ha colpito rifà volentieri quella mossa, chi
     // era a metà di un'altra azione la rimpiange, chi l'ha presa si copre di più.
@@ -6792,9 +6792,10 @@
     else squarciaSuolo(x, q.base, z.tipo === "capo" ? 2 : pesante(z) ? 1.3 : 0.8);
     if (z.tipo === "capo") {
       z.x = Math.max(q.l + 60 * S, Math.min(q.r - 60 * S, z.x));             // è largo: dentro la finestra per intero
-      z.hp = z.hpMax = corsa && corsa.chi ? Math.round((14 + 2.5 * corsa.round) * (1 + 0.5 * pressione())) : 18 + 3 * (corsa ? corsa.round : 1);
+      z.hp = z.hpMax = corsa && corsa.chi ? Math.round((14 + 2.5 * corsa.round) * (1 + 0.5 * pressione()) * biomaCorsa().capo.vita * potenzaCiclo()) : 18 + 3 * (corsa ? corsa.round : 1);
+      if (corsa && corsa.chi) z.bioma = corsa.bioma || 0;               // (la pelle, l'aura e l'attacco del capo del bioma)
       scossa = Math.max(scossa, 14); polvere(x, q.base - 1, 14);
-      scrivi(dici("Il capo") + "!", x, q.base - 140 * S, true);
+      scrivi(corsa && corsa.chi ? dici(biomaCorsa().capo.nome) + "!" : dici("Il capo") + "!", x, q.base - 140 * S, true);
     }
   }
   function brutoDaSotto(z, q) {
@@ -6970,6 +6971,11 @@
     const Zc = ZOMBI[z.tipo];
     const lanciato = z.stato === "mira" || z.stato === "letale" || (z.stato === "colpo" && !forte && prossimoColpoZ(z) !== null && (z.s >= Zc.carica - 16 || z.s > Zc.carica));
     z.hp -= (forte ? 2 : 1) * molt; z.lampo = 5;
+    // IL COLPO SI SENTE (25/10/2026, Riccardo: «perfezionare il gameplay, soprattutto il feedback dei colpi»): il numero
+    // del danno che salta via, un anello bianco e un fermo un po' più lungo sui colpi forti.
+    numeroDanno(x, y - 14 * S, (forte ? 2 : 1) * molt * 10, forte, da && corsa && corsa.chi && da.tipo === corsa.chi);
+    if (forte && particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "impatto", x, y, vx: 0, vy: 0, vita: 10, max: 10, r: (grosso ? 40 : 28) * S, giro: Math.random() * 6, colore: "#ffffff" });
+    if (forte) fermoColpo = Math.max(fermoColpo, 4);
     if (!lanciato) z.s = 0;
     // Il grosso barcolla solo ai colpi forti, e quasi non si sposta.
     z.botta = lanciato ? 0 : grosso ? (forte ? 12 : 3) : 18;
@@ -6979,6 +6985,9 @@
     if (!lanciato) { z.reaz = 12; z.reazDir = dir || -z.dir; }
     if (z.hp > 0) { if (!lanciato) z.stato = "va"; scrivi(SUONI[Math.floor(Math.random() * SUONI.length)], x, y - 8 * S, false); return true; }
     if (lanciato) prossimaLetale = tempo + attesaLetale();
+    // l'ultimo colpo: un lampo sul corpo, schegge in più e un attimo di fermo (il «colpo che chiude»)
+    fermoColpo = Math.max(fermoColpo, grosso ? 7 : 4);
+    if (particelle.length < MAX_PARTICELLE - 1) particelle.push({ tipo: "impatto", x, y, vx: 0, vy: 0, vita: 14, max: 14, r: (grosso ? 60 : 38) * S, giro: Math.random() * 6, colore: "#ffd84a" });
     z.stato = "giu"; z.cade = dir || 1; orda.uccisi++; orda.uccisiOndata++;
     if (corsa) corsaUcciso(z);
     schegge(x, y, 5, TONI_ZOMBIE[z.tono][0]);
@@ -6995,6 +7004,29 @@
     if (z.tipo === "botto") scoppioBotto(z, false);
     if (z.volo) z.vy = -1.5 * S;                              // il draghetto sobbalza e cade
     return true;
+  }
+  // ·· I NUMERI DEL DANNO (25/10/2026) ··
+  // Saltano via dal punto colpito, si gonfiano un attimo e cadono di lato: d'oro i colpi forti di chi gioca, bianchi gli altri.
+  function numeroDanno(x, y, quanto, forte, mio) {
+    if (numeri.length > 40 || !(quanto > 0)) return;
+    numeri.push({ x, y, vx: caso(-0.8, 0.8) * S, vy: -caso(2.2, 3.2) * S, t: 0, vita: 42, n: Math.max(1, Math.round(quanto)), forte: !!forte, mio: !!mio });
+  }
+  function aggiornaNumeri() {
+    if (!numeri.length) return;
+    for (const q of numeri) { q.t++; q.x += q.vx; q.y += q.vy; q.vy += 0.12 * S; }
+    numeri = numeri.filter((q) => q.t < q.vita);
+  }
+  function disegnaNumeri() {
+    if (!numeri.length) return;
+    ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    for (const q of numeri) {
+      const pop = q.t < 6 ? 1 + 0.5 * Math.sin(Math.PI * q.t / 6) : 1, px = Math.round((q.forte ? 17 : 13) * S * pop);
+      ctx.globalAlpha = Math.min(1, (q.vita - q.t) / 12);
+      ctx.font = "900 " + px + "px Archivo, sans-serif";
+      ctx.lineWidth = 4 * S; ctx.strokeStyle = "#17171c"; ctx.strokeText(String(q.n), q.x, q.y);
+      ctx.fillStyle = q.mio && q.forte ? "#ffd84a" : q.mio ? "#ffffff" : "#ff8a7a"; ctx.fillText(String(q.n), q.x, q.y);
+    }
+    ctx.restore();
   }
   // Il gonfio scoppia: una nube verde che stende gli zombie vicini e fa tossire chi c'è dentro.
   function scoppioGonfio(z) {
@@ -7808,7 +7840,7 @@
       q.dallUltimo = (q.dallUltimo || 0) + 1;
       // Nella corsa (a flusso) la coda non si svuota mai: agli ultimi due arriva la fase dopo.
       // (durante la guida della prima corsa l'orda aspetta: vedi «LA PRIMA CORSA GUIDATA»)
-      const trattenuta = !!(corsa && corsa.guida);
+      const trattenuta = !!(corsa && (corsa.guida || corsa.squarcio || corsa.capoGiu > 0));
       if (corsa && corsa.chi && corsa.fase === "lotta" && R.coda.length <= 2 && !trattenuta) prossimaFase();
       if (R.coda.length && vivi < R.insieme && !trattenuta && --q.prossimo <= 0) {
         // Troppi in volo insieme: passa avanti il primo da terra della coda.
@@ -8359,8 +8391,8 @@
     const botto = z.tipo === "botto", gelido = z.tipo === "gelido", saltatore = z.tipo === "saltatore", sputatore = z.tipo === "sputatore", doro = z.tipo === "doro";
     const bruto = z.tipo === "bruto";
     const pelle = z.lampo > 0 ? "#ffffff" : z.gelo > 0 ? "#cfeeff" : bruto ? "#a3a199" : botto ? (z.stato === "colpo" && passi % 6 < 3 ? "#ff7a5a" : "#c9b27a") : gelido ? "#c4e6f5"
-      : saltatore ? "#cbd96c" : sputatore ? "#bba3d2" : doro ? "#ffd84a" : rabbioso ? "#d9a08c" : capo ? "#8aa47c" : corazzato ? "#93b48a" : gonfio ? "#b9dc6e" : grosso ? "#86a878" : svelto ? "#b7d1a6" : "#9dbf8c";
-    const scura = bruto ? "#66645e" : botto ? "#8f7a48" : gelido ? "#7fb0c8" : saltatore ? "#8a9a3a" : sputatore ? "#7d5f99" : doro ? "#b8901c" : rabbioso ? "#a8604c" : gonfio ? "#8fb650" : grosso ? "#628556" : "#6f9164";
+      : saltatore ? "#cbd96c" : sputatore ? "#bba3d2" : doro ? "#ffd84a" : rabbioso ? "#d9a08c" : capo ? (z.bioma !== undefined ? BIOMI[z.bioma].capo.pelle : "#8aa47c") : corazzato ? "#93b48a" : gonfio ? "#b9dc6e" : grosso ? "#86a878" : svelto ? "#b7d1a6" : "#9dbf8c";
+    const scura = capo && z.bioma !== undefined ? BIOMI[z.bioma].capo.scura : bruto ? "#66645e" : botto ? "#8f7a48" : gelido ? "#7fb0c8" : saltatore ? "#8a9a3a" : sputatore ? "#7d5f99" : doro ? "#b8901c" : rabbioso ? "#a8604c" : gonfio ? "#8fb650" : grosso ? "#628556" : "#6f9164";
     const emerge = sottoTerra(z);
     const k = z.stato === "giu" ? Math.min(1, z.s / 16) : 0;                   // 0 in piedi, 1 steso
     ctx.save();
@@ -14517,11 +14549,20 @@
       for (const f of lottatori) {
         if (!f || !f.p) continue;
         const altri = lottatori.filter((l) => l !== f && l.p && !l.esploso && !l.fuoriCampo);
-        const bersaglio = altri.reduce((migliore, curr) => {
-          if (!migliore) return curr;
-          const dCurr = Math.abs(curr.cx - f.cx), dMigl = Math.abs(migliore.cx - f.cx);
-          return dCurr < dMigl ? curr : migliore;
-        }, altri[0] || f);
+        // Il bersaglio (25/10/2026, «migliora l'intelligenza artificiale»): non sempre il più vicino. Chi ha la percentuale
+        // alta vale di più (lo si può buttare fuori), chi sta sul bordo del palco anche, chi è appena rinato (intoccabile)
+        // no; chi ci ha appena colpiti attira la vendetta. Si cambia idea ogni secondo circa, non a ogni passo.
+        const valore = (l) => {
+          if (l.invuln > 0) return -1e9;
+          const d = Math.abs(l.cx - f.cx) + Math.abs(l.p.bacino.y - f.p.bacino.y) * 0.6;
+          const o = l.supporto, bordo = o && o.palco ? Math.min(l.cx - o.l, o.r - l.cx) < 40 * S : false;
+          return -d + (l.percento || 0) * 1.4 * S + (bordo ? 90 * S : 0) + (f.ultimoColpitoDa === l && tempo - (f.colpitoBrawl || -1e9) < 120 ? 120 * S : 0);
+        };
+        let bersaglio = f.mirinoBrawl && altri.indexOf(f.mirinoBrawl) >= 0 && f.miraFino > tempo ? f.mirinoBrawl : null;
+        if (!bersaglio) {
+          bersaglio = altri.reduce((m, l) => (!m || valore(l) > valore(m) ? l : m), null) || f;
+          f.mirinoBrawl = bersaglio; f.miraFino = tempo + Math.round(caso(50, 90));
+        }
         coppie.push([f, bersaglio]);
       }
     }
@@ -14606,7 +14647,7 @@
         const b = f.p.bacino, pd = piattaforma();
         if (f.supporto) f.salvato = 0;
         else if (pd && !f.koVero && !f.fuori && !f.tenuto && !f.preso && !(f.jet > 0) && !(f.salvato > 0) &&
-                 b.y > pd.t + 4 * S && b.y >= b.oy && !sottoCe(b.x, b.y) && vitaVera(f) > 0.25) salvaInVolo(f, pd);
+                 b.y > pd.t + 4 * S && b.y >= b.oy && !sottoCe(b.x, b.y) && (brawl ? rientraBrawl(f) : vitaVera(f) > 0.25)) salvaInVolo(f, pd);
         if (f.salvato > 0) f.salvato--;
       }
       if (f.specchio > 0) f.specchio--;
@@ -14801,6 +14842,8 @@
             if (pt.oy < pt.y) pt.oy = pt.y;
             pt.ox += (pt.x - pt.ox) * (piovendo ? 0.05 : 0.3);
           }
+          // (nel brawl, lanciati forte contro un bordo si va fuori: vedi `fuoriDaiBordi`)
+          if (brawl && f.lancioBrawl > 0 && n === "bacino" && (pt.y < pt.r + 4 * S || pt.x < pt.r + 6 * S || pt.x > W - pt.r - 6 * S) && Math.hypot(pt.x - pt.ox, pt.y - pt.oy) > 6 * S) f.bordoBrawl = true;
           if (pt.y < pt.r) {
             // Il tetto: si rompe se ci si sbatte forte, e a gravità rovesciata è il pavimento.
             if (pt.oy - pt.y > 9 * S) danneggiaBordo("tetto", pt.x, Math.min(1, (pt.oy - pt.y) / (VELOCITA_MAX * S)));
@@ -14831,6 +14874,7 @@
       if (f.fantasma && !f.preso && !f.tenuto && !dentroQualcosa(f)) f.fantasma = false;
       // Uno schianto dopo un lancio si sente.
       if (urto > 6 * S && !f.polv) { polvere(f.p.piedeA.x, f.base - 1, urto > 11 * S ? 6 : 3); f.polv = 14; }
+      if (brawl && f.supporto && f.supporto.palco && urto > 6 * S) colpisciPalco(f.supporto, urto / S, f.p.bacino.x);
       if (f.inVolo && urto > 9 * S && !f.botta) {
         scrivi(urto > 15 * S ? "SPLAT!" : "BONK!", f.p.bacino.x, f.p.bacino.y - 20 * S, false);
         f.botta = 30;
@@ -14843,7 +14887,7 @@
     }
     aggiornaLame(); aggiornaFulmini(); aggiornaMagie();
     aggiornaTelefoni(); aggiornaCreature(); aggiornaNubi(); aggiornaFinale(); aggiornaProiettili(); aggiornaParticelle(); aggiornaEventi(); aggiornaDanni();
-    aggiornaArti(); aggiornaMeteo(); aggiornaSisma(); aggiornaMeteore(); aggiornaBuco(); aggiornaFatale(); tieniDentroFatale(); aggiornaEquilibri(); aggiornaCinema(); aggiornaMira(); aggiornaCorsa(); aggiornaAudio(); aggiornaOrda(); aggiornaOnde(); aggiornaVite();
+    aggiornaNumeri(); aggiornaArti(); aggiornaMeteo(); aggiornaSisma(); aggiornaMeteore(); aggiornaBuco(); aggiornaFatale(); tieniDentroFatale(); aggiornaEquilibri(); aggiornaCinema(); aggiornaMira(); aggiornaCorsa(); aggiornaAudio(); aggiornaOrda(); aggiornaOnde(); aggiornaVite();
     if (anime) controllaScontro();
     for (const sc of scie) sc.vita--;
     if (scie.length && scie[0].vita <= 0) scie = scie.filter((sc) => sc.vita > 0);
@@ -16102,6 +16146,8 @@
 
   function disegna() {
     ctx.clearRect(0, 0, W, H);
+    disegnaBioma();
+    disegnaPalcoBrawl();
     disegnaScenario();
     ctx.save();
     if (scossa > 0 && fattoreScossa() > 0) ctx.translate(caso(-1, 1) * Math.min(4, scossa) * S * fattoreScossa(), caso(-1, 1) * Math.min(4, scossa) * S * fattoreScossa());
@@ -16139,7 +16185,10 @@
     for (const f of lottatori) disegnaCratere(f.cratere);
     disegnaScie();
     disegnaBuche();
+    disegnaCapiBioma();
     disegnaOrda();
+    disegnaNumeri();
+    disegnaTargheBrawl();
     disegnaAggancio();
     disegnaEquilibri();
     disegnaFondoCorsa();
@@ -17176,6 +17225,284 @@
                          dragoVeleno: ["\u{1F409}\u{1F9EA}", "Draghetto velenoso"], sputatore: ["\u{1F4A6}", "Sputatore"], rabbioso: ["\u{1F621}", "Rabbioso"],
                          bruto: ["\u{1F525}\u{1F52B}", "Bruto di brace"], saiba: ["🌱💥", "Germoglio esplosivo"] };
   const PERSONAGGI_CORSA = [["", "Classici"], ["guerrieri", "Super guerrieri"], ["maghi", "Maghi"], ["lame", "Duellanti"]];
+  // ·· I CINQUE BIOMI DELLA CORSA (25/10/2026, Riccardo: «ad ogni fine boss si cambia bioma del ring: 5 biomi e altrettanti
+  // boss, dopo di che se si continua si ricomincia dal primo boss con i nemici più potenti; con traslazione dal bioma, il
+  // personaggio che va verso l'alto volando cercando di raggiungere uno squarcio») ··
+  // Ogni capo battuto apre uno squarcio nel cielo (`avviaSquarcio`): l'orda si sbriciola, l'eroe vola su fino allo
+  // squarcio, il bioma vecchio scivola giù e da sopra arriva quello nuovo, l'eroe ci atterra e l'orda riparte. Dopo il
+  // quinto si torna al primo con un ciclo in più: `potenzaCiclo()` moltiplica vita e danni dei nemici.
+  // Il fondo lo disegna il motore (`disegnaBioma`), a meno che l'ospite non dica di farlo lui: `window.__ringBioma(info)`
+  // riceve { indice, id, nome, ciclo } a ogni cambio e, se torna `true`, il motore non disegna il fondo. Con un'arena
+  // dell'ospite (`__ringArena`, pedane vere sotto il canvas) il motore non copre: tinge soltanto, sennò sparirebbero le pedane.
+  // Il capo di ogni bioma ha la sua pelle, la sua aura e un attacco suo, annunciato da un cerchio che si stringe
+  // (`specialeCapo`): la strega chiama i gonfi, il colosso fa tremare la terra (si evita in aria o col parry), lo yeti
+  // gela, il signore della brace fa piovere meteore.
+  const BIOMI = [
+    { id: "cortile", nome: "Il cortile", cielo: ["#141a33", "#2f3560", "#d9826a"], lontano: "#22264a", vicino: "#171a33", suolo: ["#5b5149", "#3e3631"], aria: "foglia", luce: "#ffd9a0",
+      capo: { nome: "Il re del cortile", pelle: "#8aa47c", scura: "#5d7752", aura: "#c9a0ff", vita: 1, speciale: "manate" } },
+    { id: "palude", nome: "La palude", cielo: ["#08140f", "#173226", "#4f7a4a"], lontano: "#11281d", vicino: "#0b1b14", suolo: ["#3b4a2c", "#26311d"], aria: "lucciola", luce: "#c8ff7a",
+      capo: { nome: "La strega della palude", pelle: "#6fae6a", scura: "#3f6d3f", aura: "#8dff5a", vita: 1.15, speciale: "veleno" } },
+    { id: "dune", nome: "Le dune", cielo: ["#2c2140", "#b8603f", "#ffcf7a"], lontano: "#9a5a3c", vicino: "#7a4430", suolo: ["#d9a560", "#a87a3e"], aria: "sabbia", luce: "#ffe2a0",
+      capo: { nome: "Il colosso delle dune", pelle: "#c9a06a", scura: "#8a6a3e", aura: "#ffcf5a", vita: 1.3, speciale: "sisma" } },
+    { id: "ghiacci", nome: "I ghiacci", cielo: ["#070f24", "#22476e", "#9fd2f0"], lontano: "#36597c", vicino: "#24405e", suolo: ["#e6f6ff", "#9cc6e0"], aria: "neve", luce: "#e6f7ff",
+      capo: { nome: "Lo yeti dei ghiacci", pelle: "#dfeef7", scura: "#94b4c8", aura: "#8fe3ff", vita: 1.45, speciale: "gelo" } },
+    { id: "vulcano", nome: "La bocca del vulcano", cielo: ["#0e0508", "#3f0d10", "#c2410c"], lontano: "#2a0b0d", vicino: "#1a0708", suolo: ["#3a2622", "#1f1412"], aria: "brace", luce: "#ffb26a",
+      capo: { nome: "Il signore della brace", pelle: "#b0503a", scura: "#6d2a1f", aura: "#ff7a2a", vita: 1.6, speciale: "meteore" } },
+  ];
+  const SQUARCIO = { attesa: 100, sale: 140, scende: 80 };          // fotogrammi: il capo giù, il volo, l'arrivo
+  const biomaCorsa = () => BIOMI[(corsa && corsa.bioma) || 0];
+  // Dal secondo giro dei biomi i nemici reggono e picchiano di più: +60% a ciclo.
+  const potenzaCiclo = () => 1 + 0.6 * ((corsa && corsa.chi && corsa.ciclo) || 0);
+  function diciBioma() {
+    const c = corsa, b = biomaCorsa();
+    try {
+      if (typeof window.__ringBioma === "function") return window.__ringBioma({ indice: c.bioma || 0, id: b.id, nome: dici(b.nome), ciclo: c.ciclo || 0 }) === true;
+    } catch (errore) { /* l'ospite non risponde: il fondo lo fa il motore */ }
+    return false;
+  }
+  // Il capo è giù: fra un attimo (gemme, forziere) lo squarcio.
+  function capoBattuto() {
+    const c = corsa;
+    if (!c || !c.chi || c.squarcio) return;
+    c.capoGiu = SQUARCIO.attesa;
+  }
+  function avviaSquarcio() {
+    const c = corsa;
+    const fatti = (c.biomiFatti || 0) + 1;
+    c.squarcio = { t: 0, da: c.bioma || 0, a: fatti % BIOMI.length, ciclo: Math.floor(fatti / BIOMI.length), x: W / 2, y: Math.max(testataBasso + 40 * S, H * 0.12), cambiato: false };
+    scritte.push({ testo: dici("Uno squarcio nel cielo!"), x: W / 2, y: Math.max(testataBasso + 96 * S, H * 0.2), vita: 120, grande: true, fermo: true });
+    suona("potenza", W / 2, 0.8);
+  }
+  // L'eroe portato dal volo: la posa di chi esulta, tutta rigida, nel punto voluto (niente fisica: `fatVola`).
+  function posaPortata(f, x, base) {
+    const vera = f.base;
+    f.cx = x; f.base = base;
+    const q = posa(f);
+    f.base = vera;
+    for (const n in q) { const p = f.p[n]; if (!p) continue; p.x = q[n][0]; p.y = q[n][1]; p.ox = p.x; p.oy = p.y; }
+  }
+  function aggiornaSquarcio() {
+    const c = corsa, s = c.squarcio, f = eroe();
+    s.t++;
+    c.invuln = Math.max(c.invuln || 0, 40);
+    if (orda) {
+      for (const z of orda.zombie) if (z.stato !== "giu") { z.stato = "giu"; z.s = 0; z.cade = -z.dir || 1; polvere(z.x, orda.base - 10 * S, 3); }
+      orda.prossimo = Math.max(orda.prossimo || 0, 30);
+    }
+    const T1 = 30, T2 = T1 + SQUARCIO.sale, T3 = T2 + SQUARCIO.scende;
+    if (!f || !f.p) { if (s.t > T3) { cambiaBioma(s); c.squarcio = null; } return; }
+    if (s.t === T1) {
+      s.x0 = f.cx; s.base0 = Math.min(f.base, orda ? orda.base : pavimento);
+      f.azione = "esulta"; f.t = 0; f.durata = 9999; f.fatVola = true; f.fantasma = true; f.jet = 0; f.volo = false;
+      f.ko = 0; f.stordito = 0; f.dir = s.x >= f.cx ? 1 : -1;
+      polvere(f.cx, s.base0 - 1, 10); suona("salto", f.cx, 1);
+    }
+    if (s.t > T1 && s.t <= T2) {
+      // Su, verso lo squarcio: prima piano, poi sempre più veloce (e la scia dietro).
+      const u = (s.t - T1) / SQUARCIO.sale, k = u * u * (3 - 2 * u);
+      const x = s.x0 + (s.x - s.x0) * k, base = s.base0 + (s.y + 40 * S - s.base0) * (k * k);
+      posaPortata(f, x, base);
+      if (particelle.length < MAX_PARTICELLE - 2) {
+        particelle.push({ tipo: "linea", x: f.p.bacino.x + caso(-10, 10) * S, y: f.p.piedeA.y + 6 * S, vx: 0, vy: 6 * S, vita: 12, max: 12, lung: caso(18, 34) * S, colore: biomaCorsa().luce });
+        particelle.push({ tipo: "linea", x: f.p.bacino.x + caso(-14, 14) * S, y: f.p.bacino.y, vx: 0, vy: 9 * S, vita: 9, max: 9, lung: caso(26, 46) * S, colore: "#ffffff" });
+      }
+      if (s.t === T2 - 10) { lampoSchermo = Math.max(lampoSchermo, 0.5); suona("boom", s.x, 0.7); }
+    }
+    if (s.t === T2) cambiaBioma(s);
+    if (s.t > T2 && s.t <= T3) {
+      // Giù nel bioma nuovo, dall'alto, e un atterraggio pesante.
+      const u = (s.t - T2) / SQUARCIO.scende, k = u * u;
+      const base = s.y - 60 * S + (s.base0 - (s.y - 60 * S)) * k;
+      posaPortata(f, s.x, base);
+    }
+    if (s.t > T3) {
+      f.fatVola = false; f.azione = null; f.durata = 0; f.t = 0;
+      lasciaAndare(f, 0, 3 * S);
+      scossa = Math.max(scossa, 12); polvere(s.x, s.base0 - 1, 14); suona("tonfo", s.x, 1);
+      if (orda && particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "onda", x: s.x, y: orda.base - 4 * S, vx: 0, vy: 0, vita: 22, max: 22, colore: biomaCorsa().luce });
+      c.squarcio = null;
+    }
+  }
+  function cambiaBioma(s) {
+    const c = corsa;
+    if (s.cambiato) return;
+    s.cambiato = true;
+    c.bioma = s.a; c.ciclo = s.ciclo; c.biomiFatti = (c.biomiFatti || 0) + 1;
+    c.biomaHost = diciBioma();
+    const b = biomaCorsa(), y = Math.max(testataBasso + 96 * S, H * 0.2);
+    scritte.push({ testo: dici(b.nome) + (c.ciclo ? " · " + dici("ciclo") + " " + (c.ciclo + 1) : ""), x: W / 2, y, vita: 170, grande: true, fermo: true });
+    if (c.ciclo && s.a === 0) scritte.push({ testo: dici("I nemici sono più forti"), x: W / 2, y: y + 26 * S, vita: 170, grande: false, fermo: true });
+    particelleFondo = [];
+  }
+  // L'attacco speciale del capo del bioma: annunciato (un cerchio che si stringe sul capo), poi via.
+  function specialeCapo(z) {
+    const c = corsa, b = BIOMI[z.bioma || 0] || BIOMI[0], f = eroe();
+    if (!f || !f.p || b.capo.speciale === "manate" && !(c.ciclo > 0)) return;
+    if (z.annuncio > 0) {
+      if (--z.annuncio > 0) return;
+      const sp = b.capo.speciale === "manate" ? ["veleno", "sisma", "gelo", "meteore"][Math.floor(c.rng() * 4)] : b.capo.speciale;
+      const cz = corpoZ(z), hx = f.p.bacino.x, piedi = Math.max(f.p.piedeA.y, f.p.piedeD.y);
+      const aTerra = !(f.jet > 0) && !f.inVolo && piedi > orda.base - 14 * S, para = f.azione === "para" && f.paraT0 !== undefined && tempo - f.paraT0 <= PARRY.finestra + larghezzaParry(f);
+      if (sp === "veleno") {
+        for (const lato of [-1, 1]) { const prima = orda.zombie.length; nuovoZombie("gonfio", lato); const w = orda.zombie[prima]; if (w) w.x = Math.max(orda.l + 10 * S, Math.min(orda.r - 10 * S, z.x + lato * 70 * S)); }
+        scintille(cz[0], cz[1], 14, b.capo.aura); suona("soffio", z.x, 1);
+      } else if (sp === "sisma") {
+        scossa = Math.max(scossa, 20); sbuffoTerra(z.x, b);
+        if (aTerra && !para && Math.abs(hx - z.x) < 330 * S) feritaEroe(Math.round(10 * potenzaCiclo()), hx, f.p.bacino.y);
+        else if (para) scrivi(dici("PARATO!"), hx, f.p.collo.y - 30 * S, false);
+        suona("boom", z.x, 1);
+      } else if (sp === "gelo") {
+        if (!para && Math.abs(hx - z.x) < 360 * S) { c.gelato = Math.max(c.gelato || 0, 110); scintille(hx, f.p.bacino.y, 12, "#cfeeff"); }
+        if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "onda", x: z.x, y: orda.base - 20 * S, vx: 0, vy: 0, vita: 26, max: 26, colore: "#8fe3ff" });
+        suona("metallo", z.x, 0.8);
+      } else if (sp === "meteore") {
+        for (let i = 0; i < 3 + Math.min(4, c.ciclo || 0); i++) nuovaMeteora(i === 0);
+        suona("fiamma", z.x, 1);
+      }
+      z.cdSpeciale = Math.round((420 + c.rng() * 240) / Math.min(1.8, potenzaCiclo()));
+      return;
+    }
+    if (z.cdSpeciale === undefined) z.cdSpeciale = 240;
+    if (--z.cdSpeciale <= 0 && z.stato !== "giu" && !sottoTerra(z)) { z.annuncio = 54; scrivi("!", corpoZ(z)[0], corpoZ(z)[1] - 90 * S, true); }
+  }
+  function sbuffoTerra(x, b) {
+    if (!orda) return;
+    for (let i = 0; i < 18 && particelle.length < MAX_PARTICELLE; i++) {
+      const lato = i % 2 ? 1 : -1, d = caso(10, 330) * S;
+      particelle.push({ tipo: "polvere", x: x + lato * d, y: orda.base - 2 * S, vx: lato * caso(0.4, 1.6) * S, vy: -caso(0.8, 2.6) * S, vita: 30, max: 34, colore: b.suolo[0] });
+    }
+  }
+  // Il fondo del bioma: cielo a fasce, due file di sagome, il suolo, l'aria che si muove. `dy` lo fa scivolare (lo squarcio).
+  function disegnaFondoBioma(b, dy, alfa) {
+    const yS = (orda ? orda.base : pavimento), alto = yS - testataBasso;
+    ctx.save(); ctx.translate(0, dy); ctx.globalAlpha = alfa;
+    const g = ctx.createLinearGradient(0, testataBasso, 0, yS);
+    g.addColorStop(0, b.cielo[0]); g.addColorStop(0.62, b.cielo[1]); g.addColorStop(1, b.cielo[2]);
+    ctx.fillStyle = g; ctx.fillRect(0, testataBasso, W, alto + 2);
+    // il disco di luce (sole, luna, bagliore del cratere)
+    const lx = W * 0.74, ly = testataBasso + alto * 0.32, lr = Math.min(W, H) * 0.07;
+    const gl = ctx.createRadialGradient(lx, ly, 0, lx, ly, lr * 3);
+    gl.addColorStop(0, b.luce); gl.addColorStop(0.3, "rgba(255,255,255,0.12)"); gl.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(lx, ly, lr * 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = b.luce; ctx.globalAlpha = alfa * 0.85; ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = alfa;
+    // le sagome, lontane e vicine, ognuna col suo profilo
+    const profilo = (seme, ampiezza, base, colore, punte) => {
+      ctx.fillStyle = colore; ctx.beginPath(); ctx.moveTo(0, yS);
+      for (let x = 0; x <= W + 24; x += 24) {
+        const u = x / W, h = ampiezza * (0.55 + 0.45 * Math.sin(u * 7.1 + seme) * Math.sin(u * 3.3 + seme * 2));
+        ctx.lineTo(x, base - (punte ? Math.abs(Math.sin(u * 23 + seme)) * ampiezza * 0.35 : 0) - h);
+      }
+      ctx.lineTo(W, yS); ctx.closePath(); ctx.fill();
+    };
+    const id = b.id;
+    profilo(1.3, alto * (id === "ghiacci" ? 0.42 : id === "vulcano" ? 0.5 : 0.3), yS - alto * 0.12, b.lontano, id === "ghiacci" || id === "cortile");
+    if (id === "vulcano") {
+      // il cono del vulcano, col bagliore in cima
+      const vx = W * 0.3, top = yS - alto * 0.62;
+      ctx.fillStyle = b.vicino; ctx.beginPath(); ctx.moveTo(vx - alto * 0.55, yS); ctx.lineTo(vx - alto * 0.08, top); ctx.lineTo(vx + alto * 0.08, top); ctx.lineTo(vx + alto * 0.55, yS); ctx.fill();
+      const gv = ctx.createRadialGradient(vx, top, 0, vx, top, alto * 0.25);
+      gv.addColorStop(0, "rgba(255,140,40,0.7)"); gv.addColorStop(1, "rgba(255,80,20,0)");
+      ctx.fillStyle = gv; ctx.beginPath(); ctx.arc(vx, top, alto * 0.25, 0, Math.PI * 2); ctx.fill();
+    } else if (id === "palude") {
+      // alberi morti
+      ctx.strokeStyle = b.vicino; ctx.lineCap = "round";
+      for (const [u, h] of [[0.12, 0.42], [0.27, 0.3], [0.61, 0.5], [0.86, 0.36]]) {
+        const x = u * W, y0 = yS - alto * 0.05, y1 = y0 - alto * h;
+        ctx.lineWidth = 9 * S; ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x + 6 * S, y1); ctx.stroke();
+        ctx.lineWidth = 4 * S; ctx.beginPath(); ctx.moveTo(x + 4 * S, y1 + alto * h * 0.4); ctx.lineTo(x + 30 * S, y1 + alto * h * 0.2); ctx.moveTo(x + 5 * S, y1 + alto * h * 0.6); ctx.lineTo(x - 24 * S, y1 + alto * h * 0.45); ctx.stroke();
+      }
+    } else if (id === "cortile") {
+      // la città dietro il muro, con le finestre accese
+      ctx.fillStyle = b.vicino;
+      for (let i = 0; i < 9; i++) {
+        const x = (i / 9) * W + ((i * 37) % 23) * S, w = W / 11, h = alto * (0.22 + ((i * 53) % 17) / 60);
+        ctx.fillRect(x, yS - h, w, h);
+        ctx.fillStyle = "rgba(255,214,140,0.5)";
+        for (let k = 0; k < 4; k++) if ((i * 7 + k * 3) % 5 < 2) ctx.fillRect(x + w * 0.2 + (k % 2) * w * 0.4, yS - h + 10 * S + Math.floor(k / 2) * 18 * S, 6 * S, 8 * S);
+        ctx.fillStyle = b.vicino;
+      }
+    } else {
+      profilo(4.1, alto * (id === "ghiacci" ? 0.24 : 0.18), yS - alto * 0.02, b.vicino, id === "ghiacci");
+    }
+    // l'aria
+    const P = particelleFondo;
+    if (dy === 0 && alfa >= 1 && P.length < 40 && passi % 4 === 0) {
+      const giu = b.aria === "neve" || b.aria === "foglia" || b.aria === "sabbia";
+      P.push({ x: b.aria === "sabbia" ? -10 : Math.random() * W, y: giu ? testataBasso : yS - Math.random() * alto * 0.7, vx: b.aria === "sabbia" ? caso(3, 6) * S : caso(-0.4, 0.4) * S,
+               vy: b.aria === "brace" ? -caso(0.5, 1.4) * S : b.aria === "lucciola" ? caso(-0.3, 0.3) * S : caso(0.4, 1.2) * S, vita: 400, f: Math.random() * 6 });
+    }
+    for (const p of P) {
+      if (dy === 0 && alfa >= 1) { p.x += p.vx + (b.aria === "foglia" ? Math.sin(passi * 0.05 + p.f) * 0.6 * S : 0); p.y += p.vy; p.vita--; }
+      const colore = b.aria === "brace" ? "#ff9a3a" : b.aria === "lucciola" ? "#d6ff7a" : b.aria === "neve" ? "#ffffff" : b.aria === "sabbia" ? "#f0c890" : "#c9783a";
+      ctx.globalAlpha = alfa * (b.aria === "lucciola" ? 0.5 + 0.5 * Math.sin(passi * 0.1 + p.f) : 0.8);
+      ctx.fillStyle = colore; ctx.beginPath(); ctx.arc(p.x, p.y, (b.aria === "neve" ? 2.2 : b.aria === "sabbia" ? 1.2 : 1.8) * S, 0, Math.PI * 2); ctx.fill();
+    }
+    if (dy === 0 && alfa >= 1) particelleFondo = P.filter((p) => p.vita > 0 && p.x > -20 && p.x < W + 20 && p.y > testataBasso - 20 && p.y < yS + 4);
+    // il suolo
+    ctx.globalAlpha = alfa;
+    const gs = ctx.createLinearGradient(0, yS, 0, H);
+    gs.addColorStop(0, b.suolo[0]); gs.addColorStop(1, b.suolo[1]);
+    ctx.fillStyle = gs; ctx.fillRect(0, yS, W, H - yS);
+    ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.fillRect(0, yS, W, 2 * S);
+    ctx.restore();
+  }
+  function disegnaBioma() {
+    const c = corsa;
+    if (!c || !c.chi || c.fase === "scelta" || c.biomaHost) return;
+    const b = biomaCorsa(), s = c.squarcio;
+    if (inArenaApp()) {
+      // sopra le pedane dell'ospite: solo la tinta del bioma, leggera
+      ctx.save(); ctx.globalAlpha = 0.22; ctx.fillStyle = b.cielo[1]; ctx.fillRect(0, 0, W, H); ctx.restore();
+      if (s) disegnaSquarcioCielo(s);
+      return;
+    }
+    if (!s) { disegnaFondoBioma(b, 0, 1); return; }
+    // il bioma vecchio scende, quello nuovo arriva da sopra (mentre l'eroe sale verso lo squarcio)
+    const u = Math.max(0, Math.min(1, (s.t - 30 - SQUARCIO.sale * 0.55) / (SQUARCIO.sale * 0.45 + SQUARCIO.scende * 0.6))), k = u * u * (3 - 2 * u);
+    if (u <= 0) disegnaFondoBioma(BIOMI[s.da], 0, 1);
+    else if (u >= 1) disegnaFondoBioma(BIOMI[s.a], 0, 1);
+    else { disegnaFondoBioma(BIOMI[s.da], k * H, 1); disegnaFondoBioma(BIOMI[s.a], (k - 1) * H, 1); }
+    disegnaSquarcioCielo(s);
+  }
+  // Lo squarcio: una ferita luminosa nel cielo che si apre, coi bordi che tremano.
+  function disegnaSquarcioCielo(s) {
+    const T1 = 30, apre = Math.min(1, s.t / 50), chiude = s.t > T1 + SQUARCIO.sale + 20 ? Math.max(0, 1 - (s.t - T1 - SQUARCIO.sale - 20) / 40) : 1;
+    const a = apre * chiude;
+    if (a <= 0) return;
+    const nuovo = BIOMI[s.a], L = 120 * S * a, h = 26 * S * a;
+    ctx.save();
+    const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, L * 1.4);
+    g.addColorStop(0, "rgba(255,255,255,0.9)"); g.addColorStop(0.35, nuovo.luce); g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.globalAlpha = 0.55 * a; ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(s.x, s.y, L * 1.4, h * 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = a; ctx.fillStyle = "#ffffff"; ctx.beginPath();
+    ctx.moveTo(s.x - L, s.y);
+    for (let i = 1; i < 8; i++) ctx.lineTo(s.x - L + (2 * L * i) / 8, s.y - h * (0.4 + 0.6 * Math.abs(Math.sin(i * 1.7 + passi * 0.3))));
+    ctx.lineTo(s.x + L, s.y);
+    for (let i = 7; i > 0; i--) ctx.lineTo(s.x - L + (2 * L * i) / 8, s.y + h * (0.4 + 0.6 * Math.abs(Math.sin(i * 2.3 + passi * 0.27))));
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = nuovo.capo.aura; ctx.lineWidth = 3 * S; ctx.stroke();
+    ctx.restore();
+  }
+  // Il capo del bioma: l'aura sotto i piedi e, quando prepara l'attacco, il cerchio che si stringe.
+  function disegnaCapiBioma() {
+    if (!orda || !corsa || !corsa.chi) return;
+    for (const z of orda.zombie) {
+      if (z.tipo !== "capo" || z.stato === "giu" || sottoTerra(z)) continue;
+      const b = BIOMI[z.bioma || 0] || BIOMI[0], c = corpoZ(z);
+      ctx.save();
+      ctx.globalAlpha = 0.28 + 0.12 * Math.sin(passi * 0.12);
+      const g = ctx.createRadialGradient(z.x, orda.base, 0, z.x, orda.base, 90 * S);
+      g.addColorStop(0, b.capo.aura); g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(z.x, orda.base - 4 * S, 90 * S, 22 * S, 0, 0, Math.PI * 2); ctx.fill();
+      if (z.annuncio > 0) {
+        const k = z.annuncio / 54;
+        ctx.globalAlpha = 0.9; ctx.strokeStyle = passi % 6 < 3 ? "#ffffff" : b.capo.aura; ctx.lineWidth = 4 * S;
+        ctx.beginPath(); ctx.arc(c[0], c[1], (40 + 120 * k) * S, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
   // ·· LA PRIMA CORSA GUIDATA (18/10/2026 sera, Riccardo: «fai iniziare la corsa infinita come un tutorial la prima volta
   // che lo fai, quindi se sei loggato la seconda volta non lo fa più. Il tutorial ti fa vedere le basi e come fare la
   // parata, il parry guidato e ogni volta che c'è un nemico nuovo con un nuovo attacco spieghi la caratteristica, il tipo
@@ -17213,7 +17540,7 @@
     rabbioso: ["\u{1F621}", "Rabbioso", "Rosso e velocissimo.", "Ti corre addosso e morde subito.", "Tieni il dito pronto: premi {P} appena l'anello diventa d'oro."],
     bruto: ["\u{1F525}\u{1F52B}", "Bruto di brace", "Enorme e muscoloso, con la maschera di ferro: tiene la distanza e se gli vai addosso balza via.", "Spara raffiche e tira granate a parabola; quando ringhia è scoperto.", "Col parry rimandi colpi e granate a chi li ha tirati. Morendo lascia il fucile-sega."],
     saiba: ["🌱💥", "Germoglio esplosivo", "Piccolo e agile: lotta da terra con artigliate e salta per picchiare dall'alto.", "Quando è quasi finito carica a testa bassa per aggrapparsi al petto.", "Se ti si aggrappa addosso esplode dopo un secondo: colpiscilo prima."],
-    capo: ["\u{1F480}", "Il capo", "Enorme e lento, con tanta vita.", "Tre manate di fila.", "Parale tutte e tre col parry: CONTRO TOTALE e il capo va giù sbilanciato."],
+    capo: ["\u{1F480}", "Il capo", "Enorme e lento, con tanta vita. Ogni bioma ha il suo, e battuto apre uno squarcio verso il bioma dopo.", "Tre manate di fila; e ogni tanto il suo attacco speciale, annunciato da un cerchio che si stringe.", "Parale tutte e tre col parry: CONTRO TOTALE. Quando il cerchio si chiude: in aria o col parry."],
     doro: ["\u{1FA99}", "Zombie d'oro", "Non attacca: scappa carico di monete.", "Dopo otto secondi si rintana.", "Prendilo prima che scappi: lascia tante monete."],
     letale: ["\u{1F534}", "La carica rossa", "Una scintilla rossa, poi lo zombie parte di corsa verso di te.", "Una carica che la parata non regge: l'anello è rosso.", "Solo il parry la ferma: premi {P} quando arriva e stendi chi ti sta intorno."],
     motosega: ["\u{1FA9A}", "Fucile-sega", "Spara da solo da lontano.", "Con {P} ti metti in agguato: il primo nemico che arriva lo tagli in due, a rallentatore.", "Si usa una volta sola: dopo il taglio la sega si rompe. Tienila per il nemico più pericoloso."],
@@ -17231,8 +17558,8 @@
   // Dal quarto minuto in poi la crescita diventa esponenziale: con tutte le armi evolute si arrivava
   // al tredicesimo minuto senza giocare, e una corsa così non finisce più (misurato).
   // (col volo dell'eroe, 09/10 notte, una corsa su dodici arrivava ancora al nono minuto: coda più ripida)
-  const vitaZombie = () => { const k = pressione(); return (1 + 0.3 * k + 0.35 * k * k) * Math.pow(1.9, Math.max(0, k - 4)); };
-  const crescita = () => { const k = pressione(); return (1 + 0.15 * k + 0.17 * k * k) * Math.pow(1.6, Math.max(0, k - 4)); };
+  const vitaZombie = () => { const k = pressione(); return (1 + 0.3 * k + 0.35 * k * k) * Math.pow(1.9, Math.max(0, k - 4)) * potenzaCiclo(); };
+  const crescita = () => { const k = pressione(); return (1 + 0.15 * k + 0.17 * k * k) * Math.pow(1.6, Math.max(0, k - 4)) * potenzaCiclo(); };
   const pelleCorsa = () => (1 - 0.1 * livello("pelle")) * (1 - 0.05 * (bottega.pelle || 0));
   const areaCorsa = () => 1 + 0.12 * livello("area");
   const ricaricaCorsa = () => (1 - 0.08 * livello("ricarica")) * (1 - 0.04 * (bottega.ricarica || 0));
@@ -17275,6 +17602,7 @@
 
   // ·· Aprire, scegliere, chiudere ··
   function apriCorsa() {
+    chiudiBrawl();
     if (corsa) { if (corsa.fase === "lotta" || corsa.fase === "intro" || corsa.fase === "vinto") finisciCorsa(); return true; }
     assicuraAcceso();
     const prima = { sorprese, acquazzone, uraganoFisso, rallentaFisso, verso, gravita: gravitaScelta, radiale: radiale.aperto, chi: radiale.chi };
@@ -17300,7 +17628,7 @@
       invuln: 0, scudo: 0, imprevisti: [], prossimoImprevisto: 0, nemicoGiu: false, iniziata: Date.now(), danniRound: 0, inviato: false, nome: "",
       tLotta: 0, tiri: [], pozze: [], sbloccati: ["lento", "svelto", "corvo"], novita: 0, cdVolo: 300, nuovo: null, protagonisti: [], gelato: 0, frenesia: 0,
       prossimaSorpresa: 600, ultimaSorpresa: null, sorprese: 0,
-      capi: 0, evoluzioni: 0, puliti: 0, annunciate: [], rimescola: 1 + (bottega.dadi || 0), missioniFatte: [],
+      capi: 0, bioma: 0, ciclo: 0, biomiFatti: 0, squarcio: null, capoGiu: 0, biomaHost: false, evoluzioni: 0, puliti: 0, annunciate: [], rimescola: 1 + (bottega.dadi || 0), missioniFatte: [],
     });
     try { corsa.nome = deposito.getItem("mut-ring-nome") || ""; } catch (errore) { /* niente nome */ }
     corsa.guida = guidaFatta ? null : { passo: "inizio", t: 0 };
@@ -17965,7 +18293,7 @@
     const p = corpoZ(z), x = p[0], y = p[1];
     lasciaGemma(x, y, GEMMA_ZOMBIE[z.tipo] || 1, "gemma");
     if (c.rng() < 0.06 + 0.03 * livello("tasche")) lasciaGemma(x, y, 1 + livello("tasche"), "moneta");
-    if (z.tipo === "capo") c.capi = (c.capi || 0) + 1;
+    if (z.tipo === "capo") { c.capi = (c.capi || 0) + 1; capoBattuto(); }
     if (z.tipo === "capo") { c.forzieri.push({ x, y, base: orda.base, vy: -4 * S }); lasciaOggetto(x + 20 * S, y, oggettoCorsa()); for (let i = 0; i < 6; i++) lasciaGemma(x, y, 3, "moneta"); }
     else if (z.tipo === "doro") {
       // Lo zombie d'oro: una fontana di monete e tre gemme grosse.
@@ -18412,6 +18740,10 @@
     if (c.daScegliere > 0 && !c.scelta && !c.forziere && !c.scheda && !mira && c.fase !== "fine") apriLivello();
     if (c.fase === "intro" && c.t >= CORSA.intro) iniziaLotta();
     else if (c.fase === "lotta") {
+      // (lo squarcio dopo il capo: niente altro finché non si atterra nel bioma nuovo)
+      if (c.squarcio) { aggiornaSquarcio(); return; }
+      if (c.capoGiu > 0 && --c.capoGiu <= 0) { if (c.forziere || c.scelta || mira || fatale) c.capoGiu = 30; else if (!(orda && orda.zombie.some((w) => w.tipo === "capo" && vivoZ(w)))) avviaSquarcio(); }
+      if (orda) for (const w of orda.zombie) if (w.tipo === "capo" && vivoZ(w)) specialeCapo(w);
       aggiornaGuida();
       // (durante la guida il tempo della corsa non conta e non arrivano sorprese)
       if (!c.guida) c.tLotta++;
@@ -18980,10 +19312,173 @@
     { id: "mela", nome: "Mela Ninja", titolo: "Ninja Agile", stile: "", tipo: "mela", icona: "\u{1F977}", colore: "#eb3b5a", desc: "Velocità estrema, shuriken affilati, calci acrobatici volanti e prese a sorpresa." },
   ];
 
-  let brawl = null;
+  // (`brawl` è dichiarato in cima, accanto agli altri stati: `rileva` lo legge già all'avvio)
+  // Fuori dal brawl: via il palco, tornano gli elementi della pagina (e niente più abisso sotto chi lotta).
+  function chiudiBrawl() { if (!brawl) return; brawl = null; if (W) rileva(); }
   // Il brawl è del sito del gioco, dove prende il posto dell'«1 contro 1» (`__ringModoLibero.unoControUno`), o di chi
   // lo chiede con `window.__ringBrawl = true`. Nell'estensione, nell'app e sul tracker la seconda voce resta il
   // combattimento libero di sempre (il 21/10 il brawl l'aveva sostituito ovunque).
+
+  // ·· IL PALCO DEL BRAWL (25/10/2026, Riccardo: «la modalità brawl deve essere a tutti gli effetti uno Smash Bros, con
+  // fisica avanzata, distruttibilità e metamorfosi del ring; migliora l'intelligenza artificiale») ··
+  //  - LA PERCENTUALE: ogni colpo la alza (`spintaBrawl`), e più è alta più lontano si vola: la spinta cresce con lei.
+  //  - IL FUORI CAMPO: si muore cadendo nell'abisso sotto il palco (il meccanismo della lava, `nellaLava` → `koBrawl`) o
+  //    sbattendo sui bordi dello schermo lanciati forte sopra il 50% (`fuoriDaiBordi`, la stella).
+  //  - IL RIENTRO: chi cade prova a tornare sul palco in volo (`salvaInVolo`); ci riesce sempre meno spesso man mano
+  //    che la percentuale sale (`rientraBrawl`).
+  //  - IL PALCO SI ROMPE: le botte d'atterraggio crepano le piattaforme (`colpisciPalco`); a zero crollano e tornano
+  //    dopo un po'. Il palco principale regge di più.
+  //  - LA METAMORFOSI: ogni 40 secondi il palco cambia forma (campo di battaglia, isole, torre), annunciato tre secondi
+  //    prima dalle sagome della forma nuova; cambia anche il fondo (uno dei biomi della corsa).
+  // Con un'arena dell'ospite (`__ringArena`, pedane vere) il palco è quello dell'ospite: restano percentuale, spinta e bordi.
+  const BRAWL = { metamorfosi: 2400, avviso: 180, pct: 2.6, spinta: 55, rientro: 190, bordo: 50 };
+  const FORME_PALCO = [
+    { nome: "Campo di battaglia", p: [[0.18, 0.82, 0.68, true], [0.27, 0.42, 0.52], [0.58, 0.73, 0.52], [0.42, 0.58, 0.38]] },
+    { nome: "Le isole", p: [[0.1, 0.42, 0.66, true], [0.58, 0.9, 0.66, true], [0.43, 0.57, 0.5], [0.2, 0.32, 0.42], [0.68, 0.8, 0.42]] },
+    { nome: "La torre", p: [[0.24, 0.76, 0.72, true], [0.4, 0.6, 0.54], [0.12, 0.28, 0.44], [0.72, 0.88, 0.44], [0.42, 0.58, 0.34]] },
+  ];
+  function creaPalco(forma) {
+    const F = FORME_PALCO[forma % FORME_PALCO.length], alto = Math.max(testataBasso + 60 * S, 0);
+    brawl.forma = forma % FORME_PALCO.length;
+    brawl.palco = F.p.map(([a, b, y, grande]) => {
+      const t = Math.round(alto + (H - alto) * y), sp = Math.round((grande ? 26 : 12) * S);
+      return { l: Math.round(W * a), r: Math.round(W * b), t, b: t + sp, uno: !grande, palco: true, grande: !!grande, hp: grande ? 260 : 90, max: grande ? 260 : 90, rotto: false, torna: 0, el: null, crepe: [] };
+    });
+  }
+  function palcoNeiSolidi() {
+    ostacoli = brawl.palco.filter((o) => !o.rotto);
+    scatole = [];
+    lava = Math.round(H * 0.1);
+    pavimento = H - lava;
+  }
+  function colpisciPalco(o, forza, x) {
+    if (!o || o.rotto || !brawl) return;
+    o.hp -= forza * 2.2;
+    if (o.crepe.length < 9 && forza > 8) o.crepe.push({ x: Math.max(o.l + 6 * S, Math.min(o.r - 6 * S, x)), a: caso(-0.6, 0.6), l: caso(10, 26) * S });
+    schegge(x, o.t + 2 * S, 3, "#b9b3a8");
+    if (o.hp > 0) return;
+    // crolla: pezzi che cadono, e chi c'era sopra va giù con lui
+    o.rotto = true; o.torna = o.grande ? 420 : 600; o.crepe = [];
+    for (let i = 0; i < 14 && pezzi.length < 60; i++) schegge(o.l + Math.random() * (o.r - o.l), o.t + 4 * S, 2, "#8a8378");
+    scossa = Math.max(scossa, 12); suona("tonfo", (o.l + o.r) / 2, 1);
+    scrivi(dici("CROLLA!"), (o.l + o.r) / 2, o.t - 30 * S, true);
+    for (const f of lottatori) if (f.supporto === o) { f.supporto = null; f.inVolo = true; }
+    rileva();
+  }
+  function aggiornaPalco() {
+    if (!brawl.palco) return;
+    let cambiato = false;
+    for (const o of brawl.palco) if (o.rotto && --o.torna <= 0) { o.rotto = false; o.hp = o.max; o.crepe = []; cambiato = true; scintille((o.l + o.r) / 2, o.t, 10, "#ffffff"); }
+    if (--brawl.metamorfosi === BRAWL.avviso) {
+      brawl.prossima = (brawl.forma + 1) % FORME_PALCO.length;
+      scritte.push({ testo: dici("Il palco cambia!") + " · " + dici(FORME_PALCO[brawl.prossima].nome), x: W / 2, y: Math.max(testataBasso + 90 * S, H * 0.18), vita: 160, grande: true, fermo: true });
+      suona("potenza", W / 2, 0.6);
+    }
+    if (brawl.metamorfosi <= 0) {
+      creaPalco(brawl.prossima !== undefined ? brawl.prossima : brawl.forma + 1);
+      brawl.bioma = (brawl.bioma + 1 + Math.floor(Math.random() * (BIOMI.length - 1))) % BIOMI.length;
+      particelleFondo = [];
+      brawl.metamorfosi = BRAWL.metamorfosi;
+      lampoSchermo = Math.max(lampoSchermo, 0.4); scossa = Math.max(scossa, 16); suona("boom", W / 2, 0.9);
+      // chi stava su un pezzo che non c'è più cade: lo rimette sul palco nuovo il rientro, come dopo un volo
+      for (const f of lottatori) if (f && f.supporto) { f.supporto = null; f.inVolo = true; }
+      cambiato = true;
+    }
+    if (cambiato) rileva();
+  }
+  // Chi cade dal palco torna su in volo? Una volta a caduta: sempre meno, man mano che la percentuale sale.
+  function rientraBrawl(f) {
+    if (f.cadutaDecisa === undefined) f.cadutaDecisa = Math.random() < Math.max(0.12, 1 - (f.percento || 0) / BRAWL.rientro);
+    return f.cadutaDecisa;
+  }
+  function spintaBrawl(f, altro, forza, x, y) {
+    const pct = altro.percento = Math.min(999, (altro.percento || 0) + forza * BRAWL.pct * (formaDi(f) === "super" ? 1.25 : 1));
+    const kb = forza * (0.55 + pct / BRAWL.spinta), dir = f.dir || 1;
+    const vx = dir * kb * 0.9 * S, vy = -kb * (0.5 + Math.min(0.35, pct / 400)) * S;
+    for (const n in altro.p) { altro.p[n].ox -= vx; altro.p[n].oy -= vy; }
+    numeroDanno(x, y - 18 * S, Math.round(forza * BRAWL.pct), kb > 9, altro.brawlIdx !== 0);
+    if (kb > 8) {
+      altro.inVolo = true; altro.ko = Math.max(altro.ko || 0, Math.round(8 + kb * 1.6)); altro.lancioBrawl = 50; altro.lanciato = Math.max(altro.lanciato || 0, 30);
+      altro.supporto = null; altro.cadutaDecisa = undefined;
+      fermoColpo = Math.max(fermoColpo, Math.min(16, Math.round(kb * 0.7)));
+      if (kb > 15) { lampoSchermo = Math.max(lampoSchermo, 0.25); scossa = Math.max(scossa, 14); if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "impatto", x, y, vx: 0, vy: 0, vita: 16, max: 16, r: 70 * S, giro: 0, colore: altro.brawlColore || "#ffffff" }); suona("boom", x, 0.6); }
+    }
+  }
+  // Lanciati forte contro un bordo dello schermo: fuori, con la stella.
+  function fuoriDaiBordi() {
+    for (const f of lottatori) {
+      if (!f || !f.p || f.fuoriCampo || f.brawlIdx === undefined) continue;
+      if (f.supporto) f.cadutaDecisa = undefined;
+      if (f.lancioBrawl > 0) f.lancioBrawl--;
+      if (f.bordoBrawl) { f.bordoBrawl = false; if ((f.percento || 0) >= BRAWL.bordo) koBrawl(f, f.ultimoColpitoDa, "bordo"); }
+    }
+  }
+  function raggieraKO(x, y, colore) {
+    for (let i = 0; i < 14 && particelle.length < MAX_PARTICELLE; i++) {
+      const a = Math.atan2(H / 2 - y, W / 2 - x) + caso(-0.9, 0.9), v = caso(6, 14) * S;
+      particelle.push({ tipo: "linea", x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vita: 22, max: 22, lung: caso(30, 70) * S, colore: i % 2 ? "#ffffff" : colore });
+    }
+    if (particelle.length < MAX_PARTICELLE) particelle.push({ tipo: "onda", x, y, vx: 0, vy: 0, vita: 26, max: 26, colore });
+    lampoSchermo = Math.max(lampoSchermo, 0.35);
+  }
+  // Il fondo, l'abisso e il palco (le crepe, il lampeggio di chi sta per crollare, le sagome della forma che arriva).
+  function disegnaPalcoBrawl() {
+    if (!brawl || !brawl.palco || inArenaApp()) return;
+    disegnaFondoBioma(BIOMI[brawl.bioma || 0], 0, 1);
+    const g = ctx.createLinearGradient(0, pavimento - 30 * S, 0, H);
+    g.addColorStop(0, "rgba(8,6,20,0)"); g.addColorStop(0.35, "rgba(8,6,20,0.92)"); g.addColorStop(1, "#05040c");
+    ctx.save(); ctx.fillStyle = g; ctx.fillRect(0, pavimento - 30 * S, W, H - pavimento + 30 * S);
+    ctx.globalAlpha = 0.35 + 0.15 * Math.sin(passi * 0.05); ctx.fillStyle = BIOMI[brawl.bioma || 0].capo.aura; ctx.fillRect(0, H - 3 * S, W, 3 * S);
+    ctx.restore();
+    const b = BIOMI[brawl.bioma || 0];
+    for (const o of brawl.palco) {
+      if (o.rotto) {
+        if (o.torna < 90 && passi % 8 < 4) { ctx.save(); ctx.globalAlpha = 0.35; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2 * S; ctx.strokeRect(o.l, o.t, o.r - o.l, o.b - o.t); ctx.restore(); }
+        continue;
+      }
+      const k = o.hp / o.max, trema = k < 0.25 && passi % 6 < 3 ? S : 0;
+      ctx.save(); ctx.translate(trema, 0);
+      const gp = ctx.createLinearGradient(0, o.t, 0, o.b + (o.grande ? 30 * S : 8 * S));
+      gp.addColorStop(0, b.suolo[0]); gp.addColorStop(1, b.suolo[1]);
+      ctx.fillStyle = gp;
+      ctx.beginPath();
+      if (o.grande) { ctx.moveTo(o.l, o.t); ctx.lineTo(o.r, o.t); ctx.lineTo(o.r - 20 * S, o.b); ctx.lineTo((o.l + o.r) / 2 + 30 * S, o.b + 40 * S); ctx.lineTo((o.l + o.r) / 2 - 30 * S, o.b + 40 * S); ctx.lineTo(o.l + 20 * S, o.b); ctx.closePath(); }
+      else { const r = 5 * S; ctx.moveTo(o.l + r, o.t); ctx.lineTo(o.r - r, o.t); ctx.quadraticCurveTo(o.r, o.t, o.r, o.t + r); ctx.lineTo(o.r, o.b - r); ctx.quadraticCurveTo(o.r, o.b, o.r - r, o.b); ctx.lineTo(o.l + r, o.b); ctx.quadraticCurveTo(o.l, o.b, o.l, o.b - r); ctx.lineTo(o.l, o.t + r); ctx.quadraticCurveTo(o.l, o.t, o.l + r, o.t); }
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.45)"; ctx.lineWidth = 2 * S; ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.fillRect(o.l + 3 * S, o.t, o.r - o.l - 6 * S, 2 * S);
+      ctx.strokeStyle = b.capo.aura; ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5 * S;
+      ctx.beginPath(); ctx.moveTo(o.l + 4 * S, o.t + 1); ctx.lineTo(o.r - 4 * S, o.t + 1); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.strokeStyle = "rgba(20,14,10,0.8)"; ctx.lineWidth = 1.6 * S;
+      for (const c of o.crepe) { ctx.beginPath(); ctx.moveTo(c.x, o.t); ctx.lineTo(c.x + Math.sin(c.a) * c.l * 0.5, o.t + c.l * 0.5); ctx.lineTo(c.x + Math.sin(c.a) * c.l, o.t + Math.min(o.b - o.t + 20 * S, c.l)); ctx.stroke(); }
+      if (k < 0.25) { ctx.globalAlpha = 0.25 + 0.25 * Math.sin(passi * 0.5); ctx.fillStyle = "#ff4a3a"; ctx.fillRect(o.l, o.t, o.r - o.l, 3 * S); }
+      ctx.restore();
+    }
+    // la forma che arriva: sagome tratteggiate che lampeggiano
+    if (brawl.metamorfosi <= BRAWL.avviso && brawl.prossima !== undefined) {
+      const F = FORME_PALCO[brawl.prossima], alto = Math.max(testataBasso + 60 * S, 0);
+      ctx.save(); ctx.globalAlpha = passi % 12 < 6 ? 0.7 : 0.3; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2 * S;
+      if (ctx.setLineDash) ctx.setLineDash([8 * S, 6 * S]);
+      for (const [a, bb, y, grande] of F.p) { const t = alto + (H - alto) * y; ctx.strokeRect(W * a, t, W * (bb - a), (grande ? 26 : 12) * S); }
+      ctx.restore();
+    }
+  }
+  // Sopra ognuno: il nome, il colore del lottatore e la percentuale, come in Smash.
+  function disegnaTargheBrawl() {
+    if (!brawl || brawl.fase !== "lotta") return;
+    for (const p of brawl.partecipanti) {
+      const f = p.f;
+      if (!f || !f.p || f.fuoriCampo) continue;
+      const x = f.p.testa.x, y = f.p.testa.y - 26 * S;
+      ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.font = "900 " + Math.round(10 * S) + "px Archivo, sans-serif";
+      ctx.lineWidth = 3 * S; ctx.strokeStyle = "#17171c"; const tag = p.isPlayer ? "P1" : "CPU";
+      ctx.strokeText(tag, x, y); ctx.fillStyle = p.isPlayer ? "#56e1ff" : p.colore; ctx.fillText(tag, x, y);
+      ctx.beginPath(); ctx.moveTo(x - 5 * S, y + 7 * S); ctx.lineTo(x + 5 * S, y + 7 * S); ctx.lineTo(x, y + 12 * S); ctx.closePath(); ctx.fill();
+      if (f.invuln > 0 && passi % 8 < 4) { ctx.globalAlpha = 0.5; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2 * S; ctx.beginPath(); ctx.arc(f.p.bacino.x, f.p.bacino.y - 10 * S, 34 * S, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
   const conBrawl = () => window.__ringBrawl === true || !!(window.__ringModoLibero && window.__ringModoLibero.unoControUno && window.__ringBrawl !== false);
 
   function apriBrawlScelta() {
@@ -19058,6 +19553,8 @@
     danni = []; scritte = []; telefoni = []; particelle = []; evento = null;
     creature = []; nubi = []; finale = null;
 
+    brawl.palco = null; brawl.forma = 0; brawl.metamorfosi = BRAWL.metamorfosi; brawl.avviso = 0; brawl.bioma = Math.floor(Math.random() * BIOMI.length);
+    if (!inArenaApp()) { creaPalco(0); rileva(); }
     const ped = piattaforma();
     const yBase = ped ? ped.t : pavimento;
     const leftX = ped ? ped.l + 35 * S : 80 * S;
@@ -19076,7 +19573,7 @@
       f.brawlIcona = p.icona;
       f.brawlTitolo = p.titolo;
       f.invuln = 120; // 2s di invulnerabilità all'avvio
-      f.vita = 100;
+      f.percento = 0;
       f.danni = 0;
       f.soglia = 14;
       if (f.stile === "lame") accendiLama(f);
@@ -19112,7 +19609,7 @@
     f.brawlIcona = p.icona;
     f.brawlTitolo = p.titolo;
     f.invuln = 120; // 2s di invulnerabilità lampeggiante
-    f.vita = 100;
+    f.percento = 0;
     f.danni = 0;
     f.soglia = 14;
     if (f.stile === "lame") accendiLama(f);
@@ -19126,7 +19623,7 @@
     scrivi(p.nome + " RINASCE!", posX, yBase - 90 * S, false);
   }
 
-  function koBrawl(morto, assassino) {
+  function koBrawl(morto, assassino, come) {
     if (!brawl || brawl.fase !== "lotta") return;
     if (!morto || morto.brawlIdx === undefined) return;
 
@@ -19143,7 +19640,9 @@
     const mx = morto.p && morto.p.bacino ? morto.p.bacino.x : morto.cx || W / 2;
     const my = morto.p && morto.p.bacino ? morto.p.bacino.y : pavimento - 40 * S;
 
-    scrivi("\u{1F4A5} K.O.!", mx, my - 30 * S, true);
+    scrivi(come === "bordo" ? "\u2B50 K.O.!" : "\u{1F4A5} K.O.!", Math.max(60 * S, Math.min(W - 60 * S, mx)), Math.max(testataBasso + 50 * S, Math.min(pavimento - 40 * S, my - 30 * S)), true);
+    // l'esplosione di luce dal punto d'uscita, come quando si vola fuori in Smash
+    raggieraKO(Math.max(0, Math.min(W, mx)), Math.max(0, Math.min(H, my)), muertoSlot.colore);
     suona("ko", mx, 1.2);
     scossa = Math.max(scossa, 16);
     scintille(mx, my, 25, muertoSlot.colore);
@@ -19153,7 +19652,7 @@
     morto.koVero = true;
     morto.fuoriCampo = true;
     morto.esploso = null;
-    morto.vita = 0;
+    morto.percento = 0;
     morto.inVolo = false;
     morto.onda = null;
     morto.azione = null;
@@ -19175,6 +19674,8 @@
     for (const f of lottatori) {
       if (f && f.invuln > 0) f.invuln--;
     }
+    aggiornaPalco();
+    fuoriDaiBordi();
 
     if (brawl.tempoRimanente <= 0) {
       fineBrawl();
@@ -19239,7 +19740,7 @@
         return true;
       }
       if (c === "Escape") {
-        brawl = null;
+        chiudiBrawl();
         apriMenu("principale");
         return true;
       }
@@ -19255,7 +19756,7 @@
         return true;
       }
       if (c === "Escape") {
-        brawl = null;
+        chiudiBrawl();
         apriMenu("principale");
         return true;
       }
@@ -19263,7 +19764,7 @@
     }
     if (brawl.fase === "lotta") {
       if (c === "Escape") {
-        brawl = null;
+        chiudiBrawl();
         apriMenu("principale");
         return true;
       }
@@ -19598,7 +20099,7 @@
       });
 
       tastoUI(escX, btnY, escW, btnH, "\u21A9\uFE0F MENU", () => {
-        brawl = null; apriMenu("principale");
+        chiudiBrawl(); apriMenu("principale");
       }, {
         colore: "#282536", bordo: GRIGIO_UI, px: 13 * S
       });
@@ -19641,9 +20142,9 @@
         const cx = startX + idx * (cardW + cardGap);
         const cy = startY;
         const f = lottatori[idx] || p.f;
-        const vita = f && f.vita !== undefined ? Math.max(0, f.vita) : 100;
-        const vitaRapporto = vita / 100;
-        const coloreVita = vitaRapporto > 0.5 ? "#2fbf71" : vitaRapporto > 0.25 ? "#f2c230" : "#e0443a";
+        const pct = f && !f.fuoriCampo ? Math.round(f.percento || 0) : null;
+        // dal bianco al rosso scuro, come in Smash
+        const kp = Math.min(1, (pct || 0) / 150), colorePct = "rgb(255," + Math.round(255 - 200 * kp) + "," + Math.round(255 - 220 * kp) + ")";
 
         ctx.save();
         if (p.isPlayer) {
@@ -19662,8 +20163,9 @@
         scriviUI(p.nome.toUpperCase(), cx + 8 * S, cy + 27 * S, 12 * S, "#ffffff", "left", 900);
         disegnaSplashPersonaggio(p.id, cx + cardW - 20 * S, cy + 22 * S, 13 * S, p.isPlayer);
 
-        // Barra Vita
-        barraUI(cx + 8 * S, cy + 34 * S, cardW - 16 * S, 8 * S, vitaRapporto, coloreVita);
+        // La percentuale (trema appena colpito)
+        const scuoti = f && f.colpitoBrawl && tempo - f.colpitoBrawl < 10 ? caso(-1.5, 1.5) * S : 0;
+        scriviUI(pct === null ? "\u2014" : pct + "%", cx + 8 * S + scuoti, cy + 41 * S, 17 * S, colorePct, "left", 900);
 
         // Metriche: MORTI (chiave vittoria) e K.O.
         scriviUI("\u{1F480} Morti: " + p.morto, cx + 8 * S, cy + 54 * S, 11 * S, p.morto === 0 ? "#2fbf71" : "#ff6b6b", "left", 800);
@@ -19762,7 +20264,7 @@
       }, { colore: "#2d3436", bordo: "#56e1ff", px: 12.5 * S });
 
       tastoUI(bx3, by, btnW, btnH, "\u{1F3E0} MENU", () => {
-        brawl = null; apriMenu("principale");
+        chiudiBrawl(); apriMenu("principale");
       }, { colore: "#2d3436", bordo: GRIGIO_UI, px: 13 * S });
 
       scriviUI("Premi R per rivincita, C per scegliere un altro lottatore, ESC per il Menu", W / 2, Math.min(H - 14 * S, by + btnH + 20 * S), 10.5 * S, GRIGIO_UI, "center", 700);
@@ -19773,9 +20275,10 @@
   // destra il combattimento libero / brawl (A e D dalla tastiera, come nella scelta del personaggio).
   function scegliModo(modo) {
     modoScelto(modo);
+    if (modo !== "brawl") chiudiBrawl();
     sceltaModo = false;
     if (modo === "corsa") apriCorsa();
-    else if (modo === "libero" && conBrawl()) apriBrawlScelta();
+    else if (modo === "brawl" || (modo === "libero" && conBrawl())) apriBrawlScelta();
     aggiornaInterruttori();
     riparti();
     return true;
@@ -19791,13 +20294,17 @@
     const voci = [["corsa", "\u{1F3C3}", dici("Corsa infinita"), dici("Sopravvivi a ondate sempre più grandi: armi, livelli, draghetti, capi."), "sinistra"],
                   conBrawl() ? ["libero", "\u2694\uFE0F", dici("Brawl"), dici("4 lottatori nell'arena, sfida a tempo di 3 min: vince chi muore meno volte!"), "destra"]
                              : ["libero", "\u{1F94A}", dici("Combattimento libero"), dici("Due lottatori, i personaggi che vuoi, oggetti e imprevisti dalla tendina."), "destra"]];
-    const w = stretto ? Math.min(320 * S, W - 32) : Math.min(280 * S, (W - 48) / 2), h = 170 * S, gap = 16 * S;
+    // (25/10/2026, Riccardo: «hai tolto i personaggi creati, rimettili»: dove la seconda voce è il combattimento libero,
+    // il brawl col suo roster è un terzo riquadro)
+    if (!conBrawl()) voci.push(["brawl", "⚔️", dici("Brawl"), dici("4 lottatori nell'arena, sfida a tempo di 3 min: vince chi muore meno volte!"), null]);
+    const n = voci.length, h = (stretto && n > 2 ? 132 : 170) * S, gap = (stretto && n > 2 ? 10 : 16) * S;
+    const w = stretto ? Math.min(320 * S, W - 32) : Math.min(280 * S, (W - 32 - gap * (n - 1)) / n);
     voci.forEach(([modo, icona, nome, testo, tasto], i) => {
-      const x = stretto ? W / 2 - w / 2 : W / 2 - w - gap / 2 + i * (w + gap), y = top + 64 * S + (stretto ? i * (h + gap) : 0);
+      const x = stretto ? W / 2 - w / 2 : W / 2 - (n * w + (n - 1) * gap) / 2 + i * (w + gap), y = top + 64 * S + (stretto ? i * (h + gap) : 0);
       ctx.save(); ctx.shadowColor = ORO; ctx.shadowBlur = 12 * S; pannelloUI(x, y, w, h, 14 * S, i ? "#56e1ff" : ORO); ctx.restore();
       scriviUI(icona, x + w / 2, y + 34 * S, 30 * S, "#ffffff", "center");
       scriviUI(nome, x + w / 2, y + 74 * S, 20 * S, i ? "#56e1ff" : ORO, "center", 900);
-      righeUI(testo, w - 32 * S, 12 * S).forEach((r, k) => scriviUI(r, x + w / 2, y + 102 * S + k * 16 * S, 12 * S, "#ffffff", "center", 600));
+      righeUI(testo, w - 32 * S, 12 * S).slice(0, h < 150 * S ? 1 : 4).forEach((r, k) => scriviUI(r, x + w / 2, y + 102 * S + k * 16 * S, 12 * S, "#ffffff", "center", 600));
       const k = tastoDi(tasto);
       if (k) scriviUI(k, x + w - 18 * S, y + 18 * S, 11 * S, GRIGIO_UI, "center", 900);
       tastiUI.push({ x, y, w, h, fa: () => scegliModo(modo) });
@@ -19871,6 +20378,9 @@
       conBrawl()
         ? { icona: "⚔️", nome: "Brawl", testo: "Tutti contro tutti, a tempo: 3 minuti. Scegli il tuo lottatore dal roster: vince chi muore meno volte.", fa: () => { menu = null; modoScelto("libero"); apriBrawlScelta(); return true; } }
         : { icona: libero ? libero.icona || "\u{1F94A}" : "\u{1F94A}", nome: libero ? libero.nome : "Combattimento libero", testo: libero ? libero.testo : "Due lottatori sulla pagina che si picchiano da soli. Comandi chi vuoi, scegli i personaggi, lanci oggetti e scateni imprevisti dalla tendina.", fa: () => { menu = null; modoScelto("libero"); if (sceltaModo) scegliModo("libero"); else if (corsa) chiudiCorsa(); return true; } },
+      // (25/10/2026, Riccardo: «hai tolto i personaggi creati, rimettili»: dove la seconda voce è il combattimento
+      // libero della pagina, il brawl col suo roster è una voce sua)
+      ...(conBrawl() ? [] : [{ icona: "⚔️", nome: "Brawl", testo: "Tutti contro tutti, a tempo: 3 minuti. Otto lottatori nel roster, ognuno col suo stile: vince chi muore meno volte.", fa: () => { menu = null; if (corsa) chiudiCorsa(); sceltaModo = false; modoScelto("brawl"); apriBrawlScelta(); return true; } }]),
       { icona: "\u{1F4D6}", nome: "Come si gioca", testo: "Sei pagine per imparare tutto: muoversi, attaccare, la parata e il parry col contrattacco, la corsa infinita, l'aggancio, crescere fra una corsa e l'altra.", fa: () => vaiA("guida"), nuovo: primaVolta },
       { icona: "⚙️", nome: "Impostazioni", testo: "Audio e volume, dettaglio grafico, aiuti al parry, rallentatore, scossa dello schermo, difficoltà della corsa, tasti.", fa: () => vaiA("impostazioni") },
     ];
@@ -19950,6 +20460,7 @@
       ["\u{1F6E1}️", "La guardia sotto i piedi si consuma a ogni parata. A zero si rompe e resti scoperto: alterna parry e attacchi."]] },
     { icona: "\u{1F3C3}", titolo: "La corsa infinita", righe: [
       ["⚠️", "La minaccia cresce da sola: più nemici, tipi nuovi, un capo ogni cinque livelli."],
+      ["🌋", "Cinque biomi, cinque capi: battuto il capo si vola nello squarcio verso il bioma dopo. Dopo il quinto si ricomincia, coi nemici più forti."],
       ["\u{1F48E}", "Le gemme danno esperienza: a ogni livello una carta da scegliere (1 2 3, o frecce e Invio)."],
       ["Z", "Il colpo finale, quando la barra è piena. X C V usano gli oggetti raccolti."],
       ["❤️", "Tre vite. Finite, l'ultima possibilità: un colpo finale a segno ti rimette in piedi."]] },
@@ -21111,6 +21622,8 @@
     // Solo per i test: la corsa senza toccare il canvas.
     corsa: {
       apri: (seme) => { const ok = apriCorsa(); if (corsa && seme) corsa.semeVoluto = seme; return ok; },
+      uccidi: (tipo) => { const z = orda && orda.zombie.find((w) => w.tipo === tipo && vivoZ(w)); if (!z) return false; z.hp = 0.01; return colpisciZombie(z, 9, 1, z.x, corpoZ(z)[1], eroe()); },
+      squarcio: () => { if (corsa && corsa.chi && corsa.fase === "lotta" && !corsa.squarcio) avviaSquarcio(); return !!(corsa && corsa.squarcio); },
       scegli: (tipo) => scegliEroe(tipo), carta: (i) => prendiCarta(i), compra: (id) => compraBottega(id), bottega: (si) => { if (corsa) corsa.bottega = !!si; },
       esperienza: (n) => { if (corsa && corsa.chi) daiEsperienza(n); }, arma: (id, l) => { if (corsa && corsa.chi) corsa.armi[id] = l; },
       potere: (id, l) => { if (corsa && corsa.chi) corsa.livelli[id] = l; }, lascia: (id) => { const f = eroe(); if (f && corsa.chi) lasciaOggetto(f.p.bacino.x, f.p.bacino.y - 30 * S, id); },
@@ -21147,7 +21660,7 @@
     fatale: fatale ? { tipo: fatale.tipo, fase: fatale.fase, t: fatale.t, da: fatale.da.tipo, a: fatale.a.tipo, contato: fatale.contato,
                        r: fatale.d && fatale.d.r ? fatale.d.r : 0 } : null,
     fataleRound, fataliFatti, fataleBuio, fataleVoluto, fataleDebito,
-    corsa: corsa ? { fase: corsa.fase, chi: corsa.chi, round: corsa.round, tipo: corsa.tipo, tipi: (corsa.tipi || []).slice(), vite: corsa.vite, hp: corsa.hp, hpMax: corsa.hpMax,
+    corsa: corsa ? { fase: corsa.fase, chi: corsa.chi, round: corsa.round, bioma: corsa.bioma || 0, ciclo: corsa.ciclo || 0, squarcio: corsa.squarcio ? corsa.squarcio.t : null, capoGiu: corsa.capoGiu || 0, tipo: corsa.tipo, tipi: (corsa.tipi || []).slice(), vite: corsa.vite, hp: corsa.hp, hpMax: corsa.hpMax,
                      energia: corsa.energia, ultima: corsa.ultima, monete: corsa.monete, punti: corsa.punti, uccisi: corsa.uccisi, livelli: Object.assign({}, corsa.livelli),
                      slot: (corsa.slot || []).slice(), variante: corsa.variante ? corsa.variante.slice() : null, liv: corsa.liv, xp: corsa.xp, pausa: !!corsa.pausa,
                      armi: Object.assign({}, corsa.armi || {}), carte: corsa.scelta ? corsa.scelta.carte.map((k) => k.arma ? (k.evo ? "evo:" : "arma:") + k.arma : k.potere ? "potere:" + k.potere : k.monete ? "monete" : k.vita ? "vita" : "cura") : null,

@@ -1386,7 +1386,8 @@ test("duellanti: hanno la lama, si colpiscono, lo scatto attraversa l'avversario
 
 test("duellanti: le lame si incrociano; con gli effetti spenti non si stacca niente, accesi sì", () => {
   let pressa = false;
-  for (let prova = 0; prova < 5 && !pressa; prova++) {
+  // (l'incrocio capita di rado, un duello di 12 s su tre circa: col motore del 19/10 e con questo; 10 prove, non 5)
+  for (let prova = 0; prova < 10 && !pressa; prova++) {
     const amb = ambiente();
     amb.avanza(30);
     const r = amb.finestra.__ring;
@@ -4878,8 +4879,9 @@ test("menu principale: frecce e Invio, la guida si sfoglia, le impostazioni si c
   r.sceltaModo(true);
   amb.avanza(10);
   assert.strictEqual(amb.stato().tastiera.menu, "principale", "all'accensione nell'estensione c'è il menu");
-  r.tastoGiu("ArrowDown"); r.tastoGiu("ArrowDown"); r.tastoGiu("Enter");
-  assert.strictEqual(amb.stato().tastiera.menu, "guida", "la terza voce è la guida");
+  // (dal 25/10/2026 dopo il combattimento libero c'è il brawl: la guida è la quarta voce)
+  r.tastoGiu("ArrowDown"); r.tastoGiu("ArrowDown"); r.tastoGiu("ArrowDown"); r.tastoGiu("Enter");
+  assert.strictEqual(amb.stato().tastiera.menu, "guida", "la quarta voce è la guida");
   r.tastoGiu("ArrowRight"); r.tastoGiu("ArrowRight");
   amb.avanza(2);
   r.tastoGiu("Escape");
@@ -4891,7 +4893,7 @@ test("menu principale: frecce e Invio, la guida si sfoglia, le impostazioni si c
   assert.strictEqual(JSON.parse(amb.memoria["mut-ring-impostazioni"]).volume, 6, "il volume cambiato si ricorda");
   r.tastoGiu("Escape"); r.tastoGiu("Escape");
   assert.strictEqual(amb.stato().tastiera.menu, "principale", "dalla prima scelta si va solo avanti");
-  r.tastoGiu("ArrowUp"); r.tastoGiu("ArrowUp"); r.tastoGiu("ArrowUp"); r.tastoGiu("Enter");
+  r.tastoGiu("ArrowUp"); r.tastoGiu("ArrowUp"); r.tastoGiu("ArrowUp"); r.tastoGiu("ArrowUp"); r.tastoGiu("Enter");
   amb.avanza(5);
   assert.ok(amb.stato().corsa, "Corsa infinita apre la corsa");
   assert.strictEqual(amb.stato().tastiera.menu, null);
@@ -5267,4 +5269,66 @@ test("le scritte: via le onomatopee dei colpi, ma i numeri e i richiami restano"
   const lista = s.slice(s.indexOf("const LISTA_FUMETTI"), s.indexOf("]);", s.indexOf("const LISTA_FUMETTI")));
   for (const w of ["ORA", "SU", "VAI", "GRRR"]) assert.ok(!lista.includes('"' + w + '"'), w + " è un richiamo, non un'onomatopea");
   assert.ok(Array.isArray(r.scritte()));
+});
+
+// ·· I biomi della corsa e il palco del brawl (25/10/2026) ··
+
+test("biomi: il capo battuto apre lo squarcio, l'eroe vola su, si cambia bioma; dopo il quinto si ricomincia più forti", () => {
+  const { amb, r } = corsaAvviata({}, "robot", 4321);
+  avanzaCorsa(amb, r, 60 * 6, (s) => (s.orda && s.corsa.fase === "lotta" ? false : undefined));
+  assert.strictEqual(amb.stato().corsa.bioma, 0, "si parte dal primo bioma");
+  r.zombie("capo", amb.lottatore("robot").bacino.x + 200);
+  avanzaCorsa(amb, r, 30);
+  assert.ok(r.corsa.uccidi("capo"), "il capo va giù");
+  assert.ok(amb.stato().corsa.capoGiu > 0, "battuto il capo, lo squarcio è in arrivo");
+  let squarcio = false, y0 = amb.lottatore("robot").bacino.y, piuSu = y0;
+  avanzaCorsa(amb, r, 60 * 10, (s) => {
+    if (s.corsa.squarcio !== null) squarcio = true;
+    piuSu = Math.min(piuSu, s.lottatori.find((l) => l.tipo === "robot").bacino.y);
+    if (squarcio && s.corsa.squarcio === null) return false;
+  });
+  assert.ok(squarcio, "lo squarcio si apre");
+  assert.ok(piuSu < y0 - 200, "l'eroe vola su verso lo squarcio: " + Math.round(y0 - piuSu));
+  assert.strictEqual(amb.stato().corsa.bioma, 1, "nel bioma dopo");
+  avanzaCorsa(amb, r, 60);
+  assert.ok(amb.lottatore("robot").bacino.y > y0 - 60, "e atterra");
+  // gli altri quattro: dopo il quinto si torna al primo, al secondo ciclo
+  for (let i = 0; i < 4; i++) { r.corsa.squarcio(); avanzaCorsa(amb, r, 60 * 6, (s) => (s.corsa.squarcio === null ? false : undefined)); }
+  assert.strictEqual(amb.stato().corsa.bioma, 0, "dopo il quinto bioma si ricomincia dal primo");
+  assert.strictEqual(amb.stato().corsa.ciclo, 1, "con un ciclo in più (nemici più forti)");
+  dentro(amb);
+});
+
+test("brawl: percentuale e spinta come in Smash, il palco si crepa, crolla e cambia forma, e si muore fuori", () => {
+  const amb = ambiente({ globali: { __ringBrawl: true } });
+  const r = amb.finestra.__ring;
+  amb.avanza(30);
+  r.apriBrawl(0);
+  assert.ok(r.brawl().palco && r.brawl().palco.length >= 4, "c'è il palco con le piattaforme");
+  let forme = new Set(), crolli = 0, pct = 0;
+  amb.avanza(60 * 100, () => {
+    const b = r.brawl();
+    if (b.fase !== "lotta") return false;
+    forme.add(b.forma);
+    for (const o of b.palco) { if (o.rotto && !o.contato) { o.contato = true; crolli++; } if (!o.rotto) o.contato = false; }
+    for (const l of r.lottatori()) pct = Math.max(pct, l.percento || 0);
+  });
+  const b = r.brawl();
+  assert.ok(pct > 30, "la percentuale sale coi colpi: " + Math.round(pct));
+  assert.ok(forme.size >= 2, "in cento secondi il palco cambia forma");
+  assert.ok(crolli >= 1, "qualche piattaforma crolla");
+  assert.ok(b.partecipanti.reduce((n, p) => n + p.morto, 0) >= 2, "si va fuori dal palco");
+  assert.ok(b.partecipanti.every((p) => p.morto <= 20), "nessuno muore di continuo");
+  dentro(amb);
+});
+
+test("il brawl è nel menu anche nell'estensione, accanto al combattimento libero", () => {
+  const amb = ambiente({});
+  const r = amb.finestra.__ring;
+  r.sceltaModo(true); amb.avanza(10);
+  r.tastoGiu("ArrowDown"); r.tastoGiu("ArrowDown"); r.tastoGiu("Enter");
+  amb.avanza(5);
+  assert.strictEqual(r.brawl() && r.brawl().fase, "scelta", "la terza voce apre la scelta del brawl");
+  r.tastoGiu("Escape");
+  assert.strictEqual(r.brawl(), null);
 });
