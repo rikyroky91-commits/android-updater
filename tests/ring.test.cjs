@@ -5347,3 +5347,29 @@ test("il sito: `brawl: true` fa del brawl la seconda voce (una sola), e l'ospite
   avanzaCorsa(amb, r, 60 * 6, (s) => (s.corsa.squarcio === null ? false : undefined));
   assert.deepStrictEqual(visti.slice(0, 2), ["cortile", "palude"], "l'ospite sa del bioma all'inizio e a ogni cambio");
 });
+
+test("Kriòs e Vespro: nel roster del brawl, usano le loro mosse gridandole, e si trasformano (Vespro massimo è un gigante)", () => {
+  const amb = ambiente({ globali: { __ringBrawl: true } });
+  const r = amb.finestra.__ring;
+  amb.avanza(30);
+  const gridi = { krios: ["RAGGIO LETALE!", "DISCO DELLA MORTE!", "SUPERNOVA!", "ESPLODI!", "FORMA AUREA!"], vespro: ["ONDA PERFETTA!", "LAMPO SOLARE!", "BARRIERA PERFETTA!", "AUTODISTRUZIONE!", "FORMA MASSIMA!"] };
+  for (const pg of ["krios", "vespro"]) {
+    // (si apre il brawl con ogni lottatore del roster finché chi gioca è lui)
+    const idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].find((i) => { r.apriBrawl(i); return r.lottatori()[0].pg === pg; });
+    assert.ok(idx !== undefined, pg + " è nel roster");
+    const sentiti = new Set();
+    let gigante = 0;
+    amb.avanza(60 * 90, (s) => {
+      for (const t of s.scritte) if (gridi[pg].indexOf(t) >= 0) sentiti.add(t);
+      const io = r.lottatori()[0];
+      if (r.formaDi(io) === "super") gigante = Math.max(gigante, r.quantoGrosso(io));
+      if (sentiti.size >= 3 && gigante) return false;
+    });
+    assert.ok(sentiti.size >= 3, pg + ": in un minuto e mezzo almeno tre mosse sue (" + [...sentiti].join(", ") + ")");
+    const io = r.lottatori()[0];
+    io.forma = 1; io.potenziato = 600;
+    assert.strictEqual(r.formaDi(io), "super", pg + ": si trasforma");
+    assert.strictEqual(r.quantoGrosso(io), pg === "vespro" ? 1.5 : 1, pg + ": la taglia della forma trasformata");
+  }
+  dentro(amb);
+});
