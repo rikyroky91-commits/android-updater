@@ -1090,7 +1090,7 @@
     // era una pedana sopra un pavimento in fondo allo schermo, e i lottatori ci scendevano sotto e restavano lì.
     else if (arena && arena.pavimento > 0) pavimento = H - Math.min(H * 0.5, arena.pavimento);
     // Il palco del brawl (vedi «IL PALCO DEL BRAWL»): al posto degli elementi della pagina, con l'abisso sotto.
-    if (brawl && brawl.palco && !inArenaApp()) palcoNeiSolidi();
+    if (brawl && brawl.palco) palcoNeiSolidi();
   }
 
   // --- Il corpo --------------------------------------------------------
@@ -17268,6 +17268,7 @@
   }
   function avviaSquarcio() {
     const c = corsa;
+    if (c.biomaHost === undefined) c.biomaHost = diciBioma();
     const fatti = (c.biomiFatti || 0) + 1;
     c.squarcio = { t: 0, da: c.bioma || 0, a: fatti % BIOMI.length, ciclo: Math.floor(fatti / BIOMI.length), x: W / 2, y: Math.max(testataBasso + 40 * S, H * 0.12), cambiato: false };
     scritte.push({ testo: dici("Uno squarcio nel cielo!"), x: W / 2, y: Math.max(testataBasso + 96 * S, H * 0.2), vita: 120, grande: true, fermo: true });
@@ -17449,8 +17450,9 @@
   }
   function disegnaBioma() {
     const c = corsa;
-    if (!c || !c.chi || c.fase === "scelta" || c.biomaHost) return;
+    if (!c || !c.chi || c.fase === "scelta") return;
     const b = biomaCorsa(), s = c.squarcio;
+    if (c.biomaHost) { if (s) disegnaSquarcioCielo(s); return; }       // (il fondo lo fa l'ospite, lo squarcio no)
     if (inArenaApp()) {
       // sopra le pedane dell'ospite: solo la tinta del bioma, leggera
       ctx.save(); ctx.globalAlpha = 0.22; ctx.fillStyle = b.cielo[1]; ctx.fillRect(0, 0, W, H); ctx.restore();
@@ -17628,7 +17630,7 @@
       invuln: 0, scudo: 0, imprevisti: [], prossimoImprevisto: 0, nemicoGiu: false, iniziata: Date.now(), danniRound: 0, inviato: false, nome: "",
       tLotta: 0, tiri: [], pozze: [], sbloccati: ["lento", "svelto", "corvo"], novita: 0, cdVolo: 300, nuovo: null, protagonisti: [], gelato: 0, frenesia: 0,
       prossimaSorpresa: 600, ultimaSorpresa: null, sorprese: 0,
-      capi: 0, bioma: 0, ciclo: 0, biomiFatti: 0, squarcio: null, capoGiu: 0, biomaHost: false, evoluzioni: 0, puliti: 0, annunciate: [], rimescola: 1 + (bottega.dadi || 0), missioniFatte: [],
+      capi: 0, bioma: 0, ciclo: 0, biomiFatti: 0, squarcio: null, capoGiu: 0, biomaHost: undefined, evoluzioni: 0, puliti: 0, annunciate: [], rimescola: 1 + (bottega.dadi || 0), missioniFatte: [],
     });
     try { corsa.nome = deposito.getItem("mut-ring-nome") || ""; } catch (errore) { /* niente nome */ }
     corsa.guida = guidaFatta ? null : { passo: "inizio", t: 0 };
@@ -17672,6 +17674,7 @@
   // Fuori dalla corsa: si torna al ring di sempre, com'era prima.
   function chiudiCorsa() {
     if (!corsa) return;
+    try { if (typeof window.__ringBioma === "function") window.__ringBioma(null); } catch (errore) { /* l'ospite non risponde */ }
     const p = corsa.prima;
     mostraNome(false);
     if (mira) chiudiMira(false);
@@ -17808,6 +17811,7 @@
   function iniziaLotta() {
     const c = corsa;
     c.fase = "lotta"; c.t = 0;
+    if (c.biomaHost === undefined) c.biomaHost = diciBioma();         // (l'ospite che disegna i biomi parte dal primo)
     // L'orda del round prima può essere ancora nella sua festa: via, sennò il round nuovo risulterebbe già vinto
     // (e nel duello la tregua dell'orda impedirebbe ai due di colpirsi).
     if (orda) { orda = null; for (const l of lottatori) { l.zMira = null; l.cinque = false; } }
@@ -19330,7 +19334,7 @@
   //    dopo un po'. Il palco principale regge di più.
   //  - LA METAMORFOSI: ogni 40 secondi il palco cambia forma (campo di battaglia, isole, torre), annunciato tre secondi
   //    prima dalle sagome della forma nuova; cambia anche il fondo (uno dei biomi della corsa).
-  // Con un'arena dell'ospite (`__ringArena`, pedane vere) il palco è quello dell'ospite: restano percentuale, spinta e bordi.
+  // Anche sopra un'arena dell'ospite (`__ringArena`, il sito e l'app) il palco è questo: il fondo copre l'arena di sotto.
   const BRAWL = { metamorfosi: 2400, avviso: 180, pct: 2.6, spinta: 55, rientro: 190, bordo: 50 };
   const FORME_PALCO = [
     { nome: "Campo di battaglia", p: [[0.18, 0.82, 0.68, true], [0.27, 0.42, 0.52], [0.58, 0.73, 0.52], [0.42, 0.58, 0.38]] },
@@ -19423,7 +19427,7 @@
   }
   // Il fondo, l'abisso e il palco (le crepe, il lampeggio di chi sta per crollare, le sagome della forma che arriva).
   function disegnaPalcoBrawl() {
-    if (!brawl || !brawl.palco || inArenaApp()) return;
+    if (!brawl || !brawl.palco) return;
     disegnaFondoBioma(BIOMI[brawl.bioma || 0], 0, 1);
     const g = ctx.createLinearGradient(0, pavimento - 30 * S, 0, H);
     g.addColorStop(0, "rgba(8,6,20,0)"); g.addColorStop(0.35, "rgba(8,6,20,0.92)"); g.addColorStop(1, "#05040c");
@@ -19479,7 +19483,8 @@
       ctx.restore();
     }
   }
-  const conBrawl = () => window.__ringBrawl === true || !!(window.__ringModoLibero && window.__ringModoLibero.unoControUno && window.__ringBrawl !== false);
+  // (il sito del gioco lo dice con `__ringModoLibero.brawl: true`; prima con `unoControUno`)
+  const conBrawl = () => window.__ringBrawl === true || !!(window.__ringModoLibero && (window.__ringModoLibero.brawl === true || window.__ringModoLibero.unoControUno) && window.__ringBrawl !== false);
 
   function apriBrawlScelta() {
     assicuraAcceso();
@@ -19554,7 +19559,7 @@
     creature = []; nubi = []; finale = null;
 
     brawl.palco = null; brawl.forma = 0; brawl.metamorfosi = BRAWL.metamorfosi; brawl.avviso = 0; brawl.bioma = Math.floor(Math.random() * BIOMI.length);
-    if (!inArenaApp()) { creaPalco(0); rileva(); }
+    creaPalco(0); rileva();
     const ped = piattaforma();
     const yBase = ped ? ped.t : pavimento;
     const leftX = ped ? ped.l + 35 * S : 80 * S;

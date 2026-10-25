@@ -5332,3 +5332,18 @@ test("il brawl è nel menu anche nell'estensione, accanto al combattimento liber
   r.tastoGiu("Escape");
   assert.strictEqual(r.brawl(), null);
 });
+
+test("il sito: `brawl: true` fa del brawl la seconda voce (una sola), e l'ospite che disegna i biomi li riceve", () => {
+  const sito = ambiente({ globali: { __ringModoLibero: { nome: "Brawl", testo: "", unoControUno: false, brawl: true } } });
+  const rs = sito.finestra.__ring;
+  sito.avanza(30);
+  rs.sceltaModo(true); sito.avanza(5);
+  assert.ok(rs.tastoGiu("KeyD"));
+  assert.strictEqual(rs.brawl() && rs.brawl().fase, "scelta", "la seconda voce del sito apre il brawl");
+  const visti = [];
+  const { amb, r } = corsaAvviata({ globali: { __ringBioma: (info) => { visti.push(info && info.id); return true; } } }, "robot", 99);
+  avanzaCorsa(amb, r, 60 * 6, (s) => (s.orda && s.corsa.fase === "lotta" ? false : undefined));
+  r.corsa.squarcio();
+  avanzaCorsa(amb, r, 60 * 6, (s) => (s.corsa.squarcio === null ? false : undefined));
+  assert.deepStrictEqual(visti.slice(0, 2), ["cortile", "palude"], "l'ospite sa del bioma all'inizio e a ogni cambio");
+});
