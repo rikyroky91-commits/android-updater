@@ -5183,7 +5183,8 @@ test("trasformato: i passi delle mosse restano interi, la raffica di pugni arriv
   // (il 21/10 il trasformato andava a passi di 1,6: `f.t % 4 === 2` non tornava mai e la raffica non toccava nessuno;
   // e `zip()` chiamava `maghi(f)` senza nessuna `f`, quindi ogni teletrasporto lanciava un ReferenceError)
   let colpita = false;
-  for (let prova = 0; prova < 9 && !colpita; prova++) {
+  // (un tentativo va a segno una volta su tre circa: 20 tentativi, non 9; il 25/10 in CI ne erano caduti 9 di fila)
+  for (let prova = 0; prova < 20 && !colpita; prova++) {
     const amb = ambiente();
     amb.avanza(30);
     const r = amb.finestra.__ring;
