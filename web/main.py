@@ -2953,6 +2953,67 @@ def _con_rete(scheda: dict | None, nome: str, grezzo: str = "") -> dict | None:
     return rete
 
 
+# Produttori che il TAC e i cataloghi scrivono con nomi diversi. Il gruppo
+# di `extract` è troppo largo per questo confronto (mette Motorola con vivo,
+# realme con OnePlus); qui serve sapere se due nomi parlano dello stesso
+# produttore. Lenovo sta con Motorola perché molti TAC dei moto sono
+# registrati a nome Lenovo.
+_FAMIGLIA_DI_MARCA = {
+    "xiaomi": "xiaomi", "redmi": "xiaomi", "poco": "xiaomi",
+    "vivo": "vivo", "iqoo": "vivo",
+    "motorola": "motorola", "moto": "motorola", "lenovo": "motorola",
+    "huawei": "huawei", "honor": "honor",
+    "oppo": "oppo", "realme": "realme", "oneplus": "oneplus",
+}
+
+
+def _famiglie_di_marca(testo: str) -> set[str]:
+    parole = re.sub(r"[^a-z0-9 ]+", " ",
+                    (testo or "").lower().replace("one plus", "oneplus")).split()
+    return {_FAMIGLIA_DI_MARCA[p] for p in parole if p in _FAMIGLIA_DI_MARCA}
+
+
+def _risposta_di_unaltra_marca(risultato: dict, imei: dict) -> bool:
+    """Se la ricerca partita dal TAC ha trovato il telefono di un altro produttore.
+
+    Segnalato dall'utente il 27/10/2026 con l'IMEI 867232055130331: il
+    TAC dice «SECUMORE, SECUMORE G05», del nome resta «G05», la ricerca
+    per «G05» è debole e l'AI la traduce in «Motorola moto g05». La
+    pagina usciva ibrida: titolo «SECUMORE G05», codice XT2523-3,
+    processore e firmware del moto. Due telefoni in una scheda, e nessun
+    modo di accorgersene.
+
+    Non è un caso di quel TAC. Ogni riga TAC di una marca che l'app non
+    raggruppa, con un nome corto come «A15», «G50», «C32», dopo aver
+    perso la marca somiglia a un modello di un produttore grande: misurato
+    il 27/10/2026, 4.762 righe di 185 marche (ZTE A15, Nubia A56, HMD G21,
+    TCL, Alcatel…). Il blocco sta qui, nell'ancoraggio, e non solo
+    nell'AI, perché anche una ricerca diretta può rispondere con l'altro
+    telefono.
+
+    Risponde True solo quando la risposta nomina un produttore che il TAC
+    non nomina. Una risposta senza marca riconoscibile passa: «non so»
+    non è «è un altro».
+    """
+    if not (risultato or {}).get("trovato"):
+        return False
+    marca_tac = (imei or {}).get("marca") or ""
+    if not marca_tac:
+        return False
+    nome = risultato.get("nome") or ""
+    testo_tac = " ".join([marca_tac, imei.get("modello") or "", imei.get("codice") or ""])
+    famiglie = _famiglie_di_marca(nome)
+    famiglie_tac = _famiglie_di_marca(testo_tac)
+    if famiglie and famiglie_tac:
+        return not (famiglie & famiglie_tac)
+    codice = risultato.get("codice") or ""
+    gruppo = extract.detect_brand(nome) or (sources.brand_from_code(codice) if codice else None)
+    if not gruppo:
+        return False
+    gruppo_tac = extract.detect_brand(testo_tac) or sources.gruppo_di_marca(marca_tac)
+    return gruppo != gruppo_tac
+
+
 def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
     """Il TAC stabilisce l'identità; il firmware può solo arricchirla.
 
@@ -2963,6 +3024,13 @@ def _ancora_esito_imei(risultato: dict, imei: dict) -> dict:
     identita = imei.get("modello_cercato") or ""
     if not identita:
         return risultato
+
+    # UNA RISPOSTA SU UN ALTRO PRODUTTORE NON ARRICCHISCE NIENTE: si butta
+    # tutta: codice, firmware, notizie, interpretazione dell'AI. Resta il
+    # telefono del TAC, con il confronto fra le fonti e i link di verifica
+    # che la pagina mostra comunque. Vedi `_risposta_di_unaltra_marca`.
+    if _risposta_di_unaltra_marca(risultato, imei):
+        risultato = _esito_vuoto(identita)
 
     ancorato = dict(risultato)
     codice = imei.get("codice") or ancorato.get("codice", "")
