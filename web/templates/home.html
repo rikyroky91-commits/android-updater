@@ -72,7 +72,10 @@
    uno stacco: la seconda copia è nascosta ai lettori di schermo e fuori
    dal giro del tasto Tab, così non si legge tutto due volte. #}
 <div class="ultimora" data-ultimora>
-  <canvas class="ultimora-ring" data-ring aria-hidden="true"></canvas>
+  {# LE LOTTE A RICHIESTA (02/11/2026, Riccardo: «spegni le lotte all'avvio del sito e mettile
+     opzionali solo se si vogliono attivare»): con `data-lotte="a-richiesta"` il ring parte spento a
+     ogni visita e si accende solo col tasto «Lotte» della striscia (vedi `ring.js`). #}
+  <canvas class="ultimora-ring" data-ring data-lotte="a-richiesta" aria-hidden="true"></canvas>
   {# LA TENDINA DEL RING (01/10/2026, su richiesta): si apre dal tasto col
      guantone. Armi e oggetti da mettere in campo a mano, imprevisti da accendere e spegnere.
      Senza JavaScript resta nascosta.
@@ -244,13 +247,14 @@
             aria-expanded="false" aria-controls="ring-pannello"
             title="Opzioni del combattimento: personaggi, armi, imprevisti">&#129354;</button>
     <button type="button" class="ultimora-tasto ultimora-gioca" data-gioca hidden
-            aria-pressed="true" aria-label="Lotte accese o spente"
-            title="Spegni le lotte e lascia solo le notizie">
+            aria-pressed="false" aria-label="Lotte accese o spente"
+            title="Accendi le lotte">
       <svg class="omino" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
         <circle cx="12" cy="5" r="2.6" fill="none" stroke="currentColor" stroke-width="2"/>
         <path d="M12 8v7M7 11h10M12 15l-4 6M12 15l4 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         <path class="omino-taglio" d="M4 20L20 4" stroke="#d8343f" stroke-width="2.6" stroke-linecap="round"/>
       </svg>
+      <span class="gioca-invito">Lotte</span>
     </button>
   </div>
 </div>

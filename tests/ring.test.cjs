@@ -33,7 +33,7 @@ function riquadro(l, t, r, b) {
 // i test della corsa vogliono l'orda subito, senza schede che fermano il gioco. Vedi «LA PRIMA CORSA GUIDATA».)
 const GIA_VISTI = JSON.stringify({ lento: 1, svelto: 1, corvo: 1, striscia: 1, botto: 1, dragoFuoco: 1, gonfio: 1, saltatore: 1, dragoFulmine: 1, corazzato: 1, gelido: 1,
   grosso: 1, dragoVeleno: 1, sputatore: 1, rabbioso: 1, bruto: 1, saiba: 1, capo: 1, doro: 1, letale: 1, motosega: 1 });
-function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false, premio = null, pannello = false, audio = null, arena = null, globali = {}, nuovo = false } = {}) {
+function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [], campo = null, memoria = {}, estensione = false, premio = null, pannello = false, audio = null, arena = null, globali = {}, nuovo = false, lotte = null } = {}) {
   if (!nuovo) { if (!("mut-ring-guida" in memoria)) memoria["mut-ring-guida"] = "fatta"; if (!("mut-ring-presentati" in memoria)) memoria["mut-ring-presentati"] = GIA_VISTI; }
   const richieste = [];
   const ascoltatori = {};
@@ -55,6 +55,8 @@ function ambiente({ ridotto = false, larghezza = 1200, altezza = 800, solidi = [
   });
   const tela = { clientWidth: larghezza, clientHeight: altezza, width: 0, height: 0, style: {},
                  getContext: () => contesto2d };
+  // `data-lotte="a-richiesta"` sul canvas, come nella home di M.U.T. (02/11/2026).
+  if (lotte) tela.getAttribute = (k) => (k === "data-lotte" ? lotte : null);
   const pavimento = altezza - 44;
   const barra = { getBoundingClientRect: () => riquadro(0, pavimento, larghezza, altezza) };
   const elementi = solidi.map(([l, t, r, b]) => ({
@@ -291,6 +293,32 @@ test("il tasto spegne tutto il livello delle lotte e lo riaccende", () => {
   assert.strictEqual(amb.stato().lottatori.length, 2);
   assert.notStrictEqual(amb.tela.style.display, "none");
   amb.avanza(120); dentro(amb);
+});
+
+test("lotte a richiesta (home di M.U.T.): partono spente anche con «mut-ring» acceso, il tasto le accende per la scheda", () => {
+  const scheda = {};
+  const sessionStorage = { getItem: (k) => (k in scheda ? scheda[k] : null), setItem: (k, v) => { scheda[k] = String(v); } };
+  const amb = ambiente({ lotte: "a-richiesta", memoria: { "mut-ring": "on" }, globali: { sessionStorage } });
+  amb.avanza(30);
+  assert.strictEqual(amb.stato().lottatori.length, 0, "all'avvio del sito le lotte sono spente");
+  assert.strictEqual(amb.tela.style.display, "none");
+  assert.strictEqual(amb.tasto.attr["aria-pressed"], "false");
+  assert.strictEqual(amb.tasto.title, "Accendi le lotte");
+  amb.tasto.ascolta.click();
+  assert.strictEqual(amb.stato().lottatori.length, 2, "il tasto le accende");
+  assert.strictEqual(scheda["mut-ring-lotte"], "on");
+  assert.strictEqual(amb.memoria["mut-ring"], "on", "la scelta di sempre non si tocca");
+  amb.avanza(60); dentro(amb);
+  // Nella stessa scheda, tornando in home, restano accese; in una scheda nuova si riparte spenti.
+  assert.strictEqual(ambiente({ lotte: "a-richiesta", globali: { sessionStorage } }).stato().lottatori.length, 2);
+  assert.strictEqual(ambiente({ lotte: "a-richiesta", memoria: { "mut-ring": "on" } }).stato().lottatori.length, 0);
+  // Spente col tasto, la scheda lo ricorda.
+  amb.tasto.ascolta.click();
+  assert.strictEqual(scheda["mut-ring-lotte"], "off");
+  assert.strictEqual(amb.memoria["mut-ring"], "on");
+  // E nella home vera il canvas lo chiede.
+  const casa = fs.readFileSync(path.join(__dirname, "..", "web", "templates", "home.html"), "utf8");
+  assert.ok(/<canvas class="ultimora-ring" data-ring data-lotte="a-richiesta"/.test(casa), "la home non chiede le lotte a richiesta");
 });
 
 test("la scelta «spento» si ricorda alla visita dopo; «acceso» batte il movimento ridotto", () => {

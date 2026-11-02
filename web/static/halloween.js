@@ -4,8 +4,9 @@
  * Con zucche, luci e zombie tipiche e mani senza arti che camminano in giro,
  * tema scuro attivato di standard».
  *
- * QUANDO: si accende da solo dal 1° ottobre al 2 novembre (la data è quella
- * del browser). Il tasto con la zucca nella testata lo spegne e lo riaccende;
+ * QUANDO: si accende da solo dal 1° ottobre al 1° novembre (la data è quella
+ * del browser; fino al 02/11/2026 era il 2 novembre, che ora è del passaggio a
+ * Natale, vedi «IL PASSAGGIO A NATALE» qui sotto). Il tasto con la zucca nella testata lo spegne e lo riaccende;
  * spento in stagione resta spento fino alla stagione dopo (`mut-halloween`
  * = "off-2026"), acceso fuori stagione resta acceso fino a fine anno
  * ("on-2026"). `?halloween=1` (o `=0`) nell'indirizzo lo forza per quella
@@ -30,6 +31,27 @@
  *   - pipistrelli ogni tanto, nebbia bassa sul fondo, ragnatele negli angoli.
  * Con «meno movimento» restano zucche, lucine e ragnatele, ferme.
  *
+ * IL PASSAGGIO A NATALE (02/11/2026). Riccardo: «fai un tema di transizione
+ * da quello di halloween a quello di natale, come se la neve e il natale
+ * portano via le zucche, gli zombie e altro e diventa il tema di natale».
+ * Dal 2 all'8 novembre la prima pagina aperta in ogni scheda parte ancora con
+ * Halloween e lo fa sparire così (una dozzina di secondi):
+ *   1. un attimo di Halloween com'è, con uno zombie e i pipistrelli in vista;
+ *   2. comincia a nevicare (`__natale.arriva()`): le lucine si spengono una a
+ *      una, la neve fa il cappuccio alle zucche e le candele si smorzano, gli
+ *      zombie si fermano, tremano e restano chiusi in un blocco di ghiaccio, le
+ *      mani scappano fuori dalla finestra, i pipistrelli volano via, la nebbia
+ *      sbianca e le ragnatele brinano;
+ *   3. arriva la tormenta (`__natale.soffia()`): le zucche rotolano giù dagli
+ *      elementi e fuori dallo schermo, i blocchi di ghiaccio con gli zombie
+ *      scivolano via, ragnatele e filo delle lucine volano col vento;
+ *   4. il canvas sfuma, la classe `html.halloween` se ne va e resta il tema di
+ *      Natale, con albero, pupazzi e regali che spuntano dalla neve.
+ * Lo decide lo script in testa a `base.html` (classe `html.passaggio`, una
+ * volta per scheda: `sessionStorage` `mut-passaggio`); `?passaggio=1` lo
+ * forza. Non si salva niente in `mut-halloween` né in `mut-natale`. Con «meno
+ * movimento» non c'è la scena: si passa subito a Natale.
+ *
  * Tutti i disegni sono nostri.
  */
 (function () {
@@ -39,8 +61,8 @@
   var CHIAVE = "mut-halloween";
   var ridotto = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
-  // La stagione: dal 1° ottobre al 2 novembre.
-  function inStagione(d) { var m = d.getMonth(), g = d.getDate(); return m === 9 || (m === 10 && g <= 2); }
+  // La stagione: dal 1° ottobre al 1° novembre (il 2 comincia il passaggio a Natale).
+  function inStagione(d) { var m = d.getMonth(), g = d.getDate(); return m === 9 || (m === 10 && g <= 1); }
   function decidi(d, salvata, indirizzo) {
     var forza = /[?&]halloween=(1|0)\b/.exec(indirizzo || "");
     if (forza) return forza[1] === "1";
@@ -51,7 +73,14 @@
   }
   var salvata = null;
   try { salvata = window.localStorage.getItem(CHIAVE); } catch (e) { /* niente scelta */ }
-  var acceso = decidi(new Date(), salvata, window.location ? window.location.search : "");
+  var cerca = window.location ? window.location.search || "" : "";
+  var acceso = decidi(new Date(), salvata, cerca);
+  // Il passaggio a Natale: chiesto da `base.html` (o da `?passaggio=1`), parte con Halloween acceso.
+  var chiedePassaggio = !!((radice.classList && radice.classList.contains && radice.classList.contains("passaggio")) || /[?&]passaggio=1\b/.test(cerca));
+  if (chiedePassaggio) acceso = true;
+  var passaggio = null;
+  // I tempi della scena, in fotogrammi (60 al secondo) dall'inizio del passaggio.
+  var PASSAGGIO = { neve: 80, gelo: 120, raffica: 330, fine: 680, sfuma: 45 };
 
   var tela = null, ctx = null, W = 0, H = 0, richiesta = null, passi = 0;
   var pavimento = 0, sottoTestata = 0, superfici = [];
@@ -71,6 +100,7 @@
     }
   }
   function imposta(nuovo) {
+    if (passaggio || chiedePassaggio) { chiedePassaggio = false; passaggio = null; finePassaggio(false); }
     acceso = !!nuovo;
     var d = new Date(), anno = d.getFullYear();
     try {
@@ -165,6 +195,7 @@
   // --- Il passo ---------------------------------------------------------
   function passo() {
     passi++;
+    if (passaggio) { passoPassaggio(); return; }
     var i;
     // Gli zombie: uno alla volta (due sui computer), ogni dieci-venti secondi.
     if (passi >= prossimoZombie && zombie.length < (W < 640 ? 1 : 2)) { nuovoZombie(); prossimoZombie = passi + Math.round(caso(600, 1200)); }
@@ -240,6 +271,140 @@
     }
   }
 
+  // --- IL PASSAGGIO A NATALE (vedi in testa) ------------------------------
+  // Da 0 a 1 mentre `t` va da `a` a `b`.
+  function fra(t, a, b) { return t <= a ? 0 : t >= b ? 1 : (t - a) / (b - a); }
+  function chiamaNatale(nome, a, b) {
+    var n = window.__natale;
+    if (n && typeof n[nome] === "function") { try { n[nome](a, b); } catch (e) { /* Natale arriva lo stesso con la pagina dopo */ } }
+  }
+  function iniziaPassaggio() {
+    chiedePassaggio = false;
+    if (ridotto || !tela) { finePassaggio(true); return; }
+    passaggio = { t: 0, gelo: 0, filo: 1, ragnaVia: 0, spente: 0 };
+    // In scena almeno uno zombie (due sui computer) e due pipistrelli: devono esserci, per vederli andare via.
+    zombie = [];
+    var quanti = W < 640 ? 1 : 2;
+    for (var i = 0; i < quanti; i++) {
+      nuovoZombie();
+      var z = zombie[zombie.length - 1];
+      z.x = W * (i ? 0.66 : 0.34); z.dir = i ? -1 : 1; z.ritardo = i * 25;
+    }
+    nuovoPipistrello(); nuovoPipistrello();
+    for (i = 0; i < zucche.length; i++) zucche[i].ritardo = Math.round(caso(0, 70));
+    riparti();
+  }
+  function passoPassaggio() {
+    var P = passaggio, t = ++P.t, i;
+    if (t === PASSAGGIO.neve) chiamaNatale("arriva");
+    if (t === PASSAGGIO.raffica) chiamaNatale("soffia", 5, PASSAGGIO.fine - PASSAGGIO.raffica);
+    var vento = t >= PASSAGGIO.raffica;
+    P.gelo = fra(t, PASSAGGIO.gelo, PASSAGGIO.gelo + 170);
+    // Le lucine si spengono una a una, da sinistra, appena comincia a nevicare.
+    if (t >= PASSAGGIO.neve + 30 && t % 5 === 0) {
+      var pos = Lampadine();
+      if (P.spente < pos.length) { var l = lucine[P.spente] || (lucine[P.spente] = { spenta: 0, dondola: 0 }); l.spenta = 150; l.morta = true; l.dondola = 0.7; P.spente++; }
+    }
+    tocca(Lampadine(), true);
+    if (vento) { P.filo = Math.max(0, P.filo - 0.008); P.ragnaVia = Math.min(1.01, P.ragnaVia + 0.007); }
+    // Le zucche: il cappuccio di neve, la candela che si smorza, poi la tormenta le fa rotolare via.
+    var neve = fra(t, PASSAGGIO.neve + 20, PASSAGGIO.neve + 230), smorza = fra(t, PASSAGGIO.neve + 60, PASSAGGIO.raffica);
+    for (i = zucche.length - 1; i >= 0; i--) {
+      var zu = zucche[i];
+      zu.neve = neve; zu.candela = 1 - 0.92 * smorza; zu.sveglia *= 0.9; zu.salta = 0;
+      if (vento && !zu.via && t >= PASSAGGIO.raffica + (zu.ritardo || 0)) {
+        var s = superficie(zu.el);
+        if (!s) { zucche.splice(i, 1); continue; }
+        zu.via = { x: s.l + (s.r - s.l) * zu.u, y: s.t, vx: 0, vy: 0, giro: 0, max: caso(4.5, 7), sopra: zu.el === "fondo" ? null : { l: s.l, r: s.r } };
+      }
+      if (zu.via && rotola(zu)) zucche.splice(i, 1);
+    }
+    // Gli zombie: camminano ancora un attimo, poi si fermano, gelano e la tormenta li fa scivolare via nel ghiaccio.
+    for (i = zombie.length - 1; i >= 0; i--) {
+      var z = zombie[i], rit = z.ritardo || 0;
+      if (t < PASSAGGIO.gelo + rit) { z.x += z.dir * z.v; z.fase += 0.07 + z.v * 0.05; continue; }
+      z.sosta = 2;
+      z.gelo = fra(t, PASSAGGIO.gelo + rit, PASSAGGIO.gelo + rit + 150);
+      if (vento && t >= PASSAGGIO.raffica + 20 + rit) {
+        z.vs = Math.min(8, (z.vs || 0) + 0.08); z.x += z.vs; z.incl = Math.min(0.14, z.vs * 0.02);
+      }
+      if (z.x > W + 90 || z.x < -90) zombie.splice(i, 1);
+    }
+    // Le mani scappano fuori dalla finestra, dal lato più vicino.
+    for (i = mani.length - 1; i >= 0; i--) {
+      var m = mani[i];
+      if (t < PASSAGGIO.neve + 20) { muoviMano(m); continue; }
+      if (fugge(m)) mani.splice(i, 1);
+    }
+    // I pipistrelli: dopo la prima neve se ne vanno in alto, veloci.
+    for (i = pipistrelli.length - 1; i >= 0; i--) {
+      var p = pipistrelli[i];
+      if (t >= PASSAGGIO.neve + 20) { p.v = Math.min(6, p.v + 0.08); p.y -= 1.6; }
+      p.x += p.dir * p.v; p.fase += 0.35; p.y += Math.sin(p.fase * 0.3) * 0.9;
+      if (p.x < -50 || p.x > W + 50 || p.y < -40) pipistrelli.splice(i, 1);
+    }
+    // La nebbia sbianca e si dirada; col vento corre via.
+    for (i = nebbia.length - 1; i >= 0; i--) {
+      var q = nebbia[i];
+      q.x += q.v + (vento ? 5 : 0);
+      if (t >= PASSAGGIO.neve) q.a *= 0.994;
+      if (q.x > W + q.r || q.a < 0.005) nebbia.splice(i, 1);
+    }
+    // La fine: quando non è rimasto niente (o al più tardi a `fine`) il canvas sfuma e resta Natale.
+    var vuoto = !zucche.length && !zombie.length && !mani.length && !pipistrelli.length;
+    if ((vuoto && t > PASSAGGIO.raffica + 60) || t >= PASSAGGIO.fine) {
+      P.sfuma = (P.sfuma || 0) + 1;
+      if (tela && tela.style) tela.style.opacity = String(Math.max(0, 1 - P.sfuma / PASSAGGIO.sfuma));
+      if (P.sfuma >= PASSAGGIO.sfuma) finePassaggio(true);
+    }
+  }
+  // La zucca spinta dal vento: rotola, cade giù dall'elemento, rimbalza sul fondo. Vero quando è uscita.
+  function rotola(z) {
+    var v = z.via;
+    v.vx += (v.max - v.vx) * 0.035;
+    v.x += v.vx; v.giro += v.vx / Math.max(4, z.r);
+    if (v.sopra && (v.x > v.sopra.r + z.r * 0.4 || v.x < v.sopra.l - z.r * 0.4)) v.sopra = null;
+    if (!v.sopra) {
+      if (v.y < pavimento || v.vy < 0) { v.vy += 0.45; v.y += v.vy; }
+      if (v.y >= pavimento) { v.y = pavimento; v.vy = v.vy > 2 ? -v.vy * 0.35 : 0; }
+      else if (v.vy === 0 && v.y >= pavimento - 0.5 && Math.random() < 0.012) v.vy = -2;
+    }
+    return v.x - z.r > W + 30 || v.x + z.r < -30;
+  }
+  // La mano in fuga: corre verso il bordo più vicino e, finito l'elemento, salta giù. Vero quando è uscita.
+  function fugge(m) {
+    if (!m.fuga) {
+      m.fuga = { vy: 0, sopra: null };
+      m.salto = null; m.pronto = null; m.carica = 0; m.ferma = 0; m.tamburo = 0; m.pendenza = 0;
+      m.dir = m.x < W / 2 ? -1 : 1;
+      var s = superficie(m.el);
+      if (s && s.el !== "fondo") m.fuga.sopra = { l: s.l, r: s.r, t: s.t };
+      m.sobbalzo = 10;
+    }
+    var f = m.fuga, v = 4.6;
+    m.scappa = 30;
+    m.x += m.dir * v; m.passo += 0.22 * v;
+    if (f.sopra && (m.x < f.sopra.l || m.x > f.sopra.r)) f.sopra = null;
+    if (f.sopra) m.y = f.sopra.t;
+    else if (m.y < pavimento) { f.vy += 0.5; m.y = Math.min(pavimento, m.y + f.vy); if (m.y >= pavimento) { f.vy = 0; m.atterra = 10; } }
+    if (m.atterra > 0) m.atterra--;
+    if (m.sobbalzo > 0) m.sobbalzo--;
+    return m.x < -40 || m.x > W + 40;
+  }
+  // Chiude il passaggio: Halloween se ne va del tutto e Natale resta acceso (se `aNatale`).
+  function finePassaggio(aNatale) {
+    passaggio = null; chiedePassaggio = false;
+    if (aNatale) chiamaNatale("arriva");
+    try { if (window.sessionStorage) window.sessionStorage.setItem("mut-passaggio", "fatto"); } catch (e) { /* pazienza */ }
+    if (radice.classList && radice.classList.remove) radice.classList.remove("passaggio");
+    if (!aNatale) return;
+    acceso = false;
+    radice.classList.toggle("halloween", false);
+    aggiornaTasti();
+    try { window.dispatchEvent(new CustomEvent("mut:halloween", { detail: { acceso: false } })); } catch (e) { /* pazienza */ }
+    spegni();
+  }
+
   // --- Il puntatore su zucche e lucine ---------------------------------
   function vicinoA(x, y, raggio) { var dx = puntatore.x - x, dy = puntatore.y - y; return dx * dx + dy * dy < raggio * raggio; }
   function svegliaZucca(z) {
@@ -265,7 +430,7 @@
       if (vicinoA(pos[i].x, pos[i].y + 7, 16)) {
         if (l.spenta <= 0) l.dondola = 1;
         l.spenta = 150;
-      } else if (conTempo && l.spenta > 0) l.spenta--;
+      } else if (conTempo && l.spenta > 0 && !(l.morta && l.spenta <= 112)) l.spenta--;
       if (conTempo) l.dondola *= 0.965;
     }
   }
@@ -275,6 +440,9 @@
     var r = z.r, sv = ridotto ? (vicinoA(x, y - r * 0.82, r * 1.7 + 10) ? 1 : 0) : z.sveglia;
     var fiamma = 0.75 + 0.25 * Math.sin(passi * 0.21 + z.fase) * Math.sin(passi * 0.13 + z.fase * 2) + (ridotto ? 0.2 : Math.random() * 0.08);
     fiamma += 0.35 * sv;
+    // Nel passaggio a Natale la neve smorza la candela (`candela` da 1 a quasi 0).
+    var candela = z.candela === undefined ? 1 : z.candela;
+    fiamma *= candela;
     // Il bagliore a terra: sveglia, la candela divampa.
     var g = ctx.createRadialGradient(x, y - r * 0.6, r * 0.2, x, y - r * 0.6, r * (3 + 1.2 * sv));
     g.addColorStop(0, "rgba(255,150,40," + Math.min(0.6, 0.28 * fiamma * (1 + sv)).toFixed(3) + ")"); g.addColorStop(1, "rgba(255,150,40,0)");
@@ -287,6 +455,8 @@
     ctx.scale(cresce * (1 - 0.06 * k + schiaccia), cresce * (1 + 0.1 * k - schiaccia));
     if (z.salta > 0) ctx.rotate(Math.sin(t * Math.PI * 2) * 0.12);
     var cy = -r * 0.82;
+    // Spinta dalla tormenta, la zucca rotola sul suo centro.
+    if (z.via) { ctx.translate(0, cy); ctx.rotate(z.via.giro); ctx.translate(0, -cy); }
     ctx.lineWidth = Math.max(1, r * 0.07); ctx.strokeStyle = "#3a1d07";
     // Gli spicchi: quelli di lato prima, poi quello davanti.
     var spicchi = [[-0.45, 0.62, "#d8621a"], [0.45, 0.62, "#d8621a"], [-0.2, 0.75, "#ee7a22"], [0.2, 0.75, "#ee7a22"], [0, 0.6, "#f58a2a"]];
@@ -302,6 +472,7 @@
     var luce = "rgba(255," + Math.round(Math.min(255, 200 + 40 * fiamma)) + "," + Math.round(Math.min(200, 60 + 60 * fiamma)) + "," + Math.min(1, 0.75 + 0.25 * fiamma).toFixed(3) + ")";
     var gx = Math.max(-1, Math.min(1, (puntatore.x - x) / 150)) * r * 0.08 * sv, gy = Math.max(-1, Math.min(1, (puntatore.y - y) / 150)) * r * 0.06 * sv;
     ctx.fillStyle = luce; ctx.beginPath();
+    if (candela < 1) ctx.globalAlpha = 0.3 + 0.7 * candela;
     var oy = cy - r * 0.2 + gy, ox = gx;
     if (z.faccia === 1) {
       // occhi tondi
@@ -320,11 +491,32 @@
     var denti = z.faccia === 2 ? 3 : 4;
     for (var q = denti; q >= 0; q--) { var px = -mw + (2 * mw) * q / denti; ctx.lineTo(px, my + (q % 2 ? r * 0.12 : r * 0.02)); }
     ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+    if (z.neve > 0) disegnaCappuccio(r, cy, z.neve);
     ctx.restore();
+  }
+  // Il cappuccio di neve sulla zucca (passaggio a Natale): cresce con `neve` da 0 a 1 e cola un po' sui fianchi.
+  function disegnaCappuccio(r, cy, neve) {
+    var w = r * (0.55 + 0.4 * neve), h = r * (0.12 + 0.3 * neve), top = cy - r * 0.78;
+    ctx.fillStyle = "#f4f8ff"; ctx.strokeStyle = "rgba(150,180,215,.85)"; ctx.lineWidth = Math.max(0.8, r * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(-w, top + h * 0.55);
+    ctx.quadraticCurveTo(-w * 0.9, top - h * 0.9, 0, top - h);
+    ctx.quadraticCurveTo(w * 0.9, top - h * 0.9, w, top + h * 0.55);
+    // il bordo di sotto a goccioloni
+    var n = 5;
+    for (var i = n; i >= 0; i--) { var px = -w + 2 * w * i / n; ctx.lineTo(px, top + h * (i % 2 ? 0.95 + 0.5 * neve : 0.5)); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.beginPath(); ctx.ellipse(-w * 0.35, top - h * 0.45, w * 0.22, h * 0.25, -0.3, 0, Math.PI * 2); ctx.fill();
   }
   function disegnaLucine() {
     var y0 = sottoTestata + 2, campata = W < 640 ? 140 : 200, pos = Lampadine(), i;
     if (ridotto) tocca(pos, false);
+    // Nel passaggio, con la tormenta il filo sbiadisce e se ne va col vento.
+    var filo = passaggio ? passaggio.filo : 1;
+    if (filo <= 0) return;
+    ctx.save();
+    if (filo < 1) { ctx.globalAlpha = filo; ctx.translate((1 - filo) * 90, (1 - filo) * 30); }
     ctx.strokeStyle = "rgba(30,24,20,.85)"; ctx.lineWidth = 1.3;
     ctx.beginPath();
     for (var x = 0; x <= W; x += 6) { var u = (x % campata) / campata; var y = y0 + Math.sin(Math.PI * u) * 14; if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
@@ -343,9 +535,9 @@
         ctx.fillStyle = "rgba(255,255,255,.18)"; ctx.beginPath(); ctx.ellipse(-1.1, 4.6, 0.9, 1.6, 0, 0, Math.PI * 2); ctx.fill();
       } else {
         ctx.fillStyle = c;
-        ctx.globalAlpha = 0.3 * onda; ctx.beginPath(); ctx.arc(0, 6, 9, 0, Math.PI * 2); ctx.fill();
-        ctx.globalAlpha = 0.45 + 0.55 * onda; ctx.beginPath(); ctx.ellipse(0, 6, 3.2, 4.6, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = 0.3 * onda * filo; ctx.beginPath(); ctx.arc(0, 6, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = (0.45 + 0.55 * onda) * filo; ctx.beginPath(); ctx.ellipse(0, 6, 3.2, 4.6, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = filo;
       }
       ctx.fillStyle = "#2a2420"; ctx.fillRect(-2, 0, 4, 3);
       ctx.restore();
@@ -358,9 +550,16 @@
         ctx.stroke();
       }
     }
+    ctx.restore();
   }
   function disegnaRagnatela(x, y, sx, r) {
-    ctx.strokeStyle = "rgba(200,200,215,.38)"; ctx.lineWidth = 1;
+    // Nel passaggio brina (si fa bianca) e poi la tormenta se la porta via.
+    var gelo = passaggio ? passaggio.gelo : 0, via = passaggio ? passaggio.ragnaVia : 0;
+    if (via > 1) return;
+    ctx.save();
+    if (via > 0) { ctx.globalAlpha = 1 - via; ctx.translate(via * via * W * 0.5, via * 60); ctx.rotate(via * 0.8); }
+    ctx.strokeStyle = gelo > 0 ? "rgba(" + Math.round(200 + 45 * gelo) + "," + Math.round(200 + 50 * gelo) + ",255," + (0.38 + 0.4 * gelo).toFixed(3) + ")" : "rgba(200,200,215,.38)";
+    ctx.lineWidth = 1 + gelo * 0.6;
     var raggi = 6, giri = 5, i, k;
     ctx.beginPath();
     for (i = 0; i <= raggi; i++) { var a = (Math.PI / 2) * i / raggi; ctx.moveTo(x, y); ctx.lineTo(x + sx * Math.cos(a) * r, y + Math.sin(a) * r); }
@@ -380,10 +579,13 @@
     ctx.strokeStyle = "#17171c"; ctx.lineWidth = 0.9; ctx.beginPath();
     for (i = -1; i <= 1; i += 2) for (k = 0; k < 3; k++) { ctx.moveTo(fx, fy); ctx.lineTo(fx + i * 5, fy - 2 + k * 2.5); }
     ctx.stroke();
+    ctx.restore();
   }
   function disegnaZombie(z) {
     var x = z.x, y = pavimento, s = z.s, d = z.dir, ph = z.fase, nero = "#17171c";
-    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    // Nel passaggio: mentre gela trema, poi il blocco scivola inclinato col vento.
+    if (z.gelo > 0 && z.gelo < 1 && !ridotto) x += Math.sin(passi * 1.7 + ph) * 0.9 * z.gelo;
+    ctx.save(); ctx.translate(x, y); if (z.incl) ctx.rotate(z.incl); ctx.scale(s, s);
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     var cammina = z.sosta <= 0, dond = Math.sin(ph * 0.5) * 1.5;
     var anca = { x: 0, y: -26 };
@@ -420,7 +622,29 @@
       ctx.strokeStyle = nero; ctx.lineWidth = 5.4; ctx.beginPath(); ctx.moveTo(spalla.x, spalla.y + su); ctx.lineTo(gom.x, gom.y); ctx.lineTo(mano.x, mano.y); ctx.stroke();
       ctx.strokeStyle = brac[i][1]; ctx.lineWidth = 3.4; ctx.stroke();
     }
+    if (z.gelo > 0) disegnaBlocco(z.gelo, d);
     ctx.restore();
+  }
+  // Il blocco di ghiaccio intorno allo zombie (passaggio a Natale): sale dai piedi alla testa con `gelo` da 0 a 1.
+  function disegnaBlocco(gelo, d) {
+    var l = Math.min(-13 * d, 33 * d), w = 46, alto = 72, h = alto * Math.min(1, gelo * 1.15), top = -h;
+    ctx.fillStyle = "rgba(186,224,255," + (0.18 + 0.3 * gelo).toFixed(3) + ")";
+    ctx.strokeStyle = "rgba(235,248,255," + (0.5 + 0.4 * gelo).toFixed(3) + ")"; ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(l + 3, 0); ctx.lineTo(l, top + 5); ctx.lineTo(l + 6, top); ctx.lineTo(l + w - 4, top + 2); ctx.lineTo(l + w, top + 8); ctx.lineTo(l + w - 2, 0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // i riflessi e qualche crepa
+    ctx.strokeStyle = "rgba(255,255,255," + (0.35 + 0.5 * gelo).toFixed(3) + ")"; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(l + 6, top + 8); ctx.lineTo(l + 6, top + Math.min(h - 4, 30));
+    ctx.moveTo(l + 11, top + 6); ctx.lineTo(l + 11, top + Math.min(h - 4, 16));
+    ctx.moveTo(l + w - 10, -6); ctx.lineTo(l + w - 16, -16); ctx.lineTo(l + w - 12, -24);
+    ctx.stroke();
+    // la neve sopra al blocco
+    if (gelo > 0.6) {
+      var k = (gelo - 0.6) / 0.4;
+      ctx.fillStyle = "#f4f8ff"; ctx.beginPath();
+      ctx.moveTo(l + 2, top + 4); ctx.quadraticCurveTo(l + w / 2, top - 7 * k, l + w - 1, top + 6); ctx.lineTo(l + 2, top + 6); ctx.closePath(); ctx.fill();
+    }
   }
   // LA MANO CHE CAMMINA (rifatta il 10/10/2026: «troppo brutte»). Vista di lato, il dorso
   // in su: quattro dita a tre falangi per zampe, che si muovono a coppie alternate come un
@@ -582,7 +806,9 @@
     for (i = 0; i < pipistrelli.length; i++) disegnaPipistrello(pipistrelli[i]);
     for (i = 0; i < zombie.length; i++) disegnaZombie(zombie[i]);
     for (i = 0; i < zucche.length; i++) {
-      var z = zucche[i], s = superficie(z.el);
+      var z = zucche[i];
+      if (z.via) { disegnaZucca(z, z.via.x, z.via.y); continue; }
+      var s = superficie(z.el);
       if (!s) continue;
       disegnaZucca(z, s.l + (s.r - s.l) * z.u, s.t);
     }
@@ -615,7 +841,7 @@
   }
   function spegni() {
     if (richiesta) { window.cancelAnimationFrame(richiesta); richiesta = null; }
-    if (tela) { ctx.clearRect(0, 0, W, H); tela.style.display = "none"; }
+    if (tela) { ctx.clearRect(0, 0, W, H); tela.style.display = "none"; tela.style.opacity = ""; }
     zucche = []; zombie = []; mani = []; pipistrelli = []; nebbia = [];
   }
 
@@ -642,6 +868,7 @@
     radice.classList.toggle("halloween", acceso);
     aggiornaTasti();
     if (acceso) avvia();
+    if (chiedePassaggio) iniziaPassaggio();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", pronto);
   else pronto();
@@ -656,6 +883,8 @@
     puntatore: function (x, y) { puntatore.x = x; puntatore.y = y; },
     mani: function () { return mani; },
     passi: function (n) { for (var i = 0; i < n; i++) passo(); disegna(); },
+    passaggio: function () { return passaggio ? { t: passaggio.t, gelo: passaggio.gelo, filo: passaggio.filo, spente: passaggio.spente } : null; },
+    tempiPassaggio: PASSAGGIO,
     stato: function () {
       return { acceso: acceso, zucche: zucche.length,
                zuccheSveglie: zucche.filter(function (z) { return z.sveglia > 0.5; }).length,
@@ -663,7 +892,10 @@
                lampadine: Lampadine(), zombie: zombie.map(function (z) { return { x: z.x, dir: z.dir }; }), pipistrelli: pipistrelli.length,
                mani: mani.map(function (m) { return { x: m.x, y: m.y, dir: m.dir, scappa: m.scappa, salta: !!m.salto || m.carica > 0 }; }),
                posZucche: zucche.map(function (z) { var s = superficie(z.el); return s ? { x: s.l + (s.r - s.l) * z.u, y: s.t - z.r * 0.82 } : null; }),
-               superfici: superfici.length, pavimento: pavimento, sottoTestata: sottoTestata };
+               superfici: superfici.length, pavimento: pavimento, sottoTestata: sottoTestata,
+               zombieGelati: zombie.filter(function (z) { return z.gelo >= 1; }).length,
+               zuccheInViaggio: zucche.filter(function (z) { return !!z.via; }).length,
+               zuccheInnevate: zucche.filter(function (z) { return z.neve > 0.9; }).length };
     },
   };
 })();

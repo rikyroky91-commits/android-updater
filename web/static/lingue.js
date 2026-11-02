@@ -113,6 +113,7 @@
     "Chiudi le opzioni": ["Close options", "Cerrar opciones", "Fermer les options", "Optionen schließen"],
     "Lotte accese o spente": ["Fights on or off", "Peleas activadas o desactivadas", "Combats activés ou désactivés", "Kämpfe an oder aus"],
     "Spegni le lotte e lascia solo le notizie": ["Turn off the fights and keep only the news", "Apaga las peleas y deja solo las noticias", "Désactiver les combats et ne garder que les nouvelles", "Kämpfe ausschalten, nur die Meldungen behalten"],
+    "Lotte": ["Fights", "Peleas", "Combats", "Kämpfe"],
     "Accendi le lotte": ["Turn on the fights", "Enciende las peleas", "Activer les combats", "Kämpfe einschalten"],
     "Nessuna novità in archivio per ora: la prossima scansione riempie questa striscia.": [
       "No news in the archive yet: the next scan will fill this strip.",

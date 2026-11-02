@@ -4,6 +4,18 @@
  * spegne; la scelta resta nel browser (`mut-natale`). È separato dal ring
  * dei due lottatori: funziona su ogni pagina.
  *
+ * DA SOLO IN STAGIONE (02/11/2026, col passaggio da Halloween, vedi
+ * `halloween.js`): sul sito si accende da solo dal 2 novembre al 6 gennaio.
+ * Spento col tasto in stagione resta spento fino alla stagione dopo
+ * (`mut-natale` = "off-2026", l'anno del dicembre di quella stagione);
+ * acceso a mano fuori stagione resta acceso ("on", come prima). `?natale=1`
+ * (o `=0`) lo forza per quella pagina. Lo decide lo script in testa a
+ * `base.html` con la classe `html.natale`, che qui si legge e basta.
+ * `__natale.arriva()` lo accende senza salvare niente, con albero, regali e
+ * pupazzi che spuntano piano dalla neve e la slitta che passa alla fine;
+ * `__natale.soffia(forza, fotogrammi)` è la tormenta che spazza via
+ * Halloween.
+ *
  * Acceso:
  *   - nevica su tutta la finestra, a tre profondità, col vento che cambia; i
  *     fiocchi più grossi sono cristalli a sei punte che girano. Quelli vicini
@@ -39,7 +51,16 @@
   var CHIAVE = "mut-natale";
   var acceso = false;
   if (est) acceso = est.acceso !== false;
-  else { try { acceso = window.localStorage.getItem(CHIAVE) === "on"; } catch (e) { /* resta spento */ } }
+  else acceso = !!(radice.classList && radice.classList.contains("natale"));
+  // La stagione di Natale sul sito: dal 2 novembre al 6 gennaio. Torna l'anno del dicembre di quella stagione, o 0.
+  function stagione(d) {
+    var m = d.getMonth(), g = d.getDate(), a = d.getFullYear();
+    if ((m === 10 && g >= 2) || m === 11) return a;
+    if (m === 0 && g <= 6) return a - 1;
+    return 0;
+  }
+  // L'arrivo (`arriva()`): da 0 a 1 in una decina di secondi; albero, regali e pupazzi spuntano verso la fine.
+  var ingresso = 1, spinta = 0, spintaT = 0;
 
   var tela = null, ctx = null, W = 0, H = 0, richiesta = null, passi = 0;
   var fiocchi = [], superfici = [], cumuli = new Map(), pupazzi = [], sbuffi = [];
@@ -61,7 +82,14 @@
   }
   function imposta(nuovo) {
     acceso = !!nuovo;
-    if (!est) { try { window.localStorage.setItem(CHIAVE, acceso ? "on" : "off"); } catch (e) { /* solo per questa pagina */ } }
+    ingresso = 1;
+    if (!est) {
+      var sn = stagione(new Date());
+      try {
+        if (acceso === !!sn) window.localStorage.removeItem(CHIAVE);
+        else window.localStorage.setItem(CHIAVE, acceso ? "on" : "off-" + sn);
+      } catch (e) { /* solo per questa pagina */ }
+    }
     radice.classList.toggle("natale", acceso);
     aggiornaTasti();
     try { window.dispatchEvent(new CustomEvent("mut:natale", { detail: { acceso: acceso } })); } catch (e) { /* pazienza */ }
@@ -617,6 +645,14 @@
     for (i = 0; i < fiocchi.length; i++) { f = fiocchi[i]; if (f.z >= 0.35) continue; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
     ctx.globalAlpha = 1;
     if (slitta) disegnaSlitta();
+    // All'arrivo albero, regali e pupazzi salgono da sotto la neve del fondo.
+    var spunta = ingresso >= 1 ? 1 : ingresso < 0.78 ? 0 : (ingresso - 0.78) / 0.22;
+    ctx.save();
+    if (spunta < 1) {
+      spunta = 1 - Math.pow(1 - spunta, 3);
+      ctx.beginPath(); ctx.rect(0, 0, W, pavimento + 1); ctx.clip();
+      ctx.translate(0, (1 - spunta) * 120);
+    }
     disegnaAlbero(stretto ? 30 : 48, pavimento, stretto ? sA : 0.9);
     for (i = 0; i < regali.length; i++) disegnaRegalo(regali[i]);
     // Pupazzi: prima le sagome di dove va il prossimo pezzo, poi i pezzi.
@@ -629,6 +665,7 @@
         stella(p.x + Math.cos(a) * 30 * p.scala, p.base - 50 * p.scala + Math.sin(a) * 44 * p.scala, 3.5, "#ffd84a");
       }
     }
+    ctx.restore();
     // I ghiaccioli sotto gli elementi.
     for (i = 0; i < superfici.length; i++) {
       var sg = superfici[i];
@@ -698,7 +735,14 @@
     // Il vento gira piano, con qualche raffica.
     if (raffica > 0) raffica--; else if (!ridotto && Math.random() < 0.002) raffica = Math.round(caso(90, 200));
     var meta = Math.sin(passi * 0.004) * 0.7 + (raffica > 0 ? Math.sin(passi * 0.004 + 1) * 2.4 : 0);
-    vento += (meta - vento) * 0.02;
+    // La tormenta del passaggio da Halloween: un vento forte e costante, che poi cala.
+    if (spintaT > 0) { spintaT--; meta += spinta * Math.min(1, spintaT / 60); }
+    vento += (meta - vento) * (spintaT > 0 ? 0.05 : 0.02);
+    if (ingresso < 1) {
+      var prima = ingresso;
+      ingresso = Math.min(1, ingresso + 1 / 600);
+      if (prima < 0.95 && ingresso >= 0.95 && !slitta && !ridotto) partiSlitta();
+    }
     for (var i = 0; i < fiocchi.length; i++) {
       var f = fiocchi[i];
       f.py = f.y;
@@ -861,9 +905,24 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", pronto);
   else pronto();
 
-  // Per i test nel browser.
+  // Il passaggio da Halloween (vedi `halloween.js`): acceso senza salvare la scelta, e la tormenta.
+  function arriva() {
+    if (acceso || est) return;
+    acceso = true;
+    ingresso = 0;
+    radice.classList.add("natale");
+    aggiornaTasti();
+    try { window.dispatchEvent(new CustomEvent("mut:natale", { detail: { acceso: true } })); } catch (e) { /* pazienza */ }
+    avvia();
+  }
+  function soffia(forza, durata) { spinta = Number(forza) || 0; spintaT = Math.max(0, Math.round(Number(durata) || 0)); raffica = 0; }
+
+  // Per i test nel browser, e per il passaggio da Halloween.
   window.__natale = {
     imposta: imposta,
+    arriva: arriva,
+    soffia: soffia,
+    stagione: function (anno, mese, giorno) { return stagione(new Date(anno, mese - 1, giorno)); },
     acceso: function () { return acceso; },
     // Solo per i test: fa partire subito la slitta, apre un regalo.
     slitta: function () { partiSlitta(); },
@@ -874,7 +933,7 @@
         for (var k = 0; k < superfici[i].pila.length; k++) neve += superfici[i].pila[k];
         if (superfici[i].ghiacci) for (k = 0; k < superfici[i].ghiacci.length; k++) if (superfici[i].ghiacci[k].lung > 1) ghiaccioli++;
       }
-      return { acceso: acceso, fiocchi: fiocchi.length, cristalli: fiocchi.filter(function (f) { return f.cristallo; }).length,
+      return { acceso: acceso, ingresso: ingresso, vento: vento, fiocchi: fiocchi.length, cristalli: fiocchi.filter(function (f) { return f.cristallo; }).length,
                superfici: superfici.length, neve: neve, ghiaccioli: ghiaccioli, pavimento: pavimento, scuro: scuro,
                regali: regali.map(function (g) { return { x: g.x, y: g.base - g.h / 2, aperto: g.salto > 0 }; }),
                coriandoli: coriandoli.length, brillii: brillii.length, cappelli: cappelli.length, slitta: slitta ? { x: slitta.x, y: slitta.y } : null,

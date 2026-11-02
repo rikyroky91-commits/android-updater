@@ -1676,6 +1676,15 @@ html.ring-trema .pieduccio { animation-duration: .31s; }
 .ultimora-gioca[aria-pressed="false"] { color: color-mix(in srgb, var(--ink, #141414) 55%, transparent); }
 .ultimora-gioca[aria-pressed="false"] .omino-taglio { display: none; }
 .ultimora-gioca .omino { display: block; margin: auto; }
+/* Le lotte a richiesta (02/11/2026): da spente il tasto dice «Lotte» accanto all'omino, così
+   si capisce che è lì che si accendono; da accese torna il solo omino barrato. */
+.ultimora-gioca .gioca-invito { display: none; }
+.ultimora-gioca[aria-pressed="false"] {
+  width: auto; display: inline-flex; align-items: center; gap: .35rem; padding: 0 .7rem;
+  color: inherit; font-weight: 700; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em;
+}
+.ultimora-gioca[aria-pressed="false"] .gioca-invito { display: inline; }
+.ultimora-gioca[aria-pressed="false"] .omino { margin: 0; }
 .ultimora-opzioni[aria-expanded="true"] { background: var(--verde-tenue); }
 .ultimora-radiale[aria-pressed="true"] { background: var(--verde-tenue); }
 

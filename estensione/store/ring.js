@@ -105,6 +105,23 @@
   let scelta = null;
   try { scelta = deposito.getItem("mut-ring"); } catch (errore) { /* niente memoria */ }
   let fermo = scelta === "off" || (scelta !== "on" && preferisceFermo);
+  // LE LOTTE A RICHIESTA (02/11/2026, Riccardo: «spegni le lotte all'avvio del sito e mettile opzionali solo se si
+  // vogliono attivare»). Chi ospita il ring lo chiede con `data-lotte="a-richiesta"` sul canvas (la home di M.U.T.):
+  // ogni visita parte spenta, qualunque cosa ci sia in `mut-ring`; il tasto con l'omino le accende, e la scelta vale
+  // solo per la scheda aperta (`sessionStorage`, chiave `mut-ring-lotte`), così tornando in home non si rispegne ma
+  // alla visita dopo si riparte puliti. Estensione, app e sito del gioco non mettono l'attributo: lì tutto come prima.
+  const aRichiesta = !!(tela.getAttribute && tela.getAttribute("data-lotte") === "a-richiesta");
+  let sessione = null;
+  if (aRichiesta) {
+    try { sessione = window.sessionStorage || null; } catch (errore) { /* solo per questa pagina */ }
+    let s = null;
+    try { s = sessione && sessione.getItem("mut-ring-lotte"); } catch (errore) { /* resta spento */ }
+    fermo = s !== "on";
+  }
+  function ricordaLotte() {
+    if (aRichiesta) { try { if (sessione) sessione.setItem("mut-ring-lotte", fermo ? "off" : "on"); } catch (errore) { /* pazienza */ } return; }
+    try { deposito.setItem("mut-ring", fermo ? "off" : "on"); } catch (errore) { /* pazienza */ }
+  }
 
   // --- I tasti della striscia: pausa delle notizie e lotte accese/spente ---
   const tastoPausa = mio.querySelector("[data-pausa]");
@@ -127,7 +144,7 @@
     aggiornaTastoGioca();
     tastoGioca.addEventListener("click", () => {
       fermo = !fermo;
-      try { deposito.setItem("mut-ring", fermo ? "off" : "on"); } catch (errore) { /* pazienza */ }
+      ricordaLotte();
       aggiornaTastoGioca();
       if (fermo) spegni(); else accendi();
     });
@@ -16408,7 +16425,7 @@
   function assicuraAcceso() {
     if (!fermo) return;
     fermo = false;
-    try { deposito.setItem("mut-ring", "on"); } catch (errore) { /* pazienza */ }
+    ricordaLotte();
     aggiornaTastoGioca(); accendi();
   }
   // Le mosse dei personaggi nuovi: lo stile a cui appartengono e l'azione che fanno partire.
