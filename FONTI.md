@@ -77,6 +77,7 @@ verificabile; non sostituirla con la versione di fabbrica del C60.
 |---|---|---|---|
 | **Samsung FOTA** | `fota-cloud-dn.ospserver.net/firmware/{CSC}/{MODEL}/version.xml` | **ogni Samsung** | vedi sotto: oggi ne usa 23 su migliaia |
 | **Apple** | `api.ipsw.me/v4/device/{id}` | ogni iPhone/iPad | già in uso, solida |
+| **Apple, numeri A** | pagina ufficiale `support.apple.com/en-us/108044` → `data/apple_codici_modello.csv` | ogni iPhone (208 codici, 55 modelli; iPad no) | dal 10/11/2026; tabella nel repository, si rigenera a mano con `scripts/aggiorna_codici_apple.py` |
 | **Google Pixel** | pagine OTA `developer.android.com` | ogni Pixel | già in uso |
 | **Xiaomi** | tracker MIUI/HyperOS (YAML) | ~1300 device | già in uso, comunitaria ma curata |
 | **Motorola** | mirror `lolinet.com` | ~35 modelli | già in uso |

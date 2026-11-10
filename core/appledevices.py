@@ -18,7 +18,9 @@ cache lunga non costa nulla in accuratezza.
 """
 from __future__ import annotations
 
+import csv
 import json
+import os
 import re
 from datetime import datetime, timezone
 
@@ -159,13 +161,100 @@ def identifiers_for(name: str) -> list[str]:
     return (_by_name or {}).get(normalize_name(name), [])
 
 
+# ----------------------------------------------------------------------
+# I NUMERI A (10/11/2026, Riccardo: «quando faccio una ricerca degli iphone
+# ho bisogno che mi spunti il codice modello ben visibile esempio: A2354
+# A1552»). Il codice che si legge su un iPhone (Impostazioni > Generali >
+# Info, o sul retro dei modelli vecchi) è il numero A, non l'identificativo
+# interno iPhone13,2. Né ipsw.me né l'endpoint firmware di Apple li
+# elencano: la tabella viene dalla pagina ufficiale Apple «Identificare il
+# modello di iPhone» e sta in `data/apple_codici_modello.csv`, rigenerata a
+# mano con `scripts/aggiorna_codici_apple.py`. Nessuna rete a runtime.
+# ----------------------------------------------------------------------
+FILE_CODICI_MODELLO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                   "data", "apple_codici_modello.csv")
+_RE_NUMERO_A = re.compile(r"^\s*A\s?(\d{4})\s*$", re.I)
+# Il mercato che vale per l'Italia nella tabella Apple. Solo l'inizio della
+# parola: per l'iPhone 13 la pagina Apple scrive «other countires».
+_MERCATO_EUROPA = "other count"
+
+# chiave del nome -> [(codice, mercato)], e codice -> nome
+_codici_per_nome: dict[str, list[tuple[str, str]]] | None = None
+_nome_per_codice: dict[str, str] | None = None
+
+
+def _chiave_esatta(nome: str) -> str:
+    """Come `normalize_name` ma TENENDO le parentesi: «iPhone SE (2nd
+    generation)» e «(3rd generation)» sono due telefoni con codici diversi,
+    e `normalize_name` li fa collassare tutti e tre su «iphone se»."""
+    testo = re.sub(r"[^a-z0-9+]+", " ", (nome or "").lower()).strip()
+    return re.sub(r"^apple\s+(?=(?:iphone|ipad|ipod)\b)", "", testo)
+
+
+def _carica_codici() -> None:
+    global _codici_per_nome, _nome_per_codice
+    per_nome: dict[str, list[tuple[str, str]]] = {}
+    per_codice: dict[str, str] = {}
+    try:
+        with open(FILE_CODICI_MODELLO, encoding="utf-8", newline="") as f:
+            for riga in csv.DictReader(f):
+                nome, codice = (riga.get("nome") or "").strip(), (riga.get("codice") or "").strip().upper()
+                if not nome or not _RE_NUMERO_A.match(codice):
+                    continue
+                per_nome.setdefault(_chiave_esatta(nome), []).append((codice, (riga.get("mercato") or "").strip()))
+                per_codice.setdefault(codice, nome)
+    except OSError:
+        pass
+    _codici_per_nome, _nome_per_codice = per_nome, per_codice
+
+
+def is_numero_modello(text: str) -> bool:
+    """True per un numero A scritto da solo: «A2403», «a2403», «A 2403»."""
+    return bool(_RE_NUMERO_A.match(text or ""))
+
+
+def numero_modello_normalizzato(text: str) -> str:
+    m = _RE_NUMERO_A.match(text or "")
+    return f"A{m.group(1)}" if m else ""
+
+
+def name_for_model_number(text: str) -> str | None:
+    """'A2403' → 'iPhone 12'. None se il numero non è nella tabella Apple."""
+    if _nome_per_codice is None:
+        _carica_codici()
+    return (_nome_per_codice or {}).get(numero_modello_normalizzato(text))
+
+
+def model_numbers_for(name: str) -> list[tuple[str, str]]:
+    """'iPhone 12' → [('A2403', 'other countries and regions'), ('A2172',
+    'United States'), …]: prima la variante europea (quella venduta in
+    Italia), poi le altre nell'ordine della pagina Apple. Lista vuota per
+    un nome che la tabella non conosce (iPad, iPod, nomi storpiati)."""
+    if _codici_per_nome is None:
+        _carica_codici()
+    indice = _codici_per_nome or {}
+    voci = indice.get(_chiave_esatta(name))
+    if voci is None:
+        # Senza le parentesi solo se il nome resta di un telefono solo:
+        # «iPhone SE» da solo NON sceglie una generazione a caso.
+        chiave = normalize_name(name)
+        trovate = [v for k, v in indice.items() if normalize_name(k) == chiave]
+        voci = trovate[0] if len(trovate) == 1 else []
+    return sorted(voci, key=lambda v: _MERCATO_EUROPA not in v[1].lower())
+
+
+def e_variante_europea(mercato: str) -> bool:
+    return _MERCATO_EUROPA in (mercato or "").lower()
+
+
 def is_apple_identifier(text: str) -> bool:
     """True se il testo somiglia a un identificatore interno Apple."""
     return bool(re.fullmatch(r"(?:iPhone|iPad|iPod)\d+,\d+", (text or "").strip(), re.IGNORECASE))
 
 
 def reset_cache() -> None:
-    global _by_identifier, _by_name, _status
+    global _by_identifier, _by_name, _status, _codici_per_nome, _nome_per_codice
+    _codici_per_nome = _nome_per_codice = None
     _by_identifier = None
     _by_name = None
     _status = "non ancora caricato"

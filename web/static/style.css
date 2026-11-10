@@ -1532,6 +1532,9 @@ html.halloween .marchio:hover .iniziale { animation: candela .9s ease-in-out inf
 .altri-codici { display: inline-flex; flex-wrap: wrap; gap: .25rem; align-items: baseline; }
 .altri-codici a { text-decoration: none; }
 .altri-codici a:hover code { border-color: var(--verde); color: var(--verde); }
+/* iPhone: il mercato di ogni numero A (10/11/2026) */
+.codice-modello .mercato-codice { font-size: .74rem; color: var(--neutral); }
+.altri-codici a .mercato-codice { margin-right: .35rem; }
 .codice-mini { display: block; font-size: .76rem; margin-top: .1rem; }
 code.codice-mini { display: inline; }
 

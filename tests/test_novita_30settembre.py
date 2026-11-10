@@ -369,7 +369,10 @@ class TestCodiceNellApiENelControlloNotturno(_Sito):
         self.addCleanup(setattr, main, "_codici_del_risultato", vera_cat)
         esito = main._codici_da_mostrare({"query": "iPhone 16 Pro", "nome": "Apple iPhone 16 Pro",
                                           "trovato": True, "codice": "", "scheda": {}})
-        self.assertEqual(esito["codici_modello"], ["iPhone17,1"])
+        # Dal 10/11/2026 in testa c'è il numero A europeo (vedi
+        # tests/test_codici_apple.py); l'identificativo resta fra le varianti.
+        self.assertEqual(esito["codici_modello"], ["A3293"])
+        self.assertIn("iPhone17,1", esito["altri_codici"])
 
     #: Il risultato in pagina di una ricerca riuscita, ridotto all'osso.
     PAGINA_INTERA = ('<div id="risultato-ricerca"><section class="scheda"></section>'

@@ -7,11 +7,13 @@
   <p class="codice-modello" data-codice-modello>
     <span class="etichetta">Codice modello</span>
     {% if risultato.codici_modello %}
+    {% set mercati = risultato.mercati_codici or {} %}
     <code class="codice-principale">{{ risultato.codici_modello[0] }}</code>
-    {%- if risultato.codice_dal_nome %} <span class="tenue">dal catalogo per questo nome</span>{% endif %}
+    {%- if mercati.get(risultato.codici_modello[0]) %} <span class="mercato-codice">{{ mercati.get(risultato.codici_modello[0]) }}</span>
+    {%- elif risultato.codice_dal_nome %} <span class="tenue">dal catalogo per questo nome</span>{% endif %}
     {% if risultato.altri_codici %}
     <span class="altri-codici"><span class="tenue">· altre varianti:</span>
-      {% for c in risultato.altri_codici %}<a href="/?q={{ c | urlencode }}"><code>{{ c }}</code></a>{% endfor %}
+      {% for c in risultato.altri_codici %}<a href="/?q={{ c | urlencode }}"{% if mercati.get(c) %} title="{{ mercati.get(c) }}"{% endif %}><code>{{ c }}</code>{% if mercati.get(c) %} <span class="mercato-codice">{{ mercati.get(c) }}</span>{% endif %}</a>{% endfor %}
       {%- if risultato.altri_codici_in_piu %} <span class="tenue">e altre {{ risultato.altri_codici_in_piu }}</span>{% endif %}</span>
     {% endif %}
     {% else %}

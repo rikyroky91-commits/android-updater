@@ -5678,6 +5678,12 @@ def expand_query(query: str) -> list[str]:
             nome = appledevices.name_for(query)
             if nome:
                 candidati.append(nome)
+        # Numero A di un iPhone (A2403 → iPhone 12): la tabella Apple.
+        for testo in testi_da_esaminare + [re.sub(r"(?i)^\s*(?:apple\s+)?(?:iphone\s+)?", "", query)]:
+            nome = appledevices.name_for_model_number(testo)
+            if nome:
+                candidati.append(nome)
+                break
     except Exception:
         pass
 

@@ -571,6 +571,26 @@ _RE_MERCATO_IN_CODA = re.compile(
 # telefoni con codici diversi, e toglierli darebbe il codice dell'altro.
 
 
+def _mercato_apple(mercato: str) -> str:
+    """Il mercato della tabella Apple, detto in italiano e in breve."""
+    basso = (mercato or "").lower().strip()
+    if appledevices.e_variante_europea(basso):
+        return "Italia, Europa e resto del mondo"
+    if basso.startswith("china"):
+        return "Cina"
+    if basso.startswith(("united states", "usa")):
+        return "Stati Uniti"
+    if basso.startswith("canada, united states"):
+        return "Stati Uniti e Canada"
+    if "russia" in basso:
+        return "Russia e paesi vicini"
+    if basso == "japan":
+        return "Giappone"
+    if "canada" in basso or "japan" in basso:
+        return "Canada, Giappone e altri"
+    return mercato or ""
+
+
 def _codici_da_mostrare(risultato: dict, imei: dict | None = None) -> dict:
     """IL CODICE MODELLO ACCANTO AL NOME, SEMPRE (30/09/2026, su richiesta).
 
@@ -631,7 +651,20 @@ def _codici_da_mostrare(risultato: dict, imei: dict | None = None) -> dict:
             if trovati:
                 break
             aggiungi(voce.get("codice"))
+    # IPHONE: IL NUMERO A (10/11/2026). Chi ha cercato «A2403» vuole quel
+    # codice in testa; chi ha cercato il nome vede per primo quello europeo.
+    numero_digitato = appledevices.numero_modello_normalizzato(risultato.get("query") or "")
+    if numero_digitato and appledevices.name_for_model_number(numero_digitato):
+        aggiungi(numero_digitato)
     principale_certo = bool(trovati)
+    numeri_apple: list[tuple[str, str]] = []
+    if nome:
+        try:
+            numeri_apple = appledevices.model_numbers_for(nome)
+        except Exception:  # una tabella illeggibile non deve rompere la pagina
+            numeri_apple = []
+    for codice, _ in numeri_apple:
+        aggiungi(codice)
     ha_identita = bool(risultato.get("trovato") or (risultato.get("scheda") or {}).get("trovata")
                        or (imei and imei.get("riconosciuto")))
     # Anche senza un'identità confermata: nel primo tempo della ricerca
@@ -664,6 +697,10 @@ def _codici_da_mostrare(risultato: dict, imei: dict | None = None) -> dict:
         aggiungi(codice)
 
     copia = dict(risultato)
+    # Per ogni numero A, il mercato in chiaro: è quello che distingue
+    # l'iPhone comprato in Italia da quello americano o cinese.
+    mercati = {c: _mercato_apple(m) for c, m in numeri_apple}
+    copia["mercati_codici"] = {c: mercati[c] for c in trovati if mercati.get(c)}
     copia["codici_modello"] = trovati[:1]
     copia["altri_codici"] = trovati[1:9]
     copia["altri_codici_in_piu"] = max(0, len(trovati) - 9)
