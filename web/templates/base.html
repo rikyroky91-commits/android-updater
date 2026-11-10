@@ -21,29 +21,15 @@
      quella del sistema operativo. `localStorage` può non esserci (finestra
      privata, dati bloccati): allora si usa il sistema e basta. #}
   <script>(function(){var t=null;try{t=localStorage.getItem("mut-tema");}catch(e){}
-    /* HALLOWEEN (09/10/2026): acceso da solo dal 1° ottobre al 1° novembre, vedi `halloween.js`
-       (stessa regola: spento in stagione resta spento, ?halloween=1/0 lo forza). In stagione,
-       senza una scelta salvata, si parte col tema scuro.
-       NATALE (02/11/2026): acceso da solo dal 2 novembre al 6 gennaio, vedi `natale.js` (spento in
+    /* NATALE (02/11/2026): acceso da solo dal 2 novembre al 6 gennaio, vedi `natale.js` (spento in
        stagione resta spento: "off-<anno del dicembre>"; "on" lo tiene acceso; ?natale=1/0 lo forza).
-       IL PASSAGGIO (02/11/2026): dal 2 all'8 novembre la prima pagina di ogni scheda parte con
-       Halloween e `halloween.js` lo fa portare via dalla neve fino al tema di Natale (classe
-       `passaggio`; ?passaggio=1 lo forza). Niente passaggio per chi ha spento Halloween o Natale,
-       per chi ha chiesto meno movimento e dopo la prima volta nella scheda. */
-    var d=new Date(),m=d.getMonth(),g=d.getDate(),y=d.getFullYear(),q=location.search,ph=null,pn=null,pv=null,rx=document.documentElement;
-    try{ph=localStorage.getItem("mut-halloween");pn=localStorage.getItem("mut-natale");}catch(e){}
-    try{pv=sessionStorage.getItem("mut-passaggio");}catch(e){}
-    var hw=m===9||(m===10&&g===1);
-    if(ph==="off-"+y&&hw)hw=false;else if(ph==="on-"+y)hw=true;
-    var fz=/[?&]halloween=(1|0)\b/.exec(q);if(fz)hw=fz[1]==="1";
+       Halloween e il passaggio animato sono stati tolti il 10/11/2026. */
+    var d=new Date(),m=d.getMonth(),g=d.getDate(),y=d.getFullYear(),q=location.search,pn=null,rx=document.documentElement;
+    try{pn=localStorage.getItem("mut-natale");}catch(e){}
     var sn=(m===10&&g>=2)||m===11?y:(m===0&&g<=6?y-1:0),na=pn==="on"||(!!sn&&pn!=="off-"+sn);
     var fn=/[?&]natale=(1|0)\b/.exec(q);if(fn)na=fn[1]==="1";
-    var rm=!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);
-    var pz=/[?&]passaggio=1\b/.test(q)||(m===10&&g>=2&&g<=8&&!hw&&na&&!fz&&!fn&&ph!=="off-"+y&&pv!=="fatto"&&!rm);
-    if(pz){hw=true;na=false;rx.classList.add("passaggio");}
-    if(hw)rx.classList.add("halloween");
     if(na)rx.classList.add("natale");
-    if(t!=="scuro"&&t!=="chiaro"){t=hw||(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)?"scuro":"chiaro";}
+    if(t!=="scuro"&&t!=="chiaro"){t=(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)?"scuro":"chiaro";}
     rx.setAttribute("data-tema",t);
     /* Lingua diversa dall'italiano: la pagina resta nascosta finché `lingue.js`
        non l'ha tradotta (al massimo un secondo e mezzo), così non si vede il
@@ -53,7 +39,7 @@
     })();</script>
   {# `html.js`: gli stili sanno se gli script girano (le varianti del codice
      modello si chiudono dietro un tasto solo se il tasto può aprirle). In
-     un `<script>` suo: quello sopra lo legge per intero `halloween.test.cjs`. #}
+     un `<script>` suo: quello sopra lo legge per intero `meteo.test.cjs`. #}
   <script>document.documentElement.classList.add("js");</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -114,13 +100,13 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"
              stroke-linecap="round" aria-hidden="true"><path d="M12 2.5l4 5.5h-2.2l3.7 5h-2.3l3.8 5H5l3.8-5H6.5l3.7-5H8z"/><path d="M12 18v3.5"/></svg>
       </button>
-      {# HALLOWEEN (09/10/2026): zucche, lucine, zombie e mani che camminano; si accende da solo
-         in stagione (1° ottobre - 1° novembre), il tasto con la zucca lo spegne. Lo pilota
-         `static/halloween.js`, che dal 02/11/2026 recita anche il passaggio a Natale. #}
-      <button type="button" class="tema-tasto halloween-tasto" data-halloween-tasto aria-pressed="false"
-              aria-label="Tema di Halloween" title="Accendi il tema di Halloween">
+      {# IL METEO DI ACIREALE (10/11/2026): pioggia, temporali, nebbia, neve, vento, sole e stelle
+         secondo il tempo che c'è davvero ad Acireale (Catania), letto da Open-Meteo. Il tasto li
+         accende e li spegne; lo pilota `static/meteo.js`. #}
+      <button type="button" class="tema-tasto meteo-tasto" data-meteo-tasto aria-pressed="true"
+              aria-label="Effetti meteo di Acireale" title="Effetti meteo di Acireale">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"
-             stroke-linecap="round" aria-hidden="true"><path d="M12 6.5c-1.8-1.4-6.5-1.3-7.8 3.2-1 3.6.6 8.8 4.3 9.3 1.4.2 2.4-.4 3.5-.4s2.1.6 3.5.4c3.7-.5 5.3-5.7 4.3-9.3C18.5 5.2 13.8 5.1 12 6.5z"/><path d="M12 6.5c0-1.6.6-2.8 2-3.6"/><path d="M8.6 11l1.2-1.4 1.2 1.4M13 11l1.2-1.4 1.2 1.4M8.8 14.4c1.9 1.5 4.5 1.5 6.4 0"/></svg>
+             stroke-linecap="round" aria-hidden="true"><path d="M7 17.5h10.2a3.8 3.8 0 0 0 .5-7.6A5.6 5.6 0 0 0 6.9 9.1 4.2 4.2 0 0 0 7 17.5z"/><path d="M9 20.5l.8-1.6M13 20.5l.8-1.6M17 20.5l.8-1.6"/></svg>
       </button>
       {# LA LINGUA (02/10/2026): un velo di traduzione nel browser, vedi
          `static/lingue.js`. I nomi delle lingue non si traducono. #}
@@ -170,7 +156,7 @@
 
   <script src="{{ statico('tema.js') }}" defer></script>
   <script src="{{ statico('natale.js') }}" defer></script>
-  <script src="{{ statico('halloween.js') }}" defer></script>
+  <script src="{{ statico('meteo.js') }}" defer></script>
   <script src="{{ statico('lingue.js') }}" defer></script>
   <script src="{{ statico('rete.js') }}" defer></script>
   <script src="{{ statico('ricerca.js') }}" defer></script>

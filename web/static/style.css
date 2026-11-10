@@ -279,48 +279,6 @@ a { color: inherit; }
   margin: 0 0 .5rem; font-size: clamp(.95rem, 1.8vw, 1.1rem);
   color: var(--neutral); font-style: italic;
 }
-/* La faccina furba: annuisce piano, sempre, con una pausa fra un cenno e
-   l'altro. Passandoci sopra col mouse (o toccandola) diventa una risata
-   che saltella. Le due facce stanno una sopra l'altra: si scambia solo
-   quale si vede, così la riga non si sposta. */
-.furbetto {
-  display: inline-grid; cursor: default; vertical-align: baseline;
-}
-.faccia { grid-area: 1 / 1; display: inline-block; transform-origin: 50% 85%; }
-.faccia-furba { animation: cenno 3.2s ease-in-out infinite; }
-.faccia-ride { opacity: 0; transform: scale(.6); }
-.faccia-stordita { opacity: 0; transform: scale(.6); }
-/* Quando i lottatori (o i telefoni che si tirano) arrivano vicino, la
-   faccina perde il filo: lo decide `static/ring.js` con la classe. */
-.furbetto.stordito .faccia-furba, .furbetto.stordito .faccia-ride { opacity: 0; animation: none; }
-.furbetto.stordito .faccia-stordita { opacity: 1; animation: stordita .7s ease-in-out infinite; }
-@keyframes stordita {
-  0%, 100% { transform: scale(1.1) rotate(-14deg); }
-  50%      { transform: scale(1.1) rotate(14deg) translateY(2px); }
-}
-.furbetto:hover .faccia-furba, .furbetto:active .faccia-furba {
-  opacity: 0; animation: none;
-}
-.furbetto:hover .faccia-ride, .furbetto:active .faccia-ride {
-  opacity: 1; animation: risata .5s ease-in-out infinite;
-}
-@keyframes cenno {
-  0%, 55%, 100% { transform: rotate(0) translateY(0); }
-  65%           { transform: rotate(-12deg) translateY(-2px); }
-  75%           { transform: rotate(8deg); }
-  85%           { transform: rotate(-4deg); }
-}
-@keyframes risata {
-  0%, 100% { transform: scale(1.1) translateY(0) rotate(-6deg); }
-  50%      { transform: scale(1.2) translateY(-5px) rotate(6deg); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .faccia-furba, .furbetto:hover .faccia-ride, .furbetto:active .faccia-ride {
-    animation: none;
-  }
-  .furbetto:hover .faccia-ride { transform: scale(1.1); }
-}
-
 .ingresso-cifre {
   display: flex; justify-content: center; flex-wrap: wrap;
   gap: 1.6rem; margin: 2.2rem 0 0;
@@ -1411,108 +1369,79 @@ html.lingua-attesa body { visibility: hidden; }
 }
 html.natale-presa, html.natale-presa * { cursor: grab !important; }
 html.natale-trascina, html.natale-trascina * { cursor: grabbing !important; user-select: none !important; }
+/* Rosso di Natale (10/11/2026, su richiesta: «un po di rosso e altri addobbi»): i richiami che di
+   solito sono verdi (iniziali, navigazione attiva, tenui) diventano rossi; il tasto «Cerca» resta
+   verde, così rosso e verde stanno insieme come sull'albero. */
+html.natale { --verde: #c8102e; --verde-tenue: rgba(200, 16, 46, .12); --natale-rosso: #c8102e; --natale-verde: #1f7a45; }
+html.natale[data-tema="scuro"] { --verde: #ff6b7d; --verde-tenue: rgba(255, 107, 125, .17); --natale-rosso: #e8334d; --natale-verde: #3fae6c; }
+html.natale ::selection { background: rgba(200, 16, 46, .22); }
 /* Il cappellino: un disegno nostro, appoggiato in alto a sinistra. */
-html.natale .marchio .iniziale, html.natale .pieduccio .sigla .iniziale:first-child,
-html.natale .furbetto, html.natale .ingresso-titolo .punti:first-child { position: relative; }
-html.natale .marchio .iniziale::after, html.natale .pieduccio .sigla .iniziale:first-child::after,
-html.natale .furbetto::after {
+html.natale .marchio .iniziale, html.natale .pieduccio .sigla .iniziale:first-child { position: relative; }
+html.natale .marchio .iniziale:first-child::after, html.natale .pieduccio .sigla .iniziale:first-child::after {
   content: ""; position: absolute; pointer-events: none;
   left: -.22em; top: -.42em; width: .95em; height: .8em;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 34'%3E%3Cpath d='M6 26C8 10 20 3 30 9c4 2.5 6 7 7 12l-5 1c-1-5-3-8-6-9 2 5 2 9 1 13z' fill='%23d8343f' stroke='%23111' stroke-width='1.5'/%3E%3Crect x='2' y='24' width='27' height='8' rx='4' fill='%23fff' stroke='%23111' stroke-width='1.5'/%3E%3Ccircle cx='34.5' cy='22' r='4' fill='%23fff' stroke='%23111' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat center / contain;
   transform: rotate(-16deg);
 }
-html.natale .furbetto::after { left: .02em; top: -.3em; width: .8em; height: .68em; transform: rotate(-12deg); z-index: 1; }
-/* Le lucine sotto la testata: una fila di lampadine che si accendono a turno. */
+/* Bastoncino di zucchero: una striscia rossa e bianca in cima alla testata e in cima al piede. */
+html.natale .testata::before, html.natale .pieduccio::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px; pointer-events: none;
+  background: repeating-linear-gradient(-45deg, #c8102e 0 9px, #fff 9px 18px);
+  background-size: 25.46px 100%;
+  animation: bastoncino 2.4s linear infinite;
+}
+html.natale .pieduccio { border-top: 0; padding-top: 1.9rem; }
+html.natale .pieduccio::before { left: 1.5rem; right: 1.5rem; top: .9rem; height: 4px; border-radius: 4px; }
+@keyframes bastoncino { to { background-position: 25.46px 0; } }
+html.natale .testata { border-bottom-color: var(--natale-rosso); }
+/* Le lucine sotto la testata: una fila di lampadine che si accendono a turno, più rosse che verdi. */
 html.natale .testata::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: -9px; height: 8px; pointer-events: none;
   background:
-    radial-gradient(circle at 12px 4px, #d8343f 3px, transparent 3.6px),
+    radial-gradient(circle at 12px 4px, #e0213b 3px, transparent 3.6px),
     radial-gradient(circle at 36px 4px, #ffcf3a 3px, transparent 3.6px),
-    radial-gradient(circle at 60px 4px, #2e8b4e 3px, transparent 3.6px),
-    radial-gradient(circle at 84px 4px, #2f72e0 3px, transparent 3.6px);
-  background-size: 96px 8px; background-repeat: repeat-x;
+    radial-gradient(circle at 60px 4px, #e0213b 3px, transparent 3.6px),
+    radial-gradient(circle at 84px 4px, #2e8b4e 3px, transparent 3.6px),
+    radial-gradient(circle at 108px 4px, #e0213b 3px, transparent 3.6px),
+    radial-gradient(circle at 132px 4px, #2f72e0 3px, transparent 3.6px);
+  background-size: 144px 8px; background-repeat: repeat-x;
   animation: lucine 1.6s steps(2, jump-none) infinite;
 }
 @keyframes lucine { 0% { opacity: 1; } 100% { opacity: .45; } }
-@media (prefers-reduced-motion: reduce) { html.natale .testata::after { animation: none; } }
+/* Le schede e i risultati: filo rosso a sinistra, e un fiocco sul risultato. */
+html.natale .esito, html.natale .scheda, html.natale .esito.trovato { border-left-color: var(--natale-rosso); }
+html.natale .esito { position: relative; }
+html.natale .esito::after {
+  content: ""; position: absolute; right: 12px; top: -15px; width: 38px; height: 32px; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cpath d='M24 20C14 6 3 8 4 18c1 9 12 6 20 2zM24 20c10-14 21-12 20-2-1 9-12 6-20 2z' fill='%23d8102e' stroke='%23800a1c' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cpath d='M24 20c-3 6-8 14-12 18 5 1 9-3 12-18zM24 20c3 6 8 14 12 18-5 1-9-3-12-18z' fill='%23b30d26' stroke='%23800a1c' stroke-width='1.2' stroke-linejoin='round'/%3E%3Ccircle cx='24' cy='20' r='4.2' fill='%23e8223f' stroke='%23800a1c' stroke-width='1.2'/%3E%3C/svg%3E") no-repeat center / contain; transform: rotate(8deg);
+}
+html.natale .tabella tbody tr:hover { box-shadow: inset 3px 0 0 var(--natale-rosso); }
+html.natale main input:not([type=hidden]):focus { border-color: var(--natale-rosso); box-shadow: 0 0 0 3px rgba(200, 16, 46, .18); }
+html.natale .nav a:hover, html.natale main a:hover { color: var(--natale-rosso); }
+/* Rametti di agrifoglio ai lati della domanda in home. */
+html.natale .ingresso-domanda::before, html.natale .ingresso-domanda::after {
+  content: ""; display: inline-block; width: 2.2em; height: 1.4em; vertical-align: -.4em; margin: 0 .5em;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 40'%3E%3Cg fill='%23238a48' stroke='%23155c2e' stroke-width='1.2' stroke-linejoin='round'%3E%3Cpath d='M32 22c-4-9-14-12-24-8 3 8 12 13 24 8z'/%3E%3Cpath d='M32 22c4-9 14-12 24-8-3 8-12 13-24 8z'/%3E%3Cpath d='M32 24c-6 4-9 11-7 16 7-1 11-8 7-16z'/%3E%3C/g%3E%3Cg fill='%23d8102e' stroke='%23800a1c' stroke-width='1'%3E%3Ccircle cx='28' cy='22' r='4.4'/%3E%3Ccircle cx='36' cy='22' r='4.4'/%3E%3Ccircle cx='32' cy='28' r='4.4'/%3E%3C/g%3E%3Cg fill='%23fff' opacity='.7'%3E%3Ccircle cx='26.8' cy='20.6' r='1'/%3E%3Ccircle cx='34.8' cy='20.6' r='1'/%3E%3Ccircle cx='30.8' cy='26.6' r='1'/%3E%3C/g%3E%3C/svg%3E") no-repeat center / contain;
+}
+html.natale .ingresso-domanda::after { transform: scaleX(-1); }
+/* Il tasto del meteo e quello del Natale: il Natale è rosso acceso. */
+html.natale .tema-tasto:hover { border-color: var(--natale-rosso); }
+@media (prefers-reduced-motion: reduce) {
+  html.natale .testata::after, html.natale .testata::before, html.natale .pieduccio::before { animation: none; }
+}
 @media print { .natale-tela { display: none; } }
 
 /* ======================================================================
-   HALLOWEEN (09/10/2026) — `html.halloween`, acceso da solo in stagione
-   (1° ottobre - 2 novembre) e dal tasto con la zucca. Zucche, lucine,
-   zombie, mani che camminano, pipistrelli e ragnatele li disegna
-   `halloween.js` su un canvas che non riceve clic. Qui: il tasto e le
-   iniziali del marchio color zucca.
+   METEO DI ACIREALE (10/11/2026) — gli effetti li disegna `meteo.js` su un
+   canvas che non riceve clic, dietro il contenuto ma sopra lo sfondo.
+   Qui: il tasto, la sua etichetta e il velo di luce o di nebbia.
    ====================================================================== */
-.halloween-tasto[aria-pressed="true"] { background: #e8691b; border-color: #e8691b; color: #fff; }
-.halloween-tela { position: fixed; top: 0; left: 0; z-index: 19; pointer-events: none; display: block; }
-html.halloween .marchio .iniziale, html.halloween .pieduccio .sigla .iniziale:first-child { color: #ff8a1a; text-shadow: 0 0 10px rgba(255,138,26,.45); }
-@media print { .halloween-tela { display: none; } }
+.meteo-tasto[aria-pressed="true"] { background: #2f72e0; border-color: #2f72e0; color: #fff; }
+.meteo-tela {
+  position: fixed; top: 0; left: 0; z-index: 18; pointer-events: none; display: block;
+}
+@media print { .meteo-tela { display: none; } }
 
-/* La faccina della home in versione Halloween (10/10/2026): zucca che annuisce,
-   fantasma che ride al passaggio del mouse, teschio quando il ring la stordisce.
-   Stesse animazioni della faccina normale, che intanto resta nascosta. */
-.faccia-hw { display: none; }
-html.halloween .faccia-hw { display: inline-block; opacity: 0; transform: scale(.6); }
-html.halloween .furbetto .faccia:not(.faccia-hw) { visibility: hidden; animation: none; }
-html.halloween .faccia-hw-furba { opacity: 1; transform: none; animation: cenno 3.2s ease-in-out infinite; }
-html.halloween .furbetto:hover .faccia-hw-furba, html.halloween .furbetto:active .faccia-hw-furba,
-html.halloween .furbetto.stordito .faccia-hw-furba { opacity: 0; animation: none; }
-html.halloween .furbetto:hover .faccia-hw-ride, html.halloween .furbetto:active .faccia-hw-ride {
-  opacity: 1; animation: fantasma .9s ease-in-out infinite;
-}
-html.halloween .furbetto.stordito .faccia-hw-ride { opacity: 0; animation: none; }
-html.halloween .furbetto.stordito .faccia-hw-stordita { opacity: 1; animation: stordita .7s ease-in-out infinite; }
-@keyframes fantasma {
-  0%, 100% { transform: scale(1.15) translate(0, 0) rotate(-8deg); filter: drop-shadow(0 0 6px rgba(200,190,255,.6)); }
-  50%      { transform: scale(1.25) translate(2px, -7px) rotate(8deg); filter: drop-shadow(0 0 12px rgba(200,190,255,.9)); }
-}
-
-/* AL PASSAGGIO DEL MOUSE, col tema acceso: i tasti tremano e si accendono di
-   arancio, i collegamenti brillano come una candela, i riquadri si alzano con un
-   alone viola, il campo di ricerca prende l'anello di zucca. */
-html.halloween main button:hover, html.halloween .tema-tasto:hover, html.halloween .proposta:hover {
-  animation: brivido .35s ease-in-out; box-shadow: 0 0 0 2px rgba(255,138,26,.5), 0 0 14px rgba(255,138,26,.45);
-}
-html.halloween .halloween-tasto:hover svg { animation: dondola-zucca .6s ease-in-out infinite; transform-origin: 50% 90%; }
-html.halloween .nav a:hover, html.halloween main a:hover, html.halloween .conto:hover, html.halloween .stato-fonti:hover {
-  color: #ff9a3c; animation: candela 1.2s ease-in-out infinite;
-}
-html.halloween .esito, html.halloween .scheda, html.halloween .tabella tbody tr {
-  transition: transform .25s ease, box-shadow .25s ease;
-}
-html.halloween .esito:hover, html.halloween .scheda:hover {
-  transform: translateY(-2px); box-shadow: 0 6px 22px rgba(140,80,220,.28), 0 0 0 1px rgba(166,77,255,.35);
-}
-html.halloween .tabella tbody tr:hover { box-shadow: inset 3px 0 0 #ff8a1a; background: rgba(255,138,26,.06); }
-html.halloween main input:not([type=hidden]):focus, html.halloween main input:not([type=hidden]):hover {
-  box-shadow: 0 0 0 3px rgba(255,138,26,.35), 0 0 18px rgba(255,138,26,.25);
-}
-html.halloween .marchio:hover .iniziale { animation: candela .9s ease-in-out infinite; }
-@keyframes brivido {
-  0%, 100% { transform: translateX(0) rotate(0); }
-  20% { transform: translateX(-1.5px) rotate(-1.5deg); }
-  40% { transform: translateX(1.5px) rotate(1.5deg); }
-  60% { transform: translateX(-1px) rotate(-1deg); }
-  80% { transform: translateX(1px) rotate(.5deg); }
-}
-@keyframes candela {
-  0%, 100% { text-shadow: 0 0 6px rgba(255,138,26,.55); }
-  35%      { text-shadow: 0 0 12px rgba(255,170,60,.9), 0 0 2px rgba(255,220,150,.9); }
-  60%      { text-shadow: 0 0 4px rgba(255,138,26,.4); }
-}
-@keyframes dondola-zucca {
-  0%, 100% { transform: rotate(-10deg); }
-  50%      { transform: rotate(10deg); }
-}
-@media (prefers-reduced-motion: reduce) {
-  html.halloween .faccia-hw-furba, html.halloween .furbetto:hover .faccia-hw-ride,
-  html.halloween .furbetto.stordito .faccia-hw-stordita, html.halloween main button:hover,
-  html.halloween .tema-tasto:hover, html.halloween .proposta:hover, html.halloween .halloween-tasto:hover svg,
-  html.halloween .nav a:hover, html.halloween main a:hover, html.halloween .conto:hover,
-  html.halloween .stato-fonti:hover, html.halloween .marchio:hover .iniziale { animation: none; }
-  html.halloween .esito:hover, html.halloween .scheda:hover { transform: none; }
-}
 
 /* ======================================================================
    CODICE MODELLO ACCANTO AL NOME (30/09/2026)

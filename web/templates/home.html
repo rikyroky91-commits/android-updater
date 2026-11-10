@@ -16,21 +16,10 @@
 #}
 {% block ricerca %}
 <section class="ingresso">
-  {# UNA BATTUTA, NON UNO SLOGAN (26/09/2026, su richiesta). La domanda
-     piccola in grigio è la preparazione, il titolo grande è la risposta
-     secca, e la faccina furba chiude — con un cenno una volta sola
-     all'apertura, fermo per chi ha chiesto meno movimento. I punti sono
-     verdi come le iniziali di M.U.T nella testata. Col tema di Halloween
-     (10/10/2026) la faccina è una zucca, che passandoci sopra diventa un
-     fantasma che ride e, stordita dal ring, un teschio: lo fa il CSS. #}
+  {# La domanda piccola in grigio e basta (10/11/2026, su richiesta: via «il mio sito lo fa» e la
+     faccina, con le loro versioni di Halloween). L'h1 resta, nascosto, per i lettori di schermo. #}
+  <h1 class="sr-only">Mobile Update Tracker</h1>
   <p class="ingresso-domanda">Quale aggiornamento è arrivato, su quale modello, quando?</p>
-  <h1 class="ingresso-titolo"><span class="punti">...</span>il mio sito lo fa<span
-      class="punti">.</span> <span class="furbetto" role="img" aria-label="sorriso furbo"><span
-      class="faccia faccia-furba">😏</span><span class="faccia faccia-ride" aria-hidden="true">😂</span><span
-      class="faccia faccia-stordita" aria-hidden="true">🥴</span><span
-      class="faccia faccia-hw faccia-hw-furba" aria-hidden="true">🎃</span><span
-      class="faccia faccia-hw faccia-hw-ride" aria-hidden="true">👻</span><span
-      class="faccia faccia-hw faccia-hw-stordita" aria-hidden="true">💀</span></span></h1>
   {% with grande = true %}{% include "_ricerca.html" %}{% endwith %}
   <p class="ingresso-nota">
     Scrivi un nome («Galaxy S24»), un codice modello («SM-S921B») o un

@@ -559,10 +559,14 @@ class TestRecentiFaccinaStriscia(unittest.TestCase):
         # Le recenti sono di TUTTI e le tiene il server: niente localStorage.
         self.assertNotIn("localStorage", self.js)
 
-    def test_la_faccina_ha_la_versione_stordita(self):
-        self.assertIn("faccia-stordita", self.home)
-        self.assertIn("🥴", self.home)
-        self.assertIn(".furbetto.stordito .faccia-stordita", self.css)
+    def test_la_home_non_ha_piu_la_battuta_con_la_faccina(self):
+        # 10/11/2026, su richiesta: via «il mio sito lo fa» e la faccina (e la zucca di Halloween).
+        self.assertNotIn("il mio sito lo fa", self.home)
+        self.assertNotIn("furbetto", self.home)
+        for faccia in ("😏", "😂", "🥴", "🎃", "👻", "💀"):
+            self.assertNotIn(faccia, self.home)
+        self.assertNotIn(".furbetto", self.css)
+        self.assertIn('<h1 class="sr-only">', self.home)
 
     def test_la_striscia_e_verde_e_non_rossa(self):
         blocco = self.css[self.css.index(".ultimora-barra {"):self.css.index(".ultimora-ora {")]
@@ -743,8 +747,9 @@ class TestLinguaENatale(unittest.TestCase):
     def test_il_canvas_della_neve_non_riceve_clic(self):
         blocco = self.css[self.css.index(".natale-tela {"):]
         self.assertIn("pointer-events: none", blocco[:200])
-        self.assertIn("html.natale .furbetto::after", self.css)
+        self.assertIn("html.natale .marchio .iniziale:first-child::after", self.css)
         self.assertIn("html.natale .testata::after", self.css)
+        self.assertIn("html.natale .testata::before", self.css)
 
     def test_il_natale_non_e_piu_un_imprevisto_del_ring(self):
         self.assertNotIn('data-imprevisto="natale"', self.home)

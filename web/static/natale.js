@@ -4,17 +4,14 @@
  * spegne; la scelta resta nel browser (`mut-natale`). È separato dal ring
  * dei due lottatori: funziona su ogni pagina.
  *
- * DA SOLO IN STAGIONE (02/11/2026, col passaggio da Halloween, vedi
- * `halloween.js`): sul sito si accende da solo dal 2 novembre al 6 gennaio.
+ * DA SOLO IN STAGIONE (02/11/2026): sul sito si accende da solo dal 2 novembre al 6 gennaio.
  * Spento col tasto in stagione resta spento fino alla stagione dopo
  * (`mut-natale` = "off-2026", l'anno del dicembre di quella stagione);
  * acceso a mano fuori stagione resta acceso ("on", come prima). `?natale=1`
  * (o `=0`) lo forza per quella pagina. Lo decide lo script in testa a
  * `base.html` con la classe `html.natale`, che qui si legge e basta.
- * `__natale.arriva()` lo accende senza salvare niente, con albero, regali e
- * pupazzi che spuntano piano dalla neve e la slitta che passa alla fine;
- * `__natale.soffia(forza, fotogrammi)` è la tormenta che spazza via
- * Halloween.
+ * (Il 10/11/2026 sono andati via Halloween e il passaggio animato: `arriva()`
+ * e `soffia()` servivano solo a quello.)
  *
  * Acceso:
  *   - nevica su tutta la finestra, a tre profondità, col vento che cambia; i
@@ -31,8 +28,11 @@
  *     cappello);
  *   - ogni tanto una slitta con le renne attraversa il cielo lasciando una
  *     scia di scintille, e agli angoli della finestra c'è la brina;
- *   - sul sito, cappellini rossi sulle faccine e su qualche lettera e una
- *     fila di lucine sotto la testata li fa lo stile (`html.natale`).
+ *   - sul sito, il cappellino sulla M del marchio, il bastoncino di zucchero
+ *     in cima alla testata, i rametti di agrifoglio, i fiocchi rossi sui
+ *     risultati e le lucine sotto la testata li fa lo stile (`html.natale`);
+ *     le palline appese al filo delle lucine, che dondolano col vento, le
+ *     disegna il canvas.
  *
  * FUORI DAL SITO (02/10/2026): lo stesso file è il cuore dell'estensione
  * «Page Snow» (`estensione/`). Lì `window.__nataleEstensione` dice dove
@@ -59,8 +59,8 @@
     if (m === 0 && g <= 6) return a - 1;
     return 0;
   }
-  // L'arrivo (`arriva()`): da 0 a 1 in una decina di secondi; albero, regali e pupazzi spuntano verso la fine.
-  var ingresso = 1, spinta = 0, spintaT = 0;
+  // Albero, regali e pupazzi spuntano da sotto la neve quando `ingresso` sale da 0 a 1 (ora parte già a 1).
+  var ingresso = 1;
 
   var tela = null, ctx = null, W = 0, H = 0, richiesta = null, passi = 0;
   var fiocchi = [], superfici = [], cumuli = new Map(), pupazzi = [], sbuffi = [];
@@ -548,6 +548,30 @@
       tondo(lx - 0.8, ly - 0.4, 0.8, "rgba(255,255,255," + (0.5 + 0.4 * k) + ")");
     }
   }
+  // Le palline appese al filo delle lucine sotto la testata (solo sul sito, dove le lucine le fa lo stile):
+  // rosse per lo più, qualcuna oro e verde, e dondolano col vento. Il filo corre all'incirca 5 px sotto la testata.
+  var PALLINE_COLORI = [["#e0213b", "#8f1226"], ["#ffcf3a", "#a87b0a"], ["#e0213b", "#8f1226"], ["#2e8b4e", "#175a30"], ["#e0213b", "#8f1226"], ["#f4f1e6", "#9a9484"]];
+  var testata = null;
+  function disegnaPalline() {
+    if (!testata) testata = document.querySelector(".testata") || false;
+    if (!testata) return;
+    var y0 = testata.getBoundingClientRect().bottom + 5;
+    if (y0 < -10 || y0 > H - 30) return;
+    var passo = W < 640 ? 74 : 104, n = Math.floor((W - 30) / passo);
+    for (var i = 0; i < n; i++) {
+      var x = 34 + i * passo + ((i * 37) % 22), lung = 9 + ((i * 7) % 13), r = 4.6 + ((i * 3) % 3) * 0.7;
+      var c = PALLINE_COLORI[i % PALLINE_COLORI.length];
+      var dond = ridotto ? 0 : Math.sin(passi * 0.035 + i * 1.3) * 0.09 + vento * 0.03;
+      ctx.save(); ctx.translate(x, y0); ctx.rotate(dond);
+      ctx.strokeStyle = "#b9a25a"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, lung); ctx.stroke();
+      ctx.fillStyle = "#d9b64a"; ctx.fillRect(-1.9, lung, 3.8, 2.4);
+      var g = ctx.createRadialGradient(-r * 0.35, lung + 2.4 + r * 0.6, r * 0.1, 0, lung + 2.4 + r, r * 1.2);
+      g.addColorStop(0, "#ffffff"); g.addColorStop(0.25, c[0]); g.addColorStop(1, c[1]);
+      ctx.fillStyle = g; ctx.strokeStyle = c[1]; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.arc(0, lung + 2.4 + r, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+  }
   // La brina ai quattro angoli della finestra.
   function disegnaBrina() {
     var r = Math.min(120, W * 0.2), angoli = [[0, 0], [W, 0], [0, H], [W, H]];
@@ -690,6 +714,7 @@
       ctx.strokeStyle = "rgba(150,180,215,.45)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(s.l + 2, s.t + 0.5); ctx.lineTo(s.r - 2, s.t + 0.5); ctx.stroke();
     }
     if (est) { for (i = 0; i < cappelli.length; i++) disegnaCappello(cappelli[i]); disegnaLuci(); }
+    else disegnaPalline();
     // I fiocchi vicini, gli sbuffi, i coriandoli, i luccichii.
     for (i = 0; i < fiocchi.length; i++) {
       f = fiocchi[i];
@@ -735,9 +760,7 @@
     // Il vento gira piano, con qualche raffica.
     if (raffica > 0) raffica--; else if (!ridotto && Math.random() < 0.002) raffica = Math.round(caso(90, 200));
     var meta = Math.sin(passi * 0.004) * 0.7 + (raffica > 0 ? Math.sin(passi * 0.004 + 1) * 2.4 : 0);
-    // La tormenta del passaggio da Halloween: un vento forte e costante, che poi cala.
-    if (spintaT > 0) { spintaT--; meta += spinta * Math.min(1, spintaT / 60); }
-    vento += (meta - vento) * (spintaT > 0 ? 0.05 : 0.02);
+    vento += (meta - vento) * 0.02;
     if (ingresso < 1) {
       var prima = ingresso;
       ingresso = Math.min(1, ingresso + 1 / 600);
@@ -905,23 +928,9 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", pronto);
   else pronto();
 
-  // Il passaggio da Halloween (vedi `halloween.js`): acceso senza salvare la scelta, e la tormenta.
-  function arriva() {
-    if (acceso || est) return;
-    acceso = true;
-    ingresso = 0;
-    radice.classList.add("natale");
-    aggiornaTasti();
-    try { window.dispatchEvent(new CustomEvent("mut:natale", { detail: { acceso: true } })); } catch (e) { /* pazienza */ }
-    avvia();
-  }
-  function soffia(forza, durata) { spinta = Number(forza) || 0; spintaT = Math.max(0, Math.round(Number(durata) || 0)); raffica = 0; }
-
-  // Per i test nel browser, e per il passaggio da Halloween.
+  // Per i test nel browser.
   window.__natale = {
     imposta: imposta,
-    arriva: arriva,
-    soffia: soffia,
     stagione: function (anno, mese, giorno) { return stagione(new Date(anno, mese - 1, giorno)); },
     acceso: function () { return acceso; },
     // Solo per i test: fa partire subito la slitta, apre un regalo.
