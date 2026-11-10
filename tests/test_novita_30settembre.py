@@ -165,7 +165,8 @@ class TestTemaScuro(_SitoConLogin):
         pagina = self.client.get("/").text
         testa = pagina[:pagina.index("</head>")]
         self.assertIn('setAttribute("data-tema"', testa)
-        self.assertIn("prefers-color-scheme: dark", testa)
+        # Dall'11/11/2026, senza una scelta, il tema segue il sole di Acireale (giorno, tramonto, notte).
+        self.assertIn('setAttribute("data-cielo","tramonto")', testa)
         self.assertIn("mut-tema", testa)
         self.assertLess(testa.index('setAttribute("data-tema"'), len(testa))
 
@@ -748,7 +749,8 @@ class TestLinguaENatale(unittest.TestCase):
         blocco = self.css[self.css.index(".natale-tela {"):]
         self.assertIn("pointer-events: none", blocco[:200])
         self.assertIn("html.natale .marchio .iniziale:first-child::after", self.css)
-        self.assertIn("html.natale .testata::after", self.css)
+        # Dall'11/11/2026 le lucine le disegna il canvas (si spengono al passaggio del mouse);
+        # la testata ha la ghirlanda di abete.
         self.assertIn("html.natale .testata::before", self.css)
 
     def test_il_natale_non_e_piu_un_imprevisto_del_ring(self):

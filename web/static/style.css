@@ -274,10 +274,13 @@ a { color: inherit; }
   margin: 0 auto; max-width: 620px;
   font-size: .88rem; color: var(--neutral);
 }
-/* La preparazione della battuta: piccola, grigia, in corsivo leggero. */
+/* La domanda della home (11/11/2026, su richiesta: «fatta meglio, più centralizzata»): non più
+   una riga grigia in corsivo appoggiata al campo, ma il titolo della pagina, al centro, col suo
+   respiro sopra la ricerca. Col Natale si veste a festa (vedi `html.natale .ingresso-domanda`). */
 .ingresso-domanda {
-  margin: 0 0 .5rem; font-size: clamp(.95rem, 1.8vw, 1.1rem);
-  color: var(--neutral); font-style: italic;
+  align-self: center; max-width: 36rem;
+  margin: 0 auto 1.3rem; font-size: clamp(1.15rem, 2.5vw, 1.55rem); line-height: 1.3;
+  font-weight: 650; letter-spacing: -.012em; color: var(--ink); text-wrap: balance;
 }
 .ingresso-cifre {
   display: flex; justify-content: center; flex-wrap: wrap;
@@ -1332,9 +1335,39 @@ button.minuto { padding: .2rem .7rem; font-size: .8rem; border-width: 1px; }
 }
 .tema-tasto:hover { border-color: var(--verde); color: var(--verde); }
 .tema-tasto svg { width: 17px; height: 17px; }
-.tema-tasto .icona-luna { display: none; }
+.tema-tasto .icona-luna, .tema-tasto .icona-auto { display: none; }
 :root[data-tema="scuro"] .tema-tasto .icona-sole { display: none; }
 :root[data-tema="scuro"] .tema-tasto .icona-luna { display: block; }
+/* Col tema automatico il tasto mostra il sole sull'orizzonte, qualunque sia l'ora. */
+:root[data-tema-scelta="auto"] .tema-tasto .icona-sole, :root[data-tema-scelta="auto"] .tema-tasto .icona-luna { display: none; }
+:root[data-tema-scelta="auto"] .tema-tasto .icona-auto { display: block; }
+
+/* IL TRAMONTO (11/11/2026) — il terzo momento del tema automatico, fra il chiaro del giorno e lo
+   scuro della notte: carta color pesca, un cielo che sfuma dall'arancio al lilla dietro la pagina,
+   la testata velata. Il verde del marchio resta lo stesso. Lo decidono `base.html` e `tema.js`. */
+:root[data-cielo="tramonto"] {
+  --ink:      #2b1e22;
+  --paper:    #fbe9de;
+  --carta:    #fff6ef;
+  --neutral:  #6f5658;
+  --filo:     rgba(90, 40, 40, .16);
+  --regola:   rgba(70, 30, 34, .78);
+  --superficie: rgba(120, 50, 40, .05);
+  --ombra:    0 2px 14px rgba(150, 70, 50, .16);
+  --testo-nota: #5c4547;
+  --fondo-firmware: #fbf0e6;
+  --bordo-firmware: #ecd2c0;
+  --anello:   rgba(120, 50, 40, .14);
+}
+:root[data-cielo="tramonto"] body {
+  background: linear-gradient(180deg, #ffd6b0 0%, #fbc4b4 32%, #eec0d2 64%, #d6c3ea 100%) fixed;
+}
+:root[data-cielo="tramonto"] .testata {
+  background: rgba(255, 228, 206, .72);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+:root[data-cielo="tramonto"] #rete { opacity: .55; }
+:root.tema-in-transizione body { transition: background-color 1.2s ease, color .6s ease; }
 
 /* ======================================================================
    SCELTA DELLA LINGUA (02/10/2026) — il tasto tondo con la sigla e il suo menu
@@ -1369,12 +1402,11 @@ html.lingua-attesa body { visibility: hidden; }
 }
 html.natale-presa, html.natale-presa * { cursor: grab !important; }
 html.natale-trascina, html.natale-trascina * { cursor: grabbing !important; user-select: none !important; }
-/* Rosso di Natale (10/11/2026, su richiesta: «un po di rosso e altri addobbi»): i richiami che di
-   solito sono verdi (iniziali, navigazione attiva, tenui) diventano rossi; il tasto «Cerca» resta
-   verde, così rosso e verde stanno insieme come sull'albero. */
-html.natale { --verde: #c8102e; --verde-tenue: rgba(200, 16, 46, .12); --natale-rosso: #c8102e; --natale-verde: #1f7a45; }
-html.natale[data-tema="scuro"] { --verde: #ff6b7d; --verde-tenue: rgba(255, 107, 125, .17); --natale-rosso: #e8334d; --natale-verde: #3fae6c; }
-html.natale ::selection { background: rgba(200, 16, 46, .22); }
+/* VERDE, COL ROSSO NEI DETTAGLI (11/11/2026, su richiesta: «troppo rosso! il tema era verde e deve
+   restare verde, il rosso doveva essere in alcuni dettagli natalizi»). `--verde` resta quello del
+   marchio; il rosso sta solo nel cappellino, nelle bacche, nei fiocchi e in qualche pallina. */
+html.natale { --natale-rosso: #c8102e; --natale-verde: #1f7a45; --natale-oro: #d9a520; }
+html.natale[data-tema="scuro"] { --natale-rosso: #e8334d; --natale-verde: #3fae6c; --natale-oro: #f0c24a; }
 /* Il cappellino: un disegno nostro, appoggiato in alto a sinistra. */
 html.natale .marchio .iniziale, html.natale .pieduccio .sigla .iniziale:first-child { position: relative; }
 html.natale .marchio .iniziale:first-child::after, html.natale .pieduccio .sigla .iniziale:first-child::after {
@@ -1383,51 +1415,44 @@ html.natale .marchio .iniziale:first-child::after, html.natale .pieduccio .sigla
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 34'%3E%3Cpath d='M6 26C8 10 20 3 30 9c4 2.5 6 7 7 12l-5 1c-1-5-3-8-6-9 2 5 2 9 1 13z' fill='%23d8343f' stroke='%23111' stroke-width='1.5'/%3E%3Crect x='2' y='24' width='27' height='8' rx='4' fill='%23fff' stroke='%23111' stroke-width='1.5'/%3E%3Ccircle cx='34.5' cy='22' r='4' fill='%23fff' stroke='%23111' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat center / contain;
   transform: rotate(-16deg);
 }
-/* Bastoncino di zucchero: una striscia rossa e bianca in cima alla testata e in cima al piede. */
+/* La ghirlanda di abete: in fondo alla testata (sopra il filo delle lucine, che disegna il canvas)
+   e in cima al piede. Rametti verdi, ogni tanto una bacca rossa o una pallina d'oro. */
 html.natale .testata::before, html.natale .pieduccio::before {
-  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px; pointer-events: none;
-  background: repeating-linear-gradient(-45deg, #c8102e 0 9px, #fff 9px 18px);
-  background-size: 25.46px 100%;
-  animation: bastoncino 2.4s linear infinite;
+  content: ""; position: absolute; left: 0; right: 0; bottom: -7px; height: 12px; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 12'%3E%3Cg stroke-linecap='round' stroke-width='1.6'%3E%3Cpath d='M0 6h120' stroke='%23175a30' stroke-width='2'/%3E%3Cg stroke='%232a8a4e'%3E%3Cpath d='M4 6l5-4M10 6l5 4M16 6l5-4M22 6l5 4M28 6l5-4M34 6l5 4M40 6l5-4M46 6l5 4M52 6l5-4M58 6l5 4M64 6l5-4M70 6l5 4M76 6l5-4M82 6l5 4M88 6l5-4M94 6l5 4M100 6l5-4M106 6l5 4M112 6l5-4'/%3E%3C/g%3E%3Cg stroke='%231f6e3c'%3E%3Cpath d='M7 6l4 4M13 6l4-4M19 6l4 4M25 6l4-4M31 6l4 4M37 6l4-4M43 6l4 4M49 6l4-4M55 6l4 4M61 6l4-4M67 6l4 4M73 6l4-4M79 6l4 4M85 6l4-4M91 6l4 4M97 6l4-4M103 6l4 4M109 6l4-4M115 6l4 4'/%3E%3C/g%3E%3C/g%3E%3Ccircle cx='30' cy='7' r='2.4' fill='%23d8102e'/%3E%3Ccircle cx='33.5' cy='5' r='2.1' fill='%23d8102e'/%3E%3Ccircle cx='90' cy='7' r='2.6' fill='%23e6b422' stroke='%23a87b0a' stroke-width='.6'/%3E%3C/svg%3E") repeat-x left center / 120px 12px;
 }
-html.natale .pieduccio { border-top: 0; padding-top: 1.9rem; }
-html.natale .pieduccio::before { left: 1.5rem; right: 1.5rem; top: .9rem; height: 4px; border-radius: 4px; }
-@keyframes bastoncino { to { background-position: 25.46px 0; } }
-html.natale .testata { border-bottom-color: var(--natale-rosso); }
-/* Le lucine sotto la testata: una fila di lampadine che si accendono a turno, più rosse che verdi. */
-html.natale .testata::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: -9px; height: 8px; pointer-events: none;
-  background:
-    radial-gradient(circle at 12px 4px, #e0213b 3px, transparent 3.6px),
-    radial-gradient(circle at 36px 4px, #ffcf3a 3px, transparent 3.6px),
-    radial-gradient(circle at 60px 4px, #e0213b 3px, transparent 3.6px),
-    radial-gradient(circle at 84px 4px, #2e8b4e 3px, transparent 3.6px),
-    radial-gradient(circle at 108px 4px, #e0213b 3px, transparent 3.6px),
-    radial-gradient(circle at 132px 4px, #2f72e0 3px, transparent 3.6px);
-  background-size: 144px 8px; background-repeat: repeat-x;
-  animation: lucine 1.6s steps(2, jump-none) infinite;
-}
-@keyframes lucine { 0% { opacity: 1; } 100% { opacity: .45; } }
-/* Le schede e i risultati: filo rosso a sinistra, e un fiocco sul risultato. */
-html.natale .esito, html.natale .scheda, html.natale .esito.trovato { border-left-color: var(--natale-rosso); }
+html.natale .testata { border-bottom-color: var(--natale-verde); }
+html.natale .pieduccio { border-top: 0; padding-top: 1.9rem; position: relative; }
+html.natale .pieduccio::before { left: 1.5rem; right: 1.5rem; top: .6rem; bottom: auto; }
+/* Le schede e i risultati restano verdi; sul risultato un fiocco rosso, che è un dettaglio. */
 html.natale .esito { position: relative; }
 html.natale .esito::after {
   content: ""; position: absolute; right: 12px; top: -15px; width: 38px; height: 32px; pointer-events: none;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 40'%3E%3Cpath d='M24 20C14 6 3 8 4 18c1 9 12 6 20 2zM24 20c10-14 21-12 20-2-1 9-12 6-20 2z' fill='%23d8102e' stroke='%23800a1c' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cpath d='M24 20c-3 6-8 14-12 18 5 1 9-3 12-18zM24 20c3 6 8 14 12 18-5 1-9-3-12-18z' fill='%23b30d26' stroke='%23800a1c' stroke-width='1.2' stroke-linejoin='round'/%3E%3Ccircle cx='24' cy='20' r='4.2' fill='%23e8223f' stroke='%23800a1c' stroke-width='1.2'/%3E%3C/svg%3E") no-repeat center / contain; transform: rotate(8deg);
 }
-html.natale .tabella tbody tr:hover { box-shadow: inset 3px 0 0 var(--natale-rosso); }
-html.natale main input:not([type=hidden]):focus { border-color: var(--natale-rosso); box-shadow: 0 0 0 3px rgba(200, 16, 46, .18); }
-html.natale .nav a:hover, html.natale main a:hover { color: var(--natale-rosso); }
-/* Rametti di agrifoglio ai lati della domanda in home. */
-html.natale .ingresso-domanda::before, html.natale .ingresso-domanda::after {
-  content: ""; display: inline-block; width: 2.2em; height: 1.4em; vertical-align: -.4em; margin: 0 .5em;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 40'%3E%3Cg fill='%23238a48' stroke='%23155c2e' stroke-width='1.2' stroke-linejoin='round'%3E%3Cpath d='M32 22c-4-9-14-12-24-8 3 8 12 13 24 8z'/%3E%3Cpath d='M32 22c4-9 14-12 24-8-3 8-12 13-24 8z'/%3E%3Cpath d='M32 24c-6 4-9 11-7 16 7-1 11-8 7-16z'/%3E%3C/g%3E%3Cg fill='%23d8102e' stroke='%23800a1c' stroke-width='1'%3E%3Ccircle cx='28' cy='22' r='4.4'/%3E%3Ccircle cx='36' cy='22' r='4.4'/%3E%3Ccircle cx='32' cy='28' r='4.4'/%3E%3C/g%3E%3Cg fill='%23fff' opacity='.7'%3E%3Ccircle cx='26.8' cy='20.6' r='1'/%3E%3Ccircle cx='34.8' cy='20.6' r='1'/%3E%3Ccircle cx='30.8' cy='26.6' r='1'/%3E%3C/g%3E%3C/svg%3E") no-repeat center / contain;
+/* LA DOMANDA DELLA HOME, VESTITA A FESTA (11/11/2026, su richiesta: «fatta meglio, più centralizzata
+   con qualche decorazione natalizia»). Sopra un festone di abete con le palline appese e un fiocco
+   in mezzo; ai lati due rametti di agrifoglio; sotto una stellina. Il testo sta al centro esatto:
+   gli addobbi sono posizionati, non in linea, così non lo spostano quando va a capo. */
+html.natale .ingresso-domanda {
+  position: relative; align-self: center; width: fit-content; max-width: min(100%, 32rem);
+  padding: 2.6rem 3.4rem 1.5rem; margin-bottom: 1.4rem;
 }
-html.natale .ingresso-domanda::after { transform: scaleX(-1); }
-/* Il tasto del meteo e quello del Natale: il Natale è rosso acceso. */
-html.natale .tema-tasto:hover { border-color: var(--natale-rosso); }
-@media (prefers-reduced-motion: reduce) {
-  html.natale .testata::after, html.natale .testata::before, html.natale .pieduccio::before { animation: none; }
+html.natale .ingresso-domanda::before {
+  content: ""; position: absolute; left: 50%; top: 0; width: min(100%, 34rem); height: 2.4rem;
+  transform: translateX(-50%); pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 340 40'%3E%3Cpath d='M6 6Q88 34 170 10Q252 34 334 6' fill='none' stroke='%23175a30' stroke-width='3'/%3E%3Cg fill='none' stroke='%232a8a4e' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M20 11l6-7M34 16l7-6M48 20l6-7M62 23l7-6M76 24l6-7M90 24l7-6M104 22l6-7M118 19l7-6M132 15l6-7M146 12l7-6M194 12l-7-6M208 15l-6-7M222 19l-7-6M236 22l-6-7M250 24l-7-6M264 24l-6-7M278 23l-7-6M292 20l-6-7M306 16l-7-6M320 11l-6-7'/%3E%3Cpath d='M22 9l3 8M36 14l4 7M50 18l3 8M64 21l4 7M78 22l3 8M92 22l4 7M106 20l3 8M120 17l4 7M134 13l3 8M206 13l-3 8M220 17l-4 7M234 20l-3 8M248 22l-4 7M262 22l-3 8M276 21l-4 7M290 18l-3 8M304 14l-4 7M318 9l-3 8'/%3E%3C/g%3E%3Cg stroke='%23b9a25a' stroke-width='1'%3E%3Cpath d='M60 22v7M115 20v9M225 20v9M280 22v7'/%3E%3C/g%3E%3Ccircle cx='60' cy='32' r='4' fill='%23e6b422' stroke='%23a87b0a'/%3E%3Ccircle cx='115' cy='33' r='4.5' fill='%232f72e0' stroke='%231d4a99'/%3E%3Ccircle cx='225' cy='33' r='4.5' fill='%23e6b422' stroke='%23a87b0a'/%3E%3Ccircle cx='280' cy='32' r='4' fill='%23d8102e' stroke='%23800a1c'/%3E%3Cg fill='%23fff' opacity='.8'%3E%3Ccircle cx='58.6' cy='30.6' r='1.1'/%3E%3Ccircle cx='113.4' cy='31.4' r='1.2'/%3E%3Ccircle cx='223.4' cy='31.4' r='1.2'/%3E%3Ccircle cx='278.6' cy='30.6' r='1.1'/%3E%3C/g%3E%3Cpath d='M170 12C158 0 148 4 150 12s12 4 20 0zM170 12c12-12 22-8 20 0s-12 4-20 0z' fill='%23d8102e' stroke='%23800a1c' stroke-width='1.2'/%3E%3Cpath d='M170 12l-8 16 5-1 3-15zM170 12l8 16-5-1-3-15z' fill='%23b30d26' stroke='%23800a1c' stroke-width='1'/%3E%3Ccircle cx='170' cy='12' r='3.6' fill='%23e8223f' stroke='%23800a1c'/%3E%3C/svg%3E") no-repeat center / contain;
+}
+html.natale .ingresso-domanda::after {
+  content: ""; position: absolute; inset: 2.4rem 0 0; pointer-events: none;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 40'%3E%3Cg fill='%23238a48' stroke='%23155c2e' stroke-width='1.2' stroke-linejoin='round'%3E%3Cpath d='M32 22c-4-9-14-12-24-8 3 8 12 13 24 8z'/%3E%3Cpath d='M32 22c4-9 14-12 24-8-3 8-12 13-24 8z'/%3E%3Cpath d='M32 24c-6 4-9 11-7 16 7-1 11-8 7-16z'/%3E%3C/g%3E%3Cg fill='%23d8102e' stroke='%23800a1c' stroke-width='1'%3E%3Ccircle cx='28' cy='22' r='4.4'/%3E%3Ccircle cx='36' cy='22' r='4.4'/%3E%3Ccircle cx='32' cy='28' r='4.4'/%3E%3C/g%3E%3C/svg%3E") left center / 2.6rem 1.7rem no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 40'%3E%3Cg transform='matrix(-1 0 0 1 64 0)'%3E%3Cg fill='%23238a48' stroke='%23155c2e' stroke-width='1.2' stroke-linejoin='round'%3E%3Cpath d='M32 22c-4-9-14-12-24-8 3 8 12 13 24 8z'/%3E%3Cpath d='M32 22c4-9 14-12 24-8-3 8-12 13-24 8z'/%3E%3Cpath d='M32 24c-6 4-9 11-7 16 7-1 11-8 7-16z'/%3E%3C/g%3E%3Cg fill='%23d8102e' stroke='%23800a1c' stroke-width='1'%3E%3Ccircle cx='28' cy='22' r='4.4'/%3E%3Ccircle cx='36' cy='22' r='4.4'/%3E%3Ccircle cx='32' cy='28' r='4.4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") right center / 2.6rem 1.7rem no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 10'%3E%3Cpath d='M0 5h22M38 5h22' stroke='%231f7a5a' stroke-width='1' opacity='.55'/%3E%3Cpath d='M30 0l1.4 3.6L35 5l-3.6 1.4L30 10l-1.4-3.6L25 5l3.6-1.4z' fill='%23e6b422'/%3E%3C/svg%3E") center bottom / 6rem .7rem no-repeat;
+}
+@media (max-width: 560px) {
+  html.natale .ingresso-domanda { padding: 2.2rem 2.4rem 1.3rem; }
+  html.natale .ingresso-domanda::after { background-size: 1.9rem 1.3rem, 1.9rem 1.3rem, 5rem .6rem; }
 }
 @media print { .natale-tela { display: none; } }
 
@@ -1437,8 +1462,10 @@ html.natale .tema-tasto:hover { border-color: var(--natale-rosso); }
    Qui: il tasto, la sua etichetta e il velo di luce o di nebbia.
    ====================================================================== */
 .meteo-tasto[aria-pressed="true"] { background: #2f72e0; border-color: #2f72e0; color: #fff; }
+/* Dall'11/11/2026 il meteo sta DAVVERO dietro il contenuto (z-index 0, sopra la trama `#rete` perché
+   viene dopo nel documento, sotto `.contenuto` e la testata): le nuvole piene coprivano la domanda. */
 .meteo-tela {
-  position: fixed; top: 0; left: 0; z-index: 18; pointer-events: none; display: block;
+  position: fixed; top: 0; left: 0; z-index: 0; pointer-events: none; display: block;
 }
 @media print { .meteo-tela { display: none; } }
 

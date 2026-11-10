@@ -464,44 +464,146 @@
     for (var i = 0; i < 8; i++) { var a = (i / 8) * Math.PI * 2, rr = i % 2 ? r * 0.22 : r; ctx[i ? "lineTo" : "moveTo"](x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
     ctx.closePath(); ctx.fill(); ctx.restore();
   }
-  // L'albero: quattro piani a balze con la neve sopra, la ghirlanda, le palline e la stella.
-  var PALLINE = [[-18, 22, "#d8343f"], [14, 26, "#ffcf3a"], [-6, 42, "#2f72e0"], [12, 50, "#d8343f"], [-8, 60, "#ffcf3a"], [4, 72, "#d8343f"], [-14, 34, "#f4f1e6"], [6, 36, "#8a4fd0"]];
+  // LE LAMPADINE CHE SI SPENGONO (11/11/2026, su richiesta: «le luci di natale devono spegnersi al
+  // passaggio del mouse»). Ogni lampadina, sul filo sotto la testata, in cima alla finestra fuori dal
+  // sito e sull'albero, si registra qui a ogni disegno con la sua chiave; passandoci vicino col
+  // puntatore si spegne, resta spenta un paio di secondi e si riaccende tremolando.
+  var SPENTA = 150, RIACCENDE = 36;
+  var luciSpente = {}, luciPos = [];
+  function lampadina(chiave, x, y, col, r, k) {
+    luciPos.push({ c: chiave, x: x, y: y });
+    var sp = luciSpente[chiave] || 0;
+    if (sp > RIACCENDE) k = 0;
+    else if (sp > 0) k *= (sp % 6 < 3 ? 0.25 : 1) * (1 - sp / RIACCENDE);   // il tremolio della riaccensione
+    if (k > 0.05) { ctx.save(); ctx.globalAlpha = 0.32 * k; tondo(x, y, r * 2.9, col); ctx.restore(); }
+    ctx.save(); ctx.globalAlpha = 0.55 + 0.45 * k; ctx.fillStyle = k > 0.05 ? col : "#6b6f78";
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 1.45, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    tondo(x - r * 0.3, y - r * 0.45, r * 0.32, "rgba(255,255,255," + (0.3 + 0.5 * k) + ")");
+  }
+  function spegniVicine(x, y) {
+    for (var i = 0; i < luciPos.length; i++) {
+      var l = luciPos[i], dx = l.x - x, dy = l.y - y;
+      if (dx * dx + dy * dy < 22 * 22) luciSpente[l.c] = SPENTA;
+    }
+  }
+  function consumaSpente() {
+    for (var c in luciSpente) if (--luciSpente[c] <= 0) delete luciSpente[c];
+  }
+
+  // L'ALBERO (11/11/2026, su richiesta: «più grande e dettagliato»): alto quasi il doppio, sei piani
+  // di rami a punte con gli aghi, neve sulle punte, il vaso di legno, la ghirlanda dorata a perline,
+  // il filo di lucine a spirale (che si spengono anche loro col mouse), palline che dondolano,
+  // due bastoncini di zucchero e la stella a cinque punte coi raggi. A scala 1 è alto 120 px.
+  var PIANI = [[0, 44, 30], [20, 39, 28], [38, 33, 26], [55, 27, 24], [70, 20, 21], [83, 13, 18]];
+  var PALLINE = [[-26, 24, 0], [18, 30, 1], [-6, 44, 2], [24, 50, 3], [-22, 56, 1], [8, 66, 0], [-14, 76, 3], [14, 82, 2],
+    [-4, 92, 1], [30, 18, 2], [-34, 12, 3], [2, 26, 4], [-10, 60, 4]];
+  var TINTE = [["#d8343f", "#7d1220"], ["#e6b422", "#8a6206"], ["#2f72e0", "#163f86"], ["#f4f1e6", "#8f8a7c"], ["#7a3fc0", "#3f1d6e"]];
+  var COLORI_ALBERO = ["#ffd75a", "#ff5a4a", "#5ad2ff", "#ffd75a", "#7dff8a", "#ff8ad8"];
+  function pianoAlbero(x, yb, largo, alto, s, i) {
+    var g = ctx.createLinearGradient(x - largo, yb - alto, x + largo, yb);
+    g.addColorStop(0, scuro ? "#2f8a52" : "#3a9e5e"); g.addColorStop(0.5, "#24774a"); g.addColorStop(1, "#14492b");
+    ctx.fillStyle = g; ctx.strokeStyle = "#0f3a22"; ctx.lineWidth = 1.1; ctx.lineJoin = "round";
+    // Il bordo basso a punte, come rami d'abete che scendono.
+    var punte = 7, k, px;
+    ctx.beginPath(); ctx.moveTo(x, yb - alto); ctx.lineTo(x - largo, yb - 2 * s);
+    for (k = 0; k < punte; k++) {
+      px = x - largo + (k + 1) * (2 * largo) / punte;
+      ctx.lineTo(px - largo / punte, yb + (3 + (k % 2) * 2.5) * s);
+      ctx.lineTo(px, yb - 2 * s);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // L'ombra del piano di sopra.
+    if (i < PIANI.length - 1) {
+      ctx.fillStyle = "rgba(6,30,16,.28)"; ctx.beginPath();
+      ctx.ellipse(x, yb - alto * 0.62, largo * 0.55, 3.2 * s, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    // Gli aghi: tratti corti e chiari, sempre negli stessi posti.
+    ctx.strokeStyle = "rgba(160,225,170,.38)"; ctx.lineWidth = Math.max(0.6, 0.7 * s); ctx.beginPath();
+    for (k = 0; k < 16; k++) {
+      var u = ((k * 37 + i * 11) % 100) / 100, v = 0.3 + ((k * 53 + i * 7) % 60) / 100;
+      var ax = x + (u * 2 - 1) * largo * v * 0.92, ay = yb - alto * (1 - v) - 1 * s;
+      ctx.moveTo(ax, ay); ctx.lineTo(ax + (u < 0.5 ? -2.4 : 2.4) * s, ay + 2.6 * s);
+    }
+    ctx.stroke();
+    // La neve sulle punte del piano.
+    ctx.fillStyle = "rgba(255,255,255,.95)";
+    for (k = 0; k < punte; k += 2) {
+      px = x - largo + (k + 0.5) * (2 * largo) / punte;
+      ctx.beginPath(); ctx.ellipse(px, yb + 0.5 * s, 3.4 * s, 1.6 * s, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.beginPath(); ctx.moveTo(x, yb - alto); ctx.lineTo(x - largo * 0.28, yb - alto * 0.68);
+    ctx.quadraticCurveTo(x, yb - alto * 0.6, x + largo * 0.3, yb - alto * 0.7); ctx.closePath(); ctx.fill();
+  }
+  function bastoncino(x, y, s) {
+    ctx.save(); ctx.translate(x, y); ctx.lineCap = "round";
+    for (var k = 0; k < 2; k++) {
+      ctx.strokeStyle = k ? "#d8102e" : "#ffffff"; ctx.lineWidth = 2.4 * s;
+      if (k) ctx.setLineDash([2.2 * s, 2.2 * s]);
+      ctx.beginPath(); ctx.moveTo(0, 12 * s); ctx.lineTo(0, 0); ctx.arc(-3 * s, 0, 3 * s, 0, Math.PI, true); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // Dove sta l'albero e quanto è grande: nel margine a sinistra della colonna, grande se c'è posto.
+  function alberoS() { return W < 640 ? 0.7 : W < 1100 ? 1.1 : 1.6; }
+  function alberoX() { return W < 640 ? 36 : W < 1100 ? 56 : 84; }
   function disegnaAlbero(x, y, s) {
-    ctx.fillStyle = "#6b4423"; ctx.strokeStyle = "#4a2e17"; ctx.lineWidth = 1;
-    ctx.fillRect(x - 4.5 * s, y - 15 * s, 9 * s, 15 * s); ctx.strokeRect(x - 4.5 * s, y - 15 * s, 9 * s, 15 * s);
-    var piani = [[0, 35, 27], [20, 29, 25], [38, 22, 23], [54, 15, 20]], i;
-    for (i = 0; i < piani.length; i++) {
-      var su = piani[i][0], largo = piani[i][1] * s, alto = piani[i][2] * s, yb = y - (14 + su) * s;
-      var g = ctx.createLinearGradient(x - largo, 0, x + largo, 0);
-      g.addColorStop(0, "#2f9152"); g.addColorStop(0.55, "#2a8249"); g.addColorStop(1, "#1f683a");
-      ctx.fillStyle = g; ctx.strokeStyle = "#174d2b"; ctx.lineWidth = 1.2; ctx.lineJoin = "round";
-      // Il bordo basso a balze.
-      ctx.beginPath(); ctx.moveTo(x, yb - alto); ctx.lineTo(x - largo, yb);
-      for (var k = 0; k < 4; k++) ctx.quadraticCurveTo(x - largo + (k + 0.5) * largo / 2, yb + 4.5 * s, x - largo + (k + 1) * largo / 2, yb);
-      ctx.closePath(); ctx.fill(); ctx.stroke();
-      // La neve sul piano.
-      ctx.fillStyle = "rgba(255,255,255,.92)"; ctx.beginPath();
-      ctx.moveTo(x, yb - alto); ctx.lineTo(x - largo * 0.42, yb - alto * 0.55);
-      ctx.quadraticCurveTo(x - largo * 0.2, yb - alto * 0.42, x, yb - alto * 0.52);
-      ctx.quadraticCurveTo(x + largo * 0.2, yb - alto * 0.4, x + largo * 0.42, yb - alto * 0.55); ctx.closePath(); ctx.fill();
+    var i, k;
+    // Il vaso di legno con le doghe e il cerchio d'oro.
+    var vh = 14 * s, vt = 15 * s, vb = 11 * s;
+    ctx.fillStyle = "#7a4a26"; ctx.strokeStyle = "#3f2410"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x - vt, y - vh); ctx.lineTo(x + vt, y - vh); ctx.lineTo(x + vb, y); ctx.lineTo(x - vb, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "rgba(40,20,8,.45)"; ctx.beginPath();
+    for (k = -2; k <= 2; k++) { ctx.moveTo(x + k * 5.5 * s, y - vh); ctx.lineTo(x + k * 4 * s, y); }
+    ctx.stroke();
+    ctx.fillStyle = "#d9a520"; ctx.fillRect(x - vt * 0.93, y - vh * 0.62, vt * 1.86, 2.2 * s);
+    // Il tronco.
+    ctx.fillStyle = "#5e3a1c"; ctx.fillRect(x - 4 * s, y - vh - 9 * s, 8 * s, 9 * s);
+    var y0 = y - vh - 7 * s;
+    for (i = 0; i < PIANI.length; i++) pianoAlbero(x, y0 - PIANI[i][0] * s, PIANI[i][1] * s, PIANI[i][2] * s, s, i);
+    // La ghirlanda dorata a perline, a festoni da un lato all'altro.
+    for (i = 0; i < 4; i++) {
+      var yg = y0 - (12 + i * 20) * s, lg = (38 - i * 8) * s, dir = i % 2 ? -1 : 1;
+      for (k = 0; k <= 14; k++) {
+        var t = k / 14, gx = x + dir * (t * 2 - 1) * lg, gy = yg - (t * 8) * s + Math.sin(Math.PI * t) * 6 * s;
+        tondo(gx, gy, 1.15 * s, k % 2 ? "#f4d266" : "#c99a1c");
+      }
     }
-    // La ghirlanda dorata, a festoni.
-    ctx.strokeStyle = "#e9b93c"; ctx.lineWidth = 1.6 * s; ctx.lineCap = "round";
-    for (i = 0; i < 3; i++) {
-      var yg = y - (24 + i * 19) * s, lg = (27 - i * 7) * s;
-      ctx.beginPath(); ctx.moveTo(x - lg, yg); ctx.quadraticCurveTo(x, yg + 9 * s, x + lg, yg - 3 * s); ctx.stroke();
+    // Il filo di lucine a spirale.
+    var accese = ridotto ? 0.85 : null;
+    for (i = 0; i < 4; i++) {
+      var yl = y0 - (4 + i * 21) * s, ll = (40 - i * 8.5) * s, dl = i % 2 ? 1 : -1, n = 7 - i;
+      for (k = 0; k < n; k++) {
+        var tl = (k + 0.5) / n, lx = x + dl * (tl * 2 - 1) * ll, ly = yl - tl * 9 * s + Math.sin(Math.PI * tl) * 5 * s;
+        var kl = accese !== null ? accese : 0.4 + 0.6 * Math.max(0, Math.sin(passi * 0.06 + i * 2.1 + k * 1.7));
+        lampadina("a" + i + "-" + k, lx, ly, COLORI_ALBERO[(i * 3 + k) % COLORI_ALBERO.length], 1.4 * s, kl);
+      }
     }
+    // Le palline, che dondolano appena.
     for (i = 0; i < PALLINE.length; i++) {
-      var accesa = (Math.floor(passi / 24) + i) % 3 !== 0, px = x + PALLINE[i][0] * s, py = y - PALLINE[i][1] * s;
-      if (accesa) { ctx.save(); ctx.globalAlpha = 0.28; tondo(px, py, 5.2 * s, PALLINE[i][2]); ctx.restore(); }
-      tondo(px, py, 2.7 * s, accesa ? PALLINE[i][2] : "#8a8a8a");
-      tondo(px - 0.9 * s, py - 0.9 * s, 0.8 * s, "rgba(255,255,255,.85)");
+      var pb = PALLINE[i], tinta = TINTE[pb[2]], rr = (pb[2] === 4 ? 2.6 : 3.3) * s;
+      var dx = ridotto ? 0 : Math.sin(passi * 0.03 + i * 1.7) * 0.8 * s + vento * 0.4 * s;
+      var bx = x + pb[0] * s * 0.95 + dx, by = y0 - pb[1] * s;
+      var gb = ctx.createRadialGradient(bx - rr * 0.35, by - rr * 0.4, rr * 0.1, bx, by, rr);
+      gb.addColorStop(0, "#ffffff"); gb.addColorStop(0.3, tinta[0]); gb.addColorStop(1, tinta[1]);
+      ctx.fillStyle = "#c9a640"; ctx.fillRect(bx - 0.9 * s, by - rr - 1.3 * s, 1.8 * s, 1.5 * s);
+      ctx.fillStyle = gb; ctx.beginPath(); ctx.arc(bx, by, rr, 0, Math.PI * 2); ctx.fill();
     }
-    // La stella, col suo alone che pulsa.
-    var puls = 0.5 + 0.5 * Math.sin(passi * 0.08);
-    ctx.save(); ctx.globalAlpha = 0.2 + 0.2 * puls; tondo(x, y - 95 * s, (10 + 3 * puls) * s, "#ffe27a"); ctx.restore();
-    stella(x, y - 95 * s, 6.5 * s, "#ffd84a");
-    scintilla(x, y - 95 * s, (9 + 4 * puls) * s, "#ffffff", 0.5 * puls);
+    bastoncino(x - 18 * s, y0 - 38 * s, s * 0.9); bastoncino(x + 22 * s, y0 - 66 * s, s * 0.8);
+    // La stella, coi raggi che girano piano e l'alone che pulsa.
+    var cy = y0 - (PIANI[5][0] + PIANI[5][2] + 5) * s, puls = 0.5 + 0.5 * Math.sin(passi * 0.06);
+    ctx.save(); ctx.translate(x, cy); ctx.rotate(ridotto ? 0 : passi * 0.004);
+    ctx.strokeStyle = "rgba(255,226,122," + (0.25 + 0.25 * puls) + ")"; ctx.lineWidth = 1.2 * s; ctx.beginPath();
+    for (k = 0; k < 12; k++) { var ar = k * Math.PI / 6, r1 = 9 * s, r2 = (k % 2 ? 15 : 19) * s; ctx.moveTo(Math.cos(ar) * r1, Math.sin(ar) * r1); ctx.lineTo(Math.cos(ar) * r2, Math.sin(ar) * r2); }
+    ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.globalAlpha = 0.22 + 0.2 * puls; tondo(x, cy, (11 + 3 * puls) * s, "#ffe27a"); ctx.restore();
+    ctx.save(); ctx.strokeStyle = "#a87b0a"; ctx.lineWidth = 1.2; ctx.lineJoin = "round";
+    ctx.beginPath();
+    for (k = 0; k < 10; k++) { var as = (k / 10) * Math.PI * 2 - Math.PI / 2, rs = (k % 2 ? 3.4 : 8) * s; ctx[k ? "lineTo" : "moveTo"](x + Math.cos(as) * rs, cy + Math.sin(as) * rs); }
+    ctx.closePath();
+    var gs = ctx.createRadialGradient(x - 2 * s, cy - 2 * s, 0.5, x, cy, 8 * s);
+    gs.addColorStop(0, "#fff6c2"); gs.addColorStop(1, "#f0b81e");
+    ctx.fillStyle = gs; ctx.fill(); ctx.stroke(); ctx.restore();
+    scintilla(x, cy, (10 + 4 * puls) * s, "#ffffff", 0.45 * puls);
   }
   function disegnaRegalo(g) {
     var w = g.w, h = g.h, x = g.x - w / 2, y = g.base - h;
@@ -530,47 +632,45 @@
     ctx.beginPath(); ctx.arc(16.5 * s, -5 * s, 3.4 * s, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.restore();
   }
-  // Le lucine: un filo che fa le onde in cima alla finestra, con le lampadine che si accendono a turno.
-  var COLORI_LUCI = ["#e23b3b", "#f4b63a", "#3aa657", "#3a7be2", "#c05be0"];
-  function disegnaLuci() {
-    var passoPioli = 150, n = Math.max(2, Math.ceil(W / passoPioli)), largo = W / n, i;
-    var yFilo = function (x) { var f = (x % largo) / largo; return 5 + 15 * Math.sin(Math.PI * f); };
-    ctx.strokeStyle = scuro ? "#3d6b52" : "#1f4a32"; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(0, 5);
+  // Le lucine: un filo che fa le onde, con le lampadine che si accendono a turno. Fuori dal sito
+  // corre in cima alla finestra; sul sito sotto la testata, a festoni fra un chiodino e l'altro, con
+  // qualche pallina appesa. Al passaggio del mouse le lampadine si spengono (vedi `lampadina`).
+  var COLORI_LUCI = ["#ff4b4b", "#ffc93a", "#39c46a", "#3a8bff", "#ffffff", "#ff8a2a"];
+  var PALLINE_COLORI = [["#e6b422", "#8a6206"], ["#2e8b4e", "#175a30"], ["#d8343f", "#7d1220"], ["#f4f1e6", "#8f8a7c"], ["#2f72e0", "#163f86"]];
+  var testata = null;
+  function filoDiLuci(y0, onda, passoLuci) {
+    var campata = W < 640 ? 120 : 160, n = Math.max(2, Math.ceil(W / campata)), largo = W / n, i;
+    var yFilo = function (x) { var f = (x % largo) / largo; return y0 + onda * Math.sin(Math.PI * f); };
+    ctx.strokeStyle = scuro ? "#3d6b52" : "#1f4a32"; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(0, y0);
     for (var x = 0; x <= W; x += 8) ctx.lineTo(x, yFilo(x));
     ctx.stroke();
-    var quante = Math.floor(W / 30);
-    for (i = 0; i < quante; i++) {
-      var lx = 15 + i * 30, ly = yFilo(lx) + 5, col = COLORI_LUCI[i % COLORI_LUCI.length];
-      var k = ridotto ? 0.8 : 0.45 + 0.55 * Math.max(0, Math.sin(passi * 0.045 + i * 1.9));
-      ctx.fillStyle = "#2b2f3a"; ctx.fillRect(lx - 1.6, ly - 5, 3.2, 3);
-      ctx.save(); ctx.globalAlpha = 0.3 * k; tondo(lx, ly + 1, 8, col); ctx.restore();
-      ctx.save(); ctx.globalAlpha = 0.45 + 0.55 * k; ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(lx, ly + 1, 2.7, 4, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-      tondo(lx - 0.8, ly - 0.4, 0.8, "rgba(255,255,255," + (0.5 + 0.4 * k) + ")");
-    }
-  }
-  // Le palline appese al filo delle lucine sotto la testata (solo sul sito, dove le lucine le fa lo stile):
-  // rosse per lo più, qualcuna oro e verde, e dondolano col vento. Il filo corre all'incirca 5 px sotto la testata.
-  var PALLINE_COLORI = [["#e0213b", "#8f1226"], ["#ffcf3a", "#a87b0a"], ["#e0213b", "#8f1226"], ["#2e8b4e", "#175a30"], ["#e0213b", "#8f1226"], ["#f4f1e6", "#9a9484"]];
-  var testata = null;
-  function disegnaPalline() {
-    if (!testata) testata = document.querySelector(".testata") || false;
-    if (!testata) return;
-    var y0 = testata.getBoundingClientRect().bottom + 5;
-    if (y0 < -10 || y0 > H - 30) return;
-    var passo = W < 640 ? 74 : 104, n = Math.floor((W - 30) / passo);
-    for (var i = 0; i < n; i++) {
-      var x = 34 + i * passo + ((i * 37) % 22), lung = 9 + ((i * 7) % 13), r = 4.6 + ((i * 3) % 3) * 0.7;
-      var c = PALLINE_COLORI[i % PALLINE_COLORI.length];
+    // Le palline appese ai chiodini fra un festone e l'altro (solo sul sito).
+    if (!est) for (i = 1; i < n; i++) {
+      var c = PALLINE_COLORI[i % PALLINE_COLORI.length], px = i * largo, lung = 6 + (i * 7) % 9, r = 4.4 + (i % 3) * 0.6;
       var dond = ridotto ? 0 : Math.sin(passi * 0.035 + i * 1.3) * 0.09 + vento * 0.03;
-      ctx.save(); ctx.translate(x, y0); ctx.rotate(dond);
+      ctx.save(); ctx.translate(px, y0); ctx.rotate(dond);
       ctx.strokeStyle = "#b9a25a"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, lung); ctx.stroke();
       ctx.fillStyle = "#d9b64a"; ctx.fillRect(-1.9, lung, 3.8, 2.4);
       var g = ctx.createRadialGradient(-r * 0.35, lung + 2.4 + r * 0.6, r * 0.1, 0, lung + 2.4 + r, r * 1.2);
       g.addColorStop(0, "#ffffff"); g.addColorStop(0.25, c[0]); g.addColorStop(1, c[1]);
-      ctx.fillStyle = g; ctx.strokeStyle = c[1]; ctx.lineWidth = 0.8;
-      ctx.beginPath(); ctx.arc(0, lung + 2.4 + r, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, lung + 2.4 + r, r, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
+    var quante = Math.floor(W / passoLuci);
+    for (i = 0; i < quante; i++) {
+      var lx = passoLuci / 2 + i * passoLuci, ly = yFilo(lx) + 5, col = COLORI_LUCI[i % COLORI_LUCI.length];
+      var k = ridotto ? 0.85 : 0.45 + 0.55 * Math.max(0, Math.sin(passi * 0.045 + i * 1.9));
+      ctx.fillStyle = "#2b2f3a"; ctx.fillRect(lx - 1.6, ly - 5.5, 3.2, 3);
+      lampadina("f" + i, lx, ly + 1, col, 2.7, k);
+    }
+  }
+  function disegnaLuci() { filoDiLuci(5, 15, 30); }
+  function disegnaPalline() {
+    if (!testata) testata = document.querySelector(".testata") || false;
+    if (!testata) return;
+    var y0 = testata.getBoundingClientRect().bottom + 6;
+    if (y0 < -20 || y0 > H - 30) return;
+    filoDiLuci(y0, 9, W < 640 ? 26 : 30);
   }
   // La brina ai quattro angoli della finestra.
   function disegnaBrina() {
@@ -659,6 +759,7 @@
 
   function disegna() {
     ctx.clearRect(0, 0, W, H);
+    luciPos = [];
     var i, k, f;
     var stretto = W < 640, sA = stretto ? 0.62 : 1;
     var bordoNeve = scuro ? "rgba(190,210,235,.7)" : "rgba(110,140,180,.75)";
@@ -677,7 +778,7 @@
       ctx.beginPath(); ctx.rect(0, 0, W, pavimento + 1); ctx.clip();
       ctx.translate(0, (1 - spunta) * 120);
     }
-    disegnaAlbero(stretto ? 30 : 48, pavimento, stretto ? sA : 0.9);
+    disegnaAlbero(alberoX(), pavimento, alberoS());
     for (i = 0; i < regali.length; i++) disegnaRegalo(regali[i]);
     // Pupazzi: prima le sagome di dove va il prossimo pezzo, poi i pezzi.
     for (i = 0; i < pupazzi.length; i++) {
@@ -756,6 +857,7 @@
   // --- Il ciclo ---------------------------------------------------------
   function passo() {
     passi++;
+    consumaSpente();
     if (passi % 30 === 0) { rileva(); assesta(); }
     // Il vento gira piano, con qualche raffica.
     if (raffica > 0) raffica--; else if (!ridotto && Math.random() < 0.002) raffica = Math.round(caso(90, 200));
@@ -831,12 +933,13 @@
     var stretto = W < 640, s = stretto ? 0.62 : 1;
     // Fuori dal sito in basso a destra c'è il tasto dell'estensione: il pupazzo sta un po' più in qua.
     pupazzi.push(nuovoPupazzo(W - (stretto ? 46 : est ? 150 : 96), s));
-    if (W > 1100) pupazzi.push(nuovoPupazzo(est ? 190 : 128, 0.8));       // solo se c'è margine accanto alla colonna
+    // Il secondo pupazzo, solo se c'è margine: a destra, perché a sinistra ora c'è l'albero grande.
+    if (W > 1100) pupazzi.push(nuovoPupazzo(W - (est ? 270 : 196), 0.8));
     // I regali ai piedi dell'albero.
     regali = [];
-    var xa = stretto ? 30 : 48, k = stretto ? 0.62 : 0.9;
-    regali.push(nuovoRegalo(xa - 20 * k, 17 * k, 13 * k, 0), nuovoRegalo(xa + 21 * k, 20 * k, 16 * k, 1));
-    if (!stretto) regali.push(nuovoRegalo(xa + 44, 15, 12, 2));
+    var xa = alberoX(), k = alberoS();
+    regali.push(nuovoRegalo(xa - 30 * k, 16 * k, 12 * k, 0), nuovoRegalo(xa + 29 * k, 19 * k, 14 * k, 1));
+    if (!stretto) regali.push(nuovoRegalo(xa + 50 * k, 14 * k, 11 * k, 2), nuovoRegalo(xa + 66 * k, 12 * k, 9 * k, 3));
   }
   function avvia() {
     if (!tela) {
@@ -868,6 +971,7 @@
     puntatore.x = e.clientX; puntatore.y = e.clientY;
     if (Math.abs(puntatore.vx) > 80 || Math.abs(puntatore.vy) > 80) { puntatore.vx = 0; puntatore.vy = 0; }
     if (presa) { if (e.cancelable) e.preventDefault(); return; }
+    spegniVicine(e.clientX, e.clientY);
     tocca(e.clientX, e.clientY);
     if (e.pointerType !== "touch") radice.classList.toggle("natale-presa", !!pezzoSotto(e.clientX, e.clientY, 6) || !!regaloSotto(e.clientX, e.clientY));
   }, { capture: true, passive: false });

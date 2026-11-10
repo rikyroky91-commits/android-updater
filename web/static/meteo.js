@@ -123,8 +123,9 @@
     for (i = 0; i < nGocce; i++) gocce.push(nuovaGoccia(true));
     var nNeve = stato.neve && !radice.classList.contains("natale") ? Math.round((30 + stato.neve * 190) * larg) : 0;
     for (i = 0; i < nNeve; i++) fiocchi.push({ x: caso(0, W), y: caso(0, H), r: caso(1, 3.2), vy: caso(0.6, 1.8), fase: caso(0, 6.28) });
-    var nNuvole = Math.round(stato.nuvole * 8 * larg + (stato.nuvole > 0.1 ? 1 : 0));
-    for (i = 0; i < nNuvole; i++) nuvole.push({ x: caso(-100, W + 100), y: caso(10, Math.max(60, H * 0.32)), s: caso(0.8, 1.7), v: caso(0.08, 0.28), fase: caso(0, 6.28) });
+    var nNuvole = Math.round(stato.nuvole * 7 * larg + (stato.nuvole > 0.1 ? 1 : 0));
+    for (i = 0; i < nNuvole; i++) nuvole.push(nuovaNuvola(caso(-150, W + 150)));
+    nuvole.sort(function (a, b) { return a.z - b.z; });
     var nBanchi = stato.nebbia ? 7 : 0;
     for (i = 0; i < nBanchi; i++) banchi.push({ x: caso(-200, W), y: H * caso(0.25, 1), w: caso(380, 760), v: caso(0.12, 0.4), fase: caso(0, 6.28) });
     var nFoglie = stato.vento >= 22 ? Math.min(16, Math.round((stato.vento - 18) / 2)) : 0;
@@ -204,16 +205,81 @@
     ctx.ellipse(x, y, Math.max(0.01, Math.abs(k)) * r, r, 0, Math.PI / 2, -Math.PI / 2, (k > 0) === cresce);
     ctx.closePath(); ctx.fill();
   }
-  function nuvola(n, buia) {
-    var x = n.x, y = n.y + Math.sin(n.fase + passi * 0.01) * 3, s = n.s;
-    var colore = buia ? "72,80,96" : stato.giorno ? "255,255,255" : "150,160,190";
-    var base = buia ? 0.34 : stato.giorno ? (scuro ? 0.13 : 0.5) : 0.2;
-    var puff = [[0, 0, 46], [-44, 10, 34], [42, 12, 36], [-18, -20, 36], [22, -24, 32], [76, 18, 24], [-74, 18, 24]];
-    for (var i = 0; i < puff.length; i++) {
-      var px = x + puff[i][0] * s, py = y + puff[i][1] * s, pr = puff[i][2] * s;
-      var g = ctx.createRadialGradient(px, py, pr * 0.1, px, py, pr);
-      g.addColorStop(0, "rgba(" + colore + "," + base + ")"); g.addColorStop(1, "rgba(" + colore + ",0)");
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fill();
+  // LE NUVOLE (11/11/2026, su richiesta: «le nuvole sono brutte e statiche», e poi «sembrano molto
+  // brutte dagli screen» per le sagome piatte della prima prova). Ogni nuvola è un cumulo morbido:
+  // gli sbuffi si dipingono una volta sola su un foglietto suo, sfocati, così i bordi sfumano come
+  // vapore; sopra si stende l'ombra della pancia e la luce sulla cima. Mentre passa galleggia e
+  // respira piano. Due profondità: le lontane piccole, tenui e lente, le vicine grandi e più svelte.
+  function nuovaNuvola(x) {
+    var z = Math.random(), s = (0.55 + z * 0.75) * limita(W / 1280, 0.6, 1.2), w = caso(140, 240) * s;
+    return { x: x, y: caso(70, Math.max(120, H * 0.3)) + (1 - z) * 16, z: z, s: s, w: w,
+             v: 0.12 + z * 0.42 + caso(0, 0.08), fase: caso(0, 6.28), foglio: null, chiave: "" };
+  }
+  // I colori della scena: [luce, ombra, trasparenza].
+  function tavolozza(buia) {
+    if (buia) return ["#a3a9b6", "#5f6676", scuro ? 0.75 : 0.85];
+    if (radice.getAttribute("data-cielo") === "tramonto") return ["#fff3ea", "#e8b2bc", 0.92];
+    if (stato.giorno) return scuro ? ["#d7dce6", "#8e98aa", 0.32] : ["#ffffff", "#cdd6e4", 0.95];
+    return ["#8e98b8", "#3a4262", scuro ? 0.55 : 0.5];
+  }
+  // Il foglietto di una nuvola: una fila bassa di sbuffi medi che fa la base, e sopra tre-cinque
+  // sbuffi grandi, più alti al centro. Il foglio si misura sugli sbuffi veri (più il margine della
+  // sfocatura), così niente bordo resta tagliato dritto.
+  function foglietto(w, luce, ombra, sfoca) {
+    var sb = [], k, nt = Math.round(caso(3, 5));
+    // La base: due sbuffi bassi alle estremità (il resto lo fa l'ellisse liscia più sotto).
+    sb.push([-w * 0.36, -w * 0.1, w * 0.1], [w * 0.36, -w * 0.1, w * 0.1]);
+    for (k = 0; k < nt; k++) {
+      var ut = nt > 1 ? k / (nt - 1) - 0.5 : 0, cu = 1 - 4 * ut * ut, rt = w * (0.14 + 0.1 * cu) * caso(0.9, 1.12);
+      sb.push([ut * w * 0.55 + caso(-0.04, 0.04) * w, -w * 0.12 - rt * 0.55 - cu * w * 0.05, rt]);
+    }
+    var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (k = 0; k < sb.length; k++) { x0 = Math.min(x0, sb[k][0] - sb[k][2]); x1 = Math.max(x1, sb[k][0] + sb[k][2]); y0 = Math.min(y0, sb[k][1] - sb[k][2]); y1 = Math.max(y1, sb[k][1] + sb[k][2]); }
+    var m = Math.ceil(sfoca * 3 + 2), f = document.createElement("canvas");
+    f.width = Math.ceil(x1 - x0 + 2 * m); f.height = Math.ceil(y1 - y0 + 2 * m);
+    var c = f.getContext("2d");
+    if (!c) return null;
+    var ox = m - x0, oy = m - y0, base = oy - w * 0.04;
+    var morbido = "filter" in c;
+    if (morbido) c.filter = "blur(" + sfoca.toFixed(1) + "px)";
+    c.fillStyle = luce; c.beginPath();
+    for (k = 0; k < sb.length; k++) { c.moveTo(ox + sb[k][0] + sb[k][2], oy + sb[k][1]); c.arc(ox + sb[k][0], oy + sb[k][1], sb[k][2], 0, Math.PI * 2); }
+    c.moveTo(ox + w * 0.46, oy - w * 0.09); c.ellipse(ox, oy - w * 0.09, w * 0.46, w * 0.075, 0, 0, Math.PI * 2);
+    c.fill();
+    if (morbido) c.filter = "none";
+    // L'ombra sale dal fondo fino a metà; la luce viene dall'alto a sinistra. Solo dentro la nuvola.
+    c.globalCompositeOperation = "source-atop";
+    var g = c.createLinearGradient(0, m, 0, base);
+    g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(0.55, "rgba(255,255,255,0)"); g.addColorStop(1, ombra);
+    c.fillStyle = g; c.fillRect(0, 0, f.width, f.height);
+    var cx = ox - w * 0.12, cy = m + (base - m) * 0.25;
+    var gl = c.createRadialGradient(cx, cy, 0, cx, cy, w * 0.45);
+    gl.addColorStop(0, "rgba(255,255,255,.5)"); gl.addColorStop(1, "rgba(255,255,255,0)");
+    c.fillStyle = gl; c.fillRect(0, 0, f.width, f.height);
+    c.globalCompositeOperation = "source-over";
+    return { tela: f, ox: ox, oy: oy };
+  }
+  function prepara(n, t) {
+    var chiave = t[0] + t[1];
+    if (n.foglio && n.chiave === chiave) return;
+    n.foglio = foglietto(n.w, t[0], t[1], Math.max(2, 4.5 * n.s));
+    n.chiave = chiave;
+  }
+  function disegnaNuvole(buia) {
+    if (!nuvole.length) return;
+    var t = tavolozza(buia);
+    for (var i = 0; i < nuvole.length; i++) {
+      var n = nuvole[i];
+      if (n.x < -n.w - 80 || n.x > W + n.w + 80) continue;
+      prepara(n, t);
+      if (!n.foglio) continue;
+      // Galleggia appena e respira: si allarga e si abbassa di un soffio, piano.
+      var y = n.y + Math.sin(n.fase + passi * 0.007) * 2.5, r = 1 + 0.025 * Math.sin(n.fase * 1.3 + passi * 0.005);
+      var fo = n.foglio;
+      ctx.save(); ctx.globalAlpha = t[2] * (0.62 + 0.38 * n.z);
+      ctx.translate(n.x, y); ctx.scale(r, 2 - r);
+      ctx.drawImage(fo.tela, -fo.ox, -fo.oy);
+      ctx.restore();
     }
   }
   function arcobaleno() {
@@ -273,7 +339,7 @@
       luna(W - (W < 640 ? 60 : 120), W < 640 ? 70 : 110, 22, etaLuna(new Date()), aperto);
     }
     if (stato.arcobaleno) arcobaleno();
-    for (i = 0; i < nuvole.length; i++) nuvola(nuvole[i], buia);
+    disegnaNuvole(buia);
     // La nebbia: banchi bassi e un velo.
     if (stato.nebbia) {
       var veloA = (scuro ? 0.08 : 0.1) * stato.nebbia;
@@ -343,8 +409,12 @@
       if (f.y > H + 4) { f.y = -4; f.x = caso(0, W); }
       if (f.x < -6) f.x = W + 6; else if (f.x > W + 6) f.x = -6;
     }
-    var vv = versoVento() >= 0 ? 1 : -1, corsa = 0.2 + stato.vento * 0.012;
-    for (i = 0; i < nuvole.length; i++) { var n = nuvole[i]; n.x += vv * n.v * corsa * 3; if (n.x > W + 200) n.x = -200; else if (n.x < -200) n.x = W + 200; }
+    var vv = versoVento() >= 0 ? 1 : -1, corsa = 0.7 + Math.min(1.6, stato.vento * 0.035);
+    // Le nuvole corrono col vento: le vicine più svelte. Quella che esce rientra dall'altro lato, nuova.
+    for (i = 0; i < nuvole.length; i++) {
+      var n = nuvole[i]; n.x += vv * n.v * corsa;
+      if (n.x > W + n.w + 60 || n.x < -n.w - 60) { nuvole[i] = nuovaNuvola(vv > 0 ? -n.w - 50 : W + n.w + 50); }
+    }
     for (i = 0; i < banchi.length; i++) { var b = banchi[i]; b.x += vv * b.v; if (b.x > W + 400) b.x = -400; else if (b.x < -400) b.x = W + 400; }
     for (i = 0; i < foglie.length; i++) {
       var fo = foglie[i];

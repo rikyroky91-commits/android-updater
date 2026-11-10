@@ -29,8 +29,18 @@
     var sn=(m===10&&g>=2)||m===11?y:(m===0&&g<=6?y-1:0),na=pn==="on"||(!!sn&&pn!=="off-"+sn);
     var fn=/[?&]natale=(1|0)\b/.exec(q);if(fn)na=fn[1]==="1";
     if(na)rx.classList.add("natale");
-    if(t!=="scuro"&&t!=="chiaro"){t=(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)?"scuro":"chiaro";}
-    rx.setAttribute("data-tema",t);
+    /* IL TEMA DINAMICO (11/11/2026): senza una scelta chiaro/scuro il tema segue il sole di Acireale,
+       chiaro di giorno, tramonto attorno all'alba e al tramonto, scuro di notte. Stessa formula di
+       `tema.js` (NOAA), che poi lo tiene aggiornato col passare delle ore. */
+    var sc=t==="scuro"||t==="chiaro"?t:"auto";
+    if(sc==="auto"){var R=Math.PI/180,n=Math.floor((Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())-Date.UTC(d.getUTCFullYear(),0,0))/864e5),G=2*Math.PI/365*(n-1),
+      E=229.18*(7.5e-5+.001868*Math.cos(G)-.032077*Math.sin(G)-.014615*Math.cos(2*G)-.040849*Math.sin(2*G)),
+      D=.006918-.399912*Math.cos(G)+.070257*Math.sin(G)-.006758*Math.cos(2*G)+.000907*Math.sin(2*G),L=37.61*R,
+      A=Math.acos(Math.cos(90.833*R)/(Math.cos(L)*Math.cos(D))-Math.tan(L)*Math.tan(D))/R,
+      al=720-4*(15.16+A)-E,tr=720-4*(15.16-A)-E,u=d.getUTCHours()*60+d.getUTCMinutes();
+      var fs=(u>=tr-60&&u<=tr+40)||(u>=al-40&&u<=al+40)?"tramonto":u>al&&u<tr?"giorno":"notte";
+      t=fs==="notte"?"scuro":"chiaro";if(fs==="tramonto")rx.setAttribute("data-cielo","tramonto");}
+    rx.setAttribute("data-tema",t);rx.setAttribute("data-tema-scelta",sc);
     /* Lingua diversa dall'italiano: la pagina resta nascosta finché `lingue.js`
        non l'ha tradotta (al massimo un secondo e mezzo), così non si vede il
        lampo di italiano. */
@@ -90,6 +100,10 @@
              d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/></svg>
         <svg class="icona-luna" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
              stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg>
+        {# Tema automatico (11/11/2026): il sole a metà sull'orizzonte. #}
+        <svg class="icona-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" aria-hidden="true"><path d="M7 16a5 5 0 0 1 10 0"/><path
+             d="M12 5.5v2.2M4.6 9.1l1.6 1.4M19.4 9.1l-1.6 1.4M2.5 16h2.2M19.3 16h2.2M3 20h18"/></svg>
       </button>
       {# IL TEMA NATALIZIO (02/10/2026): neve che si posa sugli elementi,
          pupazzi che si smontano e si rimontano, cappellini. Vale per tutto

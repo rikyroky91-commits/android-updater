@@ -61,10 +61,12 @@ test("natale.js: Halloween e il passaggio non ci sono più; le palline appese ba
 // --- Lo script in testa a `base.html`: decide le classi prima del primo disegno ----------------
 const BASE = fs.readFileSync(path.join(__dirname, "..", "web", "templates", "base.html"), "utf8");
 const TESTA = BASE.slice(BASE.indexOf("<script>(function(){") + 8, BASE.indexOf("</script>", BASE.indexOf("<script>(function(){")));
-function testa({ data, memoria = {}, cerca = "", scuroSistema = false }) {
+function testa({ data, memoria = {}, cerca = "", scuroSistema = false, utc = null }) {
   const classi = new Set(), attr = {};
   const VeraData = Date;
-  function Finta() { return new VeraData(data[0], data[1] - 1, data[2], 12); }
+  // `utc`: [ore, minuti] UTC; senza, mezzogiorno UTC (giorno pieno ad Acireale).
+  function Finta(...a) { return a.length ? new VeraData(...a) : new VeraData(VeraData.UTC(data[0], data[1] - 1, data[2], ...(utc || [12, 0]))); }
+  Finta.UTC = VeraData.UTC;
   const ctx = {
     Date: Finta, location: { search: cerca },
     localStorage: { getItem: (k) => (k in memoria ? memoria[k] : null) },
@@ -73,7 +75,7 @@ function testa({ data, memoria = {}, cerca = "", scuroSistema = false }) {
   };
   ctx.window = ctx;
   vm.runInNewContext(TESTA, ctx);
-  return { classi: [...classi].sort().join(" "), tema: attr["data-tema"] };
+  return { classi: [...classi].sort().join(" "), tema: attr["data-tema"], cielo: attr["data-cielo"] || null, scelta: attr["data-tema-scelta"] };
 }
 
 test("base.html: Natale dal 2 novembre al 6 gennaio, mai Halloween né passaggio", () => {
@@ -95,8 +97,57 @@ test("base.html: Natale dal 2 novembre al 6 gennaio, mai Halloween né passaggio
   assert.strictEqual(testa({ data: [2026, 7, 1], cerca: "?natale=1" }).classi, "natale");
 });
 
-test("base.html: il tema segue la scelta salvata, poi il sistema", () => {
-  assert.strictEqual(testa({ data: [2026, 10, 15] }).tema, "chiaro");
-  assert.strictEqual(testa({ data: [2026, 10, 15], scuroSistema: true }).tema, "scuro");
-  assert.strictEqual(testa({ data: [2026, 10, 15], memoria: { "mut-tema": "chiaro" }, scuroSistema: true }).tema, "chiaro");
+test("base.html: il tema segue la scelta salvata, poi il sole di Acireale (giorno, tramonto, notte)", () => {
+  // Il 15 ottobre ad Acireale il sole sorge verso le 05:10 UTC e tramonta verso le 16:35 UTC.
+  assert.deepStrictEqual(testa({ data: [2026, 10, 15] }), { classi: "", tema: "chiaro", cielo: null, scelta: "auto" });
+  assert.strictEqual(testa({ data: [2026, 10, 15], scuroSistema: true }).tema, "chiaro", "di giorno chiaro, anche se il sistema è scuro");
+  const sera = testa({ data: [2026, 10, 15], utc: [16, 20] });
+  assert.strictEqual(sera.tema, "chiaro"); assert.strictEqual(sera.cielo, "tramonto");
+  const alba = testa({ data: [2026, 10, 15], utc: [5, 5] });
+  assert.strictEqual(alba.cielo, "tramonto", "anche all'alba");
+  const notte = testa({ data: [2026, 10, 15], utc: [21, 0] });
+  assert.strictEqual(notte.tema, "scuro"); assert.strictEqual(notte.cielo, null);
+  assert.strictEqual(testa({ data: [2026, 10, 15], utc: [2, 0] }).tema, "scuro");
+  // D'estate il tramonto è più tardi: alle 17:00 UTC del 21 giugno è ancora giorno, alle 18:20 tramonto.
+  assert.strictEqual(testa({ data: [2026, 6, 21], utc: [17, 0] }).cielo, null);
+  assert.strictEqual(testa({ data: [2026, 6, 21], utc: [18, 20] }).cielo, "tramonto");
+  // La scelta col tasto vince sul sole.
+  assert.deepStrictEqual(testa({ data: [2026, 10, 15], utc: [21, 0], memoria: { "mut-tema": "chiaro" } }), { classi: "", tema: "chiaro", cielo: null, scelta: "chiaro" });
+  assert.strictEqual(testa({ data: [2026, 10, 15], memoria: { "mut-tema": "scuro" } }).tema, "scuro");
+  assert.strictEqual(testa({ data: [2026, 10, 15], utc: [16, 20], memoria: { "mut-tema": "auto" } }).cielo, "tramonto");
+});
+
+test("tema.js: stessa formula dello script in testa; il tasto gira auto → chiaro → scuro → auto", () => {
+  const TEMA = fs.readFileSync(path.join(__dirname, "..", "web", "static", "tema.js"), "utf8");
+  const memoria = {}, attr = {}, ascoltatori = {}, tasto = { attr: {}, setAttribute(k, v) { this.attr[k] = v; }, closest: () => tasto };
+  const finestra = {
+    localStorage: { getItem: (k) => (k in memoria ? memoria[k] : null), setItem: (k, v) => { memoria[k] = String(v); } },
+    requestAnimationFrame() {}, dispatchEvent() {}, setInterval() {},
+    document: {
+      readyState: "complete", querySelectorAll: () => [tasto], addEventListener: (t, fn) => { ascoltatori[t] = fn; },
+      documentElement: { classList: { add() {} }, getAttribute: (k) => (k in attr ? attr[k] : null), setAttribute: (k, v) => { attr[k] = v; }, removeAttribute: (k) => { delete attr[k]; } },
+    },
+  };
+  finestra.window = finestra;
+  vm.runInNewContext(TEMA, Object.assign(finestra, { CustomEvent: function () {}, Math, Date, setTimeout }));
+  const t = finestra.__tema;
+  for (const [g, m, ore] of [[[2026, 10, 15], 0, [5, 5]], [[2026, 10, 15], 0, [12, 0]], [[2026, 10, 15], 0, [16, 20]], [[2026, 10, 15], 0, [21, 0]], [[2026, 6, 21], 0, [18, 20]], [[2026, 12, 21], 0, [15, 30]]]) {
+    const d = new Date(Date.UTC(g[0], g[1] - 1, g[2], ...ore));
+    const f = t.fase(d), h = testa({ data: g, utc: ore });
+    assert.strictEqual(h.cielo === "tramonto" ? "tramonto" : h.tema === "scuro" ? "notte" : "giorno", f, `stessa fase il ${g} alle ${ore}`);
+  }
+  // Tramonto del 21 dicembre ad Acireale verso le 15:40 UTC (16:40 in Italia), con un paio di minuti di margine.
+  const s = t.sole(new Date(Date.UTC(2026, 11, 21, 12)));
+  assert.ok(Math.abs(s.tramonto - (15 * 60 + 40)) < 8, "tramonto " + s.tramonto);
+  assert.strictEqual(attr["data-tema-scelta"], "auto");
+  const clic = () => ascoltatori.click({ target: tasto });
+  clic(); assert.strictEqual(memoria["mut-tema"], "chiaro"); assert.strictEqual(attr["data-tema"], "chiaro"); assert.ok(!("data-cielo" in attr));
+  clic(); assert.strictEqual(memoria["mut-tema"], "scuro"); assert.strictEqual(attr["data-tema"], "scuro"); assert.strictEqual(tasto.attr["aria-pressed"], "true");
+  clic(); assert.strictEqual(memoria["mut-tema"], "auto"); assert.strictEqual(attr["data-tema-scelta"], "auto");
+});
+
+test("natale.js: le lampadine si spengono al passaggio del puntatore e poi si riaccendono", () => {
+  assert.ok(/function spegniVicine/.test(NATALE) && /spegniVicine\(e\.clientX, e\.clientY\)/.test(NATALE), "il puntatore spegne le lampadine vicine");
+  assert.ok(/luciSpente\[l\.c\] = SPENTA/.test(NATALE));
+  assert.ok(/if \(--luciSpente\[c\] <= 0\) delete luciSpente\[c\]/.test(NATALE), "dopo un po' si riaccendono");
 });
