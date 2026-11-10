@@ -3859,6 +3859,18 @@ test("la corsa: col passare dei minuti gli zombie reggono di più e mordono più
 });
 
 // ·· LA TASTIERA (09/10/2026) ··
+test("nel campo di ricerca vuoto si scrive: il primo tasto non gli toglie il fuoco a gioco chiuso", () => {
+  // 10/11/2026: dal 21/10 un campo vuoto perdeva il fuoco al primo tasto anche senza corsa né controller,
+  // e nella ricerca non si scriveva (si poteva solo incollare).
+  const amb = ambiente({});
+  const r = amb.finestra.__ring;
+  amb.avanza(30);
+  let sfocato = 0;
+  const campo = { tagName: "INPUT", type: "search", value: "", offsetParent: {}, blur() { sfocato++; } };
+  if (amb.stato().radiale && amb.stato().radiale.aperto) r.tastoGiu("KeyH");
+  assert.strictEqual(r.tastoGiu("KeyQ", { target: campo }), false, "la Q è di chi scrive");
+  assert.strictEqual(sfocato, 0, "il campo vuoto resta col cursore");
+});
 test("la tastiera: Q E R… fanno le mosse del controller, le frecce camminano, Z mira e spara; mai mentre si scrive", () => {
   const amb = ambiente({});
   const r = amb.finestra.__ring;

@@ -16786,7 +16786,9 @@
     if (!(t === "INPUT" || t === "TEXTAREA" || t === "SELECT" || el.isContentEditable)) return false;
     if (el.closest && el.closest(".corsa-nome")) return true;
     if (el.offsetParent === null && el.type !== "hidden") return false;
-    if (t === "INPUT" && !el.value && el.blur) { el.blur(); return false; }
+    // Solo a gioco davvero aperto (corsa, brawl o controller). Il 21/10 la condizione era caduta e un campo vuoto
+    // perdeva il fuoco al primo tasto anche a ring spento: nella ricerca non si riusciva a scrivere, solo a incollare.
+    if ((corsa || brawl || radiale.aperto) && t === "INPUT" && !el.value && el.blur) { el.blur(); return false; }
     return true;
   }
   function lasciaIlCampo() {
