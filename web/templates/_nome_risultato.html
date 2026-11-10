@@ -1,23 +1,51 @@
+{# LA TESTA DEL RISULTATO (10/11/2026): il nome, la foto in piccolo, e il
+   primo dei tre DATI CHIAVE — il codice modello. Gli altri due (SoC e
+   firmware) stanno subito sotto, in `ricerca.html`, con la stessa forma
+   `.dato-chiave`: un'etichetta colorata e il valore in grande. Tutto il
+   resto della pagina è in secondo piano o dentro una tendina.
+
+   La foto sta qui e non più in una colonna sua: larga 200 px spingeva a
+   destra i dati che servono e non ne aggiungeva nessuno. #}
 <header data-nome-risultato>
+  <div class="testa-nome">
+  {% if risultato.scheda and risultato.scheda.foto %}
+  <img src="{{ risultato.scheda.foto }}" alt="{{ risultato.scheda.titolo }}" class="miniatura" loading="lazy">
+  {% endif %}
+  <div class="testa-titolo">
   <h2>{{ risultato.nome or risultato.query }}{% if risultato.rete and not risultato.rete.nel_nome %} <span class="pastiglia-rete">{{ risultato.rete.sigla }}</span>{% endif %}</h2>
+  {% if risultato.scheda and risultato.scheda.rilascio %}
+  <p class="sottotitolo">{% if risultato.scheda.mai_in_vendita %}<strong>{{ risultato.scheda.rilascio | capitalize }}</strong>{% else %}Uscito {{ risultato.scheda.rilascio }}{% endif %}</p>
+  {% endif %}
+  </div>
+  </div>
   {# IL CODICE MODELLO SOTTO IL NOME, SEMPRE (30/09/2026): vedi
      `_codici_da_mostrare` in web/main.py. Quando nessuna fonte ne dichiara
-     uno lo si dice, invece di lasciare il nome commerciale da solo. #}
+     uno lo si dice, invece di lasciare il nome commerciale da solo.
+
+     LE ALTRE VARIANTI STANNO DIETRO UN TASTO: nove codici in fila accanto
+     a quello giusto lo facevano sparire. Restano dentro questo stesso
+     paragrafo (senza JavaScript si vedono tutte: le chiude `html.js`), e
+     ognuna si copia con un clic; la freccia accanto la cerca. #}
   {% if risultato.mostra_codice %}
   <p class="codice-modello" data-codice-modello>
     <span class="etichetta">Codice modello</span>
     {% if risultato.codici_modello %}
     {% set mercati = risultato.mercati_codici or {} %}
+    <span class="valore-chiave">
     <code class="codice-principale">{{ risultato.codici_modello[0] }}</code>
     {%- if mercati.get(risultato.codici_modello[0]) %} <span class="mercato-codice">{{ mercati.get(risultato.codici_modello[0]) }}</span>
-    {%- elif risultato.codice_dal_nome %} <span class="tenue">dal catalogo per questo nome</span>{% endif %}
+    {%- elif risultato.codice_dal_nome %} <span class="tenue nota-codice">dal catalogo per questo nome</span>{% endif %}
     {% if risultato.altri_codici %}
-    <span class="altri-codici"><span class="tenue">· altre varianti:</span>
-      {% for c in risultato.altri_codici %}<a href="/?q={{ c | urlencode }}"{% if mercati.get(c) %} title="{{ mercati.get(c) }}"{% endif %}><code>{{ c }}</code>{% if mercati.get(c) %} <span class="mercato-codice">{{ mercati.get(c) }}</span>{% endif %}</a>{% endfor %}
+    <button type="button" class="apri-varianti" aria-expanded="false" data-apri-varianti>Altre varianti ({{ (risultato.altri_codici | length) + (risultato.altri_codici_in_piu or 0) }})</button>
+    {% endif %}
+    </span>
+    {% if risultato.altri_codici %}
+    <span class="altri-codici">
+      {% for c in risultato.altri_codici %}<span class="variante"><code>{{ c }}</code>{% if mercati.get(c) %} <span class="mercato-codice">{{ mercati.get(c) }}</span>{% endif %}<a href="/?q={{ c | urlencode }}" title="Cerca {{ c }}" aria-label="Cerca {{ c }}">→</a></span>{% endfor %}
       {%- if risultato.altri_codici_in_piu %} <span class="tenue">e altre {{ risultato.altri_codici_in_piu }}</span>{% endif %}</span>
     {% endif %}
     {% else %}
-    <span class="tenue">non dichiarato dalle fonti consultate — leggilo in Impostazioni › Info sul telefono</span>
+    <span class="valore-chiave"><span class="tenue nota-codice">non dichiarato dalle fonti consultate — leggilo in Impostazioni › Info sul telefono</span></span>
     {% endif %}
   </p>
   {% endif %}

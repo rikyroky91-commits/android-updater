@@ -1,0 +1,27 @@
+{# LA SCHEDA DENTRO IL RISULTATO DELLA RICERCA (10/11/2026).
+
+   Della scheda tecnica, in evidenza resta UN dato solo: il SoC, che è il
+   motivo per cui la scheda esiste (un difetto legato al chip vive su una
+   variante sola). RAM, archiviazione, batteria, rete e schermo avevano lo
+   stesso peso del processore e del firmware, e la pagina non diceva più
+   cosa guardare: ora stanno in una tendina, con un riassunto in una riga
+   sul titolo così si leggono anche senza aprirla.
+
+   `_scheda.html` resta com'è per la pagina del dispositivo in archivio.
+
+   `<section class="scheda">` resta il contenitore, anche se qui non si
+   vede (in griglia «si scioglie», vedi style.css): è il segno che la
+   scheda c'è, e i test delle due fasi della ricerca lo cercano. #}
+<section class="scheda">
+<div class="dato-chiave dato-soc cpu-in-evidenza">
+  <span class="etichetta">SoC</span>
+  <div class="valore-chiave">
+    {% if scheda.cpu %}<strong data-copia tabindex="0">{{ scheda.cpu }}</strong>
+    {% else %}<span class="tenue nota-codice">non dichiarato dalle fonti consultate</span>{% endif %}
+    {% if scheda.cpu_nota %}<p class="nota">{{ scheda.cpu_nota }}</p>{% endif %}
+    {# L'AVVERTENZA STA ACCANTO AL DATO: chi legge «Dimensity 6300» deve
+       vedere lì che quel numero riguarda una variante di un altro mercato. #}
+    {% if scheda.nota_mercato %}<p class="nota lacuna">{{ scheda.nota_mercato }}</p>{% endif %}
+  </div>
+</div>
+</section>

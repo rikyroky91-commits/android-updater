@@ -731,3 +731,33 @@ def voce_feed(item: dict) -> dict:
         "link": item.get("link") or "",
         "chiave": item.get("device_key") or "",
     }
+
+
+# I pezzi della riga firmware che sono DATI (una build, una patch, una
+# data) e non frasi: nel risultato della ricerca diventano pastiglie con
+# la propria etichetta, copiabili una per una.
+_PEZZI_FIRMWARE = (("build ", "Build"), ("patch ", "Patch"), ("uscito il ", "Uscito il"))
+
+
+def voci_firmware(riga: str | None) -> dict:
+    """Spezza la riga del firmware in titolo, dati e avvertenze.
+
+    La riga nasce in `web/main.py` come frasi unite da « · »: la prima dice
+    quale versione e con che certezza («Ultimo Android verificato: Android
+    17»), le altre sono o un dato secco (build, patch, data di uscita) o
+    un'avvertenza («data di rilascio non verificata»). Messe tutte in fila
+    con lo stesso peso, la build — il dato che si va a copiare — si perdeva
+    in mezzo alle avvertenze. Qui non si cambia una parola: si separa solo
+    cosa va in evidenza da cosa va in piccolo.
+    """
+    parti = [p.strip() for p in (riga or "").split(" · ") if p.strip()]
+    voci: list[tuple[str, str]] = []
+    note: list[str] = []
+    for parte in parti[1:]:
+        for prefisso, etichetta in _PEZZI_FIRMWARE:
+            if parte.startswith(prefisso) and parte[len(prefisso):].strip():
+                voci.append((etichetta, parte[len(prefisso):].strip()))
+                break
+        else:
+            note.append(parte)
+    return {"titolo": parti[0] if parti else "", "voci": voci, "note": note}

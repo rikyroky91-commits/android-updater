@@ -116,9 +116,18 @@ class TestConfrontoImeiInAlto(_Sito):
         pagina = self.client.get("/", params={"q": self.IMEI}).text
         link = pagina.index("Controlla lo stesso IMEI su un'altra fonte")
         confronto = pagina.index("Confronto fra le fonti IMEI")
-        firmware = pagina.index('class="titolo-firmware"')
         self.assertLess(link, confronto)
-        self.assertLess(confronto, firmware, "il confronto è ancora in fondo alla pagina")
+        # Dal 10/11/2026 i tre dati chiave (codice, SoC, firmware) stanno
+        # insieme in cima e l'IMEI viene subito dopo: il confronto resta in
+        # alto, cioè prima di tutto ciò che è in secondo piano — le altre
+        # specifiche, le azioni, la scheda completa.
+        firmware = pagina.index('class="titolo-firmware')
+        self.assertLess(firmware, link, "l'IMEI separa di nuovo i dati chiave")
+        for dopo in ('class="azioni-risultato"', 'class="completa"', 'altre-specifiche'):
+            if dopo in pagina:
+                self.assertLess(confronto, pagina.index(dopo),
+                                "il confronto è finito sotto il secondo piano")
+        self.assertLess(confronto, pagina.index('class="azioni-risultato"'))
 
     def test_i_risultati_si_vedono_senza_aprire_niente(self):
         pagina = _senza_details(self.client.get("/", params={"q": self.IMEI}).text)

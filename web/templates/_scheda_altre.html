@@ -1,0 +1,29 @@
+{# Il resto della scheda, in secondo piano: vedi `_scheda_sintesi.html`. #}
+{% set riassunto = [scheda.ram, scheda.storage, scheda.batteria] | select | list %}
+{% if riassunto or scheda.voci or scheda.patch_fino_a %}
+<details class="tendina altre-specifiche">
+  <summary>Altre specifiche{% if riassunto %} <span class="tendina-anteprima">{{ riassunto | join(" · ") }}</span>{% endif %}</summary>
+  <dl class="specifiche">
+    <div><dt>RAM</dt><dd>{{ scheda.ram or "—" }}</dd></div>
+    <div><dt>Archiviazione</dt><dd>{{ scheda.storage or "—" }}</dd></div>
+    <div><dt>Batteria</dt><dd>{{ scheda.batteria or "—" }}</dd></div>
+    <div><dt>Rete</dt><dd{% if scheda.rete and scheda.rete.dettaglio %} title="{{ scheda.rete.dettaglio }}"{% endif %}>{{ scheda.rete.sigla if scheda.rete else "non dichiarato" }}</dd></div>
+    {% for nome, valore in scheda.voci or [] %}
+    {% if not scheda.sezioni or nome == 'Schermo' %}
+    <div><dt>{{ nome }}</dt><dd>{{ valore }}</dd></div>
+    {% endif %}
+    {% endfor %}
+    {% if scheda.patch_fino_a %}
+    <div><dt>Patch di sicurezza</dt><dd>garantite fino al {{ scheda.patch_fino_a }}{% if scheda.patch_cadenza %} · cadenza {{ scheda.patch_cadenza }}{% endif %}</dd></div>
+    {% endif %}
+  </dl>
+  {% if scheda.nota_copertura %}<p class="nota lacuna">{{ scheda.nota_copertura }}</p>{% endif %}
+</details>
+{% elif scheda.nota_copertura %}
+{# Niente RAM, archiviazione o batteria da mostrare: la lacuna si dice lo
+   stesso, ma in una tendina — riguarda il resto della scheda, non il SoC. #}
+<details class="tendina altre-specifiche">
+  <summary>Altre specifiche <span class="tendina-anteprima">non disponibili per questo modello</span></summary>
+  <p class="nota lacuna">{{ scheda.nota_copertura }}</p>
+</details>
+{% endif %}

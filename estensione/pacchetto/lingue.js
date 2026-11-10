@@ -818,6 +818,13 @@
     "Nessuna novità": ["No news", "Sin novedades", "Aucune nouveauté", "Keine Neuigkeiten"],
 
     // --- Schede dei risultati
+    // Il risultato ridisegnato (10/11/2026)
+    "Altre specifiche": ["Other specs", "Otras especificaciones", "Autres caractéristiques", "Weitere Daten"],
+    "non disponibili per questo modello": ["not available for this model", "no disponibles para este modelo", "non disponibles pour ce modèle", "für dieses Modell nicht verfügbar"],
+    "Copia riepilogo": ["Copy summary", "Copiar resumen", "Copier le résumé", "Zusammenfassung kopieren"],
+    "Uscito il": ["Released", "Lanzado el", "Sorti le", "Erschienen am"],
+    "Patch di sicurezza": ["Security patches", "Parches de seguridad", "Correctifs de sécurité", "Sicherheitspatches"],
+    "non dichiarato dalle fonti consultate": ["not declared by the sources consulted", "no declarado por las fuentes consultadas", "non déclaré par les sources consultées", "von den geprüften Quellen nicht angegeben"],
     "Aggiungi al parco di test": ["Add to the test fleet", "Añadir al parque de pruebas", "Ajouter au parc de test", "Zu den Testgeräten hinzufügen"],
     "Anno": ["Year", "Año", "Année", "Jahr"],
     "Archiviazione": ["Storage", "Almacenamiento", "Stockage", "Speicher"],
@@ -963,6 +970,9 @@
     }],
     [/^(\d+) giorni$/, function (m, li) { return m[1] + " " + ["days", "días", "jours", "Tage"][li]; }],
     [/^(\d+)\/(\d+) fonti attive$/, function (m, li) { return m[1] + "/" + m[2] + " " + ["sources active", "fuentes activas", "sources actives", "Quellen aktiv"][li]; }],
+    [/^Altre varianti \((\d+)\)$/, function (m, li) { return ["Other variants", "Otras variantes", "Autres variantes", "Weitere Varianten"][li] + " (" + m[1] + ")"; }],
+    [/^Copiato: (.+)$/, function (m, li) { return ["Copied: ", "Copiado: ", "Copié : ", "Kopiert: "][li] + m[1]; }],
+    [/^(\d+) in archivio$/, function (m, li) { return m[1] + " " + ["in the archive", "en el archivo", "dans l'archive", "im Archiv"][li]; }],
     [/^Aggiornamenti di (.+)$/, function (m, li) { return ["Updates for ", "Actualizaciones de ", "Mises à jour de ", "Updates für "][li] + m[1]; }],
     [/^e altre (\d+)$/, function (m, li) { return ["and " + m[1] + " more", "y otras " + m[1], "et " + m[1] + " autres", "und " + m[1] + " weitere"][li]; }],
   ];

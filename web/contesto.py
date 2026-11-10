@@ -17,6 +17,7 @@ from fastapi.templating import Jinja2Templates
 from core import aiquery, storage
 from core.util import fmt_date, fmt_relative, truncate
 from . import auth_web
+from .presenters import voci_firmware
 
 RADICE = Path(__file__).resolve().parent
 
@@ -24,6 +25,7 @@ templates = Jinja2Templates(directory=str(RADICE / "templates"))
 templates.env.globals["fmt_relative"] = fmt_relative
 templates.env.globals["truncate"] = truncate
 templates.env.globals["fmt_date"] = fmt_date
+templates.env.globals["voci_firmware"] = voci_firmware
 
 
 def statico(nome: str) -> str:

@@ -51,6 +51,10 @@
     try{var l=localStorage.getItem("mut-lingua");if(l&&l!=="it"){document.documentElement.classList.add("lingua-attesa");
       setTimeout(function(){document.documentElement.classList.remove("lingua-attesa");},1500);}}catch(e){}
     })();</script>
+  {# `html.js`: gli stili sanno se gli script girano (le varianti del codice
+     modello si chiudono dietro un tasto solo se il tasto può aprirle). In
+     un `<script>` suo: quello sopra lo legge per intero `halloween.test.cjs`. #}
+  <script>document.documentElement.classList.add("js");</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap"
@@ -174,6 +178,7 @@
   <script src="{{ statico('imei-links.js') }}" defer></script>
   <script src="{{ statico('firmware-in-arrivo.js') }}" defer></script>
   <script src="{{ statico('confronto-installato.js') }}" defer></script>
+  <script src="{{ statico('risultato.js') }}" defer></script>
   {# ai.js pilotava il tasto «✦ AI», che non esiste piu': l'AI ora e'
      dentro la ricerca e parte dal server quando serve (vedi
      `_soccorso_ai` in web/main.py). Il file resta nel repository,

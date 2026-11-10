@@ -1806,3 +1806,291 @@ html.ring-trema .pieduccio { animation-duration: .31s; }
   .ultimora-barra.ultimora-colpita, .ultimora-barra.ultimora-guasta .ultimora-nastro { animation: none; }
 }
 .pannello-recenti-titolo { margin: .3rem 0 .2rem; font-size: .8rem; font-weight: 600; text-align: left; opacity: .7; letter-spacing: .02em; text-transform: uppercase; }
+
+/* ======================================================================
+   IL RISULTATO DELLA RICERCA, RIDISEGNATO (10/11/2026)
+
+   Tre dati in evidenza — codice modello, SoC, firmware — ognuno in un
+   riquadro col suo colore; tutto il resto in secondo piano o in tendina.
+   Prima nome, codice, nove varianti, processore, RAM, batteria, schermo,
+   firmware, fonte e cinque azioni avevano più o meno lo stesso peso, e la
+   pagina non diceva cosa guardare.
+
+   I colori sono tre e dicono tre cose: blu = identità (il codice), viola
+   = hardware (il SoC), verde = firmware verificato. Il verde resta quello
+   del marchio; il firmware NON verificato è ocra, quello assente neutro:
+   il colore del terzo riquadro è già la risposta a «mi posso fidare?».
+   Il rosso resta fuori, come nel resto del sito: significa MAJOR.
+
+   Tutto è sotto `#risultato-ricerca`, così `.esito` e `.scheda` delle
+   altre pagine non cambiano.
+   ====================================================================== */
+:root {
+  --tinta-codice: #2459c4;
+  --tinta-soc:    #7440d6;
+}
+:root[data-tema="scuro"] {
+  --tinta-codice: #82acf7;
+  --tinta-soc:    #b79bfb;
+}
+
+#risultato-ricerca .esito {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: .8rem;
+  padding: 1.4rem; border: 1px solid var(--filo); border-radius: 18px;
+  box-shadow: 0 1px 2px rgba(32, 30, 29, .05), 0 8px 28px rgba(32, 30, 29, .06);
+  margin-bottom: 1rem;
+}
+#risultato-ricerca .esito > * { grid-column: 1 / -1; min-width: 0; margin-top: 0; margin-bottom: 0; }
+/* La testa «si scioglie» nella griglia: così il codice modello, che vive
+   dentro `<header>`, può stare in colonna con SoC e firmware. */
+#risultato-ricerca header[data-nome-risultato],
+#risultato-ricerca .esito > .scheda { display: contents; }
+#risultato-ricerca .testa-nome {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: .9rem;
+  min-width: 0; margin-bottom: .2rem;
+}
+#risultato-ricerca .testa-titolo { min-width: 0; }
+#risultato-ricerca .testa-nome h2 {
+  margin: 0; font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.15;
+  letter-spacing: -.02em; overflow-wrap: anywhere;
+}
+#risultato-ricerca .testa-nome .sottotitolo { margin: .25rem 0 0; font-size: .86rem; color: var(--neutral); }
+#risultato-ricerca .miniatura {
+  flex: none; width: 3.6rem; height: 4.6rem; object-fit: contain;
+  background: var(--superficie); border-radius: 12px; padding: .25rem;
+}
+
+/* --- I tre dati chiave -------------------------------------------------- */
+#risultato-ricerca .dato-chiave,
+#risultato-ricerca .codice-modello {
+  --tinta: var(--neutral);
+  display: flex; flex-direction: column; align-items: stretch; flex-wrap: nowrap;
+  gap: .5rem; margin: 0; padding: .95rem 1.05rem 1.05rem; min-width: 0;
+  font-size: 1rem; border-radius: 14px;
+  background: color-mix(in srgb, var(--tinta) 7%, var(--carta));
+  border: 1px solid color-mix(in srgb, var(--tinta) 24%, transparent);
+}
+#risultato-ricerca .codice-modello { --tinta: var(--tinta-codice); }
+#risultato-ricerca .dato-soc       { --tinta: var(--tinta-soc); }
+#risultato-ricerca .fw-verificato  { --tinta: var(--verde); }
+#risultato-ricerca .fw-incerto     { --tinta: var(--differenza); }
+
+#risultato-ricerca .dato-chiave > .etichetta,
+#risultato-ricerca .codice-modello > .etichetta {
+  display: flex; align-items: center; gap: .45rem; margin: 0;
+  font-size: .7rem; font-weight: 700; line-height: 1.2;
+  text-transform: uppercase; letter-spacing: .1em;
+  color: color-mix(in srgb, var(--tinta) 78%, var(--ink));
+}
+#risultato-ricerca .dato-chiave > .etichetta::before,
+#risultato-ricerca .codice-modello > .etichetta::before {
+  content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--tinta);
+}
+#risultato-ricerca .valore-chiave { min-width: 0; }
+#risultato-ricerca .valore-chiave > .nota { margin-top: .45rem; }
+
+/* Codice modello */
+#risultato-ricerca .codice-modello .valore-chiave {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem .7rem;
+}
+#risultato-ricerca .codice-modello .codice-principale {
+  font-size: clamp(1.45rem, 3vw, 1.9rem); font-weight: 700; letter-spacing: 0;
+  line-height: 1.15; padding: 0; border: 0; background: none;
+  white-space: normal; overflow-wrap: anywhere;
+}
+#risultato-ricerca .codice-modello .mercato-codice { font-size: .82rem; }
+#risultato-ricerca .nota-codice { font-size: .86rem; line-height: 1.45; }
+.apri-varianti {
+  margin-left: auto; padding: .28rem .7rem; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--tinta, var(--neutral)) 35%, transparent);
+  background: var(--carta); color: inherit; font: inherit; font-size: .78rem;
+  font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.apri-varianti::after { content: " ▾"; }
+.apri-varianti[aria-expanded="true"]::after { content: " ▴"; }
+.apri-varianti:hover { border-color: var(--tinta, var(--ink)); }
+/* Senza JavaScript il tasto non serve e le varianti si vedono tutte. */
+html:not(.js) .apri-varianti, html:not(.js) .copia-riepilogo { display: none; }
+html.js #risultato-ricerca .codice-modello:not(.varianti-aperte) .altri-codici { display: none; }
+#risultato-ricerca .altri-codici {
+  display: flex; flex-wrap: wrap; gap: .4rem; align-items: center;
+  padding-top: .65rem; border-top: 1px dashed color-mix(in srgb, var(--tinta) 30%, transparent);
+}
+#risultato-ricerca .variante {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .2rem .3rem .2rem .55rem; border-radius: 999px;
+  background: var(--carta); border: 1px solid var(--filo); font-size: .8rem;
+}
+#risultato-ricerca .variante code { border: 0; background: none; padding: 0; font-weight: 600; }
+#risultato-ricerca .variante a {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.35rem; height: 1.35rem; border-radius: 50%; text-decoration: none;
+  background: var(--superficie); color: var(--neutral); font-size: .8rem;
+}
+#risultato-ricerca .variante a:hover { background: var(--tinta); color: var(--carta); }
+
+/* SoC */
+#risultato-ricerca .cpu-in-evidenza { border-bottom: 1px solid color-mix(in srgb, var(--tinta) 24%, transparent); }
+#risultato-ricerca .cpu-in-evidenza strong {
+  font-size: clamp(1.1rem, 2.2vw, 1.3rem); font-weight: 700; line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+/* Firmware */
+#risultato-ricerca .titolo-firmware { font-family: inherit; }
+#risultato-ricerca .dato-firmware .firmware-risultato,
+#risultato-ricerca .dato-firmware .firmware-in-arrivo {
+  background: none; border: 0; border-radius: 0; padding: 0; margin: 0;
+}
+#risultato-ricerca .dato-firmware .firmware-versione {
+  font-size: clamp(1.15rem, 2.4vw, 1.4rem); font-weight: 700; line-height: 1.3;
+}
+#risultato-ricerca .dato-firmware .firmware-risultato > p { margin: 0 0 .45rem; line-height: 1.5; }
+#risultato-ricerca .dato-firmware .firmware-risultato > p:last-child { margin-bottom: 0; }
+.firmware-voci {
+  list-style: none; margin: .7rem 0; padding: 0;
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .4rem .8rem; align-items: baseline;
+}
+.firmware-voci li { display: contents; }
+.firmware-voci .etichetta {
+  font-size: .68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--neutral);
+}
+.firmware-voci code {
+  justify-self: start; font-size: 1rem; font-weight: 600; padding: .15rem .5rem;
+  border-radius: 7px; background: var(--carta); white-space: normal; overflow-wrap: anywhere;
+}
+#risultato-ricerca .dato-firmware .nota { font-size: .8rem; color: var(--neutral); line-height: 1.5; }
+#risultato-ricerca .dato-firmware .firmware-fonte { margin-top: .6rem; }
+#risultato-ricerca .dato-firmware .confronto-installato {
+  margin: .8rem 0 0; padding-top: .7rem; font-size: .88rem;
+  border-top: 1px dashed color-mix(in srgb, var(--tinta) 30%, transparent);
+}
+#risultato-ricerca .dato-firmware .attesa-nota { max-width: none; }
+
+/* A schermo largo: codice e SoC in colonna a sinistra, il firmware — il
+   riquadro più ricco — alto il doppio a destra. */
+@media (min-width: 780px) {
+  #risultato-ricerca .esito-con-scheda { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+  #risultato-ricerca .esito-con-scheda .dato-soc,
+  #risultato-ricerca .esito-con-scheda .codice-modello { grid-column: 1; }
+  #risultato-ricerca .esito-con-scheda > .dato-firmware { grid-column: 2; grid-row: 2 / span 2; }
+}
+
+/* --- Secondo piano: tendine, azioni, proposte --------------------------- */
+#risultato-ricerca .tendina,
+#risultato-ricerca .esito > .correzione-nome,
+#risultato-ricerca > .completa {
+  border: 1px solid var(--filo); border-radius: 12px; background: var(--carta);
+  padding: 0 1rem; margin: 0;
+}
+#risultato-ricerca > .completa, #risultato-ricerca > .tendina-esterna { margin-bottom: 1rem; }
+#risultato-ricerca .tendina > summary,
+#risultato-ricerca .esito > .correzione-nome > summary,
+#risultato-ricerca > .completa > summary {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: .3rem .7rem;
+  padding: .75rem 0; cursor: pointer; list-style: none;
+  font-size: .9rem; font-weight: 600; color: var(--ink);
+}
+#risultato-ricerca .tendina > summary::-webkit-details-marker,
+#risultato-ricerca .esito > .correzione-nome > summary::-webkit-details-marker,
+#risultato-ricerca > .completa > summary::-webkit-details-marker { display: none; }
+#risultato-ricerca .tendina > summary::after,
+#risultato-ricerca .esito > .correzione-nome > summary::after,
+#risultato-ricerca > .completa > summary::after {
+  content: ""; margin-left: auto; align-self: center; width: .5rem; height: .5rem;
+  border-right: 2px solid var(--neutral); border-bottom: 2px solid var(--neutral);
+  transform: rotate(45deg) translateY(-.15rem); transition: transform .15s ease;
+}
+#risultato-ricerca details[open].tendina > summary::after,
+#risultato-ricerca .esito > details[open].correzione-nome > summary::after,
+#risultato-ricerca > details[open].completa > summary::after { transform: rotate(-135deg) translateY(-.1rem); }
+#risultato-ricerca .tendina[open], #risultato-ricerca .esito > .correzione-nome[open],
+#risultato-ricerca > .completa[open] { padding-bottom: 1rem; }
+.tendina-anteprima { font-weight: 400; font-size: .84rem; color: var(--neutral); }
+#risultato-ricerca .tendina .occhiello { margin: 0; color: var(--ink); }
+#risultato-ricerca .altre-specifiche .specifiche { gap: .5rem; }
+#risultato-ricerca .altre-specifiche .specifiche > div { grid-template-columns: 9rem minmax(0, 1fr); }
+#risultato-ricerca .altre-specifiche dd { color: var(--ink); overflow-wrap: anywhere; }
+#risultato-ricerca .altre-specifiche dt { color: var(--neutral); font-weight: 500; }
+
+#risultato-ricerca .blocco-imei {
+  border: 1px solid var(--filo); border-radius: 12px; padding: 1rem;
+}
+#risultato-ricerca .azioni-risultato {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+}
+#risultato-ricerca .azioni-risultato:empty { display: none; }
+#risultato-ricerca .azioni-risultato > * { margin: 0; }
+#risultato-ricerca .azioni-risultato .nota { font-size: .85rem; }
+#risultato-ricerca .copia-riepilogo::before {
+  content: ""; width: .85em; height: .85em; margin-right: .45em; background: currentColor;
+  -webkit-mask: var(--icona-copia) center / contain no-repeat;
+          mask: var(--icona-copia) center / contain no-repeat;
+}
+#risultato-ricerca .azioni-risultato button,
+#risultato-ricerca .azione-confronto {
+  display: inline-flex; align-items: center; padding: .45rem .95rem;
+  border-radius: 999px; border: 1px solid var(--filo); background: var(--carta);
+  color: var(--ink); font: inherit; font-size: .84rem; font-weight: 600;
+  text-decoration: none; cursor: pointer; box-shadow: none;
+}
+#risultato-ricerca .azioni-risultato button:hover,
+#risultato-ricerca .azione-confronto:hover { border-color: var(--ink); background: var(--superficie); color: var(--ink); }
+#risultato-ricerca .azioni-risultato .azione-parco button {
+  background: var(--verde); border-color: var(--verde); color: var(--su-verde);
+}
+#risultato-ricerca .azioni-risultato .azione-parco button:hover { filter: brightness(.92); }
+#risultato-ricerca .esito > .nota { font-size: .82rem; }
+#risultato-ricerca .esito > .proposte { margin-top: -.4rem; }
+#risultato-ricerca .esito .proposta { border-radius: 999px; padding: .3rem .8rem; font-size: .82rem; }
+
+/* --- Copia al clic ------------------------------------------------------ */
+#risultato-ricerca :is([data-copia], code, dd, td, th[scope="row"], .mercato-codice),
+#risultato-ricerca [data-nome-risultato] h2,
+.scheda :is(code, dd, .misure strong, .cpu-in-evidenza strong),
+.completa :is(td, th[scope="row"]) {
+  cursor: copy; border-radius: 6px; transition: background-color .15s ease, box-shadow .15s ease;
+}
+#risultato-ricerca :is([data-copia], code, dd, .mercato-codice):hover,
+#risultato-ricerca [data-nome-risultato] h2:hover,
+#risultato-ricerca :is(td, th[scope="row"]):hover,
+.scheda :is(code, dd, .misure strong, .cpu-in-evidenza strong):hover,
+.completa :is(td, th[scope="row"]):hover {
+  background-color: var(--verde-tenue);
+}
+#risultato-ricerca a :is(code, [data-copia]) { cursor: pointer; }
+[data-copia]:focus-visible { outline: 2px solid var(--verde); outline-offset: 3px; }
+.copiato { background-color: var(--verde-tenue) !important; box-shadow: 0 0 0 3px var(--verde-tenue); }
+/* I tre dati chiave dicono che si copiano anche senza passarci sopra. */
+#risultato-ricerca .codice-principale::after,
+#risultato-ricerca .dato-chiave [data-copia]::after {
+  content: ""; display: inline-block; width: .7em; height: .7em; margin-left: .45em;
+  vertical-align: baseline; background: currentColor; opacity: .32;
+  -webkit-mask: var(--icona-copia) center / contain no-repeat;
+          mask: var(--icona-copia) center / contain no-repeat;
+}
+#risultato-ricerca .codice-principale:hover::after,
+#risultato-ricerca .dato-chiave [data-copia]:hover::after { opacity: .8; }
+:root {
+  --icona-copia: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='12' height='12' rx='2.5'/%3E%3Cpath d='M5 15V5.5A2.5 2.5 0 0 1 7.5 3H15'/%3E%3C/svg%3E");
+}
+.avviso-copia {
+  position: fixed; left: 50%; bottom: 1.4rem; z-index: 60;
+  transform: translate(-50%, 1rem); opacity: 0; pointer-events: none;
+  max-width: min(92vw, 32rem); padding: .6rem 1rem; border-radius: 999px;
+  background: #201e1d; color: #fff; font-size: .88rem; font-weight: 600;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .25);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: opacity .18s ease, transform .18s ease;
+}
+.avviso-copia::before { content: "✓ "; color: #6fdcae; }
+.avviso-copia.fallito::before { content: "! "; color: #ffb199; }
+.avviso-copia.visibile { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) {
+  .avviso-copia, #risultato-ricerca .tendina > summary::after { transition: none; }
+}
+@media (max-width: 560px) {
+  #risultato-ricerca .esito { padding: 1rem; border-radius: 14px; }
+  .apri-varianti { margin-left: 0; }
+}

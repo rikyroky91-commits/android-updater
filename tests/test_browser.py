@@ -217,6 +217,59 @@ class TestLaSchedaArrivaConIlSecondoTempo(_NelBrowser):
                         "la pagina è stata ricaricata invece che aggiornata")
         self.assertEqual(self.errori_js, [])
 
+    def test_i_dati_si_copiano_con_un_clic_anche_dopo_il_secondo_tempo(self):
+        """10/11/2026: ogni dato del risultato si copia al clic. Il secondo
+        tempo sostituisce l'intero risultato, quindi la copia deve reggere
+        su elementi che al caricamento non esistevano (`risultato.js`
+        ascolta sul documento, non sui singoli elementi)."""
+        self.pagina.context.grant_permissions(["clipboard-read", "clipboard-write"])
+        self._apri(self.SCONOSCIUTA)
+        self._aspetta_il_firmware()
+
+        def appunti():
+            return self.pagina.evaluate("navigator.clipboard.readText()")
+
+        self.pagina.click(".firmware-voci code")
+        self.pagina.wait_for_selector(".avviso-copia.visibile")
+        self.assertEqual(appunti(), "A325FXXSCDYB2")
+        self.assertIn("A325FXXSCDYB2", self._testo(".avviso-copia"))
+
+        self.pagina.click(".codice-principale")
+        self.assertEqual(appunti(), "SM-A325F")
+        self.pagina.click(".cpu-in-evidenza strong")
+        self.assertIn("Helio G80", appunti())
+        # Della riga del firmware si copia la versione, non la frase.
+        self.pagina.click(".firmware-versione")
+        self.assertEqual(appunti(), "Android 13")
+        # Il nome senza la pastiglia 4G/5G che gli sta accanto.
+        self.pagina.click("[data-nome-risultato] h2")
+        self.assertEqual(appunti(), "Samsung Galaxy A32")
+        # Il riepilogo: una riga per dato, nell'ordine in cui si leggono.
+        self.pagina.click("[data-riepilogo-risultato]")
+        self.pagina.wait_for_function(
+            "navigator.clipboard.readText().then(t => t.indexOf('Modello: ') === 0)")
+        righe = appunti().split("\n")
+        self.assertEqual(righe[0], "Modello: Samsung Galaxy A32")
+        self.assertIn("Codice modello: SM-A325F", righe)
+        self.assertIn("Firmware: Android 13", righe)
+        self.assertIn("Build: A325FXXSCDYB2", righe)
+        self.assertTrue(any(r.startswith("SoC: ") and "Helio G80" in r for r in righe), righe)
+        self.assertEqual(self.errori_js, [])
+
+    def test_le_altre_varianti_stanno_dietro_un_tasto(self):
+        self._apri(self.SCONOSCIUTA)
+        self._aspetta_il_firmware()
+        tasto = self.pagina.locator("[data-apri-varianti]")
+        if tasto.count() == 0:
+            self.skipTest("questo modello non ha altre varianti da mostrare")
+        self.assertFalse(self.pagina.locator(".altri-codici").is_visible())
+        tasto.click()
+        self.assertTrue(self.pagina.locator(".altri-codici").is_visible())
+        self.assertEqual(tasto.get_attribute("aria-expanded"), "true")
+        # Il clic su una variante la copia; la freccia accanto la cerca.
+        self.assertEqual(self.pagina.locator(".altri-codici .variante a[href^='/?q=']").count(),
+                         self.pagina.locator(".altri-codici .variante").count())
+
     def test_il_tasto_del_parco_porta_i_valori_del_telefono_trovato(self):
         """Marca vuota e chiave costruita sul testo digitato: è quello che
         il tasto spediva quando restava quello del primo tempo."""

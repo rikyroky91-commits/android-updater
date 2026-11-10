@@ -6,11 +6,21 @@
 <p class="nota"><strong>Versione riportata dalla fonte.</strong> Disponibilità sul dispositivo da verificare.</p>
 {% endif %}
 {% if risultato.trovato and not risultato.senza_firmware %}
-  {% set parti = risultato.riga.split(' · ') %}
-  <p class="riga-esito firmware-versione">{{ parti[0] }}</p>
-  {% if parti | length > 1 %}<p class="firmware-dettagli">{{ parti[1:] | join(' · ') }}</p>{% endif %}
-  <p class="nota">{{ risultato.fonte }}</p>
-  {% if risultato.fonte_url %}<p class="nota"><a href="{{ risultato.fonte_url }}" target="_blank" rel="noopener">Apri la fonte del firmware →</a></p>{% endif %}
+  {# TRE PESI DIVERSI (10/11/2026): la versione in grande, build/patch/data
+     come dati con la propria etichetta (sono quelli che si copiano), e le
+     avvertenze in piccolo. Le parole sono le stesse di prima: le separa
+     `presenters.voci_firmware`, qui si decide solo quanto pesano. #}
+  {% set fw = voci_firmware(risultato.riga) %}
+  <p class="riga-esito firmware-versione" tabindex="0" data-copia="{{ fw.titolo.split(': ', 1)[-1] }}">{{ fw.titolo }}</p>
+  {% if fw.voci %}
+  <ul class="firmware-voci">
+    {% for etichetta, valore in fw.voci %}
+    <li><span class="etichetta">{{ etichetta }}</span> <code>{{ valore }}</code></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if fw.note %}<p class="nota firmware-note">{{ fw.note | join(' · ') }}</p>{% endif %}
+  <p class="nota firmware-fonte">{{ risultato.fonte }}{% if risultato.fonte_url %} · <a href="{{ risultato.fonte_url }}" target="_blank" rel="noopener">Apri la fonte del firmware →</a>{% endif %}</p>
 {% elif risultato.senza_firmware %}
   {# ONESTÀ DEL RISULTATO. La fonte conferma che il modello esiste ma
      non pubblica la versione. Scrivere «trovato» qui farebbe credere

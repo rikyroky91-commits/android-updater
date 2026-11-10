@@ -63,10 +63,14 @@
 <section class="esito {{ 'trovato' if risultato.trovato and not risultato.senza_firmware else 'incerto' }}{{ ' esito-con-scheda' if risultato.scheda.trovata or risultato.trovato }}">
   {% include "_nome_risultato.html" %}
   {% if risultato.scheda.trovata or risultato.trovato %}
-  {% with scheda = risultato.scheda, senza_intestazione = true, solo_sintesi = true %}{% include "_scheda.html" %}{% endwith %}
+  {% with scheda = risultato.scheda %}{% include "_scheda_sintesi.html" %}{% endwith %}
   {% endif %}
-  {% if imei %}{% include "_imei_identita.html" %}{% endif %}
-  <h3 class="titolo-firmware">Firmware</h3>
+  {# IL TERZO DATO CHIAVE. Il colore dice quanto vale: verde solo per una
+     build corrente verificata, ocra per una versione riportata o di
+     lancio, neutro quando non c'è (o non c'è ancora). #}
+  <div class="dato-chiave dato-firmware {{ 'fw-attesa' if risultato.firmware_in_arrivo else 'fw-verificato' if risultato.tipo_versione == 'current' else 'fw-incerto' if risultato.trovato and not risultato.senza_firmware else 'fw-assente' }}">
+  <h3 class="titolo-firmware etichetta">Firmware</h3>
+  <div class="valore-chiave">
 
   {# IL NOME PRIMA DI TUTTO. Si sa senza toccare la rete — dal codice
      modello e dalla scheda tecnica — mentre il firmware costa fino a
@@ -125,6 +129,22 @@
   {% else %}
   {% with senza_nome = true %}{% include "_esito_firmware.html" %}{% endwith %}
   {% endif %}
+  </div>
+  </div>
+
+  {# DA QUI IN GIÙ È SECONDO PIANO (10/11/2026): tendine e azioni piccole.
+     L'IMEI viene subito dopo i tre dati chiave e resta aperto — è la
+     verifica di chi ha cercato un IMEI — ma non li separa più. #}
+  {% if imei %}<div class="blocco-imei">{% include "_imei_identita.html" %}</div>{% endif %}
+  {% if risultato.scheda.trovata or risultato.trovato %}
+  {% with scheda = risultato.scheda %}{% include "_scheda_altre.html" %}{% endwith %}
+  {% endif %}
+  <div class="azioni-risultato">
+  {# IL RIEPILOGO IN UN CLIC (10/11/2026): nome, codice, SoC e firmware
+     in poche righe di testo, pronte per un ticket o un foglio. Lo compone
+     `risultato.js` da quello che la pagina mostra, quindi non può dire
+     una cosa diversa. Senza JavaScript il tasto non c'è. #}
+  <button type="button" class="copia-riepilogo" data-riepilogo-risultato>Copia riepilogo</button>
 
   {# CIÒ CHE SCRIVE UN DATO ASPETTA IL RISULTATO COMPLETO. Mentre il
      firmware è in arrivo questa pagina è provvisoria: il primo tempo non
@@ -164,6 +184,13 @@
     <button type="submit" class="secondario">Trova un telefono con hardware simile</button>
   </form>
   {% endif %}
+  {# L'INGRESSO AL CONFRONTO. Il primo modello è già scritto — quello che
+     è stato appena cercato — e manca solo il secondo. #}
+  {% if not (imei and not imei.riconosciuto) %}
+  <a class="azione-confronto" href="/confronto?a={{ risultato.query | urlencode }}">Confronta
+    con un altro modello →</a>
+  {% endif %}
+  </div>
 
   {# QUESTO CODICE HA PIÙ DI UN NOME COMMERCIALE VERO, NON UN «FORSE».
      `RMX3933` è insieme «C61», «Note 60», «Note 60s» e «NARZO N61»: la
@@ -284,13 +311,6 @@
     scritto in un modello che l'app conosce.</p>
   {% endif %}
 
-  {# L'INGRESSO AL CONFRONTO. Il primo modello è già scritto — quello che
-     è stato appena cercato — e manca solo il secondo: un clic in meno
-     rispetto a scrivere due nomi da zero sulla pagina di confronto. #}
-  {% if not (imei and not imei.riconosciuto) %}
-  <p class="nota"><a href="/confronto?a={{ risultato.query | urlencode }}">Confronta
-    con un altro modello →</a></p>
-  {% endif %}
 </section>
 
 {% if verifica_ai and verifica_ai.fonti %}
@@ -328,7 +348,12 @@
    È la seconda metà della domanda: «che telefono è» la risponde la
    scheda, «cosa gli è arrivato e quando» la risponde questa. #}
 {% if risultato.storico %}
-<h3 class="occhiello">Aggiornamenti di {{ risultato.nome }}</h3>
+{# IN UNA TENDINA (10/11/2026): l'ultimo firmware è già in cima, questa è
+   la cronologia per chi la vuole. Il numero sul titolo dice se vale la
+   pena aprirla. #}
+<details class="tendina tendina-esterna storico-modello">
+<summary><span class="occhiello">Aggiornamenti di {{ risultato.nome }}</span> <span class="tendina-anteprima">{{ risultato.storico | length }} in archivio</span></summary>
+<div class="tabella-scorre">
 <table class="tabella">
   <thead>
     <tr><th>Data</th><th>Versione</th><th>Build</th><th>Patch</th>
@@ -351,10 +376,12 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% if risultato.chiave %}
 <p class="nota"><a href="/dispositivo?k={{ risultato.chiave | urlencode }}">Scheda
   completa del dispositivo in archivio →</a></p>
 {% endif %}
+</details>
 {% endif %}
 
 {% with notizie = risultato.notizie %}{% include "_notizie.html" %}{% endwith %}

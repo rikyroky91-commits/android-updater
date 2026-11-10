@@ -1,4 +1,7 @@
-{% if risultato.firmware_confronto %}
+{# Solo se c'è qualcosa con cui confrontare (10/11/2026): la tendina
+   compariva anche sotto «Nessun firmware», dove il confronto non può
+   dire niente. #}
+{% if risultato.firmware_confronto and (risultato.firmware_confronto.android or risultato.firmware_confronto.build) %}
 <details class="confronto-installato">
   <summary>Confronta con il software installato</summary>
   <form data-confronto-installato='{{ risultato.firmware_confronto | tojson }}'>

@@ -257,3 +257,40 @@ class TestStatoBackup(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestVociFirmware(unittest.TestCase):
+    """La riga del firmware spezzata per la pagina dei risultati
+    (10/11/2026): build, patch e data diventano dati con la propria
+    etichetta, copiabili uno per uno; le avvertenze restano avvertenze.
+    Non si deve perdere né inventare una parola."""
+
+    def test_build_patch_e_data_sono_dati_il_resto_avvertenze(self):
+        fw = P.voci_firmware(
+            "Ultimo Android verificato: Android 17 · build S911BXXUAGZIF · patch 2026-09"
+            " · data di rilascio non verificata"
+            " · Periodo dedotto dal codice build: settembre 2026 (non è la data di rilascio)")
+        self.assertEqual(fw["titolo"], "Ultimo Android verificato: Android 17")
+        self.assertEqual(fw["voci"], [("Build", "S911BXXUAGZIF"), ("Patch", "2026-09")])
+        self.assertEqual(fw["note"], [
+            "data di rilascio non verificata",
+            "Periodo dedotto dal codice build: settembre 2026 (non è la data di rilascio)"])
+
+    def test_la_data_di_uscita_e_un_dato(self):
+        fw = P.voci_firmware("Ultima versione verificata: iOS 27.2.1 · build 24B156 · uscito il 09/11/2026")
+        self.assertEqual(fw["voci"], [("Build", "24B156"), ("Uscito il", "09/11/2026")])
+        self.assertEqual(fw["note"], [])
+
+    def test_una_frase_che_comincia_per_build_non_e_una_build(self):
+        """«Versione Android della build: non verificata» è un'avvertenza."""
+        fw = P.voci_firmware("Ultima versione verificata: HyperOS 2"
+                             " · Versione Android della build: non verificata · build OS2.0.1")
+        self.assertEqual(fw["voci"], [("Build", "OS2.0.1")])
+        self.assertEqual(fw["note"], ["Versione Android della build: non verificata"])
+
+    def test_riga_vuota_o_di_una_frase_sola(self):
+        self.assertEqual(P.voci_firmware(""), {"titolo": "", "voci": [], "note": []})
+        self.assertEqual(P.voci_firmware(None)["titolo"], "")
+        fw = P.voci_firmware("Supporto ufficiale: 7 anni di aggiornamenti")
+        self.assertEqual((fw["titolo"], fw["voci"], fw["note"]),
+                         ("Supporto ufficiale: 7 anni di aggiornamenti", [], []))
