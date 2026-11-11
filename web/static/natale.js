@@ -64,7 +64,7 @@
 
   var tela = null, ctx = null, W = 0, H = 0, richiesta = null, passi = 0;
   var fiocchi = [], superfici = [], cumuli = new Map(), pupazzi = [], sbuffi = [];
-  var ghiacci = new Map(), brillii = [], coriandoli = [], regali = [], cappelli = [], slitta = null, prossimaSlitta = 420;
+  var ghiacci = new Map(), brillii = [], coriandoli = [], regali = [], cappelli = [], slitta = null, prossimaSlitta = 420, cadenti = [];
   var pavimento = 0, vento = 0, raffica = 0, scuro = false;
   var puntatore = { x: -999, y: -999, vx: 0, vy: 0 };
   var presa = null;
@@ -153,7 +153,9 @@
     var i, els = document.querySelectorAll(POSATOI);
     for (i = 0; i < els.length && i < 400; i++) {
       var el = els[i];
-      if (el.closest && el.closest(".ring-pannello, .ultimora, [hidden]")) continue;
+      // Sulla barra di ricerca niente neve (11/11/2026, su richiesta: «dove si scrive il modello si accumula
+      // la neve in modo fastidioso»): né sul campo, né sui suoi tasti, né ghiaccioli sotto.
+      if (el.closest && el.closest(".ring-pannello, .ultimora, [hidden], .ricerca")) continue;
       var r = el.getBoundingClientRect();
       if (est && (r.width > W * 0.96 || r.height > H * 0.9)) continue;          // uno sfondo a tutta pagina non è un posatoio
       aggiungi(el, r, 9, true);
@@ -165,6 +167,9 @@
     // I titoli: riga per riga, larghi quanto il testo (non quanto la colonna).
     var titoli = document.querySelectorAll(TITOLI);
     for (i = 0; i < titoli.length && i < 12; i++) {
+      // Il titolo nascosto per i lettori di schermo (`.sr-only`, in home) ha il testo fuori dal suo
+      // riquadro di 1 px: la neve ci si posava sopra la barra di ricerca, a mezz'aria.
+      if (titoli[i].closest && titoli[i].closest(".sr-only, .ricerca")) continue;
       var intervallo = document.createRange();
       intervallo.selectNodeContents(titoli[i]);
       var rr = intervallo.getClientRects(), righe = [];
@@ -387,6 +392,7 @@
   function apri(g) {
     if (g.fermo > 0) return;
     g.salto = 46; g.fermo = 80;
+    if (g.caduto) g.via = 150;
     var colori = ["#d8343f", "#ffd84a", "#2f8f5a", "#2f72e0", "#f08a24", "#ffffff"];
     for (var i = 0; i < 26 && coriandoli.length < 140; i++) {
       coriandoli.push({ x: g.x + caso(-g.w * 0.3, g.w * 0.3), y: g.base - g.h, vx: caso(-2.6, 2.6), vy: -caso(3.5, 8), ang: caso(0, 6.28), va: caso(-0.3, 0.3),
@@ -396,15 +402,49 @@
   }
 
   // --- La slitta --------------------------------------------------------
+  // LA SLITTA CHE LANCIA I REGALI (11/11/2026, su richiesta: «la renna e babbo natale è troppo
+  // minimale rispetto al resto, vorrei una cosa più carina e che butta qualche regalo»). Babbo Natale
+  // saluta, quattro renne in coppia (davanti Rudolph col naso che brilla), e lungo il passaggio due o
+  // tre regali lanciati dal sacco: cadono girando, si posano sul fondo con uno sbuffo di neve e si
+  // aprono al clic come quelli sotto l'albero; aperti, dopo un po' svaniscono.
+  var SCALA_SLITTA = 1.5, MAX_CADUTI = 6;
   function partiSlitta() {
-    var verso = Math.random() < 0.5 ? 1 : -1;
-    slitta = { x: verso > 0 ? -220 : W + 220, y: caso(54, Math.max(60, Math.min(150, H * 0.2))), verso: verso, t: 0 };
+    var verso = Math.random() < 0.5 ? 1 : -1, n = W < 640 ? 1 : Math.round(caso(2, 3)), lanci = [], i;
+    for (i = 0; i < n; i++) lanci.push(caso(0.15, 0.85) * W);
+    slitta = { x: verso > 0 ? -260 : W + 260, y: caso(120, Math.max(130, Math.min(230, H * 0.3))), verso: verso, t: 0, lanci: lanci, saluto: 0 };
+  }
+  function lancia() {
+    var v = slitta.verso, sx = slitta.x - v * 24 * SCALA_SLITTA, sy = slitta.y - 20 * SCALA_SLITTA;
+    var w = caso(15, 21), h = w * caso(0.7, 0.95);
+    cadenti.push({ x: sx, y: sy, vx: v * caso(0.6, 1.6), vy: -caso(1.5, 3), w: w, h: h, ang: 0, va: caso(-0.12, 0.12), carta: CARTE[Math.floor(Math.random() * CARTE.length)] });
+    for (var k = 0; k < 6; k++) brillio(sx + caso(-12, 12), sy + caso(-12, 12), k % 2 ? "#ffd84a" : "#ffffff");
+    slitta.saluto = 40;
   }
   function aggiornaSlitta() {
+    var i;
+    // I regali in volo: un po' di gravità, l'aria che li frena, il vento che li sposta.
+    for (i = cadenti.length - 1; i >= 0; i--) {
+      var c = cadenti[i];
+      c.vy = Math.min(c.vy + 0.12, 3.2); c.vx = c.vx * 0.99 + vento * 0.02; c.x += c.vx; c.y += c.vy; c.ang += c.va;
+      if (c.y + c.h / 2 >= pavimento) {
+        cadenti.splice(i, 1);
+        var g = nuovoRegalo(c.x, c.w, c.h, 0); g.carta = c.carta; g.caduto = true; g.salto = 14;
+        regali.push(g);
+        for (var k = 0; k < 7; k++) sbuffo(c.x + caso(-c.w / 2, c.w / 2), pavimento - 2, caso(-1.4, 1.4), -caso(0.6, 2));
+        var caduti = regali.filter(function (r) { return r.caduto; });
+        if (caduti.length > MAX_CADUTI) regali.splice(regali.indexOf(caduti[0]), 1);
+      } else if (c.x < -60 || c.x > W + 60) cadenti.splice(i, 1);
+    }
+    // I regali caduti e già aperti svaniscono.
+    for (i = regali.length - 1; i >= 0; i--) if (regali[i].via && --regali[i].via <= 0) regali.splice(i, 1);
     if (!slitta) { if (!ridotto && passi >= prossimaSlitta) partiSlitta(); return; }
-    slitta.t++; slitta.x += slitta.verso * 3.1;
-    if (slitta.t % 3 === 0) brillio(slitta.x - slitta.verso * caso(70, 100), slitta.y + Math.sin(slitta.t * 0.05) * 9 + caso(2, 14), Math.random() < 0.5 ? "#ffd84a" : "#ffffff");
-    if (slitta.x < -260 || slitta.x > W + 260) { slitta = null; prossimaSlitta = passi + Math.round(caso(1800, 3600)); }
+    slitta.t++; slitta.x += slitta.verso * 2.6;
+    if (slitta.saluto > 0) slitta.saluto--;
+    for (i = slitta.lanci.length - 1; i >= 0; i--) {
+      if ((slitta.verso > 0 && slitta.x >= slitta.lanci[i]) || (slitta.verso < 0 && slitta.x <= slitta.lanci[i])) { slitta.lanci.splice(i, 1); lancia(); }
+    }
+    if (slitta.t % 2 === 0) brillio(slitta.x - slitta.verso * caso(40, 70) * SCALA_SLITTA * 0.6, slitta.y + Math.sin(slitta.t * 0.05) * 9 + caso(4, 22), Math.random() < 0.5 ? "#ffd84a" : "#ffffff");
+    if (slitta.x < -320 || slitta.x > W + 320) { slitta = null; prossimaSlitta = passi + Math.round(caso(1500, 3000)); }
   }
 
   // --- Disegno ----------------------------------------------------------
@@ -609,6 +649,7 @@
     var w = g.w, h = g.h, x = g.x - w / 2, y = g.base - h;
     var k = g.salto > 0 ? Math.sin(Math.PI * g.salto / 46) : 0;         // quanto è alzato il coperchio
     ctx.save();
+    if (g.via) ctx.globalAlpha = Math.min(1, g.via / 60);
     ctx.fillStyle = g.carta[0]; ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1;
     ctx.fillRect(x, y, w, h); ctx.strokeRect(x, y, w, h);
     ctx.fillStyle = g.carta[1]; ctx.fillRect(g.x - w * 0.09, y, w * 0.18, h);
@@ -695,40 +736,110 @@
       ctx.stroke();
     }
   }
-  function disegnaRenna(x, y, v, fase) {
-    var marrone = "#8a5a33", scuroR = "#5e3b20";
-    ctx.strokeStyle = scuroR; ctx.lineWidth = 1.6; ctx.lineCap = "round"; ctx.beginPath();
-    for (var k = 0; k < 4; k++) {
-      var gx = x + v * (k < 2 ? 8 : -8) + (k % 2 ? 2 : -2), a = Math.sin(fase + k * 1.6) * 0.7 * v;
-      ctx.moveTo(gx, y + 3); ctx.lineTo(gx + Math.sin(a) * 9, y + 3 + Math.cos(a) * 9);
-    }
+  // Una renna, disegnata verso destra attorno al centro del corpo; `fase` muove le zampe al galoppo.
+  function disegnaRenna(x, y, fase, rudolph, ombra) {
+    var marrone = ombra ? "#7a4e2c" : "#9a6638", scuroR = "#4f3119", chiaro = ombra ? "#b48a60" : "#d4a878";
+    ctx.save(); ctx.translate(x, y);
+    // Le zampe: al galoppo le anteriori e le posteriori si aprono e si chiudono insieme.
+    var ap = Math.sin(fase);
+    ctx.strokeStyle = scuroR; ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.beginPath();
+    ctx.moveTo(8, 3); ctx.lineTo(13 + ap * 6, 10); ctx.lineTo(15 + ap * 8, 13);
+    ctx.moveTo(5, 3); ctx.lineTo(9 + ap * 4, 11); ctx.lineTo(10 + ap * 6, 14);
+    ctx.moveTo(-9, 3); ctx.lineTo(-14 - ap * 6, 9); ctx.lineTo(-17 - ap * 8, 12);
+    ctx.moveTo(-6, 3); ctx.lineTo(-10 - ap * 4, 10); ctx.lineTo(-13 - ap * 6, 13);
     ctx.stroke();
-    ctx.fillStyle = marrone; ctx.beginPath(); ctx.ellipse(x, y, 12, 5.4, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x + v * 13, y - 7, 4.6, 3.4, v * -0.5, 0, Math.PI * 2); ctx.fill();
-    ctx.lineWidth = 3; ctx.strokeStyle = marrone; ctx.beginPath(); ctx.moveTo(x + v * 9, y - 2); ctx.lineTo(x + v * 12, y - 6); ctx.stroke();
-    ctx.lineWidth = 1.1; ctx.strokeStyle = scuroR; ctx.beginPath();
-    ctx.moveTo(x + v * 12, y - 10); ctx.lineTo(x + v * 10, y - 16); ctx.moveTo(x + v * 11, y - 13); ctx.lineTo(x + v * 14, y - 16);
-    ctx.moveTo(x + v * 14, y - 10); ctx.lineTo(x + v * 15, y - 15); ctx.stroke();
-    tondo(x - v * 12, y - 2, 1.8, "#f4f1e6");
+    // Il corpo, con la pancia chiara e la coda bianca.
+    tondo(-14, -3, 2.6, "#f4f1e6");
+    ctx.fillStyle = marrone; ctx.beginPath(); ctx.ellipse(0, 0, 13, 6.5, -0.08, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = chiaro; ctx.beginPath(); ctx.ellipse(1, 3.2, 8, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+    // Il collo e la testa col muso.
+    ctx.fillStyle = marrone; ctx.beginPath(); ctx.moveTo(7, -4); ctx.quadraticCurveTo(12, -12, 15, -14); ctx.lineTo(18, -10); ctx.quadraticCurveTo(14, -6, 11, 1); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(17, -14, 5, 3.6, -0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(21.5, -12.5, 3, 2.3, -0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = chiaro; ctx.beginPath(); ctx.ellipse(13.5, -17, 2.2, 1.1, -0.9, 0, Math.PI * 2); ctx.fill();   // l'orecchio
+    tondo(17.5, -15.5, 0.9, "#1b1b1b");
+    // Le corna, a rami.
+    ctx.strokeStyle = "#6b4a2a"; ctx.lineWidth = 1.4; ctx.beginPath();
+    ctx.moveTo(15, -17); ctx.lineTo(12, -25); ctx.moveTo(13.4, -21); ctx.lineTo(9.5, -23); ctx.moveTo(12.6, -23.5); ctx.lineTo(15, -27);
+    ctx.moveTo(17, -17); ctx.lineTo(18, -25); ctx.moveTo(17.6, -21.5); ctx.lineTo(21, -24);
+    ctx.stroke();
+    // Il naso: rosso e luminoso per Rudolph.
+    if (rudolph) {
+      var p = 0.6 + 0.4 * Math.sin(passi * 0.15);
+      ctx.save(); ctx.globalAlpha = 0.35 * p; tondo(24.2, -12.8, 6, "#ff3b3b"); ctx.restore();
+      tondo(24.2, -12.8, 2.2, "#ff2a2a"); tondo(23.6, -13.4, 0.7, "#ffffff");
+    } else tondo(24.2, -12.8, 1.4, "#2a1a10");
+    // La pettorina rossa col campanello d'oro.
+    ctx.strokeStyle = "#c8102e"; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(8, -6); ctx.quadraticCurveTo(11, 0, 9, 4); ctx.stroke();
+    ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(-8, -6); ctx.lineTo(9, -5); ctx.stroke();
+    tondo(10.5, 1.5, 1.9, "#f2c230"); tondo(10, 1, 0.6, "#fff6c2");
+    ctx.restore();
   }
   function disegnaSlitta() {
-    var v = slitta.verso, x = slitta.x, y = slitta.y + Math.sin(slitta.t * 0.05) * 9, fase = slitta.t * 0.35;
-    ctx.save();
-    // Le redini.
-    ctx.strokeStyle = "#e9b93c"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - v * 12, y - 4); ctx.lineTo(x + v * 70, y - 2); ctx.stroke();
-    disegnaRenna(x + v * 74, y + Math.sin(fase) * 2, v, fase);
-    disegnaRenna(x + v * 40, y + Math.sin(fase + 1.5) * 2, v, fase + 1.5);
-    // La slitta: il pattino dorato, la scocca rossa, il sacco.
-    ctx.strokeStyle = "#e9b93c"; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.beginPath();
-    ctx.moveTo(x - v * 26, y + 12); ctx.lineTo(x + v * 12, y + 12); ctx.quadraticCurveTo(x + v * 22, y + 12, x + v * 22, y + 3); ctx.stroke();
-    ctx.fillStyle = "#c8102e"; ctx.strokeStyle = "#7d0a1c"; ctx.lineWidth = 1; ctx.beginPath();
-    ctx.moveTo(x - v * 24, y - 6); ctx.lineTo(x + v * 4, y - 2); ctx.quadraticCurveTo(x + v * 16, y - 2, x + v * 17, y - 9);
-    ctx.lineTo(x + v * 19, y + 8); ctx.lineTo(x - v * 24, y + 8); ctx.closePath(); ctx.fill(); ctx.stroke();
-    tondo(x - v * 17, y - 9, 8, "#7a5230");
-    // Chi guida: cappotto rosso, barba bianca, cappello.
-    tondo(x - v * 3, y - 7, 6.5, "#d8343f"); tondo(x - v * 1, y - 15, 4, "#f0c9a4"); tondo(x + v * 0.5, y - 12.5, 3.2, "#ffffff");
-    ctx.fillStyle = "#d8343f"; ctx.beginPath(); ctx.moveTo(x - v * 5, y - 17); ctx.lineTo(x + v * 3, y - 17); ctx.lineTo(x - v * 6, y - 25); ctx.closePath(); ctx.fill();
-    tondo(x - v * 6.5, y - 25, 1.8, "#ffffff");
+    var v = slitta.verso, y = slitta.y + Math.sin(slitta.t * 0.05) * 9, fase = slitta.t * 0.3, S = SCALA_SLITTA;
+    ctx.save(); ctx.translate(slitta.x, y); ctx.scale(v * S, S);
+    // Le redini dorate dalle mani di Babbo Natale alle renne.
+    var renne = [[92, -2, 0], [60, 2, 1.4]], i;
+    ctx.strokeStyle = "#e9b93c"; ctx.lineWidth = 0.8; ctx.beginPath();
+    for (i = 0; i < renne.length; i++) { ctx.moveTo(8, -16); ctx.quadraticCurveTo(renne[i][0] - 30, -6, renne[i][0] + 9, renne[i][1] - 5); }
+    ctx.stroke();
+    // Le renne in coppia: quella dietro un po' più scura e spostata.
+    for (i = renne.length - 1; i >= 0; i--) {
+      var rx = renne[i][0], ry = renne[i][1] + Math.sin(fase + renne[i][2]) * 2;
+      disegnaRenna(rx + 5, ry - 4, fase + renne[i][2] + 0.6, false, true);
+      disegnaRenna(rx, ry, fase + renne[i][2], i === 0, false);
+    }
+    // Il sacco dietro, coi regali che spuntano.
+    ctx.fillStyle = "#e9c46a"; ctx.fillRect(-36, -30, 9, 8); ctx.fillStyle = "#2f8f5a"; ctx.fillRect(-28, -32, 8, 9); ctx.fillStyle = "#2f72e0"; ctx.fillRect(-33, -36, 7, 7);
+    ctx.fillStyle = "#c8102e"; ctx.fillRect(-26.5, -32, 1.6, 9); ctx.fillStyle = "#ffffff"; ctx.fillRect(-36, -26.8, 9, 1.4);
+    var gs = ctx.createRadialGradient(-30, -18, 2, -28, -14, 15);
+    gs.addColorStop(0, "#a8784a"); gs.addColorStop(1, "#6e4825");
+    ctx.fillStyle = gs; ctx.beginPath(); ctx.moveTo(-40, -6); ctx.quadraticCurveTo(-44, -22, -34, -26); ctx.quadraticCurveTo(-28, -29, -20, -25); ctx.quadraticCurveTo(-14, -14, -18, -6); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#4e3218"; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-35, -24); ctx.quadraticCurveTo(-28, -22, -22, -24); ctx.stroke();
+    // Babbo Natale: cappotto, cintura con la fibbia, barba, cappello; un braccio saluta.
+    var sal = slitta.saluto > 0 ? Math.sin(slitta.saluto * 0.5) * 0.5 : Math.sin(slitta.t * 0.06) * 0.25;
+    ctx.fillStyle = "#c8102e"; ctx.beginPath(); ctx.ellipse(-6, -14, 10, 11, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(-7, -25, 2.4, 20);
+    ctx.fillStyle = "#1e1e1e"; ctx.fillRect(-16, -10, 20, 3.2); ctx.strokeStyle = "#f2c230"; ctx.lineWidth = 1; ctx.strokeRect(-8, -10.3, 4, 3.8);
+    ctx.save(); ctx.translate(-12, -20); ctx.rotate(-2.2 + sal);
+    ctx.strokeStyle = "#c8102e"; ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(10, 0); ctx.stroke();
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(9, -2.4, 2.4, 4.8); tondo(13.5, 0, 2.6, "#1e1e1e");
+    ctx.restore();
+    ctx.strokeStyle = "#c8102e"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-1, -18); ctx.lineTo(7, -15); ctx.stroke();
+    tondo(8.5, -15.5, 2.5, "#1e1e1e");
+    tondo(-4, -31, 6, "#f3cba5");
+    ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.moveTo(-10, -31); ctx.quadraticCurveTo(-12, -20, -4, -18); ctx.quadraticCurveTo(3, -20, 2, -31); ctx.quadraticCurveTo(-4, -26, -10, -31); ctx.fill();
+    tondo(-1, -30, 1.6, "#e88a7a"); tondo(-2.2, -33, 0.8, "#1e1e1e");
+    ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.ellipse(-3, -28.6, 3.6, 1.4, 0, 0, Math.PI * 2); ctx.fill();   // i baffi
+    ctx.fillStyle = "#c8102e"; ctx.beginPath(); ctx.moveTo(-10.5, -35); ctx.quadraticCurveTo(-6, -46, 2, -36); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-8, -40); ctx.quadraticCurveTo(-16, -46, -18, -38); ctx.lineTo(-15, -38); ctx.closePath(); ctx.fill();
+    tondo(-17, -37.5, 2.2, "#ffffff");
+    ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.ellipse(-4.2, -35.4, 7.4, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+    // La slitta: scocca rossa con la sfumatura, bordo e ricciolo d'oro, pattini a ricciolo.
+    var gr = ctx.createLinearGradient(0, -14, 0, 12);
+    gr.addColorStop(0, "#e2283f"); gr.addColorStop(1, "#8d0b1f");
+    ctx.fillStyle = gr; ctx.strokeStyle = "#5e0614"; ctx.lineWidth = 1; ctx.beginPath();
+    ctx.moveTo(-40, -16); ctx.quadraticCurveTo(-46, -14, -43, -4); ctx.lineTo(-38, 10); ctx.lineTo(14, 10);
+    ctx.quadraticCurveTo(28, 9, 29, -4); ctx.quadraticCurveTo(30, -12, 23, -12); ctx.quadraticCurveTo(18, -12, 16, -6);
+    ctx.lineTo(-24, -6); ctx.quadraticCurveTo(-28, -14, -40, -16); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "#f2c230"; ctx.lineWidth = 1.6; ctx.beginPath();
+    ctx.moveTo(-38, 5); ctx.lineTo(14, 5); ctx.quadraticCurveTo(24, 4, 24, -4);
+    ctx.moveTo(-12, -1); ctx.bezierCurveTo(-8, -5, -2, 3, -6, 2); ctx.moveTo(4, -1); ctx.bezierCurveTo(8, -5, 14, 3, 10, 2);
+    ctx.stroke();
+    ctx.strokeStyle = "#d9a520"; ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.beginPath();
+    ctx.moveTo(-30, 10); ctx.lineTo(-30, 17); ctx.moveTo(6, 10); ctx.lineTo(6, 17);
+    ctx.moveTo(-46, 13); ctx.quadraticCurveTo(-46, 17, -40, 17); ctx.lineTo(24, 17); ctx.bezierCurveTo(36, 17, 38, 6, 31, 5); ctx.arc(31, 9, 3, -Math.PI / 2, Math.PI, true);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // Un regalo in volo, che gira su sé stesso.
+  function disegnaCadente(c) {
+    ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.ang);
+    ctx.fillStyle = c.carta[0]; ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1;
+    ctx.fillRect(-c.w / 2, -c.h / 2, c.w, c.h); ctx.strokeRect(-c.w / 2, -c.h / 2, c.w, c.h);
+    ctx.fillStyle = c.carta[1]; ctx.fillRect(-c.w * 0.09, -c.h / 2, c.w * 0.18, c.h); ctx.fillRect(-c.w / 2, -c.h * 0.09, c.w, c.h * 0.18);
+    ctx.beginPath(); ctx.ellipse(-c.w * 0.14, -c.h / 2 - 2, c.w * 0.15, c.h * 0.12, -0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(c.w * 0.14, -c.h / 2 - 2, c.w * 0.15, c.h * 0.12, 0.5, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
   // Un fiocco a cristallo: sei bracci con le barbe.
@@ -770,6 +881,7 @@
     for (i = 0; i < fiocchi.length; i++) { f = fiocchi[i]; if (f.z >= 0.35) continue; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
     ctx.globalAlpha = 1;
     if (slitta) disegnaSlitta();
+    for (i = 0; i < cadenti.length; i++) disegnaCadente(cadenti[i]);
     // All'arrivo albero, regali e pupazzi salgono da sotto la neve del fondo.
     var spunta = ingresso >= 1 ? 1 : ingresso < 0.78 ? 0 : (ingresso - 0.78) / 0.22;
     ctx.save();
@@ -959,7 +1071,7 @@
     radice.classList.remove("natale-presa", "natale-trascina");
     if (tela) { ctx.clearRect(0, 0, W, H); tela.style.display = "none"; }
     fiocchi = []; sbuffi = []; pupazzi = []; cumuli = new Map(); superfici = [];
-    ghiacci = new Map(); brillii = []; coriandoli = []; regali = []; cappelli = []; slitta = null; prossimaSlitta = passi + 420;
+    ghiacci = new Map(); brillii = []; coriandoli = []; regali = []; cappelli = []; slitta = null; prossimaSlitta = passi + 420; cadenti = [];
   }
 
   // --- Puntatore --------------------------------------------------------
@@ -1048,7 +1160,7 @@
       }
       return { acceso: acceso, ingresso: ingresso, vento: vento, fiocchi: fiocchi.length, cristalli: fiocchi.filter(function (f) { return f.cristallo; }).length,
                superfici: superfici.length, neve: neve, ghiaccioli: ghiaccioli, pavimento: pavimento, scuro: scuro,
-               regali: regali.map(function (g) { return { x: g.x, y: g.base - g.h / 2, aperto: g.salto > 0 }; }),
+               regali: regali.map(function (g) { return { x: g.x, y: g.base - g.h / 2, aperto: g.salto > 0, caduto: !!g.caduto }; }), cadenti: cadenti.length,
                coriandoli: coriandoli.length, brillii: brillii.length, cappelli: cappelli.length, slitta: slitta ? { x: slitta.x, y: slitta.y } : null,
                pupazzi: pupazzi.map(function (p) {
                  return { x: p.x, base: p.base, intero: intero(p),

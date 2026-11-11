@@ -151,3 +151,22 @@ test("natale.js: le lampadine si spengono al passaggio del puntatore e poi si ri
   assert.ok(/luciSpente\[l\.c\] = SPENTA/.test(NATALE));
   assert.ok(/if \(--luciSpente\[c\] <= 0\) delete luciSpente\[c\]/.test(NATALE), "dopo un po' si riaccendono");
 });
+
+test("natale.js: la slitta lancia i regali, che cadono, si posano e, aperti, svaniscono", () => {
+  const f = nataleFinto({ classiIniziali: ["natale"] });
+  f.avanza(2);
+  const prima = f.n.stato().regali.length;
+  f.n.slitta();
+  let visti = 0;
+  for (let i = 0; i < 2600; i++) { f.avanza(1); visti = Math.max(visti, f.n.stato().cadenti); }
+  const st = f.n.stato(), caduti = st.regali.filter((g) => g.caduto);
+  assert.ok(visti >= 1, "qualche regalo in volo");
+  assert.strictEqual(st.cadenti, 0, "tutti a terra");
+  assert.ok(caduti.length >= 2 && caduti.length <= 6, "posati sul fondo: " + caduti.length);
+  assert.strictEqual(st.regali.length, prima + caduti.length);
+  caduti.forEach((g) => assert.ok(Math.abs(g.y - (st.pavimento - 10)) < 12, "a terra"));
+  const i = st.regali.findIndex((g) => g.caduto);
+  f.n.apri(i);
+  f.avanza(200);
+  assert.strictEqual(f.n.stato().regali.length, st.regali.length - 1, "aperto, se ne va");
+});
